@@ -1,0 +1,19 @@
+node_modules/
+dist/
+
+# Env files — never commit secrets. .env.example is allowed to be tracked
+# but it must contain placeholders only (e.g. `BREVO_API_KEY=xkeysib-...`),
+# never real keys. The negation rule below makes that explicit.
+.env
+.env.*
+!.env.example
+
+.env.local
+.DS_Store
+*.log
+.vite/
+.claude/
+
+# PM2 + Node 22 build artifacts
+.pm2/
+*.tsbuildinfo

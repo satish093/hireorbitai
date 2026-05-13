@@ -1,0 +1,357 @@
+import { z } from 'zod';
+import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
+import { anthropic, ANTHROPIC_MODEL } from '../config/anthropic';
+
+const ResumeScoreSchema = z.object({
+  score: z.number(),
+  strengths: z.array(z.string()),
+  weaknesses: z.array(z.string()),
+  suggestions: z.array(z.string()),
+});
+type ResumeScoreResult = z.infer<typeof ResumeScoreSchema>;
+
+const AtsScoreSchema = z.object({
+  score: z.number(),
+  matched_keywords: z.array(z.string()),
+  missing_keywords: z.array(z.string()),
+  summary: z.string(),
+});
+type AtsScoreResult = z.infer<typeof AtsScoreSchema>;
+
+const VendorEmailSchema = z.object({
+  subject: z.string(),
+  body: z.string(),
+});
+
+const JobMatchListSchema = z.object({
+  matches: z.array(
+    z.object({
+      job_id: z.string(),
+      match_score: z.number(),
+      reasons: z.array(z.string()),
+    })
+  ),
+});
+export type JobMatchResult = z.infer<typeof JobMatchListSchema>['matches'][number];
+
+export async function scoreResume(resumeText: string): Promise<ResumeScoreResult> {
+  const prompt = `You are an expert technical recruiter. Score the following resume on a 0-100 scale based on clarity, impact, quantification, skill depth, and ATS-friendliness.\n\nResume:\n${resumeText}`;
+
+  const response = await anthropic.messages.parse({
+    model: ANTHROPIC_MODEL,
+    max_tokens: 4096,
+    messages: [{ role: 'user', content: prompt }],
+    output_config: { format: zodOutputFormat(ResumeScoreSchema) },
+  });
+  return response.parsed_output!;
+}
+
+export async function atsScore(resumeText: string, jobDescription: string): Promise<AtsScoreResult> {
+  const prompt = `Compare the resume below against the job description and produce an ATS match score 0-100. Identify matched keywords, missing keywords, and a 1-2 sentence summary.\n\n=== RESUME ===\n${resumeText}\n\n=== JOB DESCRIPTION ===\n${jobDescription}`;
+
+  const response = await anthropic.messages.parse({
+    model: ANTHROPIC_MODEL,
+    max_tokens: 4096,
+    messages: [{ role: 'user', content: prompt }],
+    output_config: { format: zodOutputFormat(AtsScoreSchema) },
+  });
+  return response.parsed_output!;
+}
+
+interface VendorEmailInput {
+  consultantName: string;
+  consultantSkills: string[];
+  consultantExperienceYears: number;
+  jobTitle: string;
+  jobDescription?: string;
+  vendorName?: string;
+  recruiterName: string;
+}
+
+export async function generateVendorSubmissionEmail(input: VendorEmailInput): Promise<{ subject: string; body: string }> {
+  const prompt = `Write a concise, professional vendor submission email from a recruiter introducing a consultant for a role. Friendly, confident tone, no emojis, no fluff.\n\nDetails:\n- Recruiter: ${input.recruiterName}\n- Vendor: ${input.vendorName ?? 'Hiring Manager'}\n- Consultant: ${input.consultantName} (${input.consultantExperienceYears} yrs)\n- Skills: ${input.consultantSkills.join(', ')}\n- Job: ${input.jobTitle}\n- JD: ${input.jobDescription ?? '(not provided)'}\n`;
+
+  const response = await anthropic.messages.parse({
+    model: ANTHROPIC_MODEL,
+    max_tokens: 2048,
+    messages: [{ role: 'user', content: prompt }],
+    output_config: { format: zodOutputFormat(VendorEmailSchema) },
+  });
+  return response.parsed_output!;
+}
+
+/**
+ * Jobright-shape structured requirement extract. Same keys their UI uses, so
+ * the frontend renders consistently regardless of which API the job came from.
+ */
+const JobRequirementsSchema = z.object({
+  // Hard match signals
+  must_haves: z.array(z.string()),                  // pure skill / tech names
+  nice_to_haves: z.array(z.string()),
+  required_skills: z.array(z.string()),             // de-duped, normalized skill list for matching
+  min_years_of_experience: z.number().nullable(),
+  job_seniority: z.string().nullable(),             // "Entry" | "Mid" | "Senior" | "Lead/Staff" | "Principal" | "Manager" | "Director"
+  work_model: z.string().nullable(),                // "Remote" | "Hybrid" | "Onsite" | null
+  work_authorization: z.array(z.string()),
+  location_requirements: z.string().nullable(),
+
+  // Human-readable bullets
+  core_responsibilities: z.array(z.string()),       // 4-8 bullets
+  skill_summaries: z.array(z.string()),             // paraphrased required-skill bullets
+  benefits_summaries: z.array(z.string()),
+  education_summaries: z.array(z.string()),
+
+  // Display chips
+  highlights: z.array(z.string()),                  // 3-5 candidate-facing positives
+  recommendation_tags: z.array(z.string()),         // ["H1B Sponsor Likely", "No Sponsorship", "Security Clearance", ...]
+});
+export type JobRequirements = z.infer<typeof JobRequirementsSchema>;
+
+/**
+ * Extract structured requirements from a job description. Designed to match
+ * the shape used in the Jobright UI so the frontend renders identically.
+ */
+export async function extractJobRequirements(input: {
+  title: string;
+  description?: string | null;
+  required_skills?: string[] | null;
+  location?: string | null;
+}): Promise<JobRequirements> {
+  const prompt = `You are reading a real job posting and producing structured fields used by a job-matching UI. Identify ONLY what's explicitly stated or strongly implied — never invent. Use empty arrays / null when not stated.
+
+Job title: ${input.title}
+Existing skill tags (from feed): ${(input.required_skills ?? []).join(', ') || '(none)'}
+Location: ${input.location ?? '(not provided)'}
+
+Description:
+${input.description ?? '(no description provided)'}
+
+Produce:
+- must_haves: hard requirements (specific technologies, certifications, degrees) — short phrases
+- nice_to_haves: preferred but not required
+- required_skills: clean, normalized skill names suitable for matching against a resume (e.g. "Java 8+", "Spring Boot", "React", "PostgreSQL"). 5-15 items max.
+- min_years_of_experience: integer minimum years of experience, or null
+- job_seniority: one of "Entry", "Mid", "Senior", "Lead/Staff", "Principal", "Manager", "Director", or null
+- work_model: "Remote", "Hybrid", "Onsite", or null
+- work_authorization: ["H1B Sponsor Likely", "No Sponsorship", "US Citizen", "Green Card", "Security Clearance", "Public Trust"]
+- location_requirements: short string like "Hybrid - SF (3 days/week)" or null
+- core_responsibilities: 4-8 short bullets describing what the role does
+- skill_summaries: paraphrased required-skill bullets (e.g. "9+ years building Java microservices on Spring Boot")
+- benefits_summaries: bullets — comp, equity, healthcare, PTO, remote allowance — only if mentioned
+- education_summaries: e.g. "Bachelor's in CS or equivalent experience"
+- highlights: 3-5 short positives a candidate would care about (e.g. "Backed by Sequoia", "Fully remote", "Strong equity")
+- recommendation_tags: short chips for visa / clearance signals. Use "H1B Sponsor Likely" if the posting permits H-1B; "No Sponsorship" if explicitly excluded; "Security Clearance" if required; "Public Trust"; "Remote Friendly"; "Career Pivot Friendly"`;
+
+  const response = await anthropic.messages.parse({
+    model: ANTHROPIC_MODEL,
+    max_tokens: 3072,
+    messages: [{ role: 'user', content: prompt }],
+    output_config: { format: zodOutputFormat(JobRequirementsSchema) },
+  });
+  return response.parsed_output!;
+}
+
+/**
+ * Per-skill match scoring against a consultant's resume.
+ *
+ * Returns 0..1 per skill, like Jobright's skillMatchingScores. Used in the
+ * card's right-side match panel.
+ */
+const SkillMatchSchema = z.object({
+  per_skill: z.array(z.object({
+    skill: z.string(),
+    score: z.number(),                              // 0..1
+    evidence: z.string().nullable(),                // short sentence from the resume that supports the score
+  })),
+  overall_score: z.number(),                        // 0..100
+  rank_desc: z.string(),                            // "Strong Match" / "Good Match" / "Fair Match" / "Weak Match"
+  feature_scores: z.object({
+    seniority_match: z.number(),                    // 0..1
+    skill_match: z.number(),
+    industry_match: z.number(),
+  }),
+  rationale: z.array(z.string()),                   // 2-3 sentences explaining the score
+});
+export type SkillMatchResult = z.infer<typeof SkillMatchSchema>;
+
+export async function scoreResumeAgainstJob(input: {
+  resumeText: string;
+  job: {
+    title: string;
+    description?: string | null;
+    required_skills?: string[] | null;
+    min_years_of_experience?: number | null;
+    job_seniority?: string | null;
+  };
+}): Promise<SkillMatchResult> {
+  const skills = input.job.required_skills ?? [];
+  const prompt = `Score this resume against the job. Output one score 0..1 per required skill and an overall 0..100.
+
+Resume:
+${input.resumeText}
+
+Job: ${input.job.title}
+Seniority: ${input.job.job_seniority ?? 'unspecified'}
+Min years experience: ${input.job.min_years_of_experience ?? 'unspecified'}
+Required skills: ${skills.join(', ')}
+
+JD:
+${input.job.description ?? '(none)'}
+
+Rules:
+- per_skill: one entry per required skill above. score 1.0 = strong evidence; 0.5 = mentioned/adjacent; 0.0 = absent.
+- evidence: a one-line quote/paraphrase from the resume justifying the score (null if 0).
+- feature_scores.seniority_match: 1 if resume's years >= job min; scale down otherwise.
+- feature_scores.skill_match: average of per-skill scores.
+- feature_scores.industry_match: 1 if domain matches; 0.5 if adjacent; 0 if unrelated.
+- overall_score: weighted blend (skill 60%, seniority 25%, industry 15%) on a 0..100 scale.
+- rank_desc: "Strong Match" >=85, "Good Match" 70-84, "Fair Match" 50-69, "Weak Match" <50.
+- rationale: 2-3 short sentences explaining the score from the candidate's perspective.`;
+
+  const response = await anthropic.messages.parse({
+    model: ANTHROPIC_MODEL,
+    max_tokens: 2048,
+    messages: [{ role: 'user', content: prompt }],
+    output_config: { format: zodOutputFormat(SkillMatchSchema) },
+  });
+  return response.parsed_output!;
+}
+
+// ---------------------------------------------------------------------------
+// Resume tailoring — Jobright's "Fix My Resume" flow
+//
+// Takes the consultant's current resume text, the job's description + extracted
+// requirements, an opt-in list of sections to rewrite, and a curated list of
+// missing keywords to weave in. Returns the rewritten resume body plus a diff
+// summary the recruiter can review side-by-side with the original.
+// ---------------------------------------------------------------------------
+const TailoredResumeSchema = z.object({
+  tailored_resume_markdown: z.string(),     // full rewritten resume in markdown
+  changes_summary: z.array(z.string()),     // 3-8 bullets describing what changed
+  keywords_added: z.array(z.string()),      // keywords actually woven in
+  sections_modified: z.array(z.string()),   // which named sections changed
+  estimated_match_score: z.number(),        // 0..100 — the model's own pre-score
+});
+export type TailoredResumeResult = z.infer<typeof TailoredResumeSchema>;
+
+export async function tailorResumeForJob(input: {
+  resumeText: string;
+  job: {
+    title: string;
+    company?: string | null;
+    description?: string | null;
+    required_skills?: string[] | null;
+    must_haves?: string[] | null;
+  };
+  sections: string[];           // ["Summary", "Skills", "Work Experience", ...]
+  keywords: string[];           // recruiter-chosen missing keywords to inject
+  /** "polish" (default) or "aggressive" — the iterative refinement loop
+   *  passes 'aggressive' when the first attempt scored below the target. */
+  mode?: 'polish' | 'aggressive';
+}): Promise<TailoredResumeResult> {
+  const sectionList = input.sections.length > 0 ? input.sections.join(', ') : 'all sections that need work';
+  const keywordList = input.keywords.length > 0 ? input.keywords.join(', ') : '(let the model infer from the JD)';
+  const skills = (input.job.required_skills ?? []).join(', ');
+  const musts = (input.job.must_haves ?? []).join(', ');
+  const mode = input.mode ?? 'polish';
+
+  const prompt = `You are a senior recruiter and ATS-optimization expert. Rewrite the candidate's resume so it scores 85% or higher against the job below. Resumes scoring under 80% routinely get filtered out by ATS before a human reviews them — your goal is to push the score over 85%.
+
+== JOB ==
+Title: ${input.job.title}
+Company: ${input.job.company ?? '(not specified)'}
+Required skills: ${skills || '(see JD)'}
+Must-haves: ${musts || '(see JD)'}
+
+JD:
+${input.job.description ?? '(none)'}
+
+== ORIGINAL RESUME ==
+${input.resumeText}
+
+== TARGETING ==
+Sections you may rewrite: ${sectionList}.
+Keywords to weave in (only where truthful given the resume's existing evidence): ${keywordList}.
+
+== RULES ==
+1. **Truthfulness is non-negotiable.** Never invent employers, titles, dates, degrees, or credentials. Do NOT add a skill the resume gives no evidence of. If the resume says "5 years Java", do not bump it to 8. If "Spring Boot" appears anywhere — including projects — you may surface it more prominently and add it to the Skills section.
+2. **Mirror the JD's exact phrasing** when the resume already supports it. ATS systems do literal keyword matching — "Spring Boot" and "Spring Framework" score differently. Use the JD's tokens verbatim.
+3. **Rewrite bullets for impact + keyword density.** Replace passive bullets ("Worked on backend services") with action verb + quantified outcome + JD keywords ("Led 4-engineer team building Spring Boot microservices on AWS, cutting p99 latency from 850ms to 240ms"). Aim for 2 JD keywords per bullet on average.
+4. **Surface the strongest evidence first.** If the JD asks for "8+ years Java + Kafka" and one of the roles has both, lead with that role.
+5. **Skills section must include EVERY required skill that has any resume evidence.** Group them ("Backend: Java, Spring Boot, Kafka, RabbitMQ" / "Cloud: AWS, GCP, Docker, Kubernetes") so ATS picks each one up.
+6. **Summary: rewrite as a 3-4 line value pitch** that name-drops the role title, total years, the top 5 JD keywords with resume evidence, and a quantified achievement. ATS systems heavily weight the top ~200 words.
+${mode === 'aggressive'
+  ? `7. **AGGRESSIVE MODE (retry — previous pass scored below target):** Be more assertive: re-surface evidence buried in older roles, expand abbreviations to their full keyword form ("k8s" → "Kubernetes (k8s)"), and tighten every bullet that doesn't name at least one JD keyword. Maximum keyword density while still being truthful.`
+  : ''}
+
+== OUTPUT ==
+- tailored_resume_markdown: FULL rewritten resume in clean markdown. Use \`##\` for section headings (Summary, Skills, Experience, Projects, Certifications, Education). Use \`-\` for bullets. Do NOT add prose outside the resume body.
+- changes_summary: 4–8 concrete bullets ("Added Spring Boot + Spring MVC to Skills line", "Rewrote Lead Engineer @ Acme bullet to lead with Java + Kafka + AWS", "Quantified p99 latency improvement in Stripe role").
+- keywords_added: keywords actually woven into the final resume (verbatim).
+- sections_modified: section heading names you touched.
+- estimated_match_score: honest 0–100 estimate. Be conservative — if fewer than 3 required skills had truthful evidence to surface, score under 75 even if the writing improved.`;
+
+  const response = await anthropic.messages.parse({
+    model: ANTHROPIC_MODEL,
+    max_tokens: 8192,
+    messages: [{ role: 'user', content: prompt }],
+    output_config: { format: zodOutputFormat(TailoredResumeSchema) },
+  });
+  return response.parsed_output!;
+}
+
+export async function matchJobsForConsultant(
+  consultantProfile: {
+    skills: string[];
+    experienceYears: number;
+    preferredLocations?: string[];
+    /** Plain-text resume excerpt — when present, the model uses it as the
+     *  primary matching signal (extracting actual tech/experience from it)
+     *  instead of relying on the skills keyword list alone. */
+    resume_excerpt?: string;
+  },
+  jobs: Array<{ id: string; title: string; required_skills?: string[]; location?: string; description?: string }>
+): Promise<JobMatchResult[]> {
+  if (jobs.length === 0) return [];
+
+  const hasResume = !!consultantProfile.resume_excerpt && consultantProfile.resume_excerpt.trim().length > 0;
+  const skillsBlock = consultantProfile.skills.length > 0
+    ? consultantProfile.skills.join(', ')
+    : '(none listed — derive skills from the resume below)';
+
+  const prompt = `You are ranking jobs for a specific consultant. Score each job on a 0-100 scale and produce a sorted list.
+
+== CONSULTANT ==
+Skills (recruiter-curated): ${skillsBlock}
+Years of experience: ${consultantProfile.experienceYears}
+Preferred locations: ${(consultantProfile.preferredLocations ?? []).join(', ') || '(any)'}
+${hasResume
+  ? `\n== RESUME (primary source of truth — extract actual technologies, frameworks, domains, and years from this) ==\n${consultantProfile.resume_excerpt}\n`
+  : '\n(No resume on file — use the curated skills list above as the primary signal.)\n'}
+== JOBS ==
+${JSON.stringify(jobs)}
+
+== INSTRUCTIONS ==
+For EACH job above, output a match entry with:
+- job_id: the job's id (verbatim)
+- match_score: 0-100 (integer or one decimal). Higher = stronger fit.
+  - 85+ = strong match: most required skills evidenced in resume / skills list, seniority fits.
+  - 70-84 = good match: majority of required skills present, seniority within ±1.
+  - 50-69 = fair match: some overlap, gaps in 2-4 required skills.
+  - <50  = weak match: ≤30% of required skills present or seniority mismatch.
+- reasons: 2-3 short bullets citing SPECIFIC evidence (e.g. "9 years Java + Spring Boot in resume", "Required AWS — resume mentions AWS at Acme", "JD asks for 8+ years; resume shows 11"). Be concrete, not generic.
+
+${hasResume
+  ? 'IMPORTANT: When scoring, trust the resume over the curated skills list. If the resume shows React but skills list does not, count React as present. Do not fabricate skills that are not in the resume.'
+  : 'IMPORTANT: With no resume, score conservatively — match strictly against the curated skill keywords.'}
+
+Return matches sorted by match_score descending. Include every job in the list (don't drop low matches).`;
+
+  const response = await anthropic.messages.parse({
+    model: ANTHROPIC_MODEL,
+    max_tokens: 8192,
+    messages: [{ role: 'user', content: prompt }],
+    output_config: { format: zodOutputFormat(JobMatchListSchema) },
+  });
+  return response.parsed_output!.matches;
+}
