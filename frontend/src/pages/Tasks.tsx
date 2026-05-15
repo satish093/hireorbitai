@@ -13,7 +13,9 @@ import { useAuth } from '../context/AuthContext';
 import {
   Task, TaskStatus, TaskPriority,
   TASK_STATUSES, TASK_PRIORITIES, TASK_STATUS_LABEL,
+  MANAGER_TIER, Role,
 } from '../types';
+import { invalidate, useInvalidationListener } from '../hooks/useInvalidate';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
 
@@ -41,7 +43,11 @@ const STATUS_DOT: Record<TaskStatus, string> = {
 
 export function Tasks() {
   const { profile } = useAuth();
-  const isManager = profile?.role === 'SUPER_ADMIN' || profile?.role === 'MANAGER';
+  // Use the shared MANAGER_TIER constant so DIRECTOR / CTO / CEO / HR_MANAGER
+  // / DEVELOPER also get the create button + assignee filter. The narrow
+  // `=== 'SUPER_ADMIN' || === 'MANAGER'` check used to lock those roles out
+  // even though the backend tasks.controller.ts allows the full tier.
+  const isManager = !!profile && (MANAGER_TIER as Role[]).includes(profile.role);
   const [params, setParams] = useSearchParams();
   const view: ViewMode = (params.get('view') as ViewMode) ?? 'board';
 
@@ -50,6 +56,11 @@ export function Tasks() {
   const [filters, setFilters] = useState<FilterState>({});
   const [createOpen, setCreateOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  // Bumped by the cross-page invalidation channel so a sibling page mutation
+  // (TaskDetail edit, TasksAssignedToMe complete, etc.) refetches us without
+  // a hard reload.
+  const [reloadTick, setReloadTick] = useState(0);
+  useInvalidationListener('tasks', () => setReloadTick((n) => n + 1));
 
   function buildQuery(f: FilterState): Record<string, string> {
     const out: Record<string, string> = {};
@@ -84,7 +95,7 @@ export function Tasks() {
     const t = setTimeout(() => { load(controller.signal); }, filters.q ? 300 : 0);
     return () => { clearTimeout(t); controller.abort(); };
     // eslint-disable-next-line
-  }, [JSON.stringify(filters)]);
+  }, [JSON.stringify(filters), reloadTick]);
 
   useEffect(() => {
     if (!isManager) return;
@@ -107,8 +118,14 @@ export function Tasks() {
   async function quickStatusChange(taskId: string, newStatus: TaskStatus) {
     const prev = tasks;
     setTasks(tasks.map(t => t.id === taskId ? { ...t, status: newStatus } : t));
-    try { await api.patch(`/tasks/${taskId}/status`, { status: newStatus }); }
-    catch (e: any) { setTasks(prev); toast.error(e?.response?.data?.error ?? 'Status update failed'); }
+    try {
+      await api.patch(`/tasks/${taskId}/status`, { status: newStatus });
+      // Notify TaskDetail / TasksAssignedToMe / dashboard cards.
+      invalidate('tasks');
+    } catch (e: any) {
+      setTasks(prev);
+      toast.error(e?.response?.data?.error ?? 'Status update failed');
+    }
   }
 
   return (
@@ -439,6 +456,7 @@ function CreateTaskModal({
       if (!payload.tags?.length) delete payload.tags;
       await api.post('/tasks', payload);
       toast.success('Task created');
+      invalidate('tasks');
       onCreated();
     } catch (e: any) {
       toast.error(e?.response?.data?.error ?? 'Failed to create task');

@@ -6,6 +6,7 @@ import { Avatar } from '../components/TaskBits';
 import { ApplyInterceptModal, shouldShowApplyIntercept } from '../components/ApplyInterceptModal';
 import { CustomizeResumeWizard } from '../components/CustomizeResumeWizard';
 import { DuplicateSubmissionModal } from '../components/DuplicateSubmissionModal';
+import { invalidate } from '../hooks/useInvalidate';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
 
@@ -388,8 +389,12 @@ export function JobSearch() {
         source_url: p.job.apply_url,
       });
       toast.success('Application recorded');
-      // Refresh the Applied tab so the new row shows up.
-      if (tab === 'applied') load(tab);
+      // Always refresh the current tab — the recommended endpoint excludes
+      // already-applied jobs, so applying from Recommended should drop the
+      // job from the visible list, not just appear in Applied later.
+      load(tab);
+      // Notify Applications.tsx, ManagerDashboard, Reports.
+      invalidate('applications');
     } catch (e: any) {
       // Show the actual backend error message so we can fix the root cause
       // instead of a generic toast.
@@ -678,6 +683,7 @@ export function JobSearch() {
                 setRows((rs) => rs.map((r) => r.id === j.id ? { ...r, application_status: next } : r));
                 try {
                   await api.patch(`/applications/${appId}`, { status: next });
+                  invalidate('applications');
                 } catch (e: any) {
                   toast.error(e?.response?.data?.error ?? 'Failed to update status');
                   // Roll back by reloading.

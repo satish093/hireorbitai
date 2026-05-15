@@ -16,7 +16,13 @@ export type AuditAction =
   | 'account_unlocked'
   | 'admin_created_user'
   | 'admin_disabled_user'
-  | 'admin_role_changed';
+  | 'admin_role_changed'
+  | 'admin_user_status_changed'
+  | 'admin_user_password_reset'
+  | 'admin_user_deactivated'
+  | 'admin_user_reactivated'
+  | 'admin_user_deleted'
+  | 'admin_user_impersonated';
 
 interface AuditInput {
   action: AuditAction;

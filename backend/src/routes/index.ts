@@ -20,6 +20,7 @@ import { featureFlagsRouter } from './featureFlags.routes';
 import * as featureFlagsCtl from '../controllers/featureFlags.controller';
 import { userGroupsRouter } from './userGroups.routes';
 import { usersRouter } from './users.routes';
+import { adminUsersRouter } from './adminUsers.routes';
 import { glassdoorRouter } from './glassdoor.routes';
 
 export const router = Router();
@@ -62,4 +63,5 @@ router.use('/messages', messagesRouter);
 router.use('/feature-flags', featureFlagsRouter);
 router.use('/user-groups', userGroupsRouter);
 router.use('/users', usersRouter);
+router.use('/admin/users', adminUsersRouter);
 router.use('/glassdoor', glassdoorRouter);

@@ -9,9 +9,22 @@ import toast from 'react-hot-toast';
 
 interface CalEvent { id: string; title: string; when: string; kind: 'interview' | 'reminder'; status: string; }
 
+/**
+ * Day grid for the current month, plus a detail list below for the SELECTED
+ * day (defaults to today). The page header advertises "Click a date to
+ * filter" — clicking a cell selects that day, the detail list follows.
+ *
+ * State:
+ *   - month         which month is rendered in the grid
+ *   - selectedDate  which day is shown in the detail list (or null = today)
+ *   - selecting a day OUTSIDE the visible month also flips `month` so the
+ *     grid stays in sync with the selection
+ */
 export function Calendar() {
   const [events, setEvents] = useState<CalEvent[]>([]);
   const [month, setMonth] = useState(() => new Date());
+  // Null = "show today by default". A real Date pins to that day.
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -65,12 +78,38 @@ export function Calendar() {
   const cells: (Date | null)[] = [];
   for (let i = 0; i < leading; i++) cells.push(null);
   for (let d = 1; d <= end.getDate(); d++) cells.push(new Date(month.getFullYear(), month.getMonth(), d));
-  // Pad to a multiple of 7 so the grid lines stay regular.
   while (cells.length % 7 !== 0) cells.push(null);
 
   const today = new Date();
   const isToday = (d: Date) =>
     d.getDate() === today.getDate() && d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
+  const isSelected = (d: Date) =>
+    !!selectedDate &&
+    d.getDate() === selectedDate.getDate() &&
+    d.getMonth() === selectedDate.getMonth() &&
+    d.getFullYear() === selectedDate.getFullYear();
+
+  // The day whose events are listed in the detail panel below the grid.
+  // Defaults to today; user can click any cell to override.
+  const focusDate = selectedDate ?? today;
+  const focusEvents = byDay[focusDate.toDateString()] ?? [];
+  const customSelected = !!selectedDate && !isToday(selectedDate);
+
+  function selectDay(d: Date) {
+    // Clicking the already-selected day toggles back to "today" — gives a
+    // single-click way to clear the filter without hunting for a button.
+    if (isSelected(d)) {
+      setSelectedDate(null);
+      return;
+    }
+    setSelectedDate(d);
+    // If the clicked day is in another month (e.g. user navigated then
+    // clicked a date that landed before/after the visible month), flip the
+    // grid to match. With our current cells layout this is mostly defensive.
+    if (d.getMonth() !== month.getMonth() || d.getFullYear() !== month.getFullYear()) {
+      setMonth(new Date(d.getFullYear(), d.getMonth(), 1));
+    }
+  }
 
   const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -78,7 +117,7 @@ export function Calendar() {
     <Layout title="Calendar">
       <PageHeader
         title="Calendar"
-        description="Interviews and reminders across the month. Click a date to filter."
+        description="Interviews and reminders across the month. Click a date to filter the list below."
         action={
           <div className="inline-flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-1 shadow-sm">
             <button
@@ -95,7 +134,11 @@ export function Calendar() {
               aria-label="Next month"
             >›</button>
             <span className="w-px h-5 bg-slate-200 mx-1" />
-            <Button size="sm" variant="ghost" onClick={() => setMonth(new Date())}>Today</Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => { setMonth(new Date()); setSelectedDate(null); }}
+            >Today</Button>
           </div>
         }
       />
@@ -107,62 +150,110 @@ export function Calendar() {
           ))}
         </div>
         <div className="grid grid-cols-7">
-          {cells.map((d, idx) => (
-            <div
-              key={d ? d.toISOString() : `blank-${idx}`}
-              className={clsx(
-                'min-h-[110px] border-r border-b border-slate-100 p-2',
-                (idx + 1) % 7 === 0 && 'border-r-0',
-                idx >= cells.length - 7 && 'border-b-0',
-                !d && 'bg-slate-50/40',
-              )}
-            >
-              {d && (
-                <>
-                  <div className={clsx(
-                    'text-xs font-semibold mb-1.5 inline-flex items-center justify-center w-6 h-6 rounded-full',
-                    isToday(d) ? 'bg-slate-900 text-white' : 'text-slate-700',
-                  )}>
-                    {d.getDate()}
-                  </div>
-                  {!loading && (byDay[d.toDateString()] ?? []).slice(0, 3).map((e, ei) => (
-                    <div
-                      key={e.id}
-                      style={{ animationDelay: `${ei * 30}ms` }}
-                      className={clsx(
-                        'mb-1 rounded-md px-1.5 py-0.5 border text-[11px] leading-tight cursor-pointer animate-fade-in-up transition hover:scale-[1.02] hover:shadow-sm',
-                        e.kind === 'interview' ? 'bg-indigo-50 border-indigo-100 text-indigo-800 hover:bg-indigo-100' : 'bg-amber-50 border-amber-100 text-amber-800 hover:bg-amber-100',
-                      )}
-                      title={`${new Date(e.when).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} — ${e.title}`}
-                    >
-                      <span className="font-medium">{new Date(e.when).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>{' '}
-                      <span className="truncate">{e.title}</span>
-                    </div>
-                  ))}
-                  {(byDay[d.toDateString()]?.length ?? 0) > 3 && (
-                    <div className="text-[10px] text-slate-500 mt-0.5">
-                      +{(byDay[d.toDateString()] ?? []).length - 3} more
-                    </div>
+          {cells.map((d, idx) => {
+            if (!d) {
+              return (
+                <div
+                  key={`blank-${idx}`}
+                  className={clsx(
+                    'min-h-[110px] border-r border-b border-slate-100 p-2 bg-slate-50/40',
+                    (idx + 1) % 7 === 0 && 'border-r-0',
+                    idx >= cells.length - 7 && 'border-b-0',
                   )}
-                </>
-              )}
-            </div>
-          ))}
+                />
+              );
+            }
+            const dayEvents = byDay[d.toDateString()] ?? [];
+            const sel = isSelected(d);
+            const today_ = isToday(d);
+            return (
+              <button
+                key={d.toISOString()}
+                type="button"
+                onClick={() => selectDay(d)}
+                aria-pressed={sel}
+                aria-label={`${d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}${dayEvents.length ? ` — ${dayEvents.length} event${dayEvents.length === 1 ? '' : 's'}` : ''}`}
+                className={clsx(
+                  'min-h-[110px] border-r border-b border-slate-100 p-2 text-left transition',
+                  'cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40',
+                  (idx + 1) % 7 === 0 && 'border-r-0',
+                  idx >= cells.length - 7 && 'border-b-0',
+                  sel
+                    ? 'bg-brand-50 ring-1 ring-inset ring-brand-300'
+                    : 'hover:bg-slate-50',
+                )}
+              >
+                <div className={clsx(
+                  'text-xs font-semibold mb-1.5 inline-flex items-center justify-center w-6 h-6 rounded-full',
+                  today_ ? 'bg-slate-900 text-white' :
+                  sel    ? 'bg-brand-600 text-white'
+                         : 'text-slate-700',
+                )}>
+                  {d.getDate()}
+                </div>
+                {!loading && dayEvents.slice(0, 3).map((e, ei) => (
+                  <div
+                    key={e.id}
+                    style={{ animationDelay: `${ei * 30}ms` }}
+                    className={clsx(
+                      'mb-1 rounded-md px-1.5 py-0.5 border text-[11px] leading-tight animate-fade-in-up transition',
+                      e.kind === 'interview' ? 'bg-indigo-50 border-indigo-100 text-indigo-800' : 'bg-amber-50 border-amber-100 text-amber-800',
+                    )}
+                    title={`${new Date(e.when).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} — ${e.title}`}
+                  >
+                    <span className="font-medium">{new Date(e.when).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>{' '}
+                    <span className="truncate">{e.title}</span>
+                  </div>
+                ))}
+                {dayEvents.length > 3 && (
+                  <div className="text-[10px] text-slate-500 mt-0.5">
+                    +{dayEvents.length - 3} more
+                  </div>
+                )}
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {/* Today list */}
+      {/* Detail list — defaults to today, follows the user's day selection. */}
       <div className="mt-5">
-        <h2 className="text-sm font-semibold text-slate-900 mb-2">Today</h2>
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-sm font-semibold text-slate-900">
+            {customSelected
+              ? focusDate.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })
+              : 'Today'}
+            <span className="ml-2 text-xs font-normal text-slate-500">
+              {focusEvents.length} event{focusEvents.length === 1 ? '' : 's'}
+            </span>
+          </h2>
+          {customSelected && (
+            <button
+              type="button"
+              onClick={() => setSelectedDate(null)}
+              className="text-xs text-slate-500 hover:text-slate-900 underline-offset-2 hover:underline"
+            >
+              Clear ✕
+            </button>
+          )}
+        </div>
         <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100">
-          {(byDay[today.toDateString()] ?? []).length === 0 ? (
-            <div className="px-4 py-6 text-sm text-slate-400 italic text-center">Nothing scheduled today.</div>
-          ) : (byDay[today.toDateString()] ?? []).map((e) => (
+          {focusEvents.length === 0 ? (
+            <div className="px-4 py-6 text-sm text-slate-400 italic text-center">
+              {customSelected ? 'Nothing scheduled this day.' : 'Nothing scheduled today.'}
+            </div>
+          ) : focusEvents.map((e) => (
             <div key={e.id} className="px-4 py-3 flex items-center gap-3">
               <div className="w-16 text-xs font-mono text-slate-500">
                 {new Date(e.when).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
               </div>
               <div className="flex-1 min-w-0 text-sm text-slate-800 truncate">{e.title}</div>
+              <span className={clsx(
+                'text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded',
+                e.kind === 'interview' ? 'bg-indigo-50 text-indigo-700' : 'bg-amber-50 text-amber-700',
+              )}>
+                {e.kind}
+              </span>
               <StatusBadge status={e.status} />
             </div>
           ))}

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import clsx from 'clsx';
 import { useAuth } from '../context/AuthContext';
-import { Role, ROLE_LABEL, OPERATOR_TIER, MANAGER_TIER, ALL_ROLES, OWNER_TIER } from '../types';
+import { Role, ROLE_LABEL, OPERATOR_TIER, MANAGER_TIER, ALL_ROLES, OWNER_TIER, ADMIN_TIER } from '../types';
 import { api } from '../services/api';
 import { useFeatureFlags } from '../hooks/useFeatureFlags';
 import { Brand } from './Brand';
@@ -10,7 +10,7 @@ import {
   IconHome, IconTasks, IconCalendar, IconInbox, IconReminder,
   IconUsers, IconUser, IconBriefcase, IconFileText, IconVideo, IconFile,
   IconBuilding, IconBuilding2, IconBarChart, IconSparkles, IconMailPlus,
-  IconUsersCog, IconToggle, IconLogOut,
+  IconUsersCog, IconToggle, IconUserX, IconLogOut,
 } from './Icons';
 import type { ComponentType, SVGProps } from 'react';
 
@@ -63,10 +63,12 @@ const sections: Section[] = [
   {
     heading: 'Admin',
     items: [
+      { to: '/admin/users', label: 'All users', icon: IconUsers, roles: ADMIN_TIER },
       { to: '/reports', label: 'Reports', icon: IconBarChart, roles: MANAGER_TIER, flagKey: 'reports' },
       { to: '/ai-email', label: 'AI Email', icon: IconSparkles, roles: OPERATOR_TIER, flagKey: 'ai_email' },
       { to: '/invitations', label: 'Invitations', icon: IconMailPlus, roles: MANAGER_TIER },
       { to: '/admin/groups', label: 'User groups', icon: IconUsersCog, roles: MANAGER_TIER },
+      { to: '/admin/deactivated', label: 'Deactivated accounts', icon: IconUserX, roles: ADMIN_TIER },
       { to: '/admin/features', label: 'Feature flags', icon: IconToggle, roles: OWNER_TIER },
     ],
   },
@@ -90,6 +92,10 @@ export function Sidebar() {
     if (!profile) return;
     let cancelled = false;
     const tick = async () => {
+      // Pause polling when the tab isn't visible — most "background" updates
+      // can wait until the user comes back, and this halves the request load
+      // for users with many open tabs.
+      if (typeof document !== 'undefined' && document.hidden) return;
       const [t, r, u] = await Promise.all([
         api.get('/tasks/assigned-to-me').catch(() => ({ data: [] })),
         api.get('/reminders', { params: { status: 'PENDING' } }).catch(() => ({ data: [] })),
@@ -103,7 +109,9 @@ export function Sidebar() {
       });
     };
     tick();
-    const i = setInterval(tick, 15000);
+    // 60s cadence — was 15s, which produced ~720 requests/15min/user from
+    // this single hook and tripped the global rate limiter.
+    const i = setInterval(tick, 60_000);
     return () => { cancelled = true; clearInterval(i); };
   }, [profile?.id]);
 

@@ -11,14 +11,18 @@ import { useAuth } from '../context/AuthContext';
 import {
   Task, TaskComment, TaskAttachment,
   TASK_STATUSES, TASK_PRIORITIES, TASK_STATUS_LABEL, TaskStatus, TaskPriority,
+  MANAGER_TIER, Role,
 } from '../types';
+import { invalidate } from '../hooks/useInvalidate';
 import toast from 'react-hot-toast';
 
 export function TaskDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { profile } = useAuth();
-  const isManager = profile?.role === 'SUPER_ADMIN' || profile?.role === 'MANAGER';
+  // Use the shared MANAGER_TIER tier so DIRECTOR / CTO / CEO / HR_MANAGER /
+  // DEVELOPER can edit tasks too — backend tasks.controller.ts allows them.
+  const isManager = !!profile && (MANAGER_TIER as Role[]).includes(profile.role);
 
   const [task, setTask] = useState<Task | null>(null);
   const [comments, setComments] = useState<TaskComment[]>([]);
@@ -55,6 +59,8 @@ export function TaskDetail() {
     try {
       const r = await api.patch(`/tasks/${id}`, payload);
       setTask(r.data);
+      // Notify Tasks board / TasksAssignedToMe / dashboard cards.
+      invalidate('tasks');
     } catch (e: any) {
       toast.error(e?.response?.data?.error ?? 'Update failed');
     }
@@ -64,6 +70,7 @@ export function TaskDetail() {
     try {
       const r = await api.patch(`/tasks/${id}/status`, { status });
       setTask(r.data);
+      invalidate('tasks');
     } catch (e: any) {
       toast.error(e?.response?.data?.error ?? 'Status update failed');
     }
@@ -114,7 +121,9 @@ export function TaskDetail() {
     if (!confirm('Delete this task permanently?')) return;
     try {
       await api.delete(`/tasks/${id}`);
-      toast.success('Task deleted'); navigate('/tasks');
+      toast.success('Task deleted');
+      invalidate('tasks');
+      navigate('/tasks');
     } catch (e: any) { toast.error(e?.response?.data?.error ?? 'Delete failed'); }
   }
 
@@ -372,9 +381,18 @@ export function TaskDetail() {
                   <div className="text-xs text-slate-500">Consultant</div>
                 </div>
               </div>
-              <div className="mt-3">
-                <Link to="/consultants" className="text-xs text-brand-700 hover:underline">Open consultant profile →</Link>
-              </div>
+              {/* The /consultants list is OPERATOR_TIER-only; a viewer who's
+                  themselves a consultant would land on /unauthorized. The
+                  /users/:id profile route is open server-side, so route there
+                  when we know the underlying user id. */}
+              {profile?.role !== 'CONSULTANT' && (task.consultant as any)?.user?.id && (
+                <div className="mt-3">
+                  <Link
+                    to={`/users/${(task.consultant as any).user.id}`}
+                    className="text-xs text-brand-700 hover:underline"
+                  >Open consultant profile →</Link>
+                </div>
+              )}
             </div>
           )}
 

@@ -8,6 +8,7 @@ import { SelectInput } from '../components/SelectInput';
 import { PageHeader } from '../components/PageHeader';
 import { Button } from '../components/Button';
 import { api } from '../services/api';
+import { invalidate, useInvalidationListener } from '../hooks/useInvalidate';
 import toast from 'react-hot-toast';
 
 const EMPTY = { consultant_id: '', job_id: '', vendor_id: '', notes: '' };
@@ -38,6 +39,10 @@ export function Applications() {
     return () => { cancelled = true; };
   }, []);
 
+  // Refetch when a sibling page (JobSearch's "I applied" flow, etc.)
+  // mutates the applications dataset.
+  useInvalidationListener('applications', () => load());
+
   async function submit() {
     if (submitting) return;
     if (!form.consultant_id || !form.job_id) {
@@ -59,6 +64,8 @@ export function Applications() {
       setOpen(false);
       setForm(EMPTY);
       load();
+      // Notify JobSearch (Applied tab), dashboards, Reports.
+      invalidate('applications');
     } catch (e: any) {
       toast.error(e?.response?.data?.error ?? 'Failed');
     } finally {

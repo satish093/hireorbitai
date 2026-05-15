@@ -7,6 +7,7 @@ import {
   PriorityBadge, TaskStatusBadge, DuePill, Avatar, TagPill, shortId, isOverdue,
 } from '../components/TaskBits';
 import { Task } from '../types';
+import { useInvalidationListener } from '../hooks/useInvalidate';
 import toast from 'react-hot-toast';
 
 const SECTION_ORDER = ['overdue', 'today', 'this_week', 'later', 'no_due'] as const;
@@ -64,11 +65,16 @@ export function TasksAssignedToMe() {
     }
   }
 
+  // Bumped by the cross-page invalidation channel so a status change made
+  // from Tasks board / TaskDetail / dashboard refetches us automatically.
+  const [reloadTick, setReloadTick] = useState(0);
+  useInvalidationListener('tasks', () => setReloadTick((n) => n + 1));
+
   useEffect(() => {
     const controller = new AbortController();
     load(controller.signal);
     return () => controller.abort();
-  }, []);
+  }, [reloadTick]);
 
   const buckets = useMemo(() => bucketize(tasks), [tasks]);
   const active = tasks.filter(t => t.status !== 'COMPLETED' && t.status !== 'CANCELLED');
@@ -106,14 +112,16 @@ export function TasksAssignedToMe() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button className="border border-slate-200 bg-white rounded-lg px-3 py-1.5 text-sm hover:bg-slate-50">
-            📅 Today: {new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-          </button>
-          {profile?.role === 'RECRUITER' && (
-            <Link to="/reports" className="bg-brand-600 text-white text-sm px-3 py-1.5 rounded-lg hover:bg-brand-700 inline-flex items-center gap-1.5">
-              <span>✦</span> Log daily activity
-            </Link>
-          )}
+          {/* Static date pill — purely informational, not a button. The
+              previous render used <button> with no onClick which looked
+              clickable but did nothing. */}
+          <span className="border border-slate-200 bg-white rounded-lg px-3 py-1.5 text-sm text-slate-700">
+            📅 Today · {new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+          </span>
+          {/* "Log daily activity" link removed — it pointed at /reports which
+              requires MANAGER_TIER and 403'd for every recruiter who clicked
+              it. When a recruiter-accessible activity-log route exists, wire
+              it back. */}
         </div>
       </div>
 
@@ -191,7 +199,10 @@ function RowCard({ task }: { task: Task }) {
       to={`/tasks/${task.id}`}
       className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 first:rounded-t-xl last:rounded-b-xl"
     >
-      <input type="checkbox" className="rounded border-slate-300" onClick={(e) => e.stopPropagation()} />
+      {/* The dead checkbox column was removed — no onChange, no state, no
+          backend wiring. When a "mark complete" inline-action is needed,
+          wire it to PATCH /tasks/:id/status with status=COMPLETED and add
+          invalidate('tasks'). */}
       <span className="text-[11px] font-mono text-slate-400 shrink-0">{shortId(task.id)}</span>
       <span className="flex-1 min-w-0">
         <div className="text-sm font-medium text-slate-900 truncate">{task.title}</div>

@@ -157,7 +157,21 @@ export function Recruiters() {
           candidates={candidates}
           existing={effectiveManagers(picked)}
           onClose={() => setPicked(null)}
-          onChanged={() => { load(); }}
+          onChanged={async () => {
+            // Refetch the recruiter list and re-pin `picked` to the
+            // refreshed row so the modal's "Current supervisors" panel
+            // reflects the just-applied change. Previously the modal kept
+            // showing the stale row until the user closed and reopened.
+            try {
+              const r = await api.get('/recruiters');
+              const fresh = (r.data ?? []) as RecruiterRow[];
+              setRows(fresh);
+              const refreshed = fresh.find((row) => row.id === picked.id);
+              if (refreshed) setPicked(refreshed);
+            } catch (e: any) {
+              toast.error(e?.response?.data?.error ?? 'Failed to refresh recruiters');
+            }
+          }}
         />
       )}
     </Layout>

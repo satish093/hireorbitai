@@ -64,16 +64,17 @@ export const requireAuth: RequestHandler = async (req, _res, next) => {
   const { data, error } = await supabaseAdmin.auth.getUser(token);
   if (error || !data.user) throw httpError(401, 'Invalid or expired token');
 
-  // Pull role + group_id + must_change_password. The `must_change_password`
-  // flag is critical: it gates every protected route until the user has
-  // rotated their temporary password. Fall back to a narrower select if the
-  // newer columns haven't been migrated yet.
+  // Pull role + group_id + must_change_password + status. `must_change_password`
+  // gates routes until the temp-password rotation; `status` blocks the user
+  // entirely if they've been deactivated/suspended/banned.
+  // Defensive fallback: older deployments might be missing the status column,
+  // so we narrow the select on schema-cache errors.
   let { data: profile, error: pErr } = await supabaseAdmin
     .from('users')
-    .select('id, email, role, group_id, must_change_password')
+    .select('id, email, role, group_id, must_change_password, status')
     .eq('id', data.user.id)
     .single();
-  if (pErr && /must_change_password|group_id/.test(pErr.message) && /schema cache|column/i.test(pErr.message)) {
+  if (pErr && /status|must_change_password|group_id/.test(pErr.message) && /schema cache|column/i.test(pErr.message)) {
     ({ data: profile, error: pErr } = await supabaseAdmin
       .from('users')
       .select('id, email, role')
@@ -81,6 +82,14 @@ export const requireAuth: RequestHandler = async (req, _res, next) => {
       .single());
   }
   if (pErr || !profile) throw httpError(403, 'User profile not found');
+
+  // Status gate. `active` = OK, anything else = refused. We surface a
+  // specific status string so the frontend can show "Your account is
+  // suspended" instead of a generic 403.
+  const status = (profile as any).status as string | undefined;
+  if (status && status !== 'active') {
+    throw httpError(403, `Account is ${status}`, { status });
+  }
 
   req.user = {
     id: profile.id, email: profile.email, role: profile.role as Role,

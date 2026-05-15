@@ -504,18 +504,36 @@ function DailyActivity() {
         }>
         <div className="space-y-3">
           <SelectInput label="Recruiter" placeholder="Select…"
+            value={form.recruiter_id ?? ''}
             options={recruiters.map((r) => ({ value: r.id, label: r.user?.full_name ?? r.user?.email ?? r.id }))}
             onChange={(e) => setForm({ ...form, recruiter_id: e.target.value })}
           />
           <FormInput label="Date" type="date" value={form.activity_date}
             onChange={(e) => setForm({ ...form, activity_date: e.target.value })} />
+          {/* Number inputs — passing `value` makes them controlled. The
+              previous uncontrolled form left a gap between visible-empty
+              and the actual numeric state, so submitting an "empty" field
+              would silently send 0 / NaN. Now what you see is what you
+              send. */}
           <div className="grid grid-cols-2 gap-3">
-            <FormInput label="Submissions" type="number" onChange={(e) => setForm({ ...form, submissions_count: Number(e.target.value) })} />
-            <FormInput label="Interviews scheduled" type="number" onChange={(e) => setForm({ ...form, interviews_scheduled: Number(e.target.value) })} />
-            <FormInput label="Interviews completed" type="number" onChange={(e) => setForm({ ...form, interviews_completed: Number(e.target.value) })} />
-            <FormInput label="Vendor calls" type="number" onChange={(e) => setForm({ ...form, vendor_calls: Number(e.target.value) })} />
-            <FormInput label="Offers" type="number" onChange={(e) => setForm({ ...form, offers: Number(e.target.value) })} />
-            <FormInput label="Placements" type="number" onChange={(e) => setForm({ ...form, placements: Number(e.target.value) })} />
+            <FormInput label="Submissions" type="number" min={0}
+              value={form.submissions_count ?? 0}
+              onChange={(e) => setForm({ ...form, submissions_count: e.target.value === '' ? 0 : Number(e.target.value) })} />
+            <FormInput label="Interviews scheduled" type="number" min={0}
+              value={form.interviews_scheduled ?? 0}
+              onChange={(e) => setForm({ ...form, interviews_scheduled: e.target.value === '' ? 0 : Number(e.target.value) })} />
+            <FormInput label="Interviews completed" type="number" min={0}
+              value={form.interviews_completed ?? 0}
+              onChange={(e) => setForm({ ...form, interviews_completed: e.target.value === '' ? 0 : Number(e.target.value) })} />
+            <FormInput label="Vendor calls" type="number" min={0}
+              value={form.vendor_calls ?? 0}
+              onChange={(e) => setForm({ ...form, vendor_calls: e.target.value === '' ? 0 : Number(e.target.value) })} />
+            <FormInput label="Offers" type="number" min={0}
+              value={form.offers ?? 0}
+              onChange={(e) => setForm({ ...form, offers: e.target.value === '' ? 0 : Number(e.target.value) })} />
+            <FormInput label="Placements" type="number" min={0}
+              value={form.placements ?? 0}
+              onChange={(e) => setForm({ ...form, placements: e.target.value === '' ? 0 : Number(e.target.value) })} />
           </div>
         </div>
       </Modal>

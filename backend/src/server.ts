@@ -86,25 +86,50 @@ app.use(
 );
 
 // --- Rate limiting ------------------------------------------------------------
-// Global limiter — generous, covers brute force / spray attacks. Stricter
-// auth-route limiter mounted below.
-// The default keyGenerator is IPv6-aware in v7+ and uses req.ip (which is
-// proxy-aware because we set `app.set('trust proxy', …)` above).
+// Global limiter — generous on purpose. The Sidebar polls 3 endpoints every
+// 15s (~720/15min/user) plus each page navigation fires several reads, so a
+// strict per-IP cap would 429 normal traffic on shared NAT / office networks.
+//
+// Strategy:
+//   - Key on the authenticated userId when present (req.user is set by the
+//     route-level requireAuth middlewares; for unauthed requests we fall back
+//     to the client IP). This means two users behind the same NAT don't share
+//     a bucket.
+//   - Skip /health and /ready so uptime monitors don't burn budget.
+//   - Public auth + invitation routes get their own much stricter limiter
+//     mounted below — those are the brute-force surface.
 const globalLimiter = rateLimit({
   windowMs: env.rateLimit.windowMs,
   max: env.rateLimit.max,
   standardHeaders: 'draft-7', // RateLimit-* headers
   legacyHeaders: false,
+  skip: (req) => req.path === '/health' || req.path === '/ready',
+  keyGenerator: (req) => {
+    // requireAuth sets req.user; before that we only have the IP.
+    const u = (req as unknown as { user?: { id?: string } }).user;
+    if (u?.id) return `u:${u.id}`;
+    return `ip:${req.ip ?? 'unknown'}`;
+  },
 });
 app.use(globalLimiter);
 
+// Stricter limiter on the brute-forceable surfaces. These are public routes
+// where one IP can guess many credentials. Per-IP keying is correct here —
+// we WANT to throttle a single attacker even across many candidate emails.
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 20, // 20 attempts per 15min per IP
   standardHeaders: 'draft-7',
   legacyHeaders: false,
 });
-app.use('/api/auth', authLimiter);
+app.use('/auth/login', authLimiter);
+app.use('/auth/forgot-password', authLimiter);
+app.use('/auth/reset-password', authLimiter);
+app.use('/invitations/setup', authLimiter);
+// Same routes under the /api alias for the legacy single-domain deployment.
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/forgot-password', authLimiter);
+app.use('/api/auth/reset-password', authLimiter);
 app.use('/api/invitations/setup', authLimiter);
 
 // --- Health + readiness -------------------------------------------------------

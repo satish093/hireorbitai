@@ -195,6 +195,42 @@ This password expires in ${expiry} hours. You will be asked to set a new passwor
   });
 }
 
+export async function sendInvitationLink(args: {
+  to: { email: string; name?: string };
+  role: string;
+  inviteUrl: string;
+  expiresInHours: number;
+  invitedByName?: string;
+}): Promise<void> {
+  const exp = args.expiresInHours;
+  const roleLabel = args.role.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+  const inviter = args.invitedByName ? escapeHtml(args.invitedByName) : 'A teammate';
+  const body = `
+    <p>Hi${args.to.name ? ` ${escapeHtml(args.to.name)}` : ''},</p>
+    <p>${inviter} invited you to join <strong>${escapeHtml(brand.productName)}</strong> as a <strong>${escapeHtml(roleLabel)}</strong>. Click the button below to set your password and finish creating your account.</p>
+    <p style="margin:0 0 4px 0;font-size:13px;color:${brand.mutedColor};">
+      This invitation expires in ${exp} hour${exp === 1 ? '' : 's'}. If it lapses, ask the person who invited you to send a new one.
+    </p>
+  `;
+  await sendViaBrevo({
+    to: args.to,
+    subject: `You're invited to join ${brand.productName}`,
+    html: shell({
+      preheader: `Set up your ${brand.productName} account — invitation expires in ${exp}h.`,
+      heading: `You're invited to ${brand.productName}`,
+      body,
+      cta: { label: 'Accept invitation', href: args.inviteUrl },
+      footerNote: `If the button doesn't work, paste this URL into your browser:<br/><span style="word-break:break-all;color:${brand.textColor};">${escapeHtml(args.inviteUrl)}</span>`,
+    }),
+    text:
+`${inviter.replace(/<[^>]+>/g, '')} invited you to join ${brand.productName} as a ${roleLabel}.
+Accept your invitation:
+${args.inviteUrl}
+This link expires in ${exp} hours.`,
+    tag: 'invitation',
+  });
+}
+
 export async function sendPasswordResetLink(args: {
   to: { email: string; name?: string };
   resetUrl: string;

@@ -30,16 +30,33 @@ export const me: RequestHandler = async (req, res) => {
 // ---------------------------------------------------------------------------
 // /sync — ensures a public.users row exists for the auth'd user. Used by the
 // frontend right after sign-in so we always have a profile to read /me from.
+//
+// Validates the user-supplied fields so a malicious client can't push
+// oversized strings or a `javascript:` avatar URL that would later render
+// in someone else's browser.
 // ---------------------------------------------------------------------------
+const syncSchema = z.object({
+  full_name: z.string().trim().max(120).optional(),
+  phone: z.string().trim().max(40).optional(),
+  // Only http(s) avatars — `javascript:` and `data:` get rejected at the schema layer.
+  avatar_url: z.string().trim().url().max(2048)
+    .refine((v) => /^https?:\/\//i.test(v), 'avatar_url must be http(s)')
+    .optional(),
+});
+
 export const syncProfile: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
-  const { full_name, phone, avatar_url } = req.body ?? {};
+  const parsed = syncSchema.safeParse(req.body ?? {});
+  if (!parsed.success) throw httpError(400, parsed.error.issues[0]?.message ?? 'Invalid input');
+  const patch: Record<string, unknown> = { id: req.user.id, email: req.user.email };
+  // Only include keys the caller actually supplied — undefined would otherwise
+  // overwrite an existing full_name set during invitation setup with null.
+  if (parsed.data.full_name !== undefined) patch.full_name = parsed.data.full_name;
+  if (parsed.data.phone !== undefined) patch.phone = parsed.data.phone;
+  if (parsed.data.avatar_url !== undefined) patch.avatar_url = parsed.data.avatar_url;
   const { data, error } = await supabaseAdmin
     .from('users')
-    .upsert(
-      { id: req.user.id, email: req.user.email, full_name, phone, avatar_url },
-      { onConflict: 'id' },
-    )
+    .upsert(patch, { onConflict: 'id' })
     .select()
     .single();
   if (error) throw httpError(500, error.message);
@@ -76,7 +93,10 @@ export const logout: RequestHandler = async (req, res) => {
 const changePwSchema = z.object({
   current_password: z.string().min(1).max(200),
   new_password: z.string().min(12).max(200),
-  confirm_password: z.string().min(12).max(200),
+  // No min length here — the "passwords do not match" branch below handles
+  // a too-short confirm, and we'd rather show that message than a confusing
+  // "must be at least 12 characters" error pointed at the confirm field.
+  confirm_password: z.string().max(200),
 });
 
 export const changePassword: RequestHandler = async (req, res) => {
@@ -120,7 +140,8 @@ export const forgotPassword: RequestHandler = async (req, res) => {
 const resetSchema = z.object({
   token: z.string().min(20).max(500),
   new_password: z.string().min(12).max(200),
-  confirm_password: z.string().min(12).max(200),
+  // See changePwSchema — let the mismatch branch surface a clearer error.
+  confirm_password: z.string().max(200),
 });
 
 export const resetPassword: RequestHandler = async (req, res) => {

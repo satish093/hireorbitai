@@ -31,7 +31,13 @@ export function Reminders() {
     if (!form.title || !form.due_at) { toast.error('Title and due date are required'); return; }
     setSaving(true);
     try {
-      await api.post('/reminders', form);
+      // Strip the local-only mirror field before POST. `due_at_local` is the
+      // raw `YYYY-MM-DDTHH:mm` string we pass to the picker; the server only
+      // wants `due_at` (ISO with timezone). Sending the extra field can hit
+      // strict-schema rejections or just bloat the payload.
+      const { due_at_local: _local, ...payload } = form;
+      void _local;
+      await api.post('/reminders', payload);
       toast.success('Reminder added');
       setOpen(false);
       setForm({});

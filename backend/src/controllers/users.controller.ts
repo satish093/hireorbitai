@@ -109,10 +109,35 @@ export const update: RequestHandler = async (req, res) => {
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
 
-  // Keep full_name in sync when first/last are supplied.
+  // Deterministic full_name handling. Three input shapes:
+  //   A. Caller sends first_name and/or last_name → ALWAYS recompute
+  //      full_name from those, ignoring any value the client sent in the
+  //      same payload. Previously we only recomputed when full_name was
+  //      absent, so a stale full_name on the form (which the old client
+  //      always sent) silently won and edits to first/last never updated
+  //      the displayed name.
+  //   B. Caller sends only full_name → use it as-is.
+  //   C. Caller sends neither → no full_name change.
+  // We need access to the existing first/last to compute "did either field
+  // change" correctly when only one of them is in the patch.
   const patch: Record<string, unknown> = { ...parsed.data, updated_at: new Date().toISOString() };
-  if ((parsed.data.first_name || parsed.data.last_name) && !parsed.data.full_name) {
-    patch.full_name = [parsed.data.first_name, parsed.data.last_name].filter(Boolean).join(' ').trim();
+  const sentFirst = parsed.data.first_name !== undefined;
+  const sentLast = parsed.data.last_name !== undefined;
+  if (sentFirst || sentLast) {
+    let firstFinal = parsed.data.first_name;
+    let lastFinal = parsed.data.last_name;
+    if (!sentFirst || !sentLast) {
+      // Need to fetch the unchanged half so we don't blank it out.
+      const { data: existing } = await supabaseAdmin
+        .from('users')
+        .select('first_name, last_name')
+        .eq('id', req.params.id)
+        .maybeSingle();
+      if (!sentFirst) firstFinal = (existing as any)?.first_name ?? null;
+      if (!sentLast)  lastFinal  = (existing as any)?.last_name ?? null;
+    }
+    const composed = [firstFinal, lastFinal].filter(Boolean).join(' ').trim();
+    patch.full_name = composed || null;
   }
 
   // Strip columns that aren't present yet (migration lag) and retry.
@@ -163,6 +188,13 @@ export const adminCreate: RequestHandler = async (req, res) => {
   const parsed = adminCreateSchema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, parsed.error.issues[0]?.message ?? 'Invalid input');
 
+  // Only an existing SUPER_ADMIN can mint another SUPER_ADMIN. Otherwise a
+  // DIRECTOR / CTO with admin-tier access could quietly self-escalate by
+  // creating a SUPER_ADMIN account and signing in as it.
+  if (parsed.data.role === 'SUPER_ADMIN' && req.user.role !== 'SUPER_ADMIN') {
+    throw httpError(403, 'Only a SUPER_ADMIN can create another SUPER_ADMIN.');
+  }
+
   const { user_id } = await authSvc.adminCreateUser({
     email: parsed.data.email,
     fullName: parsed.data.full_name,
@@ -172,5 +204,162 @@ export const adminCreate: RequestHandler = async (req, res) => {
   });
 
   res.status(201).json({ ok: true, user_id });
+};
+
+// ---------------------------------------------------------------------------
+// Admin lifecycle — deactivate, reactivate, hard-delete, and the listing
+// surface for deactivated accounts. All gated by requireAdmin at the route
+// level. Safety guards live in here so they can audit-log the rejection.
+// ---------------------------------------------------------------------------
+
+/** Throws if the target is the calling admin themselves. Self-destructive
+ *  actions are always a footgun — admins must use a peer admin to do this. */
+function assertNotSelf(req: { user?: { id: string } }, targetId: string): void {
+  if (req.user?.id === targetId) {
+    throw httpError(400, 'You cannot perform this action on your own account.');
+  }
+}
+
+/** Throws if removing this user would leave zero active SUPER_ADMINs. The
+ *  last SUPER_ADMIN is a soft singleton — losing them locks every admin
+ *  surface for the whole org. */
+async function assertNotLastSuperAdmin(targetId: string): Promise<void> {
+  const { data: target, error: tErr } = await supabaseAdmin
+    .from('users').select('role, is_active').eq('id', targetId).maybeSingle();
+  if (tErr) throw httpError(500, tErr.message);
+  if (!target) throw httpError(404, 'User not found');
+  if (target.role !== 'SUPER_ADMIN' || target.is_active === false) return;
+
+  const { count, error } = await supabaseAdmin
+    .from('users')
+    .select('id', { count: 'exact', head: true })
+    .eq('role', 'SUPER_ADMIN')
+    .eq('is_active', true);
+  if (error) throw httpError(500, error.message);
+  if ((count ?? 0) <= 1) {
+    throw httpError(409, 'Refusing to remove the last active SUPER_ADMIN. Promote another admin first.');
+  }
+}
+
+/** POST /users/:id/deactivate — set status=inactive AND is_active=false,
+ *  revoke sessions, audit. Funnels through the shared setUserStatus() so
+ *  the admin surface and this legacy route stay in lockstep — previously
+ *  this only flipped is_active, leaving status=active and bypassing the
+ *  middleware gate.
+ *
+ *  Optional body: `{ reason?: string }` — surfaces in the audit log + the
+ *  status_reason column shown on the user's admin detail page. */
+export const deactivate: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const targetId = req.params.id;
+  assertNotSelf(req, targetId);
+  await assertNotLastSuperAdmin(targetId);
+
+  const reason = typeof req.body?.reason === 'string'
+    ? req.body.reason.trim().slice(0, 500) || undefined
+    : undefined;
+
+  const updated = await authSvc.setUserStatus({
+    targetId,
+    status: 'inactive',
+    reason,
+    actor: { id: req.user.id, email: req.user.email },
+    req,
+  });
+  res.json({ ok: true, user: updated });
+};
+
+/** POST /users/:id/reactivate — set status=active AND is_active=true, clear
+ *  status_reason, audit. Was previously only setting is_active=true, which
+ *  meant a user deactivated via /admin/users/:id/status (which set status=
+ *  inactive) couldn't be revived via this route — they remained locked out
+ *  by the auth middleware's status check. Now both fields flip together. */
+export const reactivate: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const targetId = req.params.id;
+  assertNotSelf(req, targetId);
+
+  const updated = await authSvc.setUserStatus({
+    targetId,
+    status: 'active',
+    reason: null,
+    actor: { id: req.user.id, email: req.user.email },
+    req,
+  });
+  res.json({ ok: true, user: updated });
+};
+
+/** DELETE /users/:id — hard delete. Removes the auth user + the public.users
+ *  row. Sessions are implicitly revoked by deleting the auth user. */
+export const remove: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const targetId = req.params.id;
+  assertNotSelf(req, targetId);
+  await assertNotLastSuperAdmin(targetId);
+
+  // Order matters: drop public.users first so any FK cascades fire while the
+  // auth user still exists for audit, then delete the auth user.
+  const { error: profileErr } = await supabaseAdmin
+    .from('users').delete().eq('id', targetId);
+  if (profileErr) throw httpError(500, profileErr.message);
+
+  const { error: authErr } = await supabaseAdmin.auth.admin.deleteUser(targetId);
+  if (authErr) {
+    // public.users is already gone — log loudly, but report success since the
+    // user can no longer log in (no profile row → 403 in login()).
+    // The orphan auth row should be cleaned up manually.
+    // eslint-disable-next-line no-console
+    console.warn(`auth user delete failed for ${targetId}:`, authErr.message);
+  }
+
+  res.json({ ok: true });
+};
+
+/** GET /users/deactivated?role=… — list every account that can't currently
+ *  sign in (status != active). Captures inactive, suspended, pending, AND
+ *  banned in one place so the admin only has one "who's locked out" view to
+ *  check. Optional role filter. Admin only.
+ *
+ *  Falls back to the legacy is_active filter if the status column hasn't
+ *  been migrated yet (defensive — the migration may lag a backend deploy). */
+export const listDeactivated: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+
+  const role = typeof req.query.role === 'string' && req.query.role !== 'ALL'
+    ? req.query.role
+    : null;
+  if (role && !ROLE_VALUES.includes(role as Role)) {
+    throw httpError(400, 'Invalid role filter');
+  }
+
+  // Primary filter: status != 'active'. Secondary include: rows where status
+  // is null (pre-migration) but is_active is false, so older deactivations
+  // remain visible until the backfill completes.
+  let q = supabaseAdmin
+    .from('users')
+    .select('id, email, full_name, role, status, status_reason, status_changed_at, is_active, updated_at, created_at, last_seen_at')
+    .or('status.neq.active,and(status.is.null,is_active.eq.false)')
+    .order('updated_at', { ascending: false });
+  if (role) q = q.eq('role', role);
+
+  // Use `any` for the result tuple so we can swap in the legacy-shape
+  // fallback without TS narrowing the union to the lowest common subset.
+  let data: any = null;
+  let error: any = null;
+  ({ data, error } = await q);
+
+  // Schema-cache fallback: if `status` doesn't exist yet, fall back to the
+  // legacy is_active filter so this endpoint keeps working pre-migration.
+  if (error && /status|column .* does not exist|schema cache/i.test(error.message)) {
+    let legacy = supabaseAdmin
+      .from('users')
+      .select('id, email, full_name, role, is_active, updated_at, created_at, last_seen_at')
+      .eq('is_active', false)
+      .order('updated_at', { ascending: false });
+    if (role) legacy = legacy.eq('role', role);
+    ({ data, error } = await legacy);
+  }
+  if (error) throw httpError(500, error.message);
+  res.json(data ?? []);
 };
 

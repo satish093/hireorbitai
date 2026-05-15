@@ -22,21 +22,28 @@ import { logger } from '../config/logger';
 // response (200 with `must_change_password=true` vs 423 locked vs 401 bad).
 // ---------------------------------------------------------------------------
 
+type AccountStatus = 'active' | 'inactive' | 'suspended' | 'pending_verification' | 'banned';
+
 interface UserRow {
   id: string;
   email: string;
   full_name: string | null;
   role: Role;
+  is_active: boolean;
+  status: AccountStatus | null;
   must_change_password: boolean;
   temporary_password_sent_at: string | null;
   failed_login_attempts: number;
   locked_until: string | null;
 }
 
+const USER_ROW_COLS =
+  'id,email,full_name,role,is_active,status,must_change_password,temporary_password_sent_at,failed_login_attempts,locked_until';
+
 async function loadUserByEmail(email: string): Promise<UserRow | null> {
   const { data, error } = await supabaseAdmin
     .from('users')
-    .select('id,email,full_name,role,must_change_password,temporary_password_sent_at,failed_login_attempts,locked_until')
+    .select(USER_ROW_COLS)
     .ilike('email', email)
     .maybeSingle();
   if (error) throw httpError(500, error.message);
@@ -46,7 +53,7 @@ async function loadUserByEmail(email: string): Promise<UserRow | null> {
 async function loadUserById(id: string): Promise<UserRow | null> {
   const { data, error } = await supabaseAdmin
     .from('users')
-    .select('id,email,full_name,role,must_change_password,temporary_password_sent_at,failed_login_attempts,locked_until')
+    .select(USER_ROW_COLS)
     .eq('id', id)
     .maybeSingle();
   if (error) throw httpError(500, error.message);
@@ -117,6 +124,23 @@ export async function login(
     throw httpError(403, 'Account is not provisioned. Contact an administrator.');
   }
 
+  // Status gate. `active` = OK, anything else refuses sign-in. We surface
+  // a specific message so the user knows whether they're suspended,
+  // pending verification, etc. Defense in depth: revoke any lingering
+  // refresh tokens for non-active accounts.
+  const status = profile.status ?? (profile.is_active === false ? 'inactive' : 'active');
+  if (status !== 'active') {
+    void supabaseAdmin.auth.admin.signOut(profile.id, 'global').catch(() => {});
+    audit({ action: 'login_failed', user_id: profile.id, email: norm, req, metadata: { reason: `status_${status}` } });
+    const messages: Record<string, string> = {
+      inactive: 'This account is inactive. Contact an administrator.',
+      suspended: 'This account is suspended. Contact an administrator.',
+      banned: 'This account has been banned.',
+      pending_verification: 'Your account is awaiting verification. We\'ll email you when it\'s ready.',
+    };
+    throw httpError(403, messages[status] ?? 'This account is not active.');
+  }
+
   // Temp-password expiry check — if `must_change_password` is set and the
   // temp was issued more than TEMP_PASSWORD_EXPIRY_HOURS ago, refuse the
   // login (the admin must re-issue).
@@ -129,13 +153,16 @@ export async function login(
     }
   }
 
-  // Reset the failed-login counter on a clean success.
-  if (profile.failed_login_attempts > 0 || profile.locked_until) {
-    await supabaseAdmin
-      .from('users')
-      .update({ failed_login_attempts: 0, locked_until: null })
-      .eq('id', profile.id);
-  }
+  // On a clean success: reset failure counters AND stamp last_login_at so
+  // the admin user list can show "last active". Combined into one UPDATE.
+  await supabaseAdmin
+    .from('users')
+    .update({
+      failed_login_attempts: 0,
+      locked_until: null,
+      last_login_at: new Date().toISOString(),
+    })
+    .eq('id', profile.id);
 
   audit({
     action: 'login_success',
@@ -274,34 +301,61 @@ export async function requestPasswordReset(email: string, req: Request): Promise
   const norm = email.trim().toLowerCase();
   const user = await loadUserByEmail(norm);
 
-  if (!user) {
+  if (!user || user.is_active === false) {
     // Pad to ~150ms so attackers can't distinguish hits vs misses by timing.
+    // Deactivated accounts are treated identically to "unknown email" — no
+    // token is issued, no email is sent, but the client still sees 200.
     await sleep(150);
-    audit({ action: 'password_reset_requested', email: norm, req, metadata: { existed: false } });
+    audit({
+      action: 'password_reset_requested', email: norm, req,
+      metadata: { existed: !!user, deactivated: user?.is_active === false },
+    });
     return;
   }
 
-  const raw = generateResetToken();
-  const expires = new Date(Date.now() + env.resetTokenExpiryMinutes * 60 * 1000);
-  const { error } = await supabaseAdmin.from('password_reset_tokens').insert({
-    user_id: user.id,
-    token_hash: hashToken(raw),
-    expires_at: expires.toISOString(),
-    ip_address: req.ip ?? null,
-  });
-  if (error) {
-    logger.error({ err: error }, 'failed to insert password_reset_tokens row');
-    throw httpError(500, 'Could not start the password reset. Try again later.');
+  // Anti-enumeration: every error path below MUST be swallowed. If insert or
+  // Brevo fails we'd otherwise return 500 for existing users and 200 for
+  // unknown ones — letting attackers enumerate accounts by observing status.
+  try {
+    // Invalidate any prior unused tokens for this user so only the freshest
+    // link works. Prevents reset-link accumulation across repeated requests.
+    await supabaseAdmin
+      .from('password_reset_tokens')
+      .update({ used_at: new Date().toISOString() })
+      .eq('user_id', user.id)
+      .is('used_at', null);
+
+    const raw = generateResetToken();
+    const expires = new Date(Date.now() + env.resetTokenExpiryMinutes * 60 * 1000);
+    const { error } = await supabaseAdmin.from('password_reset_tokens').insert({
+      user_id: user.id,
+      token_hash: hashToken(raw),
+      expires_at: expires.toISOString(),
+      ip_address: req.ip ?? null,
+    });
+    if (error) {
+      logger.error({ err: error, user_id: user.id }, 'failed to insert password_reset_tokens row');
+      audit({ action: 'password_reset_requested', user_id: user.id, email: user.email, req, metadata: { existed: true, delivered: false, reason: 'insert_failed' } });
+      return;
+    }
+
+    const resetUrl = `${env.frontendUrl}/reset-password?token=${encodeURIComponent(raw)}`;
+    try {
+      await sendPasswordResetLink({
+        to: { email: user.email, name: user.full_name ?? undefined },
+        resetUrl,
+        expiresInMinutes: env.resetTokenExpiryMinutes,
+      });
+      audit({ action: 'password_reset_requested', user_id: user.id, email: user.email, req, metadata: { existed: true, delivered: true } });
+    } catch (mailErr) {
+      logger.error({ err: mailErr, user_id: user.id }, 'failed to send password reset email');
+      audit({ action: 'password_reset_requested', user_id: user.id, email: user.email, req, metadata: { existed: true, delivered: false, reason: 'mail_failed' } });
+    }
+  } catch (e) {
+    // Catch-all to preserve the anti-enumeration invariant.
+    logger.error({ err: e, user_id: user.id }, 'unexpected error in requestPasswordReset');
+    audit({ action: 'password_reset_requested', user_id: user.id, email: user.email, req, metadata: { existed: true, delivered: false, reason: 'unexpected' } });
   }
-
-  const resetUrl = `${env.frontendUrl}/reset-password?token=${encodeURIComponent(raw)}`;
-  await sendPasswordResetLink({
-    to: { email: user.email, name: user.full_name ?? undefined },
-    resetUrl,
-    expiresInMinutes: env.resetTokenExpiryMinutes,
-  });
-
-  audit({ action: 'password_reset_requested', user_id: user.id, email: user.email, req, metadata: { existed: true } });
 }
 
 // ---------------------------------------------------------------------------
@@ -337,6 +391,14 @@ export async function completePasswordReset(args: {
   // validation against their email local-part.
   const user = await loadUserById(row.user_id);
   if (!user) throw httpError(500, 'User row missing for reset token');
+
+  // Refuse to complete the reset if the account has been deactivated since
+  // the token was issued. The login flow already blocks deactivated accounts,
+  // but rotating the password under their feet would be a confusing signal.
+  if (user.is_active === false) {
+    audit({ action: 'password_reset_invalid_token', user_id: user.id, req: args.req, metadata: { reason: 'account_deactivated' } });
+    throw httpError(403, 'This account has been deactivated. Contact an administrator.');
+  }
 
   const strength = validatePasswordStrength(args.newPassword, { email: user.email });
   if (!strength.ok) throw httpError(400, strength.problems.join(' '));
@@ -426,11 +488,21 @@ export async function adminCreateUser(args: {
   // 3. Send the welcome email with the temp password. Done synchronously so
   //    the admin gets an immediate error if Brevo fails — better than
   //    silently creating an account whose owner never gets credentials.
-  await sendWelcomeWithTempPassword({
-    to: { email: norm, name: args.fullName ?? undefined },
-    tempPassword,
-    expiresInHours: env.tempPasswordExpiryHours,
-  });
+  //    If Brevo fails, roll back both the public.users row and the auth user
+  //    so the admin doesn't end up with an orphaned account whose temp
+  //    password they can no longer recover.
+  try {
+    await sendWelcomeWithTempPassword({
+      to: { email: norm, name: args.fullName ?? undefined },
+      tempPassword,
+      expiresInHours: env.tempPasswordExpiryHours,
+    });
+  } catch (mailErr) {
+    await supabaseAdmin.from('users').delete().eq('id', created.user.id).then(() => {}, () => {});
+    await supabaseAdmin.auth.admin.deleteUser(created.user.id).catch(() => {});
+    const msg = mailErr instanceof Error ? mailErr.message : 'Failed to send welcome email';
+    throw httpError(502, `Account was not created: ${msg}`);
+  }
 
   audit({
     action: 'admin_created_user',
@@ -445,4 +517,91 @@ export async function adminCreateUser(args: {
 
 function sleep(ms: number) {
   return new Promise<void>((res) => setTimeout(res, ms));
+}
+
+// ---------------------------------------------------------------------------
+// LIFECYCLE — single source of truth for account status changes.
+//
+// Both the admin surface (`/admin/users/:id/status`) and the legacy
+// (`/users/:id/deactivate`, `/users/:id/reactivate`) routes funnel through
+// here so the two persisted fields stay in lockstep:
+//
+//   status (5-state enum) ──── what middleware reads
+//   is_active (boolean)   ──── legacy column, kept in sync for back-compat
+//
+// Anything other than `active` revokes the user's refresh tokens so an in-
+// flight access token dies at its TTL and refresh stops working immediately.
+// Always audit-logged.
+// ---------------------------------------------------------------------------
+export type AccountStatusValue = 'active' | 'inactive' | 'suspended' | 'pending_verification' | 'banned';
+
+export async function setUserStatus(args: {
+  targetId: string;
+  status: AccountStatusValue;
+  reason?: string | null;
+  actor: { id: string; email: string };
+  req: Request;
+}): Promise<{ id: string; email: string; status: AccountStatusValue; status_reason: string | null; is_active: boolean }> {
+  const { targetId, status, reason, actor, req } = args;
+
+  // Snapshot the previous state for the audit metadata.
+  const { data: before, error: lookupErr } = await supabaseAdmin
+    .from('users')
+    .select('id, email, status, is_active')
+    .eq('id', targetId)
+    .maybeSingle();
+  if (lookupErr) throw httpError(500, lookupErr.message);
+  if (!before) throw httpError(404, 'User not found');
+
+  const now = new Date().toISOString();
+  const { data, error } = await supabaseAdmin
+    .from('users')
+    .update({
+      status,
+      // Reason only makes sense for non-active states. On reactivate we
+      // explicitly null it out so the old reason doesn't linger as a stale
+      // "this account was suspended because…" footer on a now-active user.
+      status_reason: status === 'active' ? null : (reason ?? null),
+      status_changed_at: now,
+      status_changed_by: actor.id,
+      // Keep the legacy is_active column in sync. New code reads `status`,
+      // but a few legacy queries (and the schema-cache fallback in the auth
+      // middleware) still rely on the boolean.
+      is_active: status === 'active',
+      updated_at: now,
+    })
+    .eq('id', targetId)
+    .select('id, email, status, status_reason, is_active')
+    .single();
+  if (error) throw httpError(500, error.message);
+
+  // Revoke ALL refresh tokens whenever the user leaves the active state.
+  // The access-token TTL is short (≤ 1h by default) so the in-flight token
+  // ages out on its own; refresh is dead immediately.
+  if (status !== 'active') {
+    await supabaseAdmin.auth.admin.signOut(targetId, 'global').catch((err) => {
+      logger.warn({ err, targetId }, 'lifecycle: signOut failed');
+    });
+  }
+
+  audit({
+    action: status === 'active' ? 'admin_user_reactivated' : 'admin_user_deactivated',
+    user_id: targetId,
+    email: data.email,
+    req,
+    metadata: {
+      from_status: before.status ?? (before.is_active === false ? 'inactive' : 'active'),
+      to_status: status,
+      reason: reason ?? null,
+      by: actor.id,
+    },
+  });
+
+  return data as {
+    id: string;
+    email: string;
+    status: AccountStatusValue;
+    status_reason: string | null;
+    is_active: boolean;
+  };
 }

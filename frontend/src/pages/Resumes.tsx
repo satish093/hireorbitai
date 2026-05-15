@@ -6,6 +6,7 @@ import { SelectInput } from '../components/SelectInput';
 import { PageHeader } from '../components/PageHeader';
 import { Button } from '../components/Button';
 import { api } from '../services/api';
+import { openExternal } from '../utils/fileUrl';
 import toast from 'react-hot-toast';
 
 export function Resumes() {
@@ -57,7 +58,9 @@ export function Resumes() {
     try {
       const { data } = await api.get(`/resumes/${id}/download-url`);
       if (!data?.url) { toast.error('No download URL'); return; }
-      window.open(data.url, '_blank');
+      // Centralized opener — handles absolute (signed) Supabase URLs and
+      // relative paths, applies noopener/noreferrer.
+      openExternal(data.url);
     } catch (e: any) {
       toast.error(e?.response?.data?.error ?? 'Download failed');
     }

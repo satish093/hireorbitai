@@ -34,6 +34,9 @@ import { FeatureFlags } from './pages/FeatureFlags';
 import { UserGroups } from './pages/UserGroups';
 import { UserProfile } from './pages/UserProfile';
 import { ResetPassword } from './pages/ResetPassword';
+import { DeactivatedAccounts } from './pages/DeactivatedAccounts';
+import { AdminUsers } from './pages/AdminUsers';
+import { AdminUserDetail } from './pages/AdminUserDetail';
 
 function DashboardRouter() {
   const { profile } = useAuth();
@@ -83,6 +86,9 @@ export default function App() {
       <Route path="/messages" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
       <Route path="/admin/features" element={<ProtectedRoute allow={OWNER_TIER}><FeatureFlags /></ProtectedRoute>} />
       <Route path="/admin/groups" element={<ProtectedRoute allow={MANAGER_TIER}><UserGroups /></ProtectedRoute>} />
+      <Route path="/admin/deactivated" element={<ProtectedRoute allow={ADMIN_TIER}><DeactivatedAccounts /></ProtectedRoute>} />
+      <Route path="/admin/users" element={<ProtectedRoute allow={ADMIN_TIER}><AdminUsers /></ProtectedRoute>} />
+      <Route path="/admin/users/:id" element={<ProtectedRoute allow={ADMIN_TIER}><AdminUserDetail /></ProtectedRoute>} />
       {/* Profile page. Access is controlled server-side: operator-tier sees everyone,
           consultants only see their own. */}
       <Route path="/users/:id" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
@@ -91,6 +97,3 @@ export default function App() {
     </Routes>
   );
 }
-
-// Reserved for callers that want the C-suite tier explicitly.
-void ADMIN_TIER;

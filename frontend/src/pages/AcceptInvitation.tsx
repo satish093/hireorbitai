@@ -3,10 +3,10 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
-import { supabase } from '../services/supabase';
-import { api } from '../services/api';
 import { Role } from '../types';
 import { Brand } from '../components/Brand';
+import { PasswordField, PasswordStrengthHints } from '../components/PasswordField';
+import { FormInput } from '../components/FormInput';
 import { config as appConfig } from '../config/env';
 
 const API_URL = appConfig.apiBaseUrl;
@@ -19,20 +19,40 @@ interface InvitePreview {
   expired: boolean;
 }
 
+interface SetupResponse {
+  email: string;
+  role: Role;
+  session: {
+    access_token: string;
+    refresh_token: string;
+    expires_at: number;
+  } | null;
+}
+
 /**
- * Two entry paths:
- *   A. User clicked the Supabase-sent invite email — they arrive with an auth
- *      session already (Supabase set it via the URL hash). We just collect the
- *      password + full name, set the password via auth.updateUser, then POST
- *      /invitations/complete to apply the invited role.
- *   B. User has only a manually-shared link and no session — fall back to the
- *      original /invitations/setup flow (creates the auth user with the given
- *      password).
+ * Brevo-only invitation accept flow.
+ *
+ * The user lands here from the email link with `?token=…`. There is NO
+ * Supabase session at this point (we removed `inviteUserByEmail` — Brevo
+ * delivers a plain token URL, not a magic-link). The full flow:
+ *
+ *   1. GET  /invitations/preview?token=…   → fetch role + email + status
+ *   2. user enters full name + strong password
+ *   3. POST /invitations/setup             → creates auth user + public.users,
+ *                                            clears must_change_password,
+ *                                            returns a fresh session pair
+ *   4. push that session into supabase-js (via AuthContext.refreshSession)
+ *   5. route to /onboarding/* or /dashboard based on role
+ *
+ * If the user happens to be signed in as someone else when they click the
+ * link, we sign them out first — silently doing anything else (like the old
+ * `supabase.auth.updateUser`) would change the signed-in user's password,
+ * which is exactly the bug we used to have.
  */
 export function AcceptInvitation() {
   const [params] = useSearchParams();
   const token = params.get('token') ?? '';
-  const { session, signIn, refreshProfile } = useAuth();
+  const { session, refreshSession, signOut } = useAuth();
   const nav = useNavigate();
 
   const [preview, setPreview] = useState<InvitePreview | null>(null);
@@ -43,6 +63,17 @@ export function AcceptInvitation() {
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [submitErr, setSubmitErr] = useState<string | null>(null);
+
+  // Sign out any existing session when the page loads with a token. We never
+  // want the invitation form to mutate a different user's account.
+  useEffect(() => {
+    if (token && session) {
+      // Fire-and-forget — we don't block the page on this.
+      void signOut();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
   useEffect(() => {
     if (!token) { setError('Missing invitation token'); setLoading(false); return; }
@@ -62,46 +93,47 @@ export function AcceptInvitation() {
     return () => controller.abort();
   }, [token]);
 
-  const hasSession = !!session;
-
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (password.length < 8) { toast.error('Password must be at least 8 characters'); return; }
-    if (password !== confirm) { toast.error("Passwords don't match"); return; }
+    setSubmitErr(null);
+    if (!fullName.trim())      { setSubmitErr('Please enter your full name.'); return; }
+    if (password.length < 12)  { setSubmitErr('Password must be at least 12 characters.'); return; }
+    if (password !== confirm)  { setSubmitErr("Passwords don't match."); return; }
     if (!preview) return;
     setSubmitting(true);
     try {
-      if (hasSession) {
-        // Path A — Supabase invite link, user already authed.
-        if (session?.user.email?.toLowerCase() !== preview.email.toLowerCase()) {
-          throw new Error(`You're signed in as ${session?.user.email}, but this invitation is for ${preview.email}. Sign out first.`);
-        }
-        const { error: updErr } = await supabase.auth.updateUser({ password });
-        if (updErr) throw updErr;
-        // Apply role + name (uses the current session — interceptor adds bearer)
-        await api.post('/invitations/complete', { token, full_name: fullName.trim() || undefined });
-        await refreshProfile();
-      } else {
-        // Path B — no session yet (manual link). Create auth user via our endpoint.
-        await axios.post(`${API_URL}/invitations/setup`, {
-          token, password, full_name: fullName.trim() || undefined,
-        });
-        await signIn(preview.email, password);
+      const { data } = await axios.post<SetupResponse>(`${API_URL}/invitations/setup`, {
+        token,
+        password,
+        full_name: fullName.trim() || undefined,
+      });
+
+      // Backend returned a session pair — push it into supabase-js so the
+      // app is immediately signed in. This avoids a second /auth/login
+      // roundtrip that could race indexing lag on the just-created user.
+      if (data.session) {
+        await refreshSession(data.session.access_token, data.session.refresh_token);
       }
+
       toast.success('Welcome to HireOrbit AI');
-      if (preview.role === 'CONSULTANT') nav('/onboarding/consultant', { replace: true });
-      else if (preview.role === 'RECRUITER') nav('/onboarding/recruiter', { replace: true });
-      else nav('/dashboard', { replace: true });
+      if (!data.session) {
+        // Backend couldn't auto-issue a session for some reason. Send them
+        // to /login so they can sign in with the password they just set.
+        nav('/login', { replace: true });
+        return;
+      }
+      if (preview.role === 'CONSULTANT')      nav('/onboarding/consultant', { replace: true });
+      else if (preview.role === 'RECRUITER')  nav('/onboarding/recruiter',  { replace: true });
+      else                                    nav('/dashboard',             { replace: true });
     } catch (e: any) {
       const msg = e?.response?.data?.error ?? e?.message ?? 'Failed to complete sign-up';
-      toast.error(msg);
+      setSubmitErr(msg);
     } finally { setSubmitting(false); }
   }
 
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
       <div className="w-full max-w-md animate-fade-in-up">
-        {/* Brand */}
         <div className="flex justify-center mb-6">
           <Brand size="lg" caption="Bridging Talent · Building Futures" />
         </div>
@@ -121,7 +153,7 @@ export function AcceptInvitation() {
             <div className="text-center space-y-3">
               <h1 className="text-xl font-semibold tracking-tight text-slate-900">Already accepted</h1>
               <p className="text-sm text-slate-600">This invitation has been used. Sign in to continue.</p>
-              <button onClick={() => nav('/login')} className="bg-slate-900 text-white text-sm px-4 py-2 rounded-lg">
+              <button onClick={() => nav('/login')} className="bg-slate-900 text-white text-sm px-4 py-2 rounded-lg press">
                 Go to sign in
               </button>
             </div>
@@ -136,40 +168,44 @@ export function AcceptInvitation() {
                   Joining as <span className="font-medium text-slate-900">{roleLabel(preview.role)}</span> ·{' '}
                   <span className="text-slate-700">{preview.email}</span>
                 </p>
-                {hasSession && (
-                  <p className="text-xs text-emerald-700 mt-1">✓ Email verified via invitation link</p>
-                )}
               </div>
 
-              <label className="block">
-                <span className="block text-xs font-medium text-slate-700 mb-1">Full name</span>
-                <input
-                  value={fullName} onChange={(e) => setFullName(e.target.value)}
-                  placeholder="Your full name"
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40"
-                  autoFocus
-                />
-              </label>
+              <FormInput
+                label="Full name"
+                value={fullName}
+                autoFocus
+                required
+                placeholder="Your full name"
+                onChange={(e) => setFullName(e.target.value)}
+              />
 
-              <label className="block">
-                <span className="block text-xs font-medium text-slate-700 mb-1">Password</span>
-                <input
-                  type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-                  placeholder="At least 8 characters"
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40"
-                />
-              </label>
-              <label className="block">
-                <span className="block text-xs font-medium text-slate-700 mb-1">Confirm password</span>
-                <input
-                  type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)}
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40"
-                />
-              </label>
+              <PasswordField
+                label="Password"
+                autoComplete="new-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+              <PasswordStrengthHints password={password} />
+              <PasswordField
+                label="Confirm password"
+                autoComplete="new-password"
+                value={confirm}
+                onChange={(e) => setConfirm(e.target.value)}
+              />
+
+              {submitErr && (
+                <p
+                  role="alert"
+                  aria-live="polite"
+                  className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-md px-2.5 py-1.5 animate-fade-in-down"
+                >
+                  {submitErr}
+                </p>
+              )}
 
               <button
                 disabled={submitting}
-                className="w-full bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white rounded-lg py-2.5 text-sm font-medium"
+                className="w-full bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white rounded-lg py-2.5 text-sm font-medium press"
               >
                 {submitting ? 'Creating account…' : 'Create account & continue'}
               </button>
@@ -199,5 +235,5 @@ function ErrorState({ message }: { message: string }) {
 }
 
 function roleLabel(r: Role): string {
-  return r.replace('_', ' ').toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+  return r.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
 }

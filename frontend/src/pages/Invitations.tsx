@@ -8,9 +8,14 @@ import { SelectInput } from '../components/SelectInput';
 import { PageHeader } from '../components/PageHeader';
 import { Button } from '../components/Button';
 import { api } from '../services/api';
+import { useAuth } from '../context/AuthContext';
+import { invalidate } from '../hooks/useInvalidate';
 import toast from 'react-hot-toast';
 
-const ROLE_OPTIONS = [
+// Master role list for the invite dropdown. We gate SUPER_ADMIN at render
+// time below — only an existing SUPER_ADMIN sees that option, matching the
+// backend check in invitations.controller.ts that 403s otherwise.
+const ALL_INVITE_OPTIONS = [
   { value: 'CONSULTANT', label: 'Consultant' },
   { value: 'RECRUITER', label: 'Recruiter' },
   { value: 'DEVELOPER', label: 'Developer' },
@@ -23,6 +28,15 @@ const ROLE_OPTIONS = [
 ];
 
 export function Invitations() {
+  const { profile } = useAuth();
+  // Hide SUPER_ADMIN from the invite dropdown unless the inviter is itself
+  // a SUPER_ADMIN — backend rejects the post otherwise (see
+  // invitations.controller.ts), so showing it would just produce a
+  // confusing 403 on submit.
+  const ROLE_OPTIONS = profile?.role === 'SUPER_ADMIN'
+    ? ALL_INVITE_OPTIONS
+    : ALL_INVITE_OPTIONS.filter((o) => o.value !== 'SUPER_ADMIN');
+
   const [rows, setRows] = useState<any[]>([]);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ email: '', role: 'CONSULTANT' });
@@ -62,6 +76,7 @@ export function Invitations() {
         );
       }
       setOpen(false); setForm({ email: '', role: 'CONSULTANT' }); load();
+      invalidate('invitations');
     } catch (e: any) { toast.error(e?.response?.data?.error ?? 'Failed'); }
     finally { setSending(false); }
   }
@@ -72,6 +87,7 @@ export function Invitations() {
       await api.post(`/invitations/${id}/revoke`);
       toast.success('Invitation revoked');
       load();
+      invalidate('invitations');
     } catch (e: any) {
       toast.error(e?.response?.data?.error ?? 'Revoke failed');
     }

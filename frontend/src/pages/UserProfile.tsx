@@ -6,7 +6,8 @@ import { Avatar } from '../components/TaskBits';
 import { PresencePill } from '../components/PresenceDot';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
-import { MANAGER_TIER, ROLE_LABEL, Role } from '../types';
+import { invalidate } from '../hooks/useInvalidate';
+import { ADMIN_TIER, MANAGER_TIER, ROLE_LABEL, Role } from '../types';
 
 interface UserProfile {
   id: string;
@@ -51,6 +52,7 @@ export function UserProfile() {
   const navigate = useNavigate();
   const { profile: me } = useAuth();
   const isManagerTier = !!me && (MANAGER_TIER as string[]).includes(me.role);
+  const isAdmin = !!me && (ADMIN_TIER as string[]).includes(me.role);
   const isSelf = me?.id === id;
   const canEdit = isManagerTier || isSelf;
 
@@ -59,6 +61,25 @@ export function UserProfile() {
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<Partial<UserProfile>>({});
   const [saving, setSaving] = useState(false);
+  const [actBusy, setActBusy] = useState(false);
+  const [showDelete, setShowDelete] = useState(false);
+  const [showDeactivate, setShowDeactivate] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+
+  // Close any open admin modal on Escape (when not mid-action). Native
+  // window.confirm was previously used for the deactivate step — switching
+  // to a styled modal here for consistency with the delete dialog.
+  useEffect(() => {
+    if (!showDelete && !showDeactivate) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !actBusy) {
+        setShowDelete(false);
+        setShowDeactivate(false);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [showDelete, showDeactivate, actBusy]);
 
   useEffect(() => {
     if (!id) return;
@@ -86,11 +107,65 @@ export function UserProfile() {
   // Allowlist of user-editable fields. Anything not in this list (role,
   // is_active, group_id, reports_to, last_seen_at, context, etc.) stays
   // server-managed and is dropped from the PATCH payload.
+  //
+  // NOTE: `full_name` is intentionally NOT here. The server recomputes it
+  // from first_name + last_name whenever either changes. If we sent the
+  // stale `full_name` that came back on the GET, the server would treat it
+  // as "user explicitly chose this" and skip the recompute (the bug we
+  // hit before — typing a new last name didn't update the displayed full
+  // name).
   const EDITABLE_FIELDS = [
-    'first_name', 'last_name', 'full_name', 'phone', 'linkedin_url', 'avatar_url',
+    'first_name', 'last_name', 'phone', 'linkedin_url', 'avatar_url',
     'address_line1', 'address_line2', 'city', 'state', 'postal_code', 'country',
     'timezone',
   ] as const;
+
+  async function deactivate() {
+    if (!user || actBusy) return;
+    setActBusy(true);
+    try {
+      const r = await api.post(`/users/${user.id}/deactivate`);
+      // The endpoint returns a compact row; merge into local state to flip the badge.
+      setUser({ ...user, is_active: false, ...(r.data?.user ?? {}) });
+      toast.success('Account deactivated');
+      setShowDeactivate(false);
+      // Notify the admin list / deactivated page so they refetch.
+      invalidate('users');
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error ?? 'Failed to deactivate');
+    } finally { setActBusy(false); }
+  }
+
+  async function reactivate() {
+    if (!user || actBusy) return;
+    setActBusy(true);
+    try {
+      const r = await api.post(`/users/${user.id}/reactivate`);
+      setUser({ ...user, is_active: true, ...(r.data?.user ?? {}) });
+      toast.success('Account reactivated');
+      invalidate('users');
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error ?? 'Failed to reactivate');
+    } finally { setActBusy(false); }
+  }
+
+  async function remove() {
+    if (!user || actBusy) return;
+    if (deleteConfirmText.trim().toLowerCase() !== user.email.toLowerCase()) {
+      toast.error('Type the email exactly to confirm deletion');
+      return;
+    }
+    setActBusy(true);
+    try {
+      await api.delete(`/users/${user.id}`);
+      toast.success('Account deleted');
+      // The user is gone — invalidate so any open admin tab drops the row.
+      invalidate('users');
+      navigate('/admin/deactivated', { replace: true });
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error ?? 'Failed to delete');
+    } finally { setActBusy(false); }
+  }
 
   async function save() {
     if (!user || saving) return;
@@ -148,10 +223,34 @@ export function UserProfile() {
             </div>
           </div>
           {canEdit && !editing && (
-            <button
-              onClick={() => setEditing(true)}
-              className="bg-slate-900 text-white text-sm px-4 py-1.5 rounded-lg hover:bg-slate-800"
-            >Edit</button>
+            <div className="flex items-center gap-2">
+              {isAdmin && !isSelf && (
+                <>
+                  {user.is_active ? (
+                    <button
+                      onClick={() => setShowDeactivate(true)}
+                      disabled={actBusy}
+                      className="border border-amber-300 text-amber-700 text-sm px-3 py-1.5 rounded-lg hover:bg-amber-50 disabled:opacity-50 press transition-colors"
+                    >Deactivate</button>
+                  ) : (
+                    <button
+                      onClick={reactivate}
+                      disabled={actBusy}
+                      className="border border-emerald-300 text-emerald-700 text-sm px-3 py-1.5 rounded-lg hover:bg-emerald-50 disabled:opacity-50 press transition-colors"
+                    >Reactivate</button>
+                  )}
+                  <button
+                    onClick={() => { setShowDelete(true); setDeleteConfirmText(''); }}
+                    disabled={actBusy}
+                    className="border border-red-300 text-red-700 text-sm px-3 py-1.5 rounded-lg hover:bg-red-50 disabled:opacity-50 press transition-colors"
+                  >Delete</button>
+                </>
+              )}
+              <button
+                onClick={() => setEditing(true)}
+                className="bg-slate-900 text-white text-sm px-4 py-1.5 rounded-lg hover:bg-slate-800"
+              >Edit</button>
+            </div>
           )}
           {editing && (
             <div className="flex items-center gap-2">
@@ -169,7 +268,7 @@ export function UserProfile() {
         </div>
 
         {/* Sections */}
-        <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6 stagger-children">
           <Card title="Contact">
             <Field label="First name" value={user.first_name} editing={editing} onChange={(v) => setForm((f) => ({ ...f, first_name: v }))} />
             <Field label="Last name"  value={user.last_name}  editing={editing} onChange={(v) => setForm((f) => ({ ...f, last_name: v }))} />
@@ -231,6 +330,86 @@ export function UserProfile() {
           )}
         </div>
       </div>
+
+      {showDeactivate && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-[2px] flex items-center justify-center p-6 animate-fade-in"
+          onClick={() => !actBusy && setShowDeactivate(false)}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div
+            className="bg-white rounded-2xl border border-slate-200 shadow-xl w-full max-w-md p-6 animate-scale-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-lg font-semibold text-slate-900">Deactivate account?</h2>
+            <p className="text-sm text-slate-600 mt-2">
+              <span className="font-medium text-slate-900">{user.email}</span> will be signed out of every session
+              and unable to log in until you reactivate them. Their data is preserved.
+            </p>
+            <div className="flex items-center justify-end gap-2 mt-5">
+              <button
+                onClick={() => setShowDeactivate(false)}
+                disabled={actBusy}
+                className="border border-slate-200 text-slate-700 text-sm px-3 py-1.5 rounded-lg hover:bg-slate-50 disabled:opacity-50 press"
+              >Cancel</button>
+              <button
+                onClick={deactivate}
+                disabled={actBusy}
+                className="bg-amber-600 text-white text-sm px-3 py-1.5 rounded-lg hover:bg-amber-700 disabled:opacity-50 press"
+              >{actBusy ? 'Deactivating…' : 'Deactivate'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDelete && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-[2px] flex items-center justify-center p-6 animate-fade-in"
+          onClick={() => !actBusy && setShowDelete(false)}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div
+            className="bg-white rounded-2xl border border-slate-200 shadow-xl w-full max-w-md p-6 animate-scale-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-lg font-semibold text-slate-900">Delete account permanently?</h2>
+            <p className="text-sm text-slate-600 mt-2">
+              This will permanently remove <span className="font-medium text-slate-900">{user.email}</span>'s
+              auth user, profile row, and active sessions. This action cannot be undone.
+            </p>
+            <p className="text-xs text-slate-500 mt-3">
+              Prefer <button type="button" onClick={() => { setShowDelete(false); setShowDeactivate(true); }} className="text-amber-700 hover:underline">deactivate</button> if
+              you want to keep the audit trail.
+            </p>
+            <label className="block mt-4">
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+                Type <span className="text-slate-900">{user.email}</span> to confirm
+              </span>
+              <input
+                type="text"
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                autoComplete="off"
+                className="mt-1 w-full text-sm bg-white border border-slate-200 rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-red-500/40"
+              />
+            </label>
+            <div className="flex items-center justify-end gap-2 mt-5">
+              <button
+                onClick={() => setShowDelete(false)}
+                disabled={actBusy}
+                className="border border-slate-200 text-slate-700 text-sm px-3 py-1.5 rounded-lg hover:bg-slate-50 disabled:opacity-50"
+              >Cancel</button>
+              <button
+                onClick={remove}
+                disabled={actBusy || deleteConfirmText.trim().toLowerCase() !== user.email.toLowerCase()}
+                className="bg-red-600 text-white text-sm px-3 py-1.5 rounded-lg hover:bg-red-700 disabled:opacity-50"
+              >{actBusy ? 'Deleting…' : 'Delete permanently'}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </Layout>
   );
 }

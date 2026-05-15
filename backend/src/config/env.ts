@@ -46,14 +46,12 @@ const envSchema = z.object({
   ANTHROPIC_API_KEY: optionalKey,
   ANTHROPIC_MODEL: z.string().default('claude-haiku-4-5-20251001'),
 
-  // --- Email ---
-  EMAIL_PROVIDER: z.enum(['resend', 'sendgrid', 'brevo']).default('brevo'),
-  EMAIL_FROM: z.string().min(3).default('HireOrbit AI <noreply@hireorbitai.com>'),
-  RESEND_API_KEY: optionalKey,
-  SENDGRID_API_KEY: optionalKey,
-  BREVO_API_KEY: optionalKey,
-  // Brevo-specific sender fields, used by the new mailer service. Default
-  // values fall back to EMAIL_FROM if individual fields aren't set.
+  // --- Email (Brevo only) ---
+  // Per the auth spec, ALL transactional email goes through Brevo. The
+  // previous multi-provider EMAIL_PROVIDER switch + Resend/SendGrid keys
+  // have been removed. If you need to swap providers in the future, do it
+  // by editing brevo.service.ts — env stays Brevo-shaped.
+  BREVO_API_KEY: z.string().min(10, 'BREVO_API_KEY is required (xkeysib-...)'),
   BREVO_SENDER_EMAIL: z.string().email().default('noreply@hireorbitai.com'),
   BREVO_SENDER_NAME: z.string().min(1).default('HireOrbit AI'),
 
@@ -72,8 +70,12 @@ const envSchema = z.object({
   FRONTEND_URL: z.string().url('FRONTEND_URL must be a fully-qualified URL').default('https://hireorbitai.com'),
 
   // --- Rate limiting (configurable per env) ---
+  // Default budget is per authenticated user (see server.ts keyGenerator) so
+  // 1500/15min is generous enough for the Sidebar's 15s poll cadence + normal
+  // page navigation without 429-ing real traffic. Tighten via env if you ever
+  // get hit by a scraper.
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().min(1000).default(15 * 60 * 1000),
-  RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(300),
+  RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(1500),
 
   // --- Trust proxy (set to 1 behind Nginx/CloudPanel, 0 if direct) ---
   TRUST_PROXY: z.coerce.number().int().min(0).max(10).default(1),
@@ -96,20 +98,6 @@ if (!parsed.success) {
 }
 
 const e = parsed.data;
-
-// Provider-specific cross-field check — fail fast if EMAIL_PROVIDER is set
-// to a service whose API key is missing. Avoids "boots fine, blows up on
-// the first invitation".
-const providerKey = {
-  resend: e.RESEND_API_KEY,
-  sendgrid: e.SENDGRID_API_KEY,
-  brevo: e.BREVO_API_KEY,
-}[e.EMAIL_PROVIDER];
-if (!providerKey) {
-  // eslint-disable-next-line no-console
-  console.error(`\n✗ EMAIL_PROVIDER=${e.EMAIL_PROVIDER} but the matching API key is empty.\n`);
-  process.exit(1);
-}
 
 /**
  * Validated, typed config. Import this anywhere in the backend instead of
@@ -137,10 +125,8 @@ export const env = {
     model: e.ANTHROPIC_MODEL,
   },
   email: {
-    provider: e.EMAIL_PROVIDER,
-    from: e.EMAIL_FROM,
-    resendKey: e.RESEND_API_KEY,
-    sendgridKey: e.SENDGRID_API_KEY,
+    // Single provider — Brevo. Kept under env.email.* so callers in
+    // services/brevo.service.ts read a stable shape.
     brevoKey: e.BREVO_API_KEY,
     brevoSenderEmail: e.BREVO_SENDER_EMAIL,
     brevoSenderName: e.BREVO_SENDER_NAME,
