@@ -1,10 +1,10 @@
 import { RequestHandler } from 'express';
-import { supabaseAdmin } from '../config/supabase';
+import { db } from '../config/db';
 import { httpError } from '../types';
 
 export const list: RequestHandler = async (req, res) => {
   const { consultant_id, from, to, is_mock } = req.query as Record<string, string | undefined>;
-  let qb = supabaseAdmin
+  let qb = db
     .from('interviews')
     .select('*, consultant:consultants(*), application:applications(*)');
   if (consultant_id) qb = qb.eq('consultant_id', consultant_id);
@@ -18,7 +18,7 @@ export const list: RequestHandler = async (req, res) => {
 
 export const schedule: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await db
     .from('interviews')
     .insert({ ...req.body, created_by: req.user.id })
     .select()
@@ -29,7 +29,7 @@ export const schedule: RequestHandler = async (req, res) => {
 
 export const scheduleMock: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await db
     .from('interviews')
     .insert({ ...req.body, type: 'MOCK', is_mock: true, created_by: req.user.id })
     .select()
@@ -39,7 +39,7 @@ export const scheduleMock: RequestHandler = async (req, res) => {
 };
 
 export const update: RequestHandler = async (req, res) => {
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await db
     .from('interviews')
     .update(req.body)
     .eq('id', req.params.id)
@@ -52,7 +52,7 @@ export const update: RequestHandler = async (req, res) => {
 export const submitFeedback: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   const feedback = req.body?.feedback ?? req.body;
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await db
     .from('interviews')
     .update({
       feedback,

@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { supabaseAdmin } from '../config/supabase';
+import { db } from '../config/db';
 import { sendInvitationLink } from './brevo.service';
 import { env } from '../config/env';
 import { logger } from '../config/logger';
@@ -14,9 +14,9 @@ interface CreateInvitationInput {
 /**
  * Create an invitation row + send the invite email through Brevo.
  *
- * The previous version of this service fell through Supabase's
- * `auth.admin.inviteUserByEmail` (which uses Supabase's SMTP). That path is
- * removed — per the auth spec, NO emails go through Supabase. Every
+ * The previous version of this service fell through the third-party auth provider's
+ * `inviteUserByEmail` API (which uses the provider's SMTP). That path is
+ * removed — per the auth spec, NO emails go through any third party. Every
  * transactional message is sent through our Brevo client so the sender,
  * branding, and deliverability are under our control.
  *
@@ -30,7 +30,7 @@ export async function createInvitation(input: CreateInvitationInput) {
   const expiresAt = new Date(Date.now() + env.invitationExpiryHours * 3600 * 1000).toISOString();
   const emailLc = input.email.trim().toLowerCase();
 
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await db
     .from('invitations')
     .insert({
       email: emailLc,
@@ -47,7 +47,7 @@ export async function createInvitation(input: CreateInvitationInput) {
   // rather than the generic "A teammate invited you…".
   let invitedByName: string | undefined;
   if (input.invitedBy) {
-    const { data: inviter } = await supabaseAdmin
+    const { data: inviter } = await db
       .from('users')
       .select('full_name, email')
       .eq('id', input.invitedBy)
@@ -83,7 +83,7 @@ export async function createInvitation(input: CreateInvitationInput) {
 }
 
 export async function acceptInvitation(token: string, userId: string) {
-  const { data: invite, error } = await supabaseAdmin
+  const { data: invite, error } = await db
     .from('invitations')
     .select('*')
     .eq('token', token)
@@ -91,15 +91,14 @@ export async function acceptInvitation(token: string, userId: string) {
   if (error || !invite) throw httpError(404, 'Invitation not found');
   if (invite.status !== 'PENDING') throw httpError(400, `Invitation already ${invite.status}`);
   if (new Date(invite.expires_at) < new Date()) {
-    await supabaseAdmin.from('invitations').update({ status: 'EXPIRED' }).eq('id', invite.id);
+    await db.from('invitations').update({ status: 'EXPIRED' }).eq('id', invite.id);
     throw httpError(400, 'Invitation expired');
   }
 
   // Guardrail: the invitation is for a specific email — reject if the logged-in
   // user isn't that recipient. Without this, anyone clicking the invite link
   // while signed in as another user would have their role overwritten.
-  const { data: actor } = await supabaseAdmin
-    .from('users').select('email, role').eq('id', userId).single();
+  const { data: actor } = await db.from('users').select('email, role').eq('id', userId).single();
   if (!actor) throw httpError(403, 'Caller not found');
   if (actor.email.toLowerCase() !== invite.email.toLowerCase()) {
     throw httpError(
@@ -109,8 +108,8 @@ export async function acceptInvitation(token: string, userId: string) {
   }
 
   // Promote the user's role and mark accepted.
-  await supabaseAdmin.from('users').update({ role: invite.role }).eq('id', userId);
-  await supabaseAdmin
+  await db.from('users').update({ role: invite.role }).eq('id', userId);
+  await db
     .from('invitations')
     .update({ status: 'ACCEPTED', accepted_at: new Date().toISOString() })
     .eq('id', invite.id);

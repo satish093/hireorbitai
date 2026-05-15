@@ -1,89 +1,100 @@
 // Bootstrap the first SUPER_ADMIN account.
 //
-// Idempotent: if the auth user already exists, we just (re)set the password
-// + role and re-arm must_change_password = true so the next sign-in forces
-// a rotation.
+// Idempotent: if the user already exists we just re-hash the password + arm
+// must_change_password = true so the next sign-in forces a rotation.
 //
 // Run with Node 22's built-in env loader:
 //   node --env-file=.env scripts/bootstrap-admin.mjs
 //
-// Required env vars:  SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
-// Optional overrides: BOOTSTRAP_ADMIN_EMAIL, BOOTSTRAP_ADMIN_PASSWORD,
-//                     BOOTSTRAP_ADMIN_NAME, BOOTSTRAP_ADMIN_ROLE.
+// Required env vars:
+//   DATABASE_URL
+//   DEFAULT_ADMIN_EMAIL
+//   DEFAULT_ADMIN_PASSWORD    (>= 12 characters; will be rotated on first login)
+// Optional:
+//   DEFAULT_ADMIN_NAME        (default: empty)
+//   DEFAULT_ADMIN_ROLE        (default: SUPER_ADMIN)
+//   DATABASE_SSL              (disable | require | no-verify; default: disable)
 
-import { createClient } from '@supabase/supabase-js';
+import { randomUUID } from 'node:crypto';
+import pg from 'pg';
+import bcrypt from 'bcryptjs';
 
-const url = process.env.SUPABASE_URL;
-const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-if (!url || !key) {
-  console.error('Need SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY in .env');
+function die(msg) {
+  console.error(msg);
   process.exit(1);
 }
 
-const ADMIN_EMAIL    = (process.env.BOOTSTRAP_ADMIN_EMAIL    ?? 'satish.flex07@gmail.com').toLowerCase();
-const ADMIN_PASSWORD =  process.env.BOOTSTRAP_ADMIN_PASSWORD ?? 'Admin@123';
-const ADMIN_NAME     =  process.env.BOOTSTRAP_ADMIN_NAME     ?? 'Satish';
-const ADMIN_ROLE     =  process.env.BOOTSTRAP_ADMIN_ROLE     ?? 'SUPER_ADMIN';
+const url = process.env.DATABASE_URL;
+if (!url) die('DATABASE_URL is required (postgres://user:pass@host:5432/dbname).');
 
-const supabase = createClient(url, key, {
-  auth: { autoRefreshToken: false, persistSession: false },
-});
+const ADMIN_EMAIL = (process.env.DEFAULT_ADMIN_EMAIL ?? '').trim().toLowerCase();
+const ADMIN_PASSWORD = process.env.DEFAULT_ADMIN_PASSWORD ?? '';
+const ADMIN_NAME = (process.env.DEFAULT_ADMIN_NAME ?? '').trim() || null;
+const ADMIN_ROLE = (process.env.DEFAULT_ADMIN_ROLE ?? 'SUPER_ADMIN').trim();
+
+if (!ADMIN_EMAIL) die('DEFAULT_ADMIN_EMAIL is required.');
+if (!/^.+@.+\..+$/.test(ADMIN_EMAIL))
+  die(`DEFAULT_ADMIN_EMAIL is not a valid email: ${ADMIN_EMAIL}`);
+if (!ADMIN_PASSWORD) die('DEFAULT_ADMIN_PASSWORD is required.');
+if (ADMIN_PASSWORD.length < 12) die('DEFAULT_ADMIN_PASSWORD must be at least 12 characters.');
+
+const sslMode = process.env.DATABASE_SSL ?? 'disable';
+const ssl =
+  sslMode === 'disable'
+    ? false
+    : sslMode === 'no-verify'
+      ? { rejectUnauthorized: false }
+      : { rejectUnauthorized: true };
+
+const pool = new pg.Pool({ connectionString: url, ssl });
 
 console.log(`→ Bootstrapping ${ADMIN_ROLE} account for ${ADMIN_EMAIL}`);
 
-// 1. Find or create the auth.users row.
-let userId;
-const { data: existing, error: lookupErr } = await supabase.auth.admin.listUsers({
-  page: 1, perPage: 200,
-});
-if (lookupErr) { console.error('listUsers failed:', lookupErr.message); process.exit(1); }
+try {
+  const hash = await bcrypt.hash(ADMIN_PASSWORD, 10);
+  const id = randomUUID();
+  const now = new Date().toISOString();
 
-const found = existing.users.find((u) => (u.email ?? '').toLowerCase() === ADMIN_EMAIL);
-if (found) {
-  userId = found.id;
-  console.log(`  ✓ auth user already exists (${userId}) — updating password`);
-  const { error: updErr } = await supabase.auth.admin.updateUserById(userId, {
-    password: ADMIN_PASSWORD,
-    email_confirm: true,
-  });
-  if (updErr) { console.error('updateUserById failed:', updErr.message); process.exit(1); }
-} else {
-  const { data: created, error: createErr } = await supabase.auth.admin.createUser({
-    email: ADMIN_EMAIL,
-    password: ADMIN_PASSWORD,
-    email_confirm: true,
-    user_metadata: { full_name: ADMIN_NAME, bootstrap: true },
-  });
-  if (createErr || !created?.user) {
-    console.error('createUser failed:', createErr?.message); process.exit(1);
-  }
-  userId = created.user.id;
-  console.log(`  ✓ created auth user (${userId})`);
-}
+  // Upsert by email. session_version is bumped on update so any stale tokens
+  // from a previous bootstrap are invalidated.
+  const r = await pool.query(
+    `INSERT INTO public.users (
+        id, email, password_hash, full_name, role,
+        must_change_password, temporary_password_sent_at,
+        failed_login_attempts, locked_until, is_active,
+        session_version, created_at, updated_at
+      )
+      VALUES ($1, $2, $3, $4, $5, true, $6, 0, NULL, true, 0, now(), now())
+      ON CONFLICT (email) DO UPDATE SET
+        password_hash = EXCLUDED.password_hash,
+        full_name = EXCLUDED.full_name,
+        role = EXCLUDED.role,
+        must_change_password = true,
+        temporary_password_sent_at = EXCLUDED.temporary_password_sent_at,
+        failed_login_attempts = 0,
+        locked_until = NULL,
+        is_active = true,
+        session_version = public.users.session_version + 1,
+        updated_at = now()
+      RETURNING id`,
+    [id, ADMIN_EMAIL, hash, ADMIN_NAME, ADMIN_ROLE, now],
+  );
 
-// 2. Upsert the matching public.users row + arm must_change_password.
-const { error: profileErr } = await supabase
-  .from('users')
-  .upsert({
-    id: userId,
-    email: ADMIN_EMAIL,
-    full_name: ADMIN_NAME,
-    role: ADMIN_ROLE,
-    must_change_password: true,
-    temporary_password_sent_at: new Date().toISOString(),
-    failed_login_attempts: 0,
-    locked_until: null,
-    is_active: true,
-  }, { onConflict: 'id' });
-if (profileErr) {
-  console.error('users upsert failed:', profileErr.message);
+  const userId = r.rows[0]?.id ?? id;
+  console.log(`  ✓ admin row ready (${userId})`);
+
+  // Deliberately do NOT echo the password back. The operator already knows
+  // what they typed into .env; printing it would leak it into shell history
+  // / terminal scrollback / CI logs.
+  console.log('\n✓ Bootstrap complete.');
+  console.log(`   Email: ${ADMIN_EMAIL}`);
+  console.log(`   Role:  ${ADMIN_ROLE}`);
+  console.log('\nThe account is flagged must_change_password=true; the app will route');
+  console.log('the user to /change-password on first sign-in and block all other routes');
+  console.log('until they pick a new password.\n');
+} catch (err) {
+  console.error('bootstrap failed:', err.message);
   process.exit(1);
+} finally {
+  await pool.end();
 }
-
-console.log('\n✓ Bootstrap complete.');
-console.log(`   Email:    ${ADMIN_EMAIL}`);
-console.log(`   Password: ${ADMIN_PASSWORD}     ← change immediately on first sign-in`);
-console.log(`   Role:     ${ADMIN_ROLE}`);
-console.log('\nThe account is flagged must_change_password=true; the app will route');
-console.log('the user to /change-password on first sign-in and block all other routes');
-console.log('until they pick a new password.\n');

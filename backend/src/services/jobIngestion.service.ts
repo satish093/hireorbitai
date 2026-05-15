@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { supabaseAdmin } from '../config/supabase';
+import { db } from '../config/db';
 import { matchJobsForConsultant } from './ai.service';
 
 /**
@@ -27,19 +27,19 @@ export type Source =
 
 export interface NormalizedJob {
   source: Source;
-  external_id: string;          // unique within the source
+  external_id: string; // unique within the source
   title: string;
   company_name: string;
-  description?: string | null;  // HTML or plain text
+  description?: string | null; // HTML or plain text
   location?: string | null;
   remote?: boolean;
-  job_type?: string | null;     // FTE | C2C | W2 | 1099
+  job_type?: string | null; // FTE | C2C | W2 | 1099
   level?: string | null;
   required_skills?: string[];
   rate_min?: number | null;
   rate_max?: number | null;
   apply_url: string;
-  posted_at?: string | null;    // ISO
+  posted_at?: string | null; // ISO
   // The user-facing board the listing was published on. Aggregators like
   // JSearch carry this so we can show "LinkedIn" / "Dice" / "Monster" /
   // "CareerBuilder" instead of just "JSearch".
@@ -52,7 +52,7 @@ interface DriverCtx {
   display_name?: string | null;
 }
 
-const UA = 'TalentBridge-AI/1.0 (+ingestion bot)';
+const UA = 'HireOrbitAI/1.0 (+ingestion bot)';
 
 // ---------------------------------------------------------------------------
 // RemoteOK
@@ -97,26 +97,28 @@ async function fetchGreenhouse(slug: string): Promise<NormalizedJob[]> {
   const url = `https://boards-api.greenhouse.io/v1/boards/${slug}/jobs?content=true`;
   const { data } = await axios.get(url, { headers: { 'User-Agent': UA }, timeout: 15000 });
   const jobs = (data?.jobs ?? []) as any[];
-  return jobs.map((j): NormalizedJob => ({
-    source: 'greenhouse',
-    external_id: String(j.id),
-    title: String(j.title),
-    company_name: prettyCompanyName(data?.meta?.company_name, slug),
-    description: stripHtml(j.content),
-    location: j.location?.name ?? null,
-    remote: /remote/i.test(j.location?.name ?? ''),
-    job_type: 'FTE',
-    level: null,
-    required_skills: [],
-    rate_min: null,
-    rate_max: null,
-    apply_url: safeApplyUrl(j.absolute_url, {
-      title: String(j.title ?? ''),
-      company: prettyCompanyName(data?.meta?.company_name, slug),
-      sourceUrl: `https://boards.greenhouse.io/${slug}/jobs/${j.id}`,
+  return jobs.map(
+    (j): NormalizedJob => ({
+      source: 'greenhouse',
+      external_id: String(j.id),
+      title: String(j.title),
+      company_name: prettyCompanyName(data?.meta?.company_name, slug),
+      description: stripHtml(j.content),
+      location: j.location?.name ?? null,
+      remote: /remote/i.test(j.location?.name ?? ''),
+      job_type: 'FTE',
+      level: null,
+      required_skills: [],
+      rate_min: null,
+      rate_max: null,
+      apply_url: safeApplyUrl(j.absolute_url, {
+        title: String(j.title ?? ''),
+        company: prettyCompanyName(data?.meta?.company_name, slug),
+        sourceUrl: `https://boards.greenhouse.io/${slug}/jobs/${j.id}`,
+      }),
+      posted_at: j.updated_at ?? j.created_at ?? null,
     }),
-    posted_at: j.updated_at ?? j.created_at ?? null,
-  }));
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -126,26 +128,28 @@ async function fetchLever(slug: string): Promise<NormalizedJob[]> {
   const url = `https://api.lever.co/v0/postings/${slug}?mode=json`;
   const { data } = await axios.get(url, { headers: { 'User-Agent': UA }, timeout: 15000 });
   const jobs = (Array.isArray(data) ? data : []) as any[];
-  return jobs.map((j): NormalizedJob => ({
-    source: 'lever',
-    external_id: String(j.id),
-    title: String(j.text),
-    company_name: prettyCompanyName(null, slug),
-    description: stripHtml(j.description),
-    location: j.categories?.location ?? null,
-    remote: /remote/i.test(j.categories?.location ?? ''),
-    job_type: mapLeverCommitment(j.categories?.commitment),
-    level: null,
-    required_skills: Array.isArray(j.categories?.team) ? [j.categories.team] : [],
-    rate_min: null,
-    rate_max: null,
-    apply_url: safeApplyUrl(j.hostedUrl ?? j.applyUrl, {
-      title: String(j.text ?? ''),
-      company: prettyCompanyName(null, slug),
-      sourceUrl: `https://jobs.lever.co/${slug}/${j.id}`,
+  return jobs.map(
+    (j): NormalizedJob => ({
+      source: 'lever',
+      external_id: String(j.id),
+      title: String(j.text),
+      company_name: prettyCompanyName(null, slug),
+      description: stripHtml(j.description),
+      location: j.categories?.location ?? null,
+      remote: /remote/i.test(j.categories?.location ?? ''),
+      job_type: mapLeverCommitment(j.categories?.commitment),
+      level: null,
+      required_skills: Array.isArray(j.categories?.team) ? [j.categories.team] : [],
+      rate_min: null,
+      rate_max: null,
+      apply_url: safeApplyUrl(j.hostedUrl ?? j.applyUrl, {
+        title: String(j.text ?? ''),
+        company: prettyCompanyName(null, slug),
+        sourceUrl: `https://jobs.lever.co/${slug}/${j.id}`,
+      }),
+      posted_at: j.createdAt ? new Date(j.createdAt).toISOString() : null,
     }),
-    posted_at: j.createdAt ? new Date(j.createdAt).toISOString() : null,
-  }));
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -155,26 +159,28 @@ async function fetchAshby(slug: string): Promise<NormalizedJob[]> {
   const url = `https://api.ashbyhq.com/posting-api/job-board/${slug}?includeCompensation=true`;
   const { data } = await axios.get(url, { headers: { 'User-Agent': UA }, timeout: 15000 });
   const jobs = (data?.jobs ?? []) as any[];
-  return jobs.map((j): NormalizedJob => ({
-    source: 'ashby',
-    external_id: String(j.id),
-    title: String(j.title),
-    company_name: prettyCompanyName(data?.organizationName, slug),
-    description: stripHtml(j.descriptionHtml ?? j.descriptionPlain ?? null),
-    location: j.location ?? j.locationName ?? null,
-    remote: !!j.isRemote || /remote/i.test(String(j.location ?? '')),
-    job_type: mapAshbyEmployment(j.employmentType),
-    level: null,
-    required_skills: [],
-    rate_min: null,
-    rate_max: null,
-    apply_url: safeApplyUrl(j.applyUrl ?? j.jobUrl, {
-      title: String(j.title ?? ''),
-      company: prettyCompanyName(data?.organizationName, slug),
-      sourceUrl: `https://jobs.ashbyhq.com/${slug}/${j.id}`,
+  return jobs.map(
+    (j): NormalizedJob => ({
+      source: 'ashby',
+      external_id: String(j.id),
+      title: String(j.title),
+      company_name: prettyCompanyName(data?.organizationName, slug),
+      description: stripHtml(j.descriptionHtml ?? j.descriptionPlain ?? null),
+      location: j.location ?? j.locationName ?? null,
+      remote: !!j.isRemote || /remote/i.test(String(j.location ?? '')),
+      job_type: mapAshbyEmployment(j.employmentType),
+      level: null,
+      required_skills: [],
+      rate_min: null,
+      rate_max: null,
+      apply_url: safeApplyUrl(j.applyUrl ?? j.jobUrl, {
+        title: String(j.title ?? ''),
+        company: prettyCompanyName(data?.organizationName, slug),
+        sourceUrl: `https://jobs.ashbyhq.com/${slug}/${j.id}`,
+      }),
+      posted_at: j.publishedAt ?? j.updatedAt ?? null,
     }),
-    posted_at: j.publishedAt ?? j.updatedAt ?? null,
-  }));
+  );
 }
 
 function mapAshbyEmployment(t?: string | null): string {
@@ -203,25 +209,27 @@ async function fetchRemotive(): Promise<NormalizedJob[]> {
     timeout: 15000,
   });
   const jobs = (data?.jobs ?? []) as any[];
-  return jobs.slice(0, 200).map((r): NormalizedJob => ({
-    source: 'remotive',
-    external_id: String(r.id),
-    title: String(r.title ?? 'Unknown title'),
-    company_name: String(r.company_name ?? 'Unknown'),
-    description: stripHtml(r.description),
-    location: r.candidate_required_location ?? 'Remote',
-    remote: true,
-    job_type: mapRemotiveType(r.job_type),
-    level: null,
-    required_skills: cleanSkills(r.tags),
-    rate_min: null,
-    rate_max: null,
-    apply_url: safeApplyUrl(r.url, {
-      title: String(r.title ?? ''),
-      company: String(r.company_name ?? ''),
+  return jobs.slice(0, 200).map(
+    (r): NormalizedJob => ({
+      source: 'remotive',
+      external_id: String(r.id),
+      title: String(r.title ?? 'Unknown title'),
+      company_name: String(r.company_name ?? 'Unknown'),
+      description: stripHtml(r.description),
+      location: r.candidate_required_location ?? 'Remote',
+      remote: true,
+      job_type: mapRemotiveType(r.job_type),
+      level: null,
+      required_skills: cleanSkills(r.tags),
+      rate_min: null,
+      rate_max: null,
+      apply_url: safeApplyUrl(r.url, {
+        title: String(r.title ?? ''),
+        company: String(r.company_name ?? ''),
+      }),
+      posted_at: r.publication_date ?? null,
     }),
-    posted_at: r.publication_date ?? null,
-  }));
+  );
 }
 
 function mapRemotiveType(t?: string | null): string {
@@ -241,25 +249,30 @@ async function fetchArbeitnow(): Promise<NormalizedJob[]> {
     timeout: 15000,
   });
   const jobs = (data?.data ?? []) as any[];
-  return jobs.map((r): NormalizedJob => ({
-    source: 'arbeitnow',
-    external_id: String(r.slug ?? r.url),
-    title: String(r.title ?? 'Unknown title'),
-    company_name: String(r.company_name ?? 'Unknown'),
-    description: stripHtml(r.description),
-    location: r.location ?? null,
-    remote: !!r.remote,
-    job_type: Array.isArray(r.job_types) && r.job_types.length > 0 ? prettyJobType(r.job_types[0]) : 'FTE',
-    level: null,
-    required_skills: cleanSkills(r.tags),
-    rate_min: null,
-    rate_max: null,
-    apply_url: safeApplyUrl(r.url, {
-      title: String(r.title ?? ''),
-      company: String(r.company_name ?? ''),
+  return jobs.map(
+    (r): NormalizedJob => ({
+      source: 'arbeitnow',
+      external_id: String(r.slug ?? r.url),
+      title: String(r.title ?? 'Unknown title'),
+      company_name: String(r.company_name ?? 'Unknown'),
+      description: stripHtml(r.description),
+      location: r.location ?? null,
+      remote: !!r.remote,
+      job_type:
+        Array.isArray(r.job_types) && r.job_types.length > 0
+          ? prettyJobType(r.job_types[0])
+          : 'FTE',
+      level: null,
+      required_skills: cleanSkills(r.tags),
+      rate_min: null,
+      rate_max: null,
+      apply_url: safeApplyUrl(r.url, {
+        title: String(r.title ?? ''),
+        company: String(r.company_name ?? ''),
+      }),
+      posted_at: r.created_at ? new Date(r.created_at * 1000).toISOString() : null,
     }),
-    posted_at: r.created_at ? new Date(r.created_at * 1000).toISOString() : null,
-  }));
+  );
 }
 
 function prettyJobType(t: string): string {
@@ -332,10 +345,11 @@ async function fetchJSearch(slug: string | null): Promise<NormalizedJob[]> {
     throw new Error('JSEARCH_API_KEY not set in backend/.env');
   }
 
-  const queriesRaw = slug
-    ?? process.env.JSEARCH_QUERIES
-    ?? 'software engineer';
-  const queries = queriesRaw.split('|').map((s) => s.trim()).filter(Boolean);
+  const queriesRaw = slug ?? process.env.JSEARCH_QUERIES ?? 'software engineer';
+  const queries = queriesRaw
+    .split('|')
+    .map((s) => s.trim())
+    .filter(Boolean);
   const country = process.env.JSEARCH_COUNTRY ?? 'us';
 
   const out: NormalizedJob[] = [];
@@ -421,19 +435,19 @@ function mapJSearchEmployment(t?: string | null): string {
 function normalizePublisher(raw: unknown): string | null {
   if (!raw || typeof raw !== 'string') return null;
   const s = raw.toLowerCase();
-  if (s.includes('linkedin'))      return 'LinkedIn';
-  if (s.includes('dice'))          return 'Dice';
-  if (s.includes('monster'))       return 'Monster';
+  if (s.includes('linkedin')) return 'LinkedIn';
+  if (s.includes('dice')) return 'Dice';
+  if (s.includes('monster')) return 'Monster';
   if (s.includes('careerbuilder')) return 'CareerBuilder';
-  if (s.includes('indeed'))        return 'Indeed';
-  if (s.includes('glassdoor'))     return 'Glassdoor';
+  if (s.includes('indeed')) return 'Indeed';
+  if (s.includes('glassdoor')) return 'Glassdoor';
   if (s.includes('ziprecruiter') || s.includes('zip recruiter')) return 'ZipRecruiter';
-  if (s.includes('snagajob'))      return 'Snagajob';
-  if (s.includes('simplyhired'))   return 'SimplyHired';
-  if (s.includes('jobot'))         return 'Jobot';
-  if (s.includes('lensa'))         return 'Lensa';
-  if (s.includes('builtin'))       return 'BuiltIn';
-  if (s.includes('google'))        return 'Google for Jobs';
+  if (s.includes('snagajob')) return 'Snagajob';
+  if (s.includes('simplyhired')) return 'SimplyHired';
+  if (s.includes('jobot')) return 'Jobot';
+  if (s.includes('lensa')) return 'Lensa';
+  if (s.includes('builtin')) return 'BuiltIn';
+  if (s.includes('google')) return 'Google for Jobs';
   // Fall back to the raw publisher name when it isn't one of the known boards.
   return /^https?:\/\//i.test(raw) ? null : raw.slice(0, 40);
 }
@@ -446,9 +460,10 @@ function extractJSearchSkills(highlights: unknown): string[] {
   const found = new Set<string>();
   for (const line of qualifications) {
     const matches = line.match(/[A-Z][a-zA-Z0-9+#.]{1,24}(?:\.[a-z]+)?/g);
-    if (matches) for (const m of matches) {
-      if (m.length >= 2 && m.length <= 24) found.add(m);
-    }
+    if (matches)
+      for (const m of matches) {
+        if (m.length >= 2 && m.length <= 24) found.add(m);
+      }
   }
   return Array.from(found).slice(0, 12);
 }
@@ -463,7 +478,10 @@ async function fetchJooble(slug: string | null): Promise<NormalizedJob[]> {
   if (!apiKey) throw new Error('JOOBLE_API_KEY not set in backend/.env');
 
   const queriesRaw = slug ?? process.env.JOOBLE_QUERIES ?? 'software engineer';
-  const queries = queriesRaw.split('|').map((s) => s.trim()).filter(Boolean);
+  const queries = queriesRaw
+    .split('|')
+    .map((s) => s.trim())
+    .filter(Boolean);
   const location = process.env.JOOBLE_LOCATION ?? 'United States';
   const out: NormalizedJob[] = [];
   const errs: string[] = [];
@@ -512,16 +530,17 @@ async function fetchJooble(slug: string | null): Promise<NormalizedJob[]> {
 async function fetchUSAJobs(slug: string | null): Promise<NormalizedJob[]> {
   const apiKey = process.env.USAJOBS_API_KEY;
   const agent = process.env.USAJOBS_USER_AGENT;
-  if (!apiKey || !agent) throw new Error('USAJOBS_API_KEY and USAJOBS_USER_AGENT must be set in backend/.env');
+  if (!apiKey || !agent)
+    throw new Error('USAJOBS_API_KEY and USAJOBS_USER_AGENT must be set in backend/.env');
 
   const keyword = slug ?? process.env.USAJOBS_KEYWORD ?? 'software engineer';
   const { data } = await axios.get('https://data.usajobs.gov/api/search', {
     params: { Keyword: keyword, ResultsPerPage: 100 },
     headers: {
-      'Host': 'data.usajobs.gov',
+      Host: 'data.usajobs.gov',
       'User-Agent': agent,
       'Authorization-Key': apiKey,
-      'Accept': 'application/json',
+      Accept: 'application/json',
     },
     timeout: 20000,
   });
@@ -535,17 +554,19 @@ async function fetchUSAJobs(slug: string | null): Promise<NormalizedJob[]> {
       title: String(j.PositionTitle ?? 'Federal role'),
       company_name: String(j.OrganizationName ?? 'US Government'),
       description: stripHtml(j.QualificationSummary ?? j.UserArea?.Details?.JobSummary ?? null),
-      location: (j.PositionLocationDisplay ?? null),
+      location: j.PositionLocationDisplay ?? null,
       remote: remoteHint,
       job_type: 'FTE',
       level: null,
       required_skills: [],
-      rate_min: typeof j.PositionRemuneration?.[0]?.MinimumRange === 'string'
-        ? Math.round(Number(j.PositionRemuneration[0].MinimumRange) / 2000) || null
-        : null,
-      rate_max: typeof j.PositionRemuneration?.[0]?.MaximumRange === 'string'
-        ? Math.round(Number(j.PositionRemuneration[0].MaximumRange) / 2000) || null
-        : null,
+      rate_min:
+        typeof j.PositionRemuneration?.[0]?.MinimumRange === 'string'
+          ? Math.round(Number(j.PositionRemuneration[0].MinimumRange) / 2000) || null
+          : null,
+      rate_max:
+        typeof j.PositionRemuneration?.[0]?.MaximumRange === 'string'
+          ? Math.round(Number(j.PositionRemuneration[0].MaximumRange) / 2000) || null
+          : null,
       apply_url: safeApplyUrl(j.PositionURI ?? j.ApplyURI?.[0], {
         title: String(j.PositionTitle ?? ''),
         company: String(j.OrganizationName ?? ''),
@@ -570,26 +591,30 @@ async function fetchSerpApi(slug: string | null): Promise<NormalizedJob[]> {
     timeout: 20000,
   });
   const rows = data?.jobs_results ?? [];
-  return rows.map((r: any): NormalizedJob => ({
-    source: 'serpapi',
-    external_id: String(r.job_id ?? r.job_highlights?.[0]?.title ?? r.title + '|' + (r.company_name ?? '')),
-    title: String(r.title ?? 'Unknown title'),
-    company_name: String(r.company_name ?? 'Unknown'),
-    description: stripHtml(r.description ?? null),
-    location: r.location ?? null,
-    remote: !!r.detected_extensions?.work_from_home,
-    job_type: r.detected_extensions?.schedule_type ?? 'FTE',
-    level: null,
-    required_skills: [],
-    rate_min: null,
-    rate_max: null,
-    apply_url: safeApplyUrl(r.apply_options?.[0]?.link ?? r.related_links?.[0]?.link, {
-      title: String(r.title ?? ''),
-      company: String(r.company_name ?? ''),
+  return rows.map(
+    (r: any): NormalizedJob => ({
+      source: 'serpapi',
+      external_id: String(
+        r.job_id ?? r.job_highlights?.[0]?.title ?? r.title + '|' + (r.company_name ?? ''),
+      ),
+      title: String(r.title ?? 'Unknown title'),
+      company_name: String(r.company_name ?? 'Unknown'),
+      description: stripHtml(r.description ?? null),
+      location: r.location ?? null,
+      remote: !!r.detected_extensions?.work_from_home,
+      job_type: r.detected_extensions?.schedule_type ?? 'FTE',
+      level: null,
+      required_skills: [],
+      rate_min: null,
+      rate_max: null,
+      apply_url: safeApplyUrl(r.apply_options?.[0]?.link ?? r.related_links?.[0]?.link, {
+        title: String(r.title ?? ''),
+        company: String(r.company_name ?? ''),
+      }),
+      posted_at: r.detected_extensions?.posted_at ?? null,
+      publisher: normalizePublisher(r.apply_options?.[0]?.title ?? r.via ?? null),
     }),
-    posted_at: r.detected_extensions?.posted_at ?? null,
-    publisher: normalizePublisher(r.apply_options?.[0]?.title ?? r.via ?? null),
-  }));
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -616,11 +641,7 @@ async function fetchSearchApi(slug: string | null): Promise<NormalizedJob[]> {
   }
   const rows = (data?.jobs ?? []) as any[];
   return rows.map((r): NormalizedJob => {
-    const apply =
-      r.apply_link
-      ?? r.apply_links?.[0]?.link
-      ?? r.share_link
-      ?? null;
+    const apply = r.apply_link ?? r.apply_links?.[0]?.link ?? r.share_link ?? null;
     return {
       source: 'searchapi',
       external_id: String(r.job_id ?? `${r.title}|${r.company_name ?? ''}|${r.location ?? ''}`),
@@ -659,34 +680,40 @@ async function fetchLinkedIn(slug: string | null): Promise<NormalizedJob[]> {
   const apiKey = process.env.RAPIDAPI_KEY ?? process.env.JSEARCH_API_KEY;
   if (!apiKey) throw new Error('RAPIDAPI_KEY (or JSEARCH_API_KEY) not set in backend/.env');
 
-  const titlesRaw = slug ?? process.env.LINKEDIN_TITLES ?? 'Software Engineer|Data Engineer|Full Stack Developer';
-  const titles = titlesRaw.split('|').map((s) => s.trim()).filter(Boolean);
+  const titlesRaw =
+    slug ?? process.env.LINKEDIN_TITLES ?? 'Software Engineer|Data Engineer|Full Stack Developer';
+  const titles = titlesRaw
+    .split('|')
+    .map((s) => s.trim())
+    .filter(Boolean);
   const location = process.env.LINKEDIN_LOCATIONS ?? 'United States';
   const window = (process.env.LINKEDIN_WINDOW ?? '24h').toLowerCase();
-  const endpoint = window === '1h' ? 'active-jb-1h'
-                : window === '7d' ? 'active-jb-7d'
-                                  : 'active-jb-24h';
+  const endpoint =
+    window === '1h' ? 'active-jb-1h' : window === '7d' ? 'active-jb-7d' : 'active-jb-24h';
 
   const out: NormalizedJob[] = [];
   const errs: string[] = [];
 
   for (const title of titles) {
     try {
-      const { data } = await axios.get(`https://linkedin-job-search-api.p.rapidapi.com/${endpoint}`, {
-        params: {
-          offset: 0,
-          title_filter: title,
-          location_filter: location,
-          description_type: 'text',
+      const { data } = await axios.get(
+        `https://linkedin-job-search-api.p.rapidapi.com/${endpoint}`,
+        {
+          params: {
+            offset: 0,
+            title_filter: title,
+            location_filter: location,
+            description_type: 'text',
+          },
+          headers: {
+            'x-rapidapi-host': 'linkedin-job-search-api.p.rapidapi.com',
+            'x-rapidapi-key': apiKey,
+            'User-Agent': UA,
+          },
+          timeout: 25000,
+          validateStatus: () => true,
         },
-        headers: {
-          'x-rapidapi-host': 'linkedin-job-search-api.p.rapidapi.com',
-          'x-rapidapi-key': apiKey,
-          'User-Agent': UA,
-        },
-        timeout: 25000,
-        validateStatus: () => true,
-      });
+      );
       if (typeof data === 'object' && data && 'message' in data && Array.isArray(data) === false) {
         errs.push(`"${title}": ${(data as any).message}`);
         continue;
@@ -694,10 +721,10 @@ async function fetchLinkedIn(slug: string | null): Promise<NormalizedJob[]> {
       const rows = Array.isArray(data) ? data : ((data as any)?.data ?? []);
       for (const r of rows as any[]) {
         const loc =
-          r.locations_raw?.[0]?.address?.addressLocality
-          ?? r.locations_derived?.[0]
-          ?? r.locations_alt_raw?.[0]
-          ?? null;
+          r.locations_raw?.[0]?.address?.addressLocality ??
+          r.locations_derived?.[0] ??
+          r.locations_alt_raw?.[0] ??
+          null;
         const region = r.locations_raw?.[0]?.address?.addressRegion;
         const country = r.locations_raw?.[0]?.address?.addressCountry;
         const fullLocation = [loc, region, country].filter(Boolean).join(', ') || null;
@@ -767,7 +794,10 @@ async function fetchMonster(slug: string | null): Promise<NormalizedJob[]> {
   let location = process.env.MONSTER_LOCATION ?? 'New York';
   let countryCode = process.env.MONSTER_COUNTRY_CODE ?? 'en_us';
   if (slug) {
-    const parts = slug.split('|').map((p) => p.trim()).filter(Boolean);
+    const parts = slug
+      .split('|')
+      .map((p) => p.trim())
+      .filter(Boolean);
     if (parts[0]) keyword = parts[0];
     if (parts[1]) location = parts[1];
     if (parts[2]) countryCode = parts[2];
@@ -789,23 +819,30 @@ async function fetchMonster(slug: string | null): Promise<NormalizedJob[]> {
     },
   );
 
-  if (status >= 400 || (data && typeof data === 'object' && 'message' in data && !Array.isArray((data as any).data))) {
+  if (
+    status >= 400 ||
+    (data && typeof data === 'object' && 'message' in data && !Array.isArray((data as any).data))
+  ) {
     throw new Error(`Monster: ${(data as any)?.message ?? `HTTP ${status}`}`);
   }
   // Be defensive: the API can return either an array, { data: [...] },
   // { jobs: [...] }, or { data: { jobs: [...] } }.
-  const rows: any[] =
-    Array.isArray(data) ? data
-    : Array.isArray((data as any)?.data) ? (data as any).data
-    : Array.isArray((data as any)?.jobs) ? (data as any).jobs
-    : Array.isArray((data as any)?.data?.jobs) ? (data as any).data.jobs
-    : [];
+  const rows: any[] = Array.isArray(data)
+    ? data
+    : Array.isArray((data as any)?.data)
+      ? (data as any).data
+      : Array.isArray((data as any)?.jobs)
+        ? (data as any).jobs
+        : Array.isArray((data as any)?.data?.jobs)
+          ? (data as any).data.jobs
+          : [];
 
   return rows.map((r): NormalizedJob => {
     const companyName = r.company?.name ?? r.company ?? r.organization ?? 'Unknown';
     const loc = r.location?.city
       ? [r.location.city, r.location.state ?? r.location.region, r.location.country]
-          .filter(Boolean).join(', ')
+          .filter(Boolean)
+          .join(', ')
       : (r.location ?? r.jobLocation ?? null);
     const url = r.applyUrl ?? r.url ?? r.jobUrl ?? r.detailsLink ?? null;
     return {
@@ -857,13 +894,13 @@ function dedupe(jobs: NormalizedJob[]): NormalizedJob[] {
 
 const DRIVERS: Record<Source, (ctx: DriverCtx) => Promise<NormalizedJob[]>> = {
   remoteok: () => fetchRemoteOK(),
-  greenhouse: ({ slug }) => slug ? fetchGreenhouse(slug) : Promise.resolve([]),
-  lever: ({ slug }) => slug ? fetchLever(slug) : Promise.resolve([]),
+  greenhouse: ({ slug }) => (slug ? fetchGreenhouse(slug) : Promise.resolve([])),
+  lever: ({ slug }) => (slug ? fetchLever(slug) : Promise.resolve([])),
   adzuna: ({ slug }) => fetchAdzuna(slug),
   remotive: () => fetchRemotive(),
   arbeitnow: () => fetchArbeitnow(),
   jsearch: ({ slug }) => fetchJSearch(slug),
-  ashby: ({ slug }) => slug ? fetchAshby(slug) : Promise.resolve([]),
+  ashby: ({ slug }) => (slug ? fetchAshby(slug) : Promise.resolve([])),
   jooble: ({ slug }) => fetchJooble(slug),
   usajobs: ({ slug }) => fetchUSAJobs(slug),
   serpapi: ({ slug }) => fetchSerpApi(slug),
@@ -903,7 +940,7 @@ export interface FullSyncResult {
  * every newly-inserted job.
  */
 export async function runSync(): Promise<FullSyncResult> {
-  const { data: sources, error } = await supabaseAdmin
+  const { data: sources, error } = await db
     .from('source_companies')
     .select('*')
     .eq('is_active', true);
@@ -918,25 +955,39 @@ export async function runSync(): Promise<FullSyncResult> {
         if (!driver) throw new Error(`Unknown source: ${s.source}`);
         const jobs = await driver(ctx);
         const { upserted, newJobIds } = await upsertJobs(jobs);
-        await supabaseAdmin.from('source_companies').update({
-          last_synced_at: new Date().toISOString(),
-          last_sync_jobs_count: upserted,
-          last_sync_error: null,
-        }).eq('id', s.id);
+        await db
+          .from('source_companies')
+          .update({
+            last_synced_at: new Date().toISOString(),
+            last_sync_jobs_count: upserted,
+            last_sync_error: null,
+          })
+          .eq('id', s.id);
         return {
-          source: s.source, slug: s.slug ?? null,
-          jobs_pulled: jobs.length, jobs_upserted: upserted,
+          source: s.source,
+          slug: s.slug ?? null,
+          jobs_pulled: jobs.length,
+          jobs_upserted: upserted,
           new_job_ids: newJobIds,
         };
       } catch (e: any) {
         const msg = e?.message ?? String(e);
-        await supabaseAdmin.from('source_companies').update({
-          last_synced_at: new Date().toISOString(),
-          last_sync_error: msg,
-        }).eq('id', s.id);
-        return { source: s.source, slug: s.slug ?? null, jobs_pulled: 0, jobs_upserted: 0, error: msg };
+        await db
+          .from('source_companies')
+          .update({
+            last_synced_at: new Date().toISOString(),
+            last_sync_error: msg,
+          })
+          .eq('id', s.id);
+        return {
+          source: s.source,
+          slug: s.slug ?? null,
+          jobs_pulled: 0,
+          jobs_upserted: 0,
+          error: msg,
+        };
       }
-    })
+    }),
   );
 
   const allNewIds = reports.flatMap((r) => r.new_job_ids ?? []);
@@ -945,9 +996,14 @@ export async function runSync(): Promise<FullSyncResult> {
 }
 
 /** Sync a single source row by id — used by an admin "refresh" button. */
-export async function runSyncForId(sourceCompanyId: string): Promise<SyncReport & { auto_match?: AutoMatchReport | null }> {
-  const { data: s, error } = await supabaseAdmin
-    .from('source_companies').select('*').eq('id', sourceCompanyId).single();
+export async function runSyncForId(
+  sourceCompanyId: string,
+): Promise<SyncReport & { auto_match?: AutoMatchReport | null }> {
+  const { data: s, error } = await db
+    .from('source_companies')
+    .select('*')
+    .eq('id', sourceCompanyId)
+    .single();
   if (error || !s) throw new Error('Source company not found');
   const ctx: DriverCtx = { slug: s.slug ?? null, display_name: s.display_name };
   try {
@@ -955,23 +1011,32 @@ export async function runSyncForId(sourceCompanyId: string): Promise<SyncReport 
     if (!driver) throw new Error(`Unknown source: ${s.source}`);
     const jobs = await driver(ctx);
     const { upserted, newJobIds } = await upsertJobs(jobs);
-    await supabaseAdmin.from('source_companies').update({
-      last_synced_at: new Date().toISOString(),
-      last_sync_jobs_count: upserted,
-      last_sync_error: null,
-    }).eq('id', s.id);
+    await db
+      .from('source_companies')
+      .update({
+        last_synced_at: new Date().toISOString(),
+        last_sync_jobs_count: upserted,
+        last_sync_error: null,
+      })
+      .eq('id', s.id);
     const autoMatch = newJobIds.length > 0 ? await autoMatchAndNotify(newJobIds) : null;
     return {
-      source: s.source, slug: s.slug ?? null,
-      jobs_pulled: jobs.length, jobs_upserted: upserted,
-      new_job_ids: newJobIds, auto_match: autoMatch,
+      source: s.source,
+      slug: s.slug ?? null,
+      jobs_pulled: jobs.length,
+      jobs_upserted: upserted,
+      new_job_ids: newJobIds,
+      auto_match: autoMatch,
     };
   } catch (e: any) {
     const msg = e?.message ?? String(e);
-    await supabaseAdmin.from('source_companies').update({
-      last_synced_at: new Date().toISOString(),
-      last_sync_error: msg,
-    }).eq('id', s.id);
+    await db
+      .from('source_companies')
+      .update({
+        last_synced_at: new Date().toISOString(),
+        last_sync_error: msg,
+      })
+      .eq('id', s.id);
     return { source: s.source, slug: s.slug ?? null, jobs_pulled: 0, jobs_upserted: 0, error: msg };
   }
 }
@@ -983,13 +1048,19 @@ export async function runSyncForId(sourceCompanyId: string): Promise<SyncReport 
 // system identity (first SUPER_ADMIN/CEO) to that consultant's recruiter.
 // ---------------------------------------------------------------------------
 
-const MATCH_NOTIFY_THRESHOLD = Math.max(0, Math.min(100, Number(process.env.MATCH_NOTIFY_THRESHOLD ?? 85)));
-const MATCH_NOTIFY_MAX_JOBS_PER_CONSULTANT = 30;     // cap prompt size
+const MATCH_NOTIFY_THRESHOLD = Math.max(
+  0,
+  Math.min(100, Number(process.env.MATCH_NOTIFY_THRESHOLD ?? 85)),
+);
+const MATCH_NOTIFY_MAX_JOBS_PER_CONSULTANT = 30; // cap prompt size
 const MATCH_NOTIFY_MAX_NOTIFICATIONS_PER_CONSULTANT = 5;
 
 function splitSkills(s: string | null | undefined): string[] {
   if (!s) return [];
-  return s.split(/[,;|/]/).map((t) => t.trim()).filter(Boolean);
+  return s
+    .split(/[,;|/]/)
+    .map((t) => t.trim())
+    .filter(Boolean);
 }
 
 async function findSystemSenderId(): Promise<string | null> {
@@ -997,8 +1068,12 @@ async function findSystemSenderId(): Promise<string | null> {
   // active manager-tier user. We use this as the sender for auto-match DMs
   // because messages.sender_id is NOT NULL and must differ from recipient_id.
   for (const role of ['SUPER_ADMIN', 'CEO', 'CTO', 'DIRECTOR']) {
-    const { data } = await supabaseAdmin
-      .from('users').select('id').eq('role', role).eq('is_active', true).limit(1);
+    const { data } = await db
+      .from('users')
+      .select('id')
+      .eq('role', role)
+      .eq('is_active', true)
+      .limit(1);
     if (data && data[0]?.id) return data[0].id;
   }
   return null;
@@ -1016,38 +1091,51 @@ async function autoMatchAndNotify(newJobIds: string[]): Promise<AutoMatchReport>
 
     // Cap the candidate pool so a huge sync doesn't blow up the AI bill.
     const candidateIds = newJobIds.slice(0, 200);
-    const { data: jobs } = await supabaseAdmin
+    const { data: jobs } = await db
       .from('jobs')
       .select('id, title, company_name, required_skills, location, description')
       .in('id', candidateIds);
     if (!jobs || jobs.length === 0) return baseline;
 
     // Active consultants only.
-    const { data: consultants } = await supabaseAdmin
+    const { data: consultants } = await db
       .from('consultants')
-      .select('id, user_id, primary_skill, skills, total_experience_years, preferred_locations, recruiter_id')
+      .select(
+        'id, user_id, primary_skill, skills, total_experience_years, preferred_locations, recruiter_id',
+      )
       .eq('marketing_status', 'ACTIVE');
     if (!consultants || consultants.length === 0) return baseline;
 
     // We need the consultant's name (for the message body) and the recruiter's
     // user_id (for the DM recipient). Fetch in two cheap batches.
-    const consultantUserIds = consultants.map((c) => c.user_id).filter(Boolean) as string[];
-    const recruiterIds = consultants.map((c) => c.recruiter_id).filter(Boolean) as string[];
+    const consultantUserIds = (consultants as Array<{ user_id: string | null }>)
+      .map((c) => c.user_id)
+      .filter(Boolean) as string[];
+    const recruiterIds = (consultants as Array<{ recruiter_id: string | null }>)
+      .map((c) => c.recruiter_id)
+      .filter(Boolean) as string[];
     const [{ data: users }, { data: recruiters }] = await Promise.all([
       consultantUserIds.length
-        ? supabaseAdmin.from('users').select('id, full_name').in('id', consultantUserIds)
+        ? db.from('users').select('id, full_name').in('id', consultantUserIds)
         : Promise.resolve({ data: [] as any[] }),
       recruiterIds.length
-        ? supabaseAdmin.from('recruiters').select('id, user_id').in('id', recruiterIds)
+        ? db.from('recruiters').select('id, user_id').in('id', recruiterIds)
         : Promise.resolve({ data: [] as any[] }),
     ]);
-    const nameByUserId = new Map<string, string>((users ?? []).map((u: any) => [u.id, u.full_name ?? 'Consultant']));
-    const recruiterUserById = new Map<string, string>((recruiters ?? []).map((r: any) => [r.id, r.user_id]));
+    const nameByUserId = new Map<string, string>(
+      (users ?? []).map((u: any) => [u.id, u.full_name ?? 'Consultant']),
+    );
+    const recruiterUserById = new Map<string, string>(
+      (recruiters ?? []).map((r: any) => [r.id, r.user_id]),
+    );
 
     const senderId = await findSystemSenderId();
     if (!senderId) {
       // No admin to send from; skip silently rather than failing the whole sync.
-      return { ...baseline, error: 'No SUPER_ADMIN/CEO user available to act as auto-match sender' };
+      return {
+        ...baseline,
+        error: 'No SUPER_ADMIN/CEO user available to act as auto-match sender',
+      };
     }
 
     const jobsForPrompt = jobs.slice(0, MATCH_NOTIFY_MAX_JOBS_PER_CONSULTANT).map((j: any) => ({
@@ -1065,15 +1153,15 @@ async function autoMatchAndNotify(newJobIds: string[]): Promise<AutoMatchReport>
     for (const c of consultants) {
       if (!c.recruiter_id) continue;
       const recipientId = recruiterUserById.get(c.recruiter_id);
-      if (!recipientId) continue;                    // recruiter row exists but has no user
-      if (recipientId === senderId) continue;        // can't DM yourself; skip if admin is also the recruiter
+      if (!recipientId) continue; // recruiter row exists but has no user
+      if (recipientId === senderId) continue; // can't DM yourself; skip if admin is also the recruiter
 
       try {
         const consultantSkills =
           Array.isArray((c as any).skills) && (c as any).skills.length > 0
-            ? (c as any).skills as string[]
+            ? ((c as any).skills as string[])
             : splitSkills(c.primary_skill);
-        if (consultantSkills.length === 0) continue;   // nothing to match on
+        if (consultantSkills.length === 0) continue; // nothing to match on
 
         const matches = await matchJobsForConsultant(
           {
@@ -1100,7 +1188,7 @@ async function autoMatchAndNotify(newJobIds: string[]): Promise<AutoMatchReport>
           const body = `Strong match for ${consultantName}: ${title} at ${company} (${score}%)${reason ? ` — ${reason}` : ''}.\nOpen: ${link}`;
           return { sender_id: senderId, recipient_id: recipientId, body };
         });
-        const { error: insErr } = await supabaseAdmin.from('messages').insert(rows);
+        const { error: insErr } = await db.from('messages').insert(rows);
         if (!insErr) notificationsSent += rows.length;
       } catch {
         // One consultant failing shouldn't abort the whole pass; just continue.
@@ -1120,7 +1208,7 @@ async function autoMatchAndNotify(newJobIds: string[]): Promise<AutoMatchReport>
 
 interface UpsertResult {
   upserted: number;
-  newJobIds: string[];   // only rows the DB hadn't seen before — used to feed the matcher
+  newJobIds: string[]; // only rows the DB hadn't seen before — used to feed the matcher
 }
 
 async function upsertJobs(jobs: NormalizedJob[]): Promise<UpsertResult> {
@@ -1137,9 +1225,12 @@ async function upsertJobs(jobs: NormalizedJob[]): Promise<UpsertResult> {
   }
   const existingKeys = new Set<string>();
   for (const [source, ids] of externalIdsBySource) {
-    // Supabase's .in() handles up to a few thousand values fine.
-    const { data } = await supabaseAdmin
-      .from('jobs').select('external_id').eq('source', source).in('external_id', ids);
+    // Postgres .in() handles up to a few thousand values fine.
+    const { data } = await db
+      .from('jobs')
+      .select('external_id')
+      .eq('source', source)
+      .in('external_id', ids);
     for (const r of data ?? []) existingKeys.add(`${source}|${r.external_id}`);
   }
   const trulyNew = jobs.filter((j) => !existingKeys.has(`${j.source}|${j.external_id}`));
@@ -1163,14 +1254,16 @@ async function upsertJobs(jobs: NormalizedJob[]): Promise<UpsertResult> {
     is_active: true,
     last_synced_at: new Date().toISOString(),
   }));
-  let { error, count } = await supabaseAdmin
-    .from('jobs').upsert(rows, { onConflict: 'source,external_id', count: 'exact' });
+  let { error, count } = await db
+    .from('jobs')
+    .upsert(rows, { onConflict: 'source,external_id', count: 'exact' });
   // If the `publisher` migration hasn't been applied yet, retry without it
   // rather than fail the whole sync. Same pattern used elsewhere.
   if (error && /publisher/.test(error.message) && /schema cache|column/i.test(error.message)) {
     const stripped = rows.map(({ publisher, ...rest }) => rest);
-    ({ error, count } = await supabaseAdmin
-      .from('jobs').upsert(stripped, { onConflict: 'source,external_id', count: 'exact' }));
+    ({ error, count } = await db
+      .from('jobs')
+      .upsert(stripped, { onConflict: 'source,external_id', count: 'exact' }));
   }
   if (error) throw new Error(`Job upsert failed: ${error.message}`);
 
@@ -1185,8 +1278,11 @@ async function upsertJobs(jobs: NormalizedJob[]): Promise<UpsertResult> {
       byKey.set(j.source, arr);
     }
     for (const [source, ids] of byKey) {
-      const { data } = await supabaseAdmin
-        .from('jobs').select('id').eq('source', source).in('external_id', ids);
+      const { data } = await db
+        .from('jobs')
+        .select('id')
+        .eq('source', source)
+        .in('external_id', ids);
       for (const r of data ?? []) if (r.id) newJobIds.push(r.id);
     }
   }
@@ -1226,15 +1322,63 @@ function stripHtml(input: string | null | undefined): string | null {
 
 // Tags RemoteOK ships that are categories, not skills.
 const JUNK_TAGS = new Set<string>([
-  'go', 'lead', 'leader', 'growth', 'engineering', 'engineer', 'developer',
-  'senior', 'junior', 'mid', 'principal', 'staff', 'manager', 'director', 'vp',
-  'digital nomad', 'non tech', 'system', 'systems', 'code', 'tech',
-  'full time', 'part time', 'contract', 'remote', 'hybrid', 'onsite',
-  'usa', 'us', 'canada', 'europe', 'asia', 'worldwide', 'global', 'apac',
-  'startup', 'crypto', 'finance', 'health', 'edtech', 'medical',
-  'sales', 'marketing', 'design', 'product', 'support', 'operations',
-  'people', 'admin', 'business', 'consulting', 'analyst', 'qa',
-  'fullstack', 'full stack', 'frontend', 'backend',  // too generic on their own
+  'go',
+  'lead',
+  'leader',
+  'growth',
+  'engineering',
+  'engineer',
+  'developer',
+  'senior',
+  'junior',
+  'mid',
+  'principal',
+  'staff',
+  'manager',
+  'director',
+  'vp',
+  'digital nomad',
+  'non tech',
+  'system',
+  'systems',
+  'code',
+  'tech',
+  'full time',
+  'part time',
+  'contract',
+  'remote',
+  'hybrid',
+  'onsite',
+  'usa',
+  'us',
+  'canada',
+  'europe',
+  'asia',
+  'worldwide',
+  'global',
+  'apac',
+  'startup',
+  'crypto',
+  'finance',
+  'health',
+  'edtech',
+  'medical',
+  'sales',
+  'marketing',
+  'design',
+  'product',
+  'support',
+  'operations',
+  'people',
+  'admin',
+  'business',
+  'consulting',
+  'analyst',
+  'qa',
+  'fullstack',
+  'full stack',
+  'frontend',
+  'backend', // too generic on their own
 ]);
 
 function cleanSkills(tags: unknown): string[] {

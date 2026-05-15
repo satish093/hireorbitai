@@ -1,6 +1,6 @@
 import { RequestHandler } from 'express';
 import { z } from 'zod';
-import { supabaseAdmin } from '../config/supabase';
+import { db } from '../config/db';
 import { httpError, ALL_ROLES, Role } from '../types';
 import { audit } from '../services/audit.service';
 import { requestPasswordReset } from '../services/auth.service';
@@ -17,7 +17,7 @@ import { logger } from '../config/logger';
 // ---------------------------------------------------------------------------
 
 const STATUSES = ['active', 'inactive', 'suspended', 'pending_verification', 'banned'] as const;
-type Status = typeof STATUSES[number];
+type Status = (typeof STATUSES)[number];
 
 // ---------------------------------------------------------------------------
 // GET /admin/users
@@ -45,11 +45,11 @@ export const list: RequestHandler = async (req, res) => {
 
   // PostgREST returns the matched-row count in the response when we ask for
   // it via `count: 'exact'`. That's what powers the pagination footer.
-  let query = supabaseAdmin
+  let query = db
     .from('users')
     .select(
       'id, email, full_name, role, status, must_change_password, ' +
-      'created_at, updated_at, last_login_at, last_seen_at, status_reason',
+        'created_at, updated_at, last_login_at, last_seen_at, status_reason',
       { count: 'exact' },
     )
     .order(sort, { ascending: order === 'asc', nullsFirst: false })
@@ -86,11 +86,7 @@ export const list: RequestHandler = async (req, res) => {
 // ---------------------------------------------------------------------------
 export const get: RequestHandler = async (req, res) => {
   const { id } = req.params;
-  const { data, error } = await supabaseAdmin
-    .from('users')
-    .select('*')
-    .eq('id', id)
-    .maybeSingle();
+  const { data, error } = await db.from('users').select('*').eq('id', id).maybeSingle();
   if (error) throw httpError(500, error.message);
   if (!data) throw httpError(404, 'User not found');
 
@@ -98,29 +94,36 @@ export const get: RequestHandler = async (req, res) => {
   // the public /users/:id does.
   const context: any = {};
   if (data.role === 'CONSULTANT') {
-    const consResult = await supabaseAdmin
+    const consResult = await db
       .from('consultants')
-      .select('id, recruiter_id, primary_skill, skills, total_experience_years, ' +
-              'visa_status, current_location, preferred_locations, marketing_status, ' +
-              'linkedin_url, github_url')
-      .eq('user_id', data.id).maybeSingle();
+      .select(
+        'id, recruiter_id, primary_skill, skills, total_experience_years, ' +
+          'visa_status, current_location, preferred_locations, marketing_status, ' +
+          'linkedin_url, github_url',
+      )
+      .eq('user_id', data.id)
+      .maybeSingle();
     const cons: any = consResult.data;
     if (cons) {
       context.consultant = cons;
       if (cons.recruiter_id) {
-        const { data: rec } = await supabaseAdmin
+        const { data: rec } = await db
           .from('recruiters')
           .select('id, team, user:users!user_id(id, full_name, email)')
-          .eq('id', cons.recruiter_id).maybeSingle();
+          .eq('id', cons.recruiter_id)
+          .maybeSingle();
         context.recruiter = rec;
       }
     }
   } else if (data.role === 'RECRUITER') {
-    const { data: rec } = await supabaseAdmin
+    const { data: rec } = await db
       .from('recruiters')
-      .select('id, team, target_submissions_per_week, manager_id, ' +
-              'manager:users!manager_id(id, full_name, email)')
-      .eq('user_id', data.id).maybeSingle();
+      .select(
+        'id, team, target_submissions_per_week, manager_id, ' +
+          'manager:users!manager_id(id, full_name, email)',
+      )
+      .eq('user_id', data.id)
+      .maybeSingle();
     context.recruiter = rec;
   }
 
@@ -151,7 +154,7 @@ export const setStatus: RequestHandler = async (req, res) => {
     throw httpError(400, 'Refusing to change your own status — ask another admin.');
   }
 
-  const { data: before } = await supabaseAdmin
+  const { data: before } = await db
     .from('users')
     .select('id, email, status')
     .eq('id', id)
@@ -159,7 +162,7 @@ export const setStatus: RequestHandler = async (req, res) => {
   if (!before) throw httpError(404, 'User not found');
 
   const now = new Date().toISOString();
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await db
     .from('users')
     .update({
       status,
@@ -179,7 +182,7 @@ export const setStatus: RequestHandler = async (req, res) => {
   // state. Without this, a still-valid access token (TTL up to 1h) could
   // continue making requests until expiry.
   if (status !== 'active') {
-    await supabaseAdmin.auth.admin.signOut(id, 'global').catch((e) => {
+    await db.auth.admin.signOut(id, 'global').catch((e) => {
       logger.warn({ err: e }, 'admin status change: signOut failed');
     });
   }
@@ -207,7 +210,7 @@ export const setNotes: RequestHandler = async (req, res) => {
   const { id } = req.params;
   const parsed = notesSchema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid input');
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await db
     .from('users')
     .update({ admin_notes: parsed.data.admin_notes })
     .eq('id', id)
@@ -228,11 +231,7 @@ export const setNotes: RequestHandler = async (req, res) => {
 export const sendPasswordReset: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   const { id } = req.params;
-  const { data: target } = await supabaseAdmin
-    .from('users')
-    .select('email')
-    .eq('id', id)
-    .maybeSingle();
+  const { data: target } = await db.from('users').select('email').eq('id', id).maybeSingle();
   if (!target) throw httpError(404, 'User not found');
 
   await requestPasswordReset(target.email, req);
@@ -254,7 +253,7 @@ export const sendPasswordReset: RequestHandler = async (req, res) => {
 // ---------------------------------------------------------------------------
 export const auditLog: RequestHandler = async (req, res) => {
   const { id } = req.params;
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await db
     .from('auth_audit_logs')
     .select('id, action, ip_address, user_agent, metadata, created_at, email')
     .eq('user_id', id)

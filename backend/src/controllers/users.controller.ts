@@ -1,6 +1,6 @@
 import { RequestHandler } from 'express';
 import { z } from 'zod';
-import { supabaseAdmin } from '../config/supabase';
+import { db } from '../config/db';
 import { httpError, MANAGER_TIER, OPERATOR_TIER, Role, ALL_ROLES } from '../types';
 import * as authSvc from '../services/auth.service';
 
@@ -11,7 +11,8 @@ const PROFILE_COLS_FULL =
   'last_seen_at, group_id, reports_to, ' +
   'address_line1, address_line2, city, state, postal_code, country, timezone, linkedin_url, ' +
   'created_at, updated_at';
-const PROFILE_COLS_LEGACY = 'id, email, full_name, phone, role, avatar_url, is_active, created_at, updated_at';
+const PROFILE_COLS_LEGACY =
+  'id, email, full_name, phone, role, avatar_url, is_active, created_at, updated_at';
 
 function isManagerTier(role: Role | undefined): boolean {
   return !!role && (MANAGER_TIER as Role[]).includes(role);
@@ -23,7 +24,10 @@ function isOperatorTier(role: Role | undefined): boolean {
 /** Can the calling user view the target user's profile?
  *   - MANAGER_TIER / RECRUITER (= OPERATOR_TIER): yes, for anyone in the org.
  *   - CONSULTANT: only their own profile. */
-async function canViewProfile(caller: { id: string; role: Role }, targetUserId: string): Promise<boolean> {
+async function canViewProfile(
+  caller: { id: string; role: Role },
+  targetUserId: string,
+): Promise<boolean> {
   if (caller.id === targetUserId) return true;
   if (isOperatorTier(caller.role)) return true;
   return false;
@@ -44,11 +48,17 @@ export const get: RequestHandler = async (req, res) => {
 
   let data: any = null;
   let error: any = null;
-  ({ data, error } = await supabaseAdmin
-    .from('users').select(PROFILE_COLS_FULL).eq('id', req.params.id).maybeSingle());
+  ({ data, error } = await db
+    .from('users')
+    .select(PROFILE_COLS_FULL)
+    .eq('id', req.params.id)
+    .maybeSingle());
   if (error && /column .* does not exist|schema cache/i.test(error.message)) {
-    ({ data, error } = await supabaseAdmin
-      .from('users').select(PROFILE_COLS_LEGACY).eq('id', req.params.id).maybeSingle());
+    ({ data, error } = await db
+      .from('users')
+      .select(PROFILE_COLS_LEGACY)
+      .eq('id', req.params.id)
+      .maybeSingle());
   }
   if (error) throw httpError(500, error.message);
   if (!data) throw httpError(404, 'User not found');
@@ -57,29 +67,36 @@ export const get: RequestHandler = async (req, res) => {
   // the profile page can show "Reports to: …" / "Recruiter: …".
   const context: any = {};
   if (data.role === 'CONSULTANT') {
-    const consResult = await supabaseAdmin
+    const consResult = await db
       .from('consultants')
-      .select('id, recruiter_id, primary_skill, skills, total_experience_years, ' +
-              'visa_status, current_location, preferred_locations, marketing_status, ' +
-              'linkedin_url, github_url')
-      .eq('user_id', data.id).maybeSingle();
+      .select(
+        'id, recruiter_id, primary_skill, skills, total_experience_years, ' +
+          'visa_status, current_location, preferred_locations, marketing_status, ' +
+          'linkedin_url, github_url',
+      )
+      .eq('user_id', data.id)
+      .maybeSingle();
     const cons: any = consResult.data;
     if (cons) {
       context.consultant = cons;
       if (cons.recruiter_id) {
-        const { data: rec } = await supabaseAdmin
+        const { data: rec } = await db
           .from('recruiters')
           .select('id, team, user:users!user_id(id, full_name, email, phone)')
-          .eq('id', cons.recruiter_id).maybeSingle();
+          .eq('id', cons.recruiter_id)
+          .maybeSingle();
         context.recruiter = rec;
       }
     }
   } else if (data.role === 'RECRUITER') {
-    const { data: rec } = await supabaseAdmin
+    const { data: rec } = await db
       .from('recruiters')
-      .select('id, manager_id, team, target_submissions_per_week, ' +
-              'manager:users!manager_id(id, full_name, email)')
-      .eq('user_id', data.id).maybeSingle();
+      .select(
+        'id, manager_id, team, target_submissions_per_week, ' +
+          'manager:users!manager_id(id, full_name, email)',
+      )
+      .eq('user_id', data.id)
+      .maybeSingle();
     context.recruiter = rec;
   }
 
@@ -95,24 +112,29 @@ export const update: RequestHandler = async (req, res) => {
   // URL can't render later in another user's browser. Same refinement we
   // use in syncProfile (auth.controller.ts). `.max()` MUST come before
   // `.refine()` — refine returns ZodEffects which doesn't expose .max.
-  const httpUrl = z.string().max(2048).url()
+  const httpUrl = z
+    .string()
+    .max(2048)
+    .url()
     .refine((v) => /^https?:\/\//i.test(v), 'must be an http(s) URL');
 
-  const schema = z.object({
-    full_name: z.string().max(120).optional(),
-    first_name: z.string().max(60).optional(),
-    last_name: z.string().max(60).optional(),
-    phone: z.string().max(40).optional().nullable(),
-    avatar_url: httpUrl.optional().or(z.literal('')).nullable(),
-    address_line1: z.string().max(120).optional().nullable(),
-    address_line2: z.string().max(120).optional().nullable(),
-    city: z.string().max(80).optional().nullable(),
-    state: z.string().max(80).optional().nullable(),
-    postal_code: z.string().max(20).optional().nullable(),
-    country: z.string().max(60).optional().nullable(),
-    timezone: z.string().max(60).optional().nullable(),
-    linkedin_url: httpUrl.optional().or(z.literal('')).nullable(),
-  }).strict();   // reject unknown fields outright instead of silently stripping
+  const schema = z
+    .object({
+      full_name: z.string().max(120).optional(),
+      first_name: z.string().max(60).optional(),
+      last_name: z.string().max(60).optional(),
+      phone: z.string().max(40).optional().nullable(),
+      avatar_url: httpUrl.optional().or(z.literal('')).nullable(),
+      address_line1: z.string().max(120).optional().nullable(),
+      address_line2: z.string().max(120).optional().nullable(),
+      city: z.string().max(80).optional().nullable(),
+      state: z.string().max(80).optional().nullable(),
+      postal_code: z.string().max(20).optional().nullable(),
+      country: z.string().max(60).optional().nullable(),
+      timezone: z.string().max(60).optional().nullable(),
+      linkedin_url: httpUrl.optional().or(z.literal('')).nullable(),
+    })
+    .strict(); // reject unknown fields outright instead of silently stripping
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
 
@@ -135,24 +157,37 @@ export const update: RequestHandler = async (req, res) => {
     let lastFinal = parsed.data.last_name;
     if (!sentFirst || !sentLast) {
       // Need to fetch the unchanged half so we don't blank it out.
-      const { data: existing } = await supabaseAdmin
+      const { data: existing } = await db
         .from('users')
         .select('first_name, last_name')
         .eq('id', req.params.id)
         .maybeSingle();
       if (!sentFirst) firstFinal = (existing as any)?.first_name ?? null;
-      if (!sentLast)  lastFinal  = (existing as any)?.last_name ?? null;
+      if (!sentLast) lastFinal = (existing as any)?.last_name ?? null;
     }
     const composed = [firstFinal, lastFinal].filter(Boolean).join(' ').trim();
     patch.full_name = composed || null;
   }
 
   // Strip columns that aren't present yet (migration lag) and retry.
-  const OPTIONAL = ['first_name', 'last_name', 'address_line1', 'address_line2',
-                    'city', 'state', 'postal_code', 'country', 'timezone', 'linkedin_url'];
-  let { data, error } = await supabaseAdmin
-    .from('users').update(patch).eq('id', req.params.id)
-    .select(PROFILE_COLS_FULL).single();
+  const OPTIONAL = [
+    'first_name',
+    'last_name',
+    'address_line1',
+    'address_line2',
+    'city',
+    'state',
+    'postal_code',
+    'country',
+    'timezone',
+    'linkedin_url',
+  ];
+  let { data, error } = await db
+    .from('users')
+    .update(patch)
+    .eq('id', req.params.id)
+    .select(PROFILE_COLS_FULL)
+    .single();
   let attempts = 0;
   while (error && attempts < OPTIONAL.length) {
     const msg = error.message ?? '';
@@ -168,9 +203,12 @@ export const update: RequestHandler = async (req, res) => {
       }
     }
     if (!removed) break;
-    ({ data, error } = await supabaseAdmin
-      .from('users').update(patch).eq('id', req.params.id)
-      .select(PROFILE_COLS_LEGACY).single());
+    ({ data, error } = await db
+      .from('users')
+      .update(patch)
+      .eq('id', req.params.id)
+      .select(PROFILE_COLS_LEGACY)
+      .single());
   }
   if (error) throw httpError(500, error.message);
   res.json(data);
@@ -179,7 +217,7 @@ export const update: RequestHandler = async (req, res) => {
 // ---------------------------------------------------------------------------
 // POST /users — admin-only user creation
 //
-// Generates a temp password, creates the Supabase auth user, inserts the
+// Generates a temp password, creates the auth user, inserts the
 // matching public.users row with must_change_password=true, then emails the
 // temp credentials via Brevo. The route is gated by requireAdmin upstream.
 // ---------------------------------------------------------------------------
@@ -231,20 +269,26 @@ function assertNotSelf(req: { user?: { id: string } }, targetId: string): void {
  *  last SUPER_ADMIN is a soft singleton — losing them locks every admin
  *  surface for the whole org. */
 async function assertNotLastSuperAdmin(targetId: string): Promise<void> {
-  const { data: target, error: tErr } = await supabaseAdmin
-    .from('users').select('role, is_active').eq('id', targetId).maybeSingle();
+  const { data: target, error: tErr } = await db
+    .from('users')
+    .select('role, is_active')
+    .eq('id', targetId)
+    .maybeSingle();
   if (tErr) throw httpError(500, tErr.message);
   if (!target) throw httpError(404, 'User not found');
   if (target.role !== 'SUPER_ADMIN' || target.is_active === false) return;
 
-  const { count, error } = await supabaseAdmin
+  const { count, error } = await db
     .from('users')
     .select('id', { count: 'exact', head: true })
     .eq('role', 'SUPER_ADMIN')
     .eq('is_active', true);
   if (error) throw httpError(500, error.message);
   if ((count ?? 0) <= 1) {
-    throw httpError(409, 'Refusing to remove the last active SUPER_ADMIN. Promote another admin first.');
+    throw httpError(
+      409,
+      'Refusing to remove the last active SUPER_ADMIN. Promote another admin first.',
+    );
   }
 }
 
@@ -262,9 +306,10 @@ export const deactivate: RequestHandler = async (req, res) => {
   assertNotSelf(req, targetId);
   await assertNotLastSuperAdmin(targetId);
 
-  const reason = typeof req.body?.reason === 'string'
-    ? req.body.reason.trim().slice(0, 500) || undefined
-    : undefined;
+  const reason =
+    typeof req.body?.reason === 'string'
+      ? req.body.reason.trim().slice(0, 500) || undefined
+      : undefined;
 
   const updated = await authSvc.setUserStatus({
     targetId,
@@ -306,11 +351,10 @@ export const remove: RequestHandler = async (req, res) => {
 
   // Order matters: drop public.users first so any FK cascades fire while the
   // auth user still exists for audit, then delete the auth user.
-  const { error: profileErr } = await supabaseAdmin
-    .from('users').delete().eq('id', targetId);
+  const { error: profileErr } = await db.from('users').delete().eq('id', targetId);
   if (profileErr) throw httpError(500, profileErr.message);
 
-  const { error: authErr } = await supabaseAdmin.auth.admin.deleteUser(targetId);
+  const { error: authErr } = await db.auth.admin.deleteUser(targetId);
   if (authErr) {
     // public.users is already gone — log loudly, but report success since the
     // user can no longer log in (no profile row → 403 in login()).
@@ -332,9 +376,8 @@ export const remove: RequestHandler = async (req, res) => {
 export const listDeactivated: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
 
-  const role = typeof req.query.role === 'string' && req.query.role !== 'ALL'
-    ? req.query.role
-    : null;
+  const role =
+    typeof req.query.role === 'string' && req.query.role !== 'ALL' ? req.query.role : null;
   if (role && !ROLE_VALUES.includes(role as Role)) {
     throw httpError(400, 'Invalid role filter');
   }
@@ -342,9 +385,11 @@ export const listDeactivated: RequestHandler = async (req, res) => {
   // Primary filter: status != 'active'. Secondary include: rows where status
   // is null (pre-migration) but is_active is false, so older deactivations
   // remain visible until the backfill completes.
-  let q = supabaseAdmin
+  let q = db
     .from('users')
-    .select('id, email, full_name, role, status, status_reason, status_changed_at, is_active, updated_at, created_at, last_seen_at')
+    .select(
+      'id, email, full_name, role, status, status_reason, status_changed_at, is_active, updated_at, created_at, last_seen_at',
+    )
     .or('status.neq.active,and(status.is.null,is_active.eq.false)')
     .order('updated_at', { ascending: false });
   if (role) q = q.eq('role', role);
@@ -358,7 +403,7 @@ export const listDeactivated: RequestHandler = async (req, res) => {
   // Schema-cache fallback: if `status` doesn't exist yet, fall back to the
   // legacy is_active filter so this endpoint keeps working pre-migration.
   if (error && /status|column .* does not exist|schema cache/i.test(error.message)) {
-    let legacy = supabaseAdmin
+    let legacy = db
       .from('users')
       .select('id, email, full_name, role, is_active, updated_at, created_at, last_seen_at')
       .eq('is_active', false)
@@ -369,4 +414,3 @@ export const listDeactivated: RequestHandler = async (req, res) => {
   if (error) throw httpError(500, error.message);
   res.json(data ?? []);
 };
-

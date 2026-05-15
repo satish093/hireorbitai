@@ -1,6 +1,13 @@
 import { RequestHandler } from 'express';
-import { supabaseAdmin } from '../config/supabase';
-import { httpError, TASK_STATUSES, TASK_PRIORITIES, TaskStatus, TaskPriority, MANAGER_TIER } from '../types';
+import { db } from '../config/db';
+import {
+  httpError,
+  TASK_STATUSES,
+  TASK_PRIORITIES,
+  TaskStatus,
+  TaskPriority,
+  MANAGER_TIER,
+} from '../types';
 
 const SELECT_WITH_JOINS = `
   *,
@@ -32,10 +39,12 @@ function applyFilters(qb: any, q: Record<string, any>) {
 /** List tasks. SUPER_ADMIN/MANAGER see everything; others see only their own assignments. */
 export const list: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
-  let qb = supabaseAdmin.from('tasks').select(SELECT_WITH_JOINS);
+  let qb = db.from('tasks').select(SELECT_WITH_JOINS);
   if (!isManagerLike(req.user.role)) qb = qb.eq('assignee_id', req.user.id);
   qb = applyFilters(qb, req.query as Record<string, any>);
-  const { data, error } = await qb.order('order_index', { ascending: true }).order('created_at', { ascending: false });
+  const { data, error } = await qb
+    .order('order_index', { ascending: true })
+    .order('created_at', { ascending: false });
   if (error) throw httpError(500, error.message);
   res.json(data);
 };
@@ -43,8 +52,11 @@ export const list: RequestHandler = async (req, res) => {
 /** Single task detail. */
 export const get: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
-  const { data, error } = await supabaseAdmin
-    .from('tasks').select(SELECT_WITH_JOINS).eq('id', req.params.id).single();
+  const { data, error } = await db
+    .from('tasks')
+    .select(SELECT_WITH_JOINS)
+    .eq('id', req.params.id)
+    .single();
   if (error || !data) throw httpError(404, 'Task not found');
   if (!isManagerLike(req.user.role) && data.assignee_id !== req.user.id) {
     throw httpError(403, 'Forbidden');
@@ -57,8 +69,10 @@ export const create: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   const b = req.body ?? {};
   if (!b.title) throw httpError(400, 'title is required');
-  if (b.status && !TASK_STATUSES.includes(b.status as TaskStatus)) throw httpError(400, 'Invalid status');
-  if (b.priority && !TASK_PRIORITIES.includes(b.priority as TaskPriority)) throw httpError(400, 'Invalid priority');
+  if (b.status && !TASK_STATUSES.includes(b.status as TaskStatus))
+    throw httpError(400, 'Invalid status');
+  if (b.priority && !TASK_PRIORITIES.includes(b.priority as TaskPriority))
+    throw httpError(400, 'Invalid priority');
 
   const payload: Record<string, unknown> = {
     title: b.title,
@@ -76,12 +90,10 @@ export const create: RequestHandler = async (req, res) => {
   // creation working even before database/tasks-tags.sql has been applied.
   if (Array.isArray(b.tags) && b.tags.length > 0) payload.tags = b.tags;
 
-  let { data, error } = await supabaseAdmin
-    .from('tasks').insert(payload).select(SELECT_WITH_JOINS).single();
+  let { data, error } = await db.from('tasks').insert(payload).select(SELECT_WITH_JOINS).single();
   if (error && /tags/i.test(error.message) && /schema cache|column/i.test(error.message)) {
     delete payload.tags;
-    ({ data, error } = await supabaseAdmin
-      .from('tasks').insert(payload).select(SELECT_WITH_JOINS).single());
+    ({ data, error } = await db.from('tasks').insert(payload).select(SELECT_WITH_JOINS).single());
   }
   if (error) throw httpError(500, error.message);
   res.status(201).json(data);
@@ -91,8 +103,11 @@ export const create: RequestHandler = async (req, res) => {
 export const update: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   const { id } = req.params;
-  const { data: existing, error: e0 } = await supabaseAdmin
-    .from('tasks').select('assignee_id').eq('id', id).single();
+  const { data: existing, error: e0 } = await db
+    .from('tasks')
+    .select('assignee_id')
+    .eq('id', id)
+    .single();
   if (e0 || !existing) throw httpError(404, 'Task not found');
 
   const isMgr = isManagerLike(req.user.role);
@@ -103,8 +118,18 @@ export const update: RequestHandler = async (req, res) => {
   const b = req.body ?? {};
   if (isMgr) {
     // Managers can edit any of the editable fields.
-    for (const k of ['title', 'description', 'status', 'priority', 'assignee_id',
-      'related_consultant_id', 'related_recruiter_id', 'due_at', 'order_index', 'tags']) {
+    for (const k of [
+      'title',
+      'description',
+      'status',
+      'priority',
+      'assignee_id',
+      'related_consultant_id',
+      'related_recruiter_id',
+      'due_at',
+      'order_index',
+      'tags',
+    ]) {
       if (k in b) allowed[k] = b[k];
     }
   } else {
@@ -118,17 +143,33 @@ export const update: RequestHandler = async (req, res) => {
     throw httpError(400, 'Invalid status');
   }
 
-  let { data, error } = await supabaseAdmin
-    .from('tasks').update(allowed).eq('id', id).select(SELECT_WITH_JOINS).single();
+  let { data, error } = await db
+    .from('tasks')
+    .update(allowed)
+    .eq('id', id)
+    .select(SELECT_WITH_JOINS)
+    .single();
   // Retry without `tags` if the column hasn't been migrated in yet, so other
   // edits still apply. Surface a 422 explaining how to enable tags.
-  if (error && /tags/i.test(error.message) && /schema cache|column/i.test(error.message) && 'tags' in allowed) {
+  if (
+    error &&
+    /tags/i.test(error.message) &&
+    /schema cache|column/i.test(error.message) &&
+    'tags' in allowed
+  ) {
     delete allowed.tags;
     if (Object.keys(allowed).length === 0) {
-      throw httpError(422, 'Tags column missing — run database/tasks-tags.sql in Supabase to enable task tags.');
+      throw httpError(
+        422,
+        'Tags column missing — run database/tasks-tags.sql against the database to enable task tags.',
+      );
     }
-    ({ data, error } = await supabaseAdmin
-      .from('tasks').update(allowed).eq('id', id).select(SELECT_WITH_JOINS).single());
+    ({ data, error } = await db
+      .from('tasks')
+      .update(allowed)
+      .eq('id', id)
+      .select(SELECT_WITH_JOINS)
+      .single());
   }
   if (error) throw httpError(500, error.message);
   res.json(data);
@@ -140,8 +181,11 @@ export const updateStatus: RequestHandler = async (req, res) => {
   const status = req.body?.status as TaskStatus | undefined;
   if (!status || !TASK_STATUSES.includes(status)) throw httpError(400, 'Invalid status');
 
-  const { data: existing, error: e0 } = await supabaseAdmin
-    .from('tasks').select('assignee_id').eq('id', req.params.id).single();
+  const { data: existing, error: e0 } = await db
+    .from('tasks')
+    .select('assignee_id')
+    .eq('id', req.params.id)
+    .single();
   if (e0 || !existing) throw httpError(404, 'Task not found');
   if (!isManagerLike(req.user.role) && existing.assignee_id !== req.user.id) {
     throw httpError(403, 'Forbidden');
@@ -149,8 +193,12 @@ export const updateStatus: RequestHandler = async (req, res) => {
 
   const patch: Record<string, unknown> = { status };
   patch.completed_at = status === 'COMPLETED' ? new Date().toISOString() : null;
-  const { data, error } = await supabaseAdmin
-    .from('tasks').update(patch).eq('id', req.params.id).select(SELECT_WITH_JOINS).single();
+  const { data, error } = await db
+    .from('tasks')
+    .update(patch)
+    .eq('id', req.params.id)
+    .select(SELECT_WITH_JOINS)
+    .single();
   if (error) throw httpError(500, error.message);
   res.json(data);
 };
@@ -159,7 +207,7 @@ export const updateStatus: RequestHandler = async (req, res) => {
 export const remove: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   if (!isManagerLike(req.user.role)) throw httpError(403, 'Forbidden');
-  const { error } = await supabaseAdmin.from('tasks').delete().eq('id', req.params.id);
+  const { error } = await db.from('tasks').delete().eq('id', req.params.id);
   if (error) throw httpError(500, error.message);
   res.json({ ok: true });
 };
@@ -167,7 +215,7 @@ export const remove: RequestHandler = async (req, res) => {
 /** Tasks assigned to the calling user. */
 export const assignedToMe: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
-  let qb = supabaseAdmin.from('tasks').select(SELECT_WITH_JOINS).eq('assignee_id', req.user.id);
+  let qb = db.from('tasks').select(SELECT_WITH_JOINS).eq('assignee_id', req.user.id);
   qb = applyFilters(qb, req.query as Record<string, any>);
   const { data, error } = await qb.order('due_at', { ascending: true, nullsFirst: false });
   if (error) throw httpError(500, error.message);
@@ -185,8 +233,10 @@ export const teamTasks: RequestHandler = async (req, res) => {
   let assigneeIds: string[] | null = null;
   if (req.user.role === 'MANAGER') {
     // Direct reports: recruiters managed by this user.
-    const { data: recs, error: re } = await supabaseAdmin
-      .from('recruiters').select('user_id, id').eq('manager_id', req.user.id);
+    const { data: recs, error: re } = await db
+      .from('recruiters')
+      .select('user_id, id')
+      .eq('manager_id', req.user.id);
     if (re) throw httpError(500, re.message);
     const recruiterUserIds = (recs ?? []).map((r: any) => r.user_id);
     const recruiterIds = (recs ?? []).map((r: any) => r.id);
@@ -194,15 +244,17 @@ export const teamTasks: RequestHandler = async (req, res) => {
     // Consultants assigned to those recruiters.
     let consultantUserIds: string[] = [];
     if (recruiterIds.length > 0) {
-      const { data: cons, error: ce } = await supabaseAdmin
-        .from('consultants').select('user_id').in('recruiter_id', recruiterIds);
+      const { data: cons, error: ce } = await db
+        .from('consultants')
+        .select('user_id')
+        .in('recruiter_id', recruiterIds);
       if (ce) throw httpError(500, ce.message);
       consultantUserIds = (cons ?? []).map((c: any) => c.user_id);
     }
     assigneeIds = [...new Set([req.user.id, ...recruiterUserIds, ...consultantUserIds])];
   }
 
-  let qb = supabaseAdmin.from('tasks').select(SELECT_WITH_JOINS);
+  let qb = db.from('tasks').select(SELECT_WITH_JOINS);
   if (assigneeIds) qb = qb.in('assignee_id', assigneeIds);
   qb = applyFilters(qb, req.query as Record<string, any>);
   const { data, error } = await qb.order('due_at', { ascending: true, nullsFirst: false });
@@ -215,12 +267,13 @@ export const metrics: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   if (!isManagerLike(req.user.role)) throw httpError(403, 'Forbidden');
 
-  const { data, error } = await supabaseAdmin
-    .from('tasks').select('status, priority, due_at, completed_at');
+  const { data, error } = await db.from('tasks').select('status, priority, due_at, completed_at');
   if (error) throw httpError(500, error.message);
 
-  const by_status: Record<string, number> = Object.fromEntries(TASK_STATUSES.map(s => [s, 0]));
-  const by_priority: Record<string, number> = Object.fromEntries(TASK_PRIORITIES.map(p => [p, 0]));
+  const by_status: Record<string, number> = Object.fromEntries(TASK_STATUSES.map((s) => [s, 0]));
+  const by_priority: Record<string, number> = Object.fromEntries(
+    TASK_PRIORITIES.map((p) => [p, 0]),
+  );
   let overdue = 0;
   let due_today = 0;
   let due_this_week = 0;
@@ -229,7 +282,8 @@ export const metrics: RequestHandler = async (req, res) => {
   let completed_last_7_days = 0;
   const now = Date.now();
   const sevenDaysAgo = now - 7 * 24 * 3600 * 1000;
-  const endOfToday = new Date(); endOfToday.setHours(23, 59, 59, 999);
+  const endOfToday = new Date();
+  endOfToday.setHours(23, 59, 59, 999);
   const endOfTodayMs = endOfToday.getTime();
   const inSevenDays = now + 7 * 24 * 3600 * 1000;
 

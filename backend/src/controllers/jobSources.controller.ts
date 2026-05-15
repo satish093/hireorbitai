@@ -1,26 +1,49 @@
 import { RequestHandler } from 'express';
 import { z } from 'zod';
-import { supabaseAdmin } from '../config/supabase';
+import { db } from '../config/db';
 import { runSync, runSyncForId, Source } from '../services/jobIngestion.service';
 import { httpError } from '../types';
 
 const VALID_SOURCES: Source[] = [
-  'remoteok', 'greenhouse', 'lever', 'adzuna', 'remotive', 'arbeitnow',
-  'jsearch', 'ashby', 'jooble', 'usajobs', 'serpapi', 'searchapi', 'linkedin', 'monster', 'manual',
+  'remoteok',
+  'greenhouse',
+  'lever',
+  'adzuna',
+  'remotive',
+  'arbeitnow',
+  'jsearch',
+  'ashby',
+  'jooble',
+  'usajobs',
+  'serpapi',
+  'searchapi',
+  'linkedin',
+  'monster',
+  'manual',
 ];
 
 function sourceNeedsSlug(s: Source): boolean {
   return s === 'greenhouse' || s === 'lever' || s === 'ashby';
 }
 function sourceRequiresKey(s: Source): boolean {
-  return s === 'adzuna' || s === 'jsearch' || s === 'jooble'
-      || s === 'usajobs' || s === 'serpapi' || s === 'searchapi'
-      || s === 'linkedin' || s === 'monster';
+  return (
+    s === 'adzuna' ||
+    s === 'jsearch' ||
+    s === 'jooble' ||
+    s === 'usajobs' ||
+    s === 'serpapi' ||
+    s === 'searchapi' ||
+    s === 'linkedin' ||
+    s === 'monster'
+  );
 }
 
 export const listSources: RequestHandler = async (_req, res) => {
-  const { data, error } = await supabaseAdmin
-    .from('source_companies').select('*').order('source').order('display_name');
+  const { data, error } = await db
+    .from('source_companies')
+    .select('*')
+    .order('source')
+    .order('display_name');
   if (error) throw httpError(500, error.message);
   res.json(data);
 };
@@ -29,8 +52,21 @@ export const createSource: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   const schema = z.object({
     source: z.enum([
-      'remoteok', 'greenhouse', 'lever', 'adzuna', 'remotive', 'arbeitnow',
-      'jsearch', 'ashby', 'jooble', 'usajobs', 'serpapi', 'searchapi', 'linkedin', 'monster', 'manual',
+      'remoteok',
+      'greenhouse',
+      'lever',
+      'adzuna',
+      'remotive',
+      'arbeitnow',
+      'jsearch',
+      'ashby',
+      'jooble',
+      'usajobs',
+      'serpapi',
+      'searchapi',
+      'linkedin',
+      'monster',
+      'manual',
     ]),
     slug: z.string().optional().nullable(),
     display_name: z.string().optional(),
@@ -40,7 +76,7 @@ export const createSource: RequestHandler = async (req, res) => {
   if (sourceNeedsSlug(parsed.data.source) && !parsed.data.slug) {
     throw httpError(400, `${parsed.data.source} requires a company slug`);
   }
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await db
     .from('source_companies')
     .insert({
       source: parsed.data.source,
@@ -48,7 +84,8 @@ export const createSource: RequestHandler = async (req, res) => {
       display_name: parsed.data.display_name ?? parsed.data.slug ?? parsed.data.source,
       added_by: req.user.id,
     })
-    .select().single();
+    .select()
+    .single();
   if (error) throw httpError(500, error.message);
   res.status(201).json(data);
 };
@@ -60,15 +97,18 @@ export const updateSource: RequestHandler = async (req, res) => {
   });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
-  const { data, error } = await supabaseAdmin
-    .from('source_companies').update(parsed.data).eq('id', req.params.id).select().single();
+  const { data, error } = await db
+    .from('source_companies')
+    .update(parsed.data)
+    .eq('id', req.params.id)
+    .select()
+    .single();
   if (error) throw httpError(500, error.message);
   res.json(data);
 };
 
 export const deleteSource: RequestHandler = async (req, res) => {
-  const { error } = await supabaseAdmin
-    .from('source_companies').delete().eq('id', req.params.id);
+  const { error } = await db.from('source_companies').delete().eq('id', req.params.id);
   if (error) throw httpError(500, error.message);
   res.json({ ok: true });
 };
@@ -100,21 +140,30 @@ export const syncOne: RequestHandler = async (req, res) => {
  *   - last sync count + last sync error (worst across rows)
  *  Used by the SourcesDrawer to explain why a source is dark / silent. */
 export const sourcesHealth: RequestHandler = async (_req, res) => {
-  const { data: rows } = await supabaseAdmin
+  const { data: rows } = await db
     .from('source_companies')
     .select('source, is_active, last_synced_at, last_sync_jobs_count, last_sync_error');
 
   // Per-source aggregates.
-  const byId = new Map<Source, {
-    rows_total: number;
-    rows_active: number;
-    last_synced_at: string | null;
-    last_sync_jobs_count: number;
-    last_error: string | null;
-  }>();
+  const byId = new Map<
+    Source,
+    {
+      rows_total: number;
+      rows_active: number;
+      last_synced_at: string | null;
+      last_sync_jobs_count: number;
+      last_error: string | null;
+    }
+  >();
   for (const r of rows ?? []) {
     const k = r.source as Source;
-    const cur = byId.get(k) ?? { rows_total: 0, rows_active: 0, last_synced_at: null, last_sync_jobs_count: 0, last_error: null };
+    const cur = byId.get(k) ?? {
+      rows_total: 0,
+      rows_active: 0,
+      last_synced_at: null,
+      last_sync_jobs_count: 0,
+      last_error: null,
+    };
     cur.rows_total++;
     if (r.is_active) cur.rows_active++;
     cur.last_sync_jobs_count += r.last_sync_jobs_count ?? 0;
@@ -126,8 +175,13 @@ export const sourcesHealth: RequestHandler = async (_req, res) => {
   }
 
   const keyConfigured: Record<string, boolean> = {
-    remoteok: true, greenhouse: true, lever: true, remotive: true, arbeitnow: true,
-    ashby: true, manual: true,
+    remoteok: true,
+    greenhouse: true,
+    lever: true,
+    remotive: true,
+    arbeitnow: true,
+    ashby: true,
+    manual: true,
     adzuna: !!(process.env.ADZUNA_APP_ID && process.env.ADZUNA_APP_KEY),
     jsearch: !!process.env.JSEARCH_API_KEY,
     jooble: !!process.env.JOOBLE_API_KEY,
@@ -139,7 +193,13 @@ export const sourcesHealth: RequestHandler = async (_req, res) => {
   };
 
   const out = VALID_SOURCES.map((s) => {
-    const agg = byId.get(s) ?? { rows_total: 0, rows_active: 0, last_synced_at: null, last_sync_jobs_count: 0, last_error: null };
+    const agg = byId.get(s) ?? {
+      rows_total: 0,
+      rows_active: 0,
+      last_synced_at: null,
+      last_sync_jobs_count: 0,
+      last_error: null,
+    };
     return {
       source: s,
       key_configured: keyConfigured[s] ?? true,
@@ -151,11 +211,13 @@ export const sourcesHealth: RequestHandler = async (_req, res) => {
       last_sync_jobs_count: agg.last_sync_jobs_count,
       last_error: agg.last_error,
       // status: green if it has active rows + key + recent sync; amber if missing key or 0 rows; red if last error.
-      status:
-        agg.last_error ? 'error'
-        : (sourceRequiresKey(s) && !keyConfigured[s]) ? 'missing_key'
-        : agg.rows_active === 0 ? 'no_rows'
-        : 'ok',
+      status: agg.last_error
+        ? 'error'
+        : sourceRequiresKey(s) && !keyConfigured[s]
+          ? 'missing_key'
+          : agg.rows_active === 0
+            ? 'no_rows'
+            : 'ok',
     };
   });
   res.json(out);

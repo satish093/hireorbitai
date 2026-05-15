@@ -1,6 +1,6 @@
 import { RequestHandler } from 'express';
 import { z } from 'zod';
-import { supabaseAdmin } from '../config/supabase';
+import { db } from '../config/db';
 import { httpError, MANAGER_TIER } from '../types';
 
 function isManagerTier(role?: string): boolean {
@@ -12,8 +12,7 @@ function isManagerTier(role?: string): boolean {
  * Returns null when the caller isn't a recruiter or has no row yet.
  */
 async function getCallerRecruiterRowId(userId: string): Promise<string | null> {
-  const { data } = await supabaseAdmin
-    .from('recruiters').select('id').eq('user_id', userId).maybeSingle();
+  const { data } = await db.from('recruiters').select('id').eq('user_id', userId).maybeSingle();
   return data?.id ?? null;
 }
 
@@ -36,11 +35,11 @@ const onboardingSchema = z.object({
 export const list: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   const recruiter_id = req.query.recruiter_id as string | undefined;
-  let q = supabaseAdmin
+  let q = db
     .from('consultants')
     .select(
       '*, user:users(id, email, full_name, phone),' +
-      'recruiter:recruiters!recruiter_id(id, team, user:users!user_id(id, email, full_name))'
+        'recruiter:recruiters!recruiter_id(id, team, user:users!user_id(id, email, full_name))',
     )
     .order('created_at', { ascending: false });
 
@@ -52,7 +51,10 @@ export const list: RequestHandler = async (req, res) => {
     if (recruiter_id) q = q.eq('recruiter_id', recruiter_id);
   } else if (req.user.role === 'RECRUITER') {
     const myRecId = await getCallerRecruiterRowId(req.user.id);
-    if (!myRecId) { res.json([]); return; }
+    if (!myRecId) {
+      res.json([]);
+      return;
+    }
     q = q.eq('recruiter_id', myRecId);
   } else if (req.user.role === 'CONSULTANT') {
     q = q.eq('user_id', req.user.id);
@@ -68,11 +70,11 @@ export const list: RequestHandler = async (req, res) => {
 
 export const get: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await db
     .from('consultants')
     .select(
       '*, user:users(id, email, full_name, phone, avatar_url),' +
-      'recruiter:recruiters!recruiter_id(id, team, user:users!user_id(id, email, full_name))'
+        'recruiter:recruiters!recruiter_id(id, team, user:users!user_id(id, email, full_name))',
     )
     .eq('id', req.params.id)
     .single();
@@ -99,15 +101,25 @@ export const onboard: RequestHandler = async (req, res) => {
   if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
 
   const payload: Record<string, unknown> = { user_id: req.user.id, ...parsed.data };
-  let { data, error } = await supabaseAdmin
-    .from('consultants').upsert(payload, { onConflict: 'user_id' }).select().single();
+  let { data, error } = await db
+    .from('consultants')
+    .upsert(payload, { onConflict: 'user_id' })
+    .select()
+    .single();
   // Optional-column migrations may not be applied yet — strip and retry so
   // the rest of the fields still save instead of hard-failing the whole call.
   for (const col of ['desired_positions', 'skills']) {
-    if (error && new RegExp(col).test(error.message) && /schema cache|column/i.test(error.message)) {
+    if (
+      error &&
+      new RegExp(col).test(error.message) &&
+      /schema cache|column/i.test(error.message)
+    ) {
       delete payload[col];
-      ({ data, error } = await supabaseAdmin
-        .from('consultants').upsert(payload, { onConflict: 'user_id' }).select().single());
+      ({ data, error } = await db
+        .from('consultants')
+        .upsert(payload, { onConflict: 'user_id' })
+        .select()
+        .single());
     }
   }
   if (error) throw httpError(500, error.message);
@@ -115,7 +127,7 @@ export const onboard: RequestHandler = async (req, res) => {
 };
 
 export const update: RequestHandler = async (req, res) => {
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await db
     .from('consultants')
     .update(req.body ?? {})
     .eq('id', req.params.id)
@@ -128,7 +140,7 @@ export const update: RequestHandler = async (req, res) => {
 export const assignRecruiter: RequestHandler = async (req, res) => {
   const recruiter_id = req.body?.recruiter_id;
   if (!recruiter_id) throw httpError(400, 'recruiter_id required');
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await db
     .from('consultants')
     .update({ recruiter_id })
     .eq('id', req.params.id)
@@ -142,7 +154,7 @@ export const setMarketingStatus: RequestHandler = async (req, res) => {
   const schema = z.object({ marketing_status: z.enum(['ACTIVE', 'PAUSED', 'PLACED']) });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid status');
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await db
     .from('consultants')
     .update({ marketing_status: parsed.data.marketing_status })
     .eq('id', req.params.id)

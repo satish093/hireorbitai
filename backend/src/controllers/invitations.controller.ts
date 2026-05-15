@@ -1,6 +1,6 @@
 import { RequestHandler } from 'express';
 import { z } from 'zod';
-import { supabaseAdmin, supabaseAnon } from '../config/supabase';
+import { db } from '../config/db';
 import { env } from '../config/env';
 import { createInvitation, acceptInvitation } from '../services/invitation.service';
 import { validatePasswordStrength } from '../utils/password';
@@ -9,9 +9,15 @@ import { httpError, ADMIN_TIER, Role } from '../types';
 const createSchema = z.object({
   email: z.string().email(),
   role: z.enum([
-    'SUPER_ADMIN', 'CEO', 'CTO', 'DIRECTOR',
-    'MANAGER', 'HR_MANAGER', 'DEVELOPER',
-    'RECRUITER', 'CONSULTANT',
+    'SUPER_ADMIN',
+    'CEO',
+    'CTO',
+    'DIRECTOR',
+    'MANAGER',
+    'HR_MANAGER',
+    'DEVELOPER',
+    'RECRUITER',
+    'CONSULTANT',
   ]),
 });
 
@@ -27,8 +33,10 @@ export const create: RequestHandler = async (req, res) => {
   if (requestedRole === 'SUPER_ADMIN' && req.user.role !== 'SUPER_ADMIN') {
     throw httpError(403, 'Only a SUPER_ADMIN can invite another SUPER_ADMIN.');
   }
-  if ((ADMIN_TIER as Role[]).includes(requestedRole)
-      && !(ADMIN_TIER as Role[]).includes(req.user.role)) {
+  if (
+    (ADMIN_TIER as Role[]).includes(requestedRole) &&
+    !(ADMIN_TIER as Role[]).includes(req.user.role)
+  ) {
     throw httpError(403, 'Admin-tier roles can only be invited by an admin.');
   }
 
@@ -41,7 +49,7 @@ export const create: RequestHandler = async (req, res) => {
 };
 
 export const list: RequestHandler = async (_req, res) => {
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await db
     .from('invitations')
     .select('*')
     .order('created_at', { ascending: false });
@@ -54,7 +62,7 @@ export const list: RequestHandler = async (_req, res) => {
   const withUrls = (data ?? []).map((r: any) =>
     r.status === 'PENDING'
       ? { ...r, invite_url: `${env.frontendUrl}/invite/accept?token=${r.token}` }
-      : r
+      : r,
   );
   res.json(withUrls);
 };
@@ -74,7 +82,7 @@ export const accept: RequestHandler = async (req, res) => {
 export const preview: RequestHandler = async (req, res) => {
   const token = String(req.query.token ?? '');
   if (!token) throw httpError(400, 'Missing token');
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await db
     .from('invitations')
     .select('email, role, status, expires_at')
     .eq('token', token)
@@ -105,12 +113,15 @@ export const setup: RequestHandler = async (req, res) => {
   const { token, password, full_name } = parsed.data;
 
   // 1. Look up the invitation and validate status.
-  const { data: invite, error } = await supabaseAdmin
-    .from('invitations').select('*').eq('token', token).single();
+  const { data: invite, error } = await db
+    .from('invitations')
+    .select('*')
+    .eq('token', token)
+    .single();
   if (error || !invite) throw httpError(404, 'Invitation not found');
   if (invite.status !== 'PENDING') throw httpError(400, `Invitation already ${invite.status}`);
   if (new Date(invite.expires_at) < new Date()) {
-    await supabaseAdmin.from('invitations').update({ status: 'EXPIRED' }).eq('id', invite.id);
+    await db.from('invitations').update({ status: 'EXPIRED' }).eq('id', invite.id);
     throw httpError(400, 'Invitation expired');
   }
 
@@ -118,9 +129,9 @@ export const setup: RequestHandler = async (req, res) => {
   const strength = validatePasswordStrength(password, { email: invite.email });
   if (!strength.ok) throw httpError(400, strength.problems.join(' '));
 
-  // 3. Create the Supabase auth user. `email_confirm: true` skips Supabase's
-  //    confirmation email — we never use Supabase email.
-  const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
+  // 3. Create the auth user. `email_confirm: true` is a no-op flag kept for
+  //    API compatibility — all email runs through Brevo.
+  const { data: created, error: createErr } = await db.auth.admin.createUser({
     email: invite.email,
     password,
     email_confirm: true,
@@ -136,7 +147,7 @@ export const setup: RequestHandler = async (req, res) => {
   //    must_change_password — the user just set their own password, no need
   //    to force a rotation on first login.
   const now = new Date().toISOString();
-  const { error: upsertErr } = await supabaseAdmin.from('users').upsert(
+  const { error: upsertErr } = await db.from('users').upsert(
     {
       id: created.user.id,
       email: invite.email,
@@ -153,21 +164,17 @@ export const setup: RequestHandler = async (req, res) => {
   if (upsertErr) {
     // Roll back the auth user — otherwise the email is "taken" but the user
     // can never finish provisioning.
-    await supabaseAdmin.auth.admin.deleteUser(created.user.id).catch(() => {});
+    await db.auth.admin.deleteUser(created.user.id).catch(() => {});
     throw httpError(500, upsertErr.message);
   }
 
   // 5. Mark the invitation as accepted.
-  await supabaseAdmin
-    .from('invitations')
-    .update({ status: 'ACCEPTED', accepted_at: now })
-    .eq('id', invite.id);
+  await db.from('invitations').update({ status: 'ACCEPTED', accepted_at: now }).eq('id', invite.id);
 
-  // 6. Issue a session right now — avoids a second client-side login that
-  //    would race the just-created Supabase user against indexing lag.
-  //    Anon client, not admin (signInWithPassword mutates the admin client's
-  //    auth state — see the comment in auth.service.ts).
-  const fresh = await supabaseAnon.auth.signInWithPassword({
+  // 6. Issue a session right now — avoids a round-trip second login on the
+  //    client and the brief window where the just-created user hasn't been
+  //    indexed for password lookup yet.
+  const fresh = await db.auth.signInWithPassword({
     email: invite.email,
     password,
   });
@@ -191,10 +198,7 @@ export const setup: RequestHandler = async (req, res) => {
 
 export const revoke: RequestHandler = async (req, res) => {
   const { id } = req.params;
-  const { error } = await supabaseAdmin
-    .from('invitations')
-    .update({ status: 'REVOKED' })
-    .eq('id', id);
+  const { error } = await db.from('invitations').update({ status: 'REVOKED' }).eq('id', id);
   if (error) throw httpError(500, error.message);
   res.json({ ok: true });
 };

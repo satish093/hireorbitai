@@ -1,5 +1,5 @@
 import type { Request } from 'express';
-import { supabaseAdmin } from '../config/supabase';
+import { db } from '../config/db';
 import { logger } from '../config/logger';
 
 export type AuditAction =
@@ -43,7 +43,7 @@ interface AuditInput {
 export function audit(input: AuditInput): void {
   const ip = input.req?.ip ?? null;
   const ua = (input.req?.headers?.['user-agent'] as string | undefined) ?? null;
-  void supabaseAdmin
+  void db
     .from('auth_audit_logs')
     .insert({
       user_id: input.user_id ?? null,

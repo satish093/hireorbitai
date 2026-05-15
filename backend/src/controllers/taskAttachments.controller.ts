@@ -1,5 +1,5 @@
 import { RequestHandler } from 'express';
-import { supabaseAdmin } from '../config/supabase';
+import { db } from '../config/db';
 import { httpError, MANAGER_TIER } from '../types';
 
 function isManagerLike(role: string): boolean {
@@ -10,7 +10,7 @@ const BUCKET = 'task-attachments';
 
 async function canAccessTask(taskId: string, userId: string, role: string): Promise<boolean> {
   if (isManagerLike(role)) return true;
-  const { data } = await supabaseAdmin.from('tasks').select('assignee_id').eq('id', taskId).single();
+  const { data } = await db.from('tasks').select('assignee_id').eq('id', taskId).single();
   return data?.assignee_id === userId;
 }
 
@@ -20,17 +20,19 @@ export const list: RequestHandler = async (req, res) => {
   const taskId = req.params.taskId;
   if (!(await canAccessTask(taskId, req.user.id, req.user.role))) throw httpError(403, 'Forbidden');
 
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await db
     .from('task_attachments')
     .select(`*, uploader:users!uploaded_by ( id, email, full_name )`)
     .eq('task_id', taskId)
     .order('created_at', { ascending: false });
   if (error) throw httpError(500, error.message);
 
-  const withUrls = await Promise.all((data ?? []).map(async (a: any) => {
-    const { data: signed } = await supabaseAdmin.storage.from(BUCKET).createSignedUrl(a.storage_path, 3600);
-    return { ...a, download_url: signed?.signedUrl ?? null };
-  }));
+  const withUrls = await Promise.all(
+    (data ?? []).map(async (a: any) => {
+      const { data: signed } = await db.storage.from(BUCKET).createSignedUrl(a.storage_path, 3600);
+      return { ...a, download_url: signed?.signedUrl ?? null };
+    }),
+  );
   res.json(withUrls);
 };
 
@@ -45,11 +47,12 @@ export const upload: RequestHandler = async (req, res) => {
 
   const safeName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
   const path = `${taskId}/${Date.now()}-${safeName}`;
-  const { error: upErr } = await supabaseAdmin.storage
-    .from(BUCKET).upload(path, file.buffer, { contentType: file.mimetype, upsert: false });
+  const { error: upErr } = await db.storage
+    .from(BUCKET)
+    .upload(path, file.buffer, { contentType: file.mimetype, upsert: false });
   if (upErr) throw httpError(500, `Storage upload failed: ${upErr.message}`);
 
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await db
     .from('task_attachments')
     .insert({
       task_id: taskId,
@@ -68,14 +71,17 @@ export const upload: RequestHandler = async (req, res) => {
 /** Delete an attachment (DB row + object). Uploader or manager. */
 export const remove: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
-  const { data: row } = await supabaseAdmin
-    .from('task_attachments').select('*').eq('id', req.params.id).single();
+  const { data: row } = await db
+    .from('task_attachments')
+    .select('*')
+    .eq('id', req.params.id)
+    .single();
   if (!row) throw httpError(404, 'Attachment not found');
   const canDelete = isManagerLike(req.user.role) || row.uploaded_by === req.user.id;
   if (!canDelete) throw httpError(403, 'Forbidden');
 
-  await supabaseAdmin.storage.from(BUCKET).remove([row.storage_path]);
-  const { error } = await supabaseAdmin.from('task_attachments').delete().eq('id', row.id);
+  await db.storage.from(BUCKET).remove([row.storage_path]);
+  const { error } = await db.from('task_attachments').delete().eq('id', row.id);
   if (error) throw httpError(500, error.message);
   res.json({ ok: true });
 };

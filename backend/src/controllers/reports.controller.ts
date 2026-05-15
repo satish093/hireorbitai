@@ -1,5 +1,5 @@
 import { RequestHandler } from 'express';
-import { supabaseAdmin } from '../config/supabase';
+import { db } from '../config/db';
 import { httpError } from '../types';
 
 // ---------------------------------------------------------------------------
@@ -16,7 +16,7 @@ export const upsertDaily: RequestHandler = async (req, res) => {
   if (!body.recruiter_id || !body.activity_date) {
     throw httpError(400, 'recruiter_id and activity_date required');
   }
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await db
     .from('recruiter_daily_activity')
     .upsert(body, { onConflict: 'recruiter_id,activity_date' })
     .select()
@@ -27,7 +27,7 @@ export const upsertDaily: RequestHandler = async (req, res) => {
 
 export const listDaily: RequestHandler = async (req, res) => {
   const { recruiter_id, from, to } = req.query as Record<string, string | undefined>;
-  let qb = supabaseAdmin.from('recruiter_daily_activity').select('*');
+  let qb = db.from('recruiter_daily_activity').select('*');
   if (recruiter_id) qb = qb.eq('recruiter_id', recruiter_id);
   if (from) qb = qb.gte('activity_date', from);
   if (to) qb = qb.lte('activity_date', to);
@@ -42,17 +42,18 @@ export const listDaily: RequestHandler = async (req, res) => {
 
 export const managerSummary: RequestHandler = async (_req, res) => {
   const [consultants, recruiters, jobs, apps] = await Promise.all([
-    supabaseAdmin.from('consultants').select('marketing_status', { count: 'exact', head: false }),
-    supabaseAdmin.from('recruiters').select('id', { count: 'exact', head: true }),
-    supabaseAdmin.from('jobs').select('id', { count: 'exact', head: true }).eq('is_active', true),
-    supabaseAdmin
+    db.from('consultants').select('marketing_status', { count: 'exact', head: false }),
+    db.from('recruiters').select('id', { count: 'exact', head: true }),
+    db.from('jobs').select('id', { count: 'exact', head: true }).eq('is_active', true),
+    db
       .from('applications')
       .select('status', { count: 'exact', head: false })
       .gte('submitted_at', new Date(Date.now() - 7 * 86400000).toISOString()),
   ]);
 
   const byStatus: Record<string, number> = { ACTIVE: 0, PAUSED: 0, PLACED: 0 };
-  for (const c of consultants.data ?? []) byStatus[c.marketing_status] = (byStatus[c.marketing_status] ?? 0) + 1;
+  for (const c of consultants.data ?? [])
+    byStatus[c.marketing_status] = (byStatus[c.marketing_status] ?? 0) + 1;
 
   const appStatus: Record<string, number> = {};
   for (const a of apps.data ?? []) appStatus[a.status] = (appStatus[a.status] ?? 0) + 1;
@@ -86,14 +87,20 @@ export const recruiterPerformance: RequestHandler = async (req, res) => {
 
   const [{ data: recruiters }, { data: consultants }, { data: apps }, { data: interviews }] =
     await Promise.all([
-      supabaseAdmin.from('recruiters').select(
-        'id, team, target_submissions_per_week, user:users!user_id(id, email, full_name)'
-      ),
-      supabaseAdmin.from('consultants').select('id, recruiter_id, marketing_status'),
-      supabaseAdmin.from('applications').select('id, recruiter_id, status, submitted_at')
-        .gte('submitted_at', from).lte('submitted_at', to),
-      supabaseAdmin.from('interviews').select('id, consultant_id, status, scheduled_at')
-        .gte('scheduled_at', from).lte('scheduled_at', to),
+      db
+        .from('recruiters')
+        .select('id, team, target_submissions_per_week, user:users!user_id(id, email, full_name)'),
+      db.from('consultants').select('id, recruiter_id, marketing_status'),
+      db
+        .from('applications')
+        .select('id, recruiter_id, status, submitted_at')
+        .gte('submitted_at', from)
+        .lte('submitted_at', to),
+      db
+        .from('interviews')
+        .select('id, consultant_id, status, scheduled_at')
+        .gte('scheduled_at', from)
+        .lte('scheduled_at', to),
     ]);
 
   // Map consultant_id → recruiter_id so we can attribute interviews back to
@@ -153,9 +160,9 @@ export const recruiterPerformance: RequestHandler = async (req, res) => {
   }
 
   res.json({
-    from, to,
-    recruiters: Array.from(map.values())
-      .sort((a, b) => b.submissions - a.submissions),
+    from,
+    to,
+    recruiters: Array.from(map.values()).sort((a, b) => b.submissions - a.submissions),
   });
 };
 
@@ -167,17 +174,23 @@ export const consultantPipeline: RequestHandler = async (req, res) => {
   const { from, to } = rangeFromQuery(req);
 
   const [{ data: consultants }, { data: apps }, { data: interviews }] = await Promise.all([
-    supabaseAdmin.from('consultants').select(
-      'id, marketing_status, primary_skill, total_experience_years, recruiter_id,' +
-      ' user:users!user_id(id, email, full_name),' +
-      ' recruiter:recruiters!recruiter_id(id, team, user:users!user_id(id, full_name, email))'
-    ),
-    supabaseAdmin.from('applications')
+    db
+      .from('consultants')
+      .select(
+        'id, marketing_status, primary_skill, total_experience_years, recruiter_id,' +
+          ' user:users!user_id(id, email, full_name),' +
+          ' recruiter:recruiters!recruiter_id(id, team, user:users!user_id(id, full_name, email))',
+      ),
+    db
+      .from('applications')
       .select('id, consultant_id, status, submitted_at, vendor_id, job_id')
-      .gte('submitted_at', from).lte('submitted_at', to),
-    supabaseAdmin.from('interviews')
+      .gte('submitted_at', from)
+      .lte('submitted_at', to),
+    db
+      .from('interviews')
       .select('id, consultant_id, status, type, scheduled_at')
-      .gte('scheduled_at', from).lte('scheduled_at', to),
+      .gte('scheduled_at', from)
+      .lte('scheduled_at', to),
   ]);
 
   type ConAgg = {
@@ -234,9 +247,9 @@ export const consultantPipeline: RequestHandler = async (req, res) => {
   }
 
   res.json({
-    from, to,
-    consultants: Array.from(map.values())
-      .sort((a, b) => b.submissions - a.submissions),
+    from,
+    to,
+    consultants: Array.from(map.values()).sort((a, b) => b.submissions - a.submissions),
   });
 };
 
@@ -249,13 +262,18 @@ export const placementAnalytics: RequestHandler = async (req, res) => {
 
   const [{ data: apps }, { data: interviews }, { data: consultants }, { data: vendors }] =
     await Promise.all([
-      supabaseAdmin.from('applications')
+      db
+        .from('applications')
         .select('id, status, submitted_at, vendor_id, consultant_id')
-        .gte('submitted_at', from).lte('submitted_at', to),
-      supabaseAdmin.from('interviews').select('id, status, consultant_id, scheduled_at')
-        .gte('scheduled_at', from).lte('scheduled_at', to),
-      supabaseAdmin.from('consultants').select('id, marketing_status, created_at'),
-      supabaseAdmin.from('vendors').select('id, company_name'),
+        .gte('submitted_at', from)
+        .lte('submitted_at', to),
+      db
+        .from('interviews')
+        .select('id, status, consultant_id, scheduled_at')
+        .gte('scheduled_at', from)
+        .lte('scheduled_at', to),
+      db.from('consultants').select('id, marketing_status, created_at'),
+      db.from('vendors').select('id, company_name'),
     ]);
 
   // Funnel: submissions → interviews → offers → placements
@@ -275,12 +293,18 @@ export const placementAnalytics: RequestHandler = async (req, res) => {
     vendorCounts.set(a.vendor_id, (vendorCounts.get(a.vendor_id) ?? 0) + 1);
   }
   const top_vendors = Array.from(vendorCounts.entries())
-    .map(([id, count]) => ({ vendor_id: id, name: vendorMap.get(id) ?? 'Unknown', submissions: count }))
+    .map(([id, count]) => ({
+      vendor_id: id,
+      name: vendorMap.get(id) ?? 'Unknown',
+      submissions: count,
+    }))
     .sort((a, b) => b.submissions - a.submissions)
     .slice(0, 5);
 
   // Interview-completion rate.
-  const interviewsCompleted = (interviews ?? []).filter((i: any) => i.status === 'COMPLETED').length;
+  const interviewsCompleted = (interviews ?? []).filter(
+    (i: any) => i.status === 'COMPLETED',
+  ).length;
   const interviewsScheduled = interviewCount;
 
   // Applications by status (full distribution)
@@ -288,7 +312,8 @@ export const placementAnalytics: RequestHandler = async (req, res) => {
   for (const a of apps ?? []) appStatus[a.status] = (appStatus[a.status] ?? 0) + 1;
 
   res.json({
-    from, to,
+    from,
+    to,
     funnel: {
       submissions,
       interviews: interviewCount,
@@ -323,20 +348,25 @@ export const userTime: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   const { from, to, role } = req.query as Record<string, string | undefined>;
   // Default window: last 30 days.
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const startDefault = new Date(today); startDefault.setDate(startDefault.getDate() - 29);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const startDefault = new Date(today);
+  startDefault.setDate(startDefault.getDate() - 29);
   const fromDate = from ?? startDefault.toISOString().slice(0, 10);
   const toDate = to ?? today.toISOString().slice(0, 10);
 
   // Pull activity rows in range.
-  let { data: rows, error } = await supabaseAdmin
+  let { data: rows, error } = await db
     .from('user_activity_daily')
     .select('user_id, activity_date, active_seconds')
     .gte('activity_date', fromDate)
     .lte('activity_date', toDate);
   if (error) {
     if (/user_activity_daily|relation .* does not exist/i.test(error.message)) {
-      throw httpError(400, 'user_activity_daily table missing — apply database/user-activity-tracking.sql in Supabase.');
+      throw httpError(
+        400,
+        'user_activity_daily table missing — apply database/user-activity-tracking.sql to the database.',
+      );
     }
     throw httpError(500, error.message);
   }
@@ -345,11 +375,14 @@ export const userTime: RequestHandler = async (req, res) => {
   const userIds = Array.from(new Set((rows ?? []).map((r: any) => r.user_id)));
   let users: any[] = [];
   if (userIds.length > 0) {
-    let uq = supabaseAdmin.from('users').select('id, full_name, email, role, last_seen_at, group_id').in('id', userIds);
+    let uq = db
+      .from('users')
+      .select('id, full_name, email, role, last_seen_at, group_id')
+      .in('id', userIds);
     const { data: us, error: uErr } = await uq;
     if (uErr && /last_seen_at|group_id/.test(uErr.message)) {
       // Migration not applied — fall back.
-      const r2 = await supabaseAdmin.from('users').select('id, full_name, email, role').in('id', userIds);
+      const r2 = await db.from('users').select('id, full_name, email, role').in('id', userIds);
       users = r2.data ?? [];
     } else {
       users = us ?? [];
@@ -367,22 +400,24 @@ export const userTime: RequestHandler = async (req, res) => {
     grouped.set(r.user_id, g);
   }
 
-  const result = Array.from(grouped.entries()).map(([userId, g]) => {
-    const u = meta.get(userId) ?? {};
-    return {
-      user_id: userId,
-      full_name: u.full_name ?? null,
-      email: u.email ?? null,
-      role: u.role ?? null,
-      group_id: u.group_id ?? null,
-      last_seen_at: u.last_seen_at ?? null,
-      total_seconds: g.total,
-      days_active: g.days.size,
-      by_day: Array.from(g.days.entries())
-        .map(([date, seconds]) => ({ date, active_seconds: seconds }))
-        .sort((a, b) => a.date.localeCompare(b.date)),
-    };
-  }).filter((r) => !role || r.role === role)
+  const result = Array.from(grouped.entries())
+    .map(([userId, g]) => {
+      const u = meta.get(userId) ?? {};
+      return {
+        user_id: userId,
+        full_name: u.full_name ?? null,
+        email: u.email ?? null,
+        role: u.role ?? null,
+        group_id: u.group_id ?? null,
+        last_seen_at: u.last_seen_at ?? null,
+        total_seconds: g.total,
+        days_active: g.days.size,
+        by_day: Array.from(g.days.entries())
+          .map(([date, seconds]) => ({ date, active_seconds: seconds }))
+          .sort((a, b) => a.date.localeCompare(b.date)),
+      };
+    })
+    .filter((r) => !role || r.role === role)
     .sort((a, b) => b.total_seconds - a.total_seconds);
 
   res.json({ from: fromDate, to: toDate, users: result });

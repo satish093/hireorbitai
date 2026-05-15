@@ -1,10 +1,10 @@
 import { RequestHandler } from 'express';
-import { supabaseAdmin } from '../config/supabase';
+import { db } from '../config/db';
 import { httpError } from '../types';
 
 export const list: RequestHandler = async (req, res) => {
   const q = (req.query.q as string) ?? '';
-  let qb = supabaseAdmin.from('vendors').select('*');
+  let qb = db.from('vendors').select('*');
   if (q) qb = qb.ilike('company_name', `%${q}%`);
   const { data, error } = await qb.order('created_at', { ascending: false });
   if (error) throw httpError(500, error.message);
@@ -12,18 +12,14 @@ export const list: RequestHandler = async (req, res) => {
 };
 
 export const get: RequestHandler = async (req, res) => {
-  const { data, error } = await supabaseAdmin
-    .from('vendors')
-    .select('*')
-    .eq('id', req.params.id)
-    .single();
+  const { data, error } = await db.from('vendors').select('*').eq('id', req.params.id).single();
   if (error) throw httpError(404, error.message);
   res.json(data);
 };
 
 export const create: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await db
     .from('vendors')
     .insert({ ...req.body, created_by: req.user.id })
     .select()
@@ -33,7 +29,7 @@ export const create: RequestHandler = async (req, res) => {
 };
 
 export const update: RequestHandler = async (req, res) => {
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await db
     .from('vendors')
     .update(req.body)
     .eq('id', req.params.id)
@@ -44,7 +40,7 @@ export const update: RequestHandler = async (req, res) => {
 };
 
 export const remove: RequestHandler = async (req, res) => {
-  const { error } = await supabaseAdmin.from('vendors').delete().eq('id', req.params.id);
+  const { error } = await db.from('vendors').delete().eq('id', req.params.id);
   if (error) throw httpError(500, error.message);
   res.json({ ok: true });
 };

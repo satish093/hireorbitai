@@ -8,8 +8,8 @@ import { logger } from '../config/logger';
 // Endpoint: POST https://api.brevo.com/v3/smtp/email
 // Docs:     https://developers.brevo.com/reference/sendtransacemail
 //
-// Every auth email in the app routes through this module — no Supabase auth
-// emails are used (the Supabase SMTP setting is left disabled).
+// Every auth email in the app routes through this module — no third-party auth
+// emails are used.
 // ---------------------------------------------------------------------------
 
 interface SendArgs {
@@ -44,7 +44,11 @@ async function sendViaBrevo(args: SendArgs): Promise<void> {
   });
   if (!res.ok) {
     let detail = '';
-    try { detail = JSON.stringify(await res.json()); } catch { detail = await res.text().catch(() => ''); }
+    try {
+      detail = JSON.stringify(await res.json());
+    } catch {
+      detail = await res.text().catch(() => '');
+    }
     // Don't include the API key in the thrown error — pino redaction protects logs,
     // but we keep the message domain-specific too.
     throw new Error(`Brevo send failed (HTTP ${res.status}): ${detail}`);
@@ -72,19 +76,19 @@ interface Branding {
 
 const brand: Branding = {
   productName: 'HireOrbit AI',
-  primaryColor: '#4f46e5',      // indigo-600
-  textColor: '#0f172a',          // slate-900
-  mutedColor: '#64748b',         // slate-500
-  borderColor: '#e2e8f0',        // slate-200
-  bgColor: '#f8fafc',            // slate-50
+  primaryColor: '#4f46e5', // indigo-600
+  textColor: '#0f172a', // slate-900
+  mutedColor: '#64748b', // slate-500
+  borderColor: '#e2e8f0', // slate-200
+  bgColor: '#f8fafc', // slate-50
   supportEmail: 'support@hireorbitai.com',
   websiteUrl: env.frontendUrl,
 };
 
 function shell(args: {
-  preheader: string;       // hidden inbox-preview text
+  preheader: string; // hidden inbox-preview text
   heading: string;
-  body: string;            // raw HTML — block-level allowed
+  body: string; // raw HTML — block-level allowed
   cta?: { label: string; href: string };
   footerNote?: string;
 }): string {
@@ -185,8 +189,7 @@ export async function sendWelcomeWithTempPassword(args: {
       cta: { label: 'Sign in', href: loginUrl },
       footerNote: 'For your security, change this temporary password the first time you sign in.',
     }),
-    text:
-`Welcome to ${brand.productName}.
+    text: `Welcome to ${brand.productName}.
 Sign in: ${loginUrl}
 Email: ${args.to.email}
 Temporary password: ${args.tempPassword}
@@ -203,7 +206,10 @@ export async function sendInvitationLink(args: {
   invitedByName?: string;
 }): Promise<void> {
   const exp = args.expiresInHours;
-  const roleLabel = args.role.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+  const roleLabel = args.role
+    .replace(/_/g, ' ')
+    .toLowerCase()
+    .replace(/\b\w/g, (c) => c.toUpperCase());
   const inviter = args.invitedByName ? escapeHtml(args.invitedByName) : 'A teammate';
   const body = `
     <p>Hi${args.to.name ? ` ${escapeHtml(args.to.name)}` : ''},</p>
@@ -222,8 +228,7 @@ export async function sendInvitationLink(args: {
       cta: { label: 'Accept invitation', href: args.inviteUrl },
       footerNote: `If the button doesn't work, paste this URL into your browser:<br/><span style="word-break:break-all;color:${brand.textColor};">${escapeHtml(args.inviteUrl)}</span>`,
     }),
-    text:
-`${inviter.replace(/<[^>]+>/g, '')} invited you to join ${brand.productName} as a ${roleLabel}.
+    text: `${inviter.replace(/<[^>]+>/g, '')} invited you to join ${brand.productName} as a ${roleLabel}.
 Accept your invitation:
 ${args.inviteUrl}
 This link expires in ${exp} hours.`,
@@ -254,8 +259,7 @@ export async function sendPasswordResetLink(args: {
       cta: { label: 'Reset password', href: args.resetUrl },
       footerNote: `If the button doesn't work, paste this URL into your browser:<br/><span style="word-break:break-all;color:${brand.textColor};">${escapeHtml(args.resetUrl)}</span>`,
     }),
-    text:
-`Reset your ${brand.productName} password.
+    text: `Reset your ${brand.productName} password.
 Open this link (valid for ${exp} minutes):
 ${args.resetUrl}
 If you didn't request this, ignore this email.`,
@@ -289,8 +293,7 @@ export async function sendPasswordChangedNotice(args: {
       heading: 'Password changed',
       body,
     }),
-    text:
-`Your ${brand.productName} password was just changed.
+    text: `Your ${brand.productName} password was just changed.
 When: ${whenStr}
 IP: ${ip}
 If this wasn't you, reset immediately and email ${brand.supportEmail}.`,
@@ -316,8 +319,7 @@ export async function sendAccountLockedNotice(args: {
       body,
       cta: { label: 'Reset password', href: `${env.frontendUrl}/forgot-password` },
     }),
-    text:
-`Your ${brand.productName} account has been temporarily locked.
+    text: `Your ${brand.productName} account has been temporarily locked.
 You can try again after ${args.unlocksAt.toUTCString()} or reset your password at:
 ${env.frontendUrl}/forgot-password`,
     tag: 'account-locked',

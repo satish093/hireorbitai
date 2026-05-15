@@ -1,9 +1,13 @@
 import { RequestHandler } from 'express';
 import { z } from 'zod';
-import { supabaseAdmin } from '../config/supabase';
+import { db } from '../config/db';
 import { uploadResumeFile, getResumeSignedUrl } from '../services/storage.service';
 import {
-  scoreResume, tailorResumeForJob, scoreResumeAgainstJob, atsScore, extractJobRequirements,
+  scoreResume,
+  tailorResumeForJob,
+  scoreResumeAgainstJob,
+  atsScore,
+  extractJobRequirements,
 } from '../services/ai.service';
 import { httpError, MANAGER_TIER } from '../types';
 
@@ -21,8 +25,11 @@ async function authorizeConsultantAccess(
 ): Promise<void> {
   if (isManagerTier(caller.role)) return; // admins + managers see all
 
-  const { data: cons } = await supabaseAdmin
-    .from('consultants').select('id, user_id, recruiter_id').eq('id', consultantId).maybeSingle();
+  const { data: cons } = await db
+    .from('consultants')
+    .select('id, user_id, recruiter_id')
+    .eq('id', consultantId)
+    .maybeSingle();
   if (!cons) throw httpError(404, 'Consultant not found');
 
   if (caller.role === 'CONSULTANT') {
@@ -30,8 +37,11 @@ async function authorizeConsultantAccess(
     return;
   }
   if (caller.role === 'RECRUITER') {
-    const { data: rec } = await supabaseAdmin
-      .from('recruiters').select('id').eq('user_id', caller.id).maybeSingle();
+    const { data: rec } = await db
+      .from('recruiters')
+      .select('id')
+      .eq('user_id', caller.id)
+      .maybeSingle();
     if (!rec || cons.recruiter_id !== rec.id) throw httpError(403, 'Forbidden');
     return;
   }
@@ -42,7 +52,7 @@ async function authorizeConsultantAccess(
 export const listForConsultant: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   await authorizeConsultantAccess(req.params.consultantId, req.user);
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await db
     .from('resumes')
     .select('*')
     .eq('consultant_id', req.params.consultantId)
@@ -65,7 +75,7 @@ export const upload: RequestHandler = async (req, res) => {
   await authorizeConsultantAccess(consultant_id, req.user);
 
   // Next version number.
-  const { data: existing } = await supabaseAdmin
+  const { data: existing } = await db
     .from('resumes')
     .select('version')
     .eq('consultant_id', consultant_id)
@@ -98,12 +108,9 @@ export const upload: RequestHandler = async (req, res) => {
   }
 
   // Flip is_current off for prior versions, on for this one.
-  await supabaseAdmin
-    .from('resumes')
-    .update({ is_current: false })
-    .eq('consultant_id', consultant_id);
+  await db.from('resumes').update({ is_current: false }).eq('consultant_id', consultant_id);
 
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await db
     .from('resumes')
     .insert({
       consultant_id,
@@ -126,7 +133,7 @@ export const upload: RequestHandler = async (req, res) => {
 /** Signed-URL download link for a resume version. */
 export const downloadUrl: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await db
     .from('resumes')
     .select('storage_path, consultant_id')
     .eq('id', req.params.id)
@@ -142,12 +149,15 @@ export const score: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   const text = String(req.body?.text ?? '');
   if (!text) throw httpError(400, 'Missing resume text');
-  const { data: existing } = await supabaseAdmin
-    .from('resumes').select('consultant_id').eq('id', req.params.id).single();
+  const { data: existing } = await db
+    .from('resumes')
+    .select('consultant_id')
+    .eq('id', req.params.id)
+    .single();
   if (!existing) throw httpError(404, 'Resume not found');
   await authorizeConsultantAccess(existing.consultant_id, req.user);
   const result = await scoreResume(text);
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await db
     .from('resumes')
     .update({ ai_score: result.score, ai_feedback: { ...result, resume_text: text } })
     .eq('id', req.params.id)
@@ -160,7 +170,7 @@ export const score: RequestHandler = async (req, res) => {
 /** Mark a specific version as current. */
 export const setCurrent: RequestHandler = async (req, res) => {
   const { id } = req.params;
-  const { data: resume, error: e1 } = await supabaseAdmin
+  const { data: resume, error: e1 } = await db
     .from('resumes')
     .select('consultant_id')
     .eq('id', id)
@@ -168,11 +178,8 @@ export const setCurrent: RequestHandler = async (req, res) => {
   if (e1 || !resume) throw httpError(404, 'Resume not found');
   if (!req.user) throw httpError(401, 'Not authenticated');
   await authorizeConsultantAccess(resume.consultant_id, req.user);
-  await supabaseAdmin
-    .from('resumes')
-    .update({ is_current: false })
-    .eq('consultant_id', resume.consultant_id);
-  const { data, error } = await supabaseAdmin
+  await db.from('resumes').update({ is_current: false }).eq('consultant_id', resume.consultant_id);
+  const { data, error } = await db
     .from('resumes')
     .update({ is_current: true })
     .eq('id', id)
@@ -212,17 +219,20 @@ export const tailorForJob: RequestHandler = async (req, res) => {
   if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
 
   // Load the source resume (with text) and the job.
-  const { data: source, error: srcErr } = await supabaseAdmin
+  const { data: source, error: srcErr } = await db
     .from('resumes')
     .select('id, consultant_id, file_name, version, ai_feedback, body_text')
-    .eq('id', parsed.data.source_resume_id).single();
+    .eq('id', parsed.data.source_resume_id)
+    .single();
   if (srcErr || !source) throw httpError(404, 'Source resume not found');
   await authorizeConsultantAccess(source.consultant_id, req.user);
 
   let resumeText: string =
-    (source as any).body_text
-    || (typeof (source as any).ai_feedback?.resume_text === 'string' ? (source as any).ai_feedback.resume_text : '')
-    || '';
+    (source as any).body_text ||
+    (typeof (source as any).ai_feedback?.resume_text === 'string'
+      ? (source as any).ai_feedback.resume_text
+      : '') ||
+    '';
 
   // If the caller passed pasted text, use it AND persist it on the source so
   // we never have to ask again.
@@ -233,39 +243,50 @@ export const tailorForJob: RequestHandler = async (req, res) => {
     };
     // Try storing in body_text too; falls back to ai_feedback only if column doesn't exist.
     persistPatch.body_text = parsed.data.resume_text;
-    let { error: persistErr } = await supabaseAdmin
-      .from('resumes').update(persistPatch).eq('id', source.id);
-    if (persistErr && /body_text/.test(persistErr.message) && /schema cache|column/i.test(persistErr.message)) {
+    let { error: persistErr } = await db.from('resumes').update(persistPatch).eq('id', source.id);
+    if (
+      persistErr &&
+      /body_text/.test(persistErr.message) &&
+      /schema cache|column/i.test(persistErr.message)
+    ) {
       delete persistPatch.body_text;
-      ({ error: persistErr } = await supabaseAdmin
-        .from('resumes').update(persistPatch).eq('id', source.id));
+      ({ error: persistErr } = await db.from('resumes').update(persistPatch).eq('id', source.id));
     }
     // Non-fatal if persist still fails — we already have the text in memory for this request.
   }
 
   if (!resumeText) {
-    throw httpError(400, 'NO_RESUME_TEXT: Source resume has no extractable text. Paste the resume text in the wizard or re-upload the resume with a text body.');
+    throw httpError(
+      400,
+      'NO_RESUME_TEXT: Source resume has no extractable text. Paste the resume text in the wizard or re-upload the resume with a text body.',
+    );
   }
 
-  const { data: job, error: jobErr } = await supabaseAdmin
-    .from('jobs').select('*').eq('id', parsed.data.job_id).single();
+  const { data: job, error: jobErr } = await db
+    .from('jobs')
+    .select('*')
+    .eq('id', parsed.data.job_id)
+    .single();
   if (jobErr || !job) throw httpError(404, 'Job not found');
 
   // Ensure requirements are extracted so we have skills + must_haves.
   let reqs = job.requirements;
   if (!reqs) {
     reqs = await extractJobRequirements({
-      title: job.title, description: job.description,
-      required_skills: job.required_skills, location: job.location,
+      title: job.title,
+      description: job.description,
+      required_skills: job.required_skills,
+      location: job.location,
     });
-    await supabaseAdmin.from('jobs').update({ requirements: reqs }).eq('id', job.id);
+    await db.from('jobs').update({ requirements: reqs }).eq('id', job.id);
   }
 
   // Before score on the ORIGINAL resume.
   const before = await scoreResumeAgainstJob({
     resumeText,
     job: {
-      title: job.title, description: job.description,
+      title: job.title,
+      description: job.description,
       required_skills: reqs?.required_skills ?? job.required_skills,
       min_years_of_experience: reqs?.min_years_of_experience ?? null,
       job_seniority: reqs?.job_seniority ?? job.level ?? null,
@@ -275,7 +296,9 @@ export const tailorForJob: RequestHandler = async (req, res) => {
   let tailored = await tailorResumeForJob({
     resumeText,
     job: {
-      title: job.title, company: job.company_name, description: job.description,
+      title: job.title,
+      company: job.company_name,
+      description: job.description,
       required_skills: reqs?.required_skills ?? job.required_skills,
       must_haves: reqs?.must_haves ?? [],
     },
@@ -286,7 +309,8 @@ export const tailorForJob: RequestHandler = async (req, res) => {
   let after = await scoreResumeAgainstJob({
     resumeText: tailored.tailored_resume_markdown,
     job: {
-      title: job.title, description: job.description,
+      title: job.title,
+      description: job.description,
       required_skills: reqs?.required_skills ?? job.required_skills,
       min_years_of_experience: reqs?.min_years_of_experience ?? null,
       job_seniority: reqs?.job_seniority ?? job.level ?? null,
@@ -300,9 +324,11 @@ export const tailorForJob: RequestHandler = async (req, res) => {
   const TARGET_SCORE = 85;
   if (after.overall_score < TARGET_SCORE) {
     const retried = await tailorResumeForJob({
-      resumeText: tailored.tailored_resume_markdown,   // build on what we just produced
+      resumeText: tailored.tailored_resume_markdown, // build on what we just produced
       job: {
-        title: job.title, company: job.company_name, description: job.description,
+        title: job.title,
+        company: job.company_name,
+        description: job.description,
         required_skills: reqs?.required_skills ?? job.required_skills,
         must_haves: reqs?.must_haves ?? [],
       },
@@ -313,7 +339,8 @@ export const tailorForJob: RequestHandler = async (req, res) => {
     const retriedScore = await scoreResumeAgainstJob({
       resumeText: retried.tailored_resume_markdown,
       job: {
-        title: job.title, description: job.description,
+        title: job.title,
+        description: job.description,
         required_skills: reqs?.required_skills ?? job.required_skills,
         min_years_of_experience: reqs?.min_years_of_experience ?? null,
         job_seniority: reqs?.job_seniority ?? job.level ?? null,
@@ -334,11 +361,16 @@ export const tailorForJob: RequestHandler = async (req, res) => {
   }
 
   // Persist as a new resume version. We store the markdown body in body_text.
-  const { data: existing } = await supabaseAdmin
-    .from('resumes').select('version').eq('consultant_id', source.consultant_id)
-    .order('version', { ascending: false }).limit(1);
+  const { data: existing } = await db
+    .from('resumes')
+    .select('version')
+    .eq('consultant_id', source.consultant_id)
+    .order('version', { ascending: false })
+    .limit(1);
   const nextVersion = (existing?.[0]?.version ?? 0) + 1;
-  const safeTitle = String(job.title ?? 'job').slice(0, 40).replace(/\s+/g, '_');
+  const safeTitle = String(job.title ?? 'job')
+    .slice(0, 40)
+    .replace(/\s+/g, '_');
   const fileName = `tailored-v${nextVersion}-${safeTitle}.md`;
 
   const insertRow: any = {
@@ -350,7 +382,9 @@ export const tailorForJob: RequestHandler = async (req, res) => {
     size_bytes: Buffer.byteLength(tailored.tailored_resume_markdown, 'utf8'),
     ai_score: after.overall_score,
     ai_feedback: {
-      rank_desc: after.rank_desc, rationale: after.rationale, per_skill: after.per_skill,
+      rank_desc: after.rank_desc,
+      rationale: after.rationale,
+      per_skill: after.per_skill,
       resume_text: tailored.tailored_resume_markdown,
     },
     is_current: false,
@@ -367,14 +401,17 @@ export const tailorForJob: RequestHandler = async (req, res) => {
     body_text: tailored.tailored_resume_markdown,
   };
 
-  let { data, error } = await supabaseAdmin.from('resumes').insert(insertRow).select().single();
-  if (error && /tailored_for_job_id|parent_resume_id|tailor_metadata|body_text/.test(error.message)
-      && /schema cache|column/i.test(error.message)) {
+  let { data, error } = await db.from('resumes').insert(insertRow).select().single();
+  if (
+    error &&
+    /tailored_for_job_id|parent_resume_id|tailor_metadata|body_text/.test(error.message) &&
+    /schema cache|column/i.test(error.message)
+  ) {
     delete insertRow.tailored_for_job_id;
     delete insertRow.parent_resume_id;
     delete insertRow.tailor_metadata;
     delete insertRow.body_text;
-    ({ data, error } = await supabaseAdmin.from('resumes').insert(insertRow).select().single());
+    ({ data, error } = await db.from('resumes').insert(insertRow).select().single());
   }
   if (error) throw httpError(500, error.message);
 
@@ -382,7 +419,7 @@ export const tailorForJob: RequestHandler = async (req, res) => {
   // customizations for job X" or "all customizations by recruiter Y" cheaply.
   // Non-fatal if the table isn't migrated yet.
   try {
-    await supabaseAdmin.from('resume_customizations').insert({
+    await db.from('resume_customizations').insert({
       consultant_id: source.consultant_id,
       job_id: parsed.data.job_id,
       source_resume_id: source.id,
@@ -395,7 +432,9 @@ export const tailorForJob: RequestHandler = async (req, res) => {
       after_score: after.overall_score,
       created_by: req.user.id,
     });
-  } catch { /* table missing — surfaces via the apply-flow-tables.sql migration */ }
+  } catch {
+    /* table missing — surfaces via the apply-flow-tables.sql migration */
+  }
 
   res.status(201).json({
     resume: data,
@@ -415,13 +454,18 @@ export const tailorForJob: RequestHandler = async (req, res) => {
 // ---------------------------------------------------------------------------
 export const body: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
-  const { data, error } = await supabaseAdmin
-    .from('resumes').select('id, consultant_id, file_name, body_text, ai_feedback, tailor_metadata, ai_score')
-    .eq('id', req.params.id).single();
+  const { data, error } = await db
+    .from('resumes')
+    .select('id, consultant_id, file_name, body_text, ai_feedback, tailor_metadata, ai_score')
+    .eq('id', req.params.id)
+    .single();
   if (error || !data) throw httpError(404, 'Resume not found');
   await authorizeConsultantAccess(data.consultant_id, req.user);
-  const text = (data as any).body_text
-    || (typeof (data as any).ai_feedback?.resume_text === 'string' ? (data as any).ai_feedback.resume_text : '');
+  const text =
+    (data as any).body_text ||
+    (typeof (data as any).ai_feedback?.resume_text === 'string'
+      ? (data as any).ai_feedback.resume_text
+      : '');
   res.json({
     id: data.id,
     file_name: data.file_name,

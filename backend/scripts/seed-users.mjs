@@ -1,89 +1,140 @@
 // One-shot seed script. Idempotent: re-run safely.
+//
 // Creates 2 managers, 2 recruiters (assigned to managers), 5 consultants
-// (assigned to recruiters), each with onboarding profile rows so they
+// (assigned to recruiters), each with their associated profile rows so they
 // bypass the consultant/recruiter onboarding gate.
 //
 // Run with Node 22's built-in env-file loader:
 //   node --env-file=.env scripts/seed-users.mjs
 
-import { createClient } from '@supabase/supabase-js';
+import { randomUUID } from 'node:crypto';
+import pg from 'pg';
+import bcrypt from 'bcryptjs';
 
-const url = process.env.SUPABASE_URL;
-const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-if (!url || !key) throw new Error('Need SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY');
+const url = process.env.DATABASE_URL;
+if (!url) throw new Error('Need DATABASE_URL');
 
-const supabase = createClient(url, key, {
-  auth: { autoRefreshToken: false, persistSession: false },
-});
+const sslMode = process.env.DATABASE_SSL ?? 'disable';
+const ssl =
+  sslMode === 'disable'
+    ? false
+    : sslMode === 'no-verify'
+      ? { rejectUnauthorized: false }
+      : { rejectUnauthorized: true };
 
-const PASSWORD = 'Passw0rd!2026';
+const pool = new pg.Pool({ connectionString: url, ssl });
+
+// Demo / sandbox seed — never run against a production database. Bail loudly
+// if NODE_ENV=production unless the operator explicitly opts in via
+// SEED_ALLOW_PROD=true.
+if (process.env.NODE_ENV === 'production' && process.env.SEED_ALLOW_PROD !== 'true') {
+  console.error(
+    'Refusing to seed demo users against a production DB. Set SEED_ALLOW_PROD=true if you really want this.',
+  );
+  process.exit(1);
+}
+
+const PASSWORD = process.env.SEED_PASSWORD ?? 'Passw0rd!2026';
+if (PASSWORD.length < 8) throw new Error('SEED_PASSWORD must be at least 8 characters.');
+const PASSWORD_HASH = await bcrypt.hash(PASSWORD, 10);
 
 const managers = [
-  { email: 'priya.anand@talentbridge.test',  full_name: 'Priya Anand' },
-  { email: 'david.chen@talentbridge.test',   full_name: 'David Chen' },
+  { email: 'priya.anand@hireorbitai.test', full_name: 'Priya Anand' },
+  { email: 'david.chen@hireorbitai.test', full_name: 'David Chen' },
 ];
 
 const recruiters = [
   {
-    email: 'marcus.bell@talentbridge.test', full_name: 'Marcus Bell',
-    manager_email: 'priya.anand@talentbridge.test',
-    team: 'Pod Alpha', target_submissions_per_week: 12, notes: 'Pacific time zone.',
+    email: 'marcus.bell@hireorbitai.test',
+    full_name: 'Marcus Bell',
+    manager_email: 'priya.anand@hireorbitai.test',
+    team: 'Pod Alpha',
+    target_submissions_per_week: 12,
+    notes: 'Pacific time zone.',
   },
   {
-    email: 'sara.okonkwo@talentbridge.test', full_name: 'Sara Okonkwo',
-    manager_email: 'david.chen@talentbridge.test',
-    team: 'Pod Beta',  target_submissions_per_week: 10, notes: 'EST. Strong on data roles.',
+    email: 'sara.okonkwo@hireorbitai.test',
+    full_name: 'Sara Okonkwo',
+    manager_email: 'david.chen@hireorbitai.test',
+    team: 'Pod Beta',
+    target_submissions_per_week: 10,
+    notes: 'EST. Strong on data roles.',
   },
 ];
 
 const consultants = [
   {
-    email: 'aniket.rao@talentbridge.test',  full_name: 'Aniket Rao',
-    recruiter_email: 'marcus.bell@talentbridge.test',
-    visa_status: 'H1B', current_location: 'New York, NY',
+    email: 'aniket.rao@hireorbitai.test',
+    full_name: 'Aniket Rao',
+    recruiter_email: 'marcus.bell@hireorbitai.test',
+    visa_status: 'H1B',
+    current_location: 'New York, NY',
     preferred_locations: ['New York, NY', 'Jersey City, NJ', 'Remote'],
-    primary_skill: 'Senior Data Engineer', total_experience_years: 6,
-    relocation: false, remote_only: false, expected_rate: 95,
+    primary_skill: 'Senior Data Engineer',
+    total_experience_years: 6,
+    relocation: false,
+    remote_only: false,
+    expected_rate: 95,
     linkedin_url: 'https://www.linkedin.com/in/aniket-rao-example',
     notes: 'Java, Spark, Airflow. Available in 2 weeks.',
   },
   {
-    email: 'yuki.tanaka@talentbridge.test',  full_name: 'Yuki Tanaka',
-    recruiter_email: 'marcus.bell@talentbridge.test',
-    visa_status: 'GC', current_location: 'San Francisco, CA',
+    email: 'yuki.tanaka@hireorbitai.test',
+    full_name: 'Yuki Tanaka',
+    recruiter_email: 'marcus.bell@hireorbitai.test',
+    visa_status: 'GC',
+    current_location: 'San Francisco, CA',
     preferred_locations: ['San Francisco, CA', 'Remote'],
-    primary_skill: 'Frontend Engineer', total_experience_years: 4,
-    relocation: false, remote_only: true, expected_rate: 85,
+    primary_skill: 'Frontend Engineer',
+    total_experience_years: 4,
+    relocation: false,
+    remote_only: true,
+    expected_rate: 85,
     linkedin_url: 'https://www.linkedin.com/in/yuki-tanaka-example',
     notes: 'React, TypeScript, design-system experience.',
   },
   {
-    email: 'rohan.mehta@talentbridge.test',  full_name: 'Rohan Mehta',
-    recruiter_email: 'marcus.bell@talentbridge.test',
-    visa_status: 'USC', current_location: 'Austin, TX',
+    email: 'rohan.mehta@hireorbitai.test',
+    full_name: 'Rohan Mehta',
+    recruiter_email: 'marcus.bell@hireorbitai.test',
+    visa_status: 'USC',
+    current_location: 'Austin, TX',
     preferred_locations: ['Austin, TX', 'Dallas, TX', 'Remote'],
-    primary_skill: 'Full-Stack Engineer', total_experience_years: 5,
-    relocation: true, remote_only: false, expected_rate: 90,
+    primary_skill: 'Full-Stack Engineer',
+    total_experience_years: 5,
+    relocation: true,
+    remote_only: false,
+    expected_rate: 90,
     linkedin_url: 'https://www.linkedin.com/in/rohan-mehta-example',
     notes: 'Node, React, Postgres. US Citizen.',
   },
   {
-    email: 'fatima.hassan@talentbridge.test', full_name: 'Fatima Hassan',
-    recruiter_email: 'sara.okonkwo@talentbridge.test',
-    visa_status: 'OPT', current_location: 'Remote',
+    email: 'fatima.hassan@hireorbitai.test',
+    full_name: 'Fatima Hassan',
+    recruiter_email: 'sara.okonkwo@hireorbitai.test',
+    visa_status: 'OPT',
+    current_location: 'Remote',
     preferred_locations: ['Remote'],
-    primary_skill: 'DevOps Engineer', total_experience_years: 7,
-    relocation: false, remote_only: true, expected_rate: 110,
+    primary_skill: 'DevOps Engineer',
+    total_experience_years: 7,
+    relocation: false,
+    remote_only: true,
+    expected_rate: 110,
     linkedin_url: 'https://www.linkedin.com/in/fatima-hassan-example',
     notes: 'K8s, Terraform, AWS. Looking for remote-only.',
   },
   {
-    email: 'linh.pham@talentbridge.test',    full_name: 'Linh Pham',
-    recruiter_email: 'sara.okonkwo@talentbridge.test',
-    visa_status: 'USC', current_location: 'Boston, MA',
+    email: 'linh.pham@hireorbitai.test',
+    full_name: 'Linh Pham',
+    recruiter_email: 'sara.okonkwo@hireorbitai.test',
+    visa_status: 'USC',
+    current_location: 'Boston, MA',
     preferred_locations: ['Boston, MA', 'Cambridge, MA', 'Remote'],
-    primary_skill: 'Backend Engineer', total_experience_years: 5,
-    relocation: false, remote_only: false, expected_rate: 95,
+    primary_skill: 'Backend Engineer',
+    total_experience_years: 5,
+    relocation: false,
+    remote_only: false,
+    expected_rate: 95,
     linkedin_url: 'https://www.linkedin.com/in/linh-pham-example',
     notes: 'Go, Python, GraphQL. US Citizen.',
   },
@@ -91,90 +142,95 @@ const consultants = [
 
 const emailToId = new Map();
 
-async function getOrCreateAuthUser(email, full_name) {
-  // 1. Look up by email first to keep this idempotent.
-  const { data: existing } = await supabase.auth.admin.listUsers({ page: 1, perPage: 1000 });
-  const found = existing?.users?.find((u) => u.email?.toLowerCase() === email.toLowerCase());
-  if (found) {
-    console.log(`  exists  ${email} -> ${found.id}`);
-    return found.id;
-  }
-  const { data, error } = await supabase.auth.admin.createUser({
-    email, password: PASSWORD, email_confirm: true, user_metadata: { full_name },
-  });
-  if (error) throw new Error(`create user ${email}: ${error.message}`);
-  console.log(`  created ${email} -> ${data.user.id}`);
-  return data.user.id;
-}
-
-async function upsertUserRow(id, email, full_name, role) {
-  const { error } = await supabase.from('users').upsert(
-    { id, email, full_name, role },
-    { onConflict: 'id' }
+async function upsertUser(email, full_name, role) {
+  const id = randomUUID();
+  const r = await pool.query(
+    `INSERT INTO public.users (id, email, password_hash, full_name, role, is_active, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, true, now(), now())
+     ON CONFLICT (email) DO UPDATE SET
+       password_hash = EXCLUDED.password_hash,
+       full_name = EXCLUDED.full_name,
+       role = EXCLUDED.role,
+       updated_at = now()
+     RETURNING id`,
+    [id, email.toLowerCase(), PASSWORD_HASH, full_name, role],
   );
-  if (error) throw new Error(`upsert users ${email}: ${error.message}`);
+  const uid = r.rows[0].id;
+  emailToId.set(email, uid);
+  console.log(`  ok ${role.padEnd(10)} ${email} -> ${uid}`);
 }
 
-async function main() {
-  console.log('--- 1. Auth users ---');
-  for (const m of managers)    emailToId.set(m.email,    await getOrCreateAuthUser(m.email, m.full_name));
-  for (const r of recruiters)  emailToId.set(r.email,    await getOrCreateAuthUser(r.email, r.full_name));
-  for (const c of consultants) emailToId.set(c.email,    await getOrCreateAuthUser(c.email, c.full_name));
+try {
+  console.log('--- 1. public.users rows ---');
+  for (const m of managers) await upsertUser(m.email, m.full_name, 'MANAGER');
+  for (const r of recruiters) await upsertUser(r.email, r.full_name, 'RECRUITER');
+  for (const c of consultants) await upsertUser(c.email, c.full_name, 'CONSULTANT');
 
-  console.log('\n--- 2. public.users rows ---');
-  for (const m of managers)    await upsertUserRow(emailToId.get(m.email),  m.email, m.full_name, 'MANAGER');
-  for (const r of recruiters)  await upsertUserRow(emailToId.get(r.email),  r.email, r.full_name, 'RECRUITER');
-  for (const c of consultants) await upsertUserRow(emailToId.get(c.email),  c.email, c.full_name, 'CONSULTANT');
-  console.log('  ok');
-
-  console.log('\n--- 3. recruiters table ---');
+  console.log('\n--- 2. recruiters table ---');
   for (const r of recruiters) {
-    const user_id    = emailToId.get(r.email);
+    const user_id = emailToId.get(r.email);
     const manager_id = emailToId.get(r.manager_email);
-    const { error } = await supabase.from('recruiters').upsert(
-      {
-        user_id, manager_id,
-        team: r.team,
-        target_submissions_per_week: r.target_submissions_per_week,
-        notes: r.notes,
-      },
-      { onConflict: 'user_id' }
+    await pool.query(
+      `INSERT INTO public.recruiters (user_id, manager_id, team, target_submissions_per_week, notes)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (user_id) DO UPDATE SET
+         manager_id = EXCLUDED.manager_id,
+         team = EXCLUDED.team,
+         target_submissions_per_week = EXCLUDED.target_submissions_per_week,
+         notes = EXCLUDED.notes`,
+      [user_id, manager_id, r.team, r.target_submissions_per_week, r.notes],
     );
-    if (error) throw new Error(`upsert recruiters ${r.email}: ${error.message}`);
     console.log(`  ok      ${r.email}`);
   }
 
-  console.log('\n--- 4. Resolve recruiter ids ---');
+  console.log('\n--- 3. Resolve recruiter ids ---');
   const recruiterRowByEmail = new Map();
   for (const r of recruiters) {
     const user_id = emailToId.get(r.email);
-    const { data, error } = await supabase.from('recruiters').select('id').eq('user_id', user_id).single();
-    if (error) throw new Error(`find recruiter for ${r.email}: ${error.message}`);
-    recruiterRowByEmail.set(r.email, data.id);
-    console.log(`  ${r.email} -> recruiter ${data.id}`);
+    const found = await pool.query(`SELECT id FROM public.recruiters WHERE user_id = $1`, [
+      user_id,
+    ]);
+    recruiterRowByEmail.set(r.email, found.rows[0].id);
+    console.log(`  ${r.email} -> recruiter ${found.rows[0].id}`);
   }
 
-  console.log('\n--- 5. consultants table ---');
+  console.log('\n--- 4. consultants table ---');
   for (const c of consultants) {
-    const user_id      = emailToId.get(c.email);
+    const user_id = emailToId.get(c.email);
     const recruiter_id = recruiterRowByEmail.get(c.recruiter_email);
-    const { error } = await supabase.from('consultants').upsert(
-      {
-        user_id, recruiter_id,
-        visa_status: c.visa_status,
-        current_location: c.current_location,
-        preferred_locations: c.preferred_locations,
-        primary_skill: c.primary_skill,
-        total_experience_years: c.total_experience_years,
-        relocation: c.relocation,
-        remote_only: c.remote_only,
-        expected_rate: c.expected_rate,
-        linkedin_url: c.linkedin_url,
-        notes: c.notes,
-      },
-      { onConflict: 'user_id' }
+    await pool.query(
+      `INSERT INTO public.consultants (
+         user_id, recruiter_id, visa_status, current_location,
+         preferred_locations, primary_skill, total_experience_years,
+         relocation, remote_only, expected_rate, linkedin_url, notes
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+       ON CONFLICT (user_id) DO UPDATE SET
+         recruiter_id = EXCLUDED.recruiter_id,
+         visa_status = EXCLUDED.visa_status,
+         current_location = EXCLUDED.current_location,
+         preferred_locations = EXCLUDED.preferred_locations,
+         primary_skill = EXCLUDED.primary_skill,
+         total_experience_years = EXCLUDED.total_experience_years,
+         relocation = EXCLUDED.relocation,
+         remote_only = EXCLUDED.remote_only,
+         expected_rate = EXCLUDED.expected_rate,
+         linkedin_url = EXCLUDED.linkedin_url,
+         notes = EXCLUDED.notes`,
+      [
+        user_id,
+        recruiter_id,
+        c.visa_status,
+        c.current_location,
+        c.preferred_locations,
+        c.primary_skill,
+        c.total_experience_years,
+        c.relocation,
+        c.remote_only,
+        c.expected_rate,
+        c.linkedin_url,
+        c.notes,
+      ],
     );
-    if (error) throw new Error(`upsert consultants ${c.email}: ${error.message}`);
     console.log(`  ok      ${c.email} -> recruiter ${c.recruiter_email}`);
   }
 
@@ -183,6 +239,9 @@ async function main() {
   console.log(`  2 recruiters : ${recruiters.map((r) => r.email).join(', ')}`);
   console.log(`  5 consultants: ${consultants.map((c) => c.email).join(', ')}`);
   console.log(`  password (all): ${PASSWORD}`);
+} catch (e) {
+  console.error('SEED FAILED:', e.message);
+  process.exit(1);
+} finally {
+  await pool.end();
 }
-
-main().catch((e) => { console.error('SEED FAILED:', e.message); process.exit(1); });
