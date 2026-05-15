@@ -14,8 +14,17 @@ interface FlagRow {
   updated_by?: string | null;
 }
 
-interface GroupLite { id: string; name: string; slug: string; is_active: boolean; }
-interface OverrideRow { group_id: string; key: string; enabled: boolean; }
+interface GroupLite {
+  id: string;
+  name: string;
+  slug: string;
+  is_active: boolean;
+}
+interface OverrideRow {
+  group_id: string;
+  key: string;
+  enabled: boolean;
+}
 
 export function FeatureFlags() {
   const [rows, setRows] = useState<FlagRow[]>([]);
@@ -37,11 +46,17 @@ export function FeatureFlags() {
       setGroups((groupsR.data ?? []).filter((g: GroupLite) => g.is_active));
       setOverrides(ovR.data ?? []);
     } catch (e: any) {
-      toast.error(e?.response?.data?.error ?? 'Failed to load feature flags (run database/feature-flags.sql)');
-    } finally { setLoading(false); }
+      toast.error(
+        e?.response?.data?.error ?? 'Failed to load feature flags (run database/feature-flags.sql)',
+      );
+    } finally {
+      setLoading(false);
+    }
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+  }, []);
 
   /** null = inherit global, true/false = override. Three-state cycle on click. */
   function overrideFor(groupId: string, key: string): boolean | null {
@@ -71,33 +86,33 @@ export function FeatureFlags() {
       toast.error(e?.response?.data?.error ?? 'Failed to update override');
       // Reload to rebuild canonical state on failure.
       load();
-    } finally { setSaving(null); }
+    } finally {
+      setSaving(null);
+    }
   }
 
   async function toggle(row: FlagRow) {
     setSaving(row.key);
     const previous = row.enabled;
     // Optimistic update.
-    setRows((rs) => rs.map((r) => r.key === row.key ? { ...r, enabled: !previous } : r));
+    setRows((rs) => rs.map((r) => (r.key === row.key ? { ...r, enabled: !previous } : r)));
     try {
       await api.patch(`/feature-flags/${row.key}`, { enabled: !previous });
       await refresh();
       invalidate('feature-flags');
     } catch (e: any) {
       // Roll back.
-      setRows((rs) => rs.map((r) => r.key === row.key ? { ...r, enabled: previous } : r));
+      setRows((rs) => rs.map((r) => (r.key === row.key ? { ...r, enabled: previous } : r)));
       toast.error(e?.response?.data?.error ?? 'Failed to update flag');
-    } finally { setSaving(null); }
+    } finally {
+      setSaving(null);
+    }
   }
 
   return (
     <Layout
       title="Feature flags"
-      crumbs={[
-        { label: 'Workspace', to: '/dashboard' },
-        { label: 'Admin' },
-        { label: 'Features' },
-      ]}
+      crumbs={[{ label: 'Workspace', to: '/dashboard' }, { label: 'Admin' }, { label: 'Features' }]}
     >
       <div className="max-w-5xl">
         <h1 className="text-2xl font-semibold tracking-tight text-slate-900 mb-1">Feature flags</h1>
@@ -111,8 +126,9 @@ export function FeatureFlags() {
           <p className="text-sm text-slate-500">Loading…</p>
         ) : rows.length === 0 ? (
           <div className="bg-white border border-amber-200 rounded-xl p-5 text-sm text-amber-900">
-            No feature flags exist yet. Run <span className="font-mono">database/feature-flags.sql</span>{' '}
-            in Supabase to seed the table.
+            No feature flags exist yet. Run{' '}
+            <span className="font-mono">database/feature-flags.sql</span> against your database to
+            seed the table.
           </div>
         ) : (
           <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100">
@@ -120,7 +136,9 @@ export function FeatureFlags() {
               <div key={r.key} className="px-5 py-4 flex items-start justify-between gap-4">
                 <div className="min-w-0">
                   <div className="text-sm font-medium text-slate-900">{prettyKey(r.key)}</div>
-                  {r.description && <div className="text-xs text-slate-500 mt-0.5">{r.description}</div>}
+                  {r.description && (
+                    <div className="text-xs text-slate-500 mt-0.5">{r.description}</div>
+                  )}
                   <div className="text-[10px] text-slate-400 mt-1 font-mono">{r.key}</div>
                 </div>
                 <Toggle
@@ -153,7 +171,10 @@ export function FeatureFlags() {
                         Feature
                       </th>
                       {groups.map((g) => (
-                        <th key={g.id} className="text-center text-[11px] uppercase tracking-widest text-slate-600 font-semibold px-3 py-2.5 whitespace-nowrap">
+                        <th
+                          key={g.id}
+                          className="text-center text-[11px] uppercase tracking-widest text-slate-600 font-semibold px-3 py-2.5 whitespace-nowrap"
+                        >
                           {g.name}
                         </th>
                       ))}
@@ -163,7 +184,9 @@ export function FeatureFlags() {
                     {rows.map((r) => (
                       <tr key={r.key}>
                         <td className="px-4 py-2.5">
-                          <div className="text-sm font-medium text-slate-900">{prettyKey(r.key)}</div>
+                          <div className="text-sm font-medium text-slate-900">
+                            {prettyKey(r.key)}
+                          </div>
                           <div className="text-[10px] font-mono text-slate-400">{r.key}</div>
                         </td>
                         {groups.map((g) => {
@@ -193,12 +216,20 @@ export function FeatureFlags() {
 }
 
 function OverrideCell({
-  state, onClick, disabled,
-}: { state: boolean | null; onClick: () => void; disabled?: boolean }) {
+  state,
+  onClick,
+  disabled,
+}: {
+  state: boolean | null;
+  onClick: () => void;
+  disabled?: boolean;
+}) {
   const tone =
-    state === true  ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
-    : state === false ? 'bg-red-100 text-red-700 border-red-200'
-    : 'bg-slate-50 text-slate-400 border-slate-200';
+    state === true
+      ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+      : state === false
+        ? 'bg-red-100 text-red-700 border-red-200'
+        : 'bg-slate-50 text-slate-400 border-slate-200';
   const label = state === true ? 'On' : state === false ? 'Off' : 'Inherit';
   return (
     <button
@@ -216,12 +247,23 @@ function OverrideCell({
 }
 
 function prettyKey(k: string): string {
-  return k.split('_').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+  return k
+    .split('_')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
 }
 
 function Toggle({
-  on, onClick, disabled, label,
-}: { on: boolean; onClick: () => void; disabled?: boolean; label?: string }) {
+  on,
+  onClick,
+  disabled,
+  label,
+}: {
+  on: boolean;
+  onClick: () => void;
+  disabled?: boolean;
+  label?: string;
+}) {
   return (
     <button
       onClick={onClick}

@@ -6,7 +6,10 @@ import { FormInput } from '../components/FormInput';
 import { Brand } from '../components/Brand';
 import { useAuth } from '../context/AuthContext';
 
-interface SigninForm { email: string; password: string; }
+interface SigninForm {
+  email: string;
+  password: string;
+}
 
 export function Login() {
   const { signIn } = useAuth();
@@ -29,14 +32,16 @@ export function Login() {
       // Surface a generic message — anti-enumeration applies on the client too.
       const msg = e?.response?.data?.error ?? e?.message ?? 'Sign in failed';
       toast.error(msg);
-    } finally { setBusy(false); }
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
       <div className="w-full max-w-sm animate-fade-in-up">
         <div className="flex justify-center mb-6">
-          <Brand size="lg" caption="Bridging Talent · Building Futures" />
+          <Brand size="lg" />
         </div>
 
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-7">

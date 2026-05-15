@@ -40,15 +40,27 @@ export function FeatureFlagsProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // Re-fetch only when the user identity changes (sign-in / sign-out / cross-
+  // tab login as a different user). The previous `[session?.access_token]`
+  // dep refetched on every silent JWT rotation (~hourly per tab), which is
+  // both pointless (the flag map doesn't depend on the token) and a known
+  // source of /feature-flags/me traffic in the rate-limit logs.
+  const userId = session?.user?.id ?? null;
   useEffect(() => {
-    if (!session) { setFlags({}); setLoading(false); return; }
-    refresh();
-  }, [session?.access_token, refresh]);
+    if (!userId) {
+      setFlags({});
+      setLoading(false);
+      return;
+    }
+    void refresh();
+  }, [userId, refresh]);
 
   // Live update — admin toggles a flag from /admin/features → that page fires
   // invalidate('feature-flags'); FeatureFlagsProvider re-fetches, every
   // sidebar/guard/page that reads the context re-renders with the new map.
-  useInvalidationListener('feature-flags', () => { void refresh(); });
+  useInvalidationListener('feature-flags', () => {
+    void refresh();
+  });
 
   return (
     <FeatureFlagsContext.Provider value={{ flags, loading, refresh }}>
@@ -103,7 +115,9 @@ export function useFeatureFlags() {
 // different fallback makes sense for the feature.
 // ---------------------------------------------------------------------------
 export function FeatureGuard({
-  feature, children, redirectTo = '/dashboard',
+  feature,
+  children,
+  redirectTo = '/dashboard',
 }: {
   feature: string;
   children: ReactNode;

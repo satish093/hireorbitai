@@ -27,17 +27,29 @@ export function RecruiterDashboard() {
         if (!cancelled) toast.error(e?.response?.data?.error ?? 'Failed to load applications');
         return { data: [] };
       }),
-    ]).then(([cRes, aRes]) => {
-      if (cancelled) return;
-      setConsultants(cRes.data ?? []);
-      setApps(aRes.data ?? []);
-    }).finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [profile]);
+    ])
+      .then(([cRes, aRes]) => {
+        if (cancelled) return;
+        setConsultants(cRes.data ?? []);
+        setApps(aRes.data ?? []);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // Key on user.id ONLY — depending on the whole `profile` object would
+    // re-fire this effect every time AuthContext re-renders (e.g. on every
+    // silent token refresh), even though the data the effect cares about
+    // hasn't changed.
+  }, [profile?.id]);
 
   const active = consultants.filter((c) => c.marketing_status === 'ACTIVE').length;
   const placed = consultants.filter((c) => c.marketing_status === 'PLACED').length;
-  const interviewing = apps.filter((a) => a.status === 'INTERVIEW' || a.status === 'SCREENING').length;
+  const interviewing = apps.filter(
+    (a) => a.status === 'INTERVIEW' || a.status === 'SCREENING',
+  ).length;
 
   return (
     <Layout title="Dashboard">
@@ -49,7 +61,12 @@ export function RecruiterDashboard() {
         <DashboardCard label="My consultants" value={consultants.length} accent="blue" />
         <DashboardCard label="Active" value={active} hint={`${placed} placed`} accent="green" />
         <DashboardCard label="Submissions" value={apps.length} accent="amber" />
-        <DashboardCard label="In pipeline" value={interviewing} hint="Screening or interview" accent="brand" />
+        <DashboardCard
+          label="In pipeline"
+          value={interviewing}
+          hint="Screening or interview"
+          accent="brand"
+        />
       </div>
 
       <h2 className="text-sm font-semibold text-slate-900 mb-2">My consultants</h2>
@@ -57,10 +74,18 @@ export function RecruiterDashboard() {
         loading={loading}
         empty="No consultants assigned yet."
         columns={[
-          { key: 'name', header: 'Name', render: (c: any) => c.user?.full_name ?? c.user?.email ?? '—' },
+          {
+            key: 'name',
+            header: 'Name',
+            render: (c: any) => c.user?.full_name ?? c.user?.email ?? '—',
+          },
           { key: 'primary_skill', header: 'Primary skill' },
           { key: 'visa_status', header: 'Visa' },
-          { key: 'marketing_status', header: 'Status', render: (c: any) => <StatusBadge status={c.marketing_status} /> },
+          {
+            key: 'marketing_status',
+            header: 'Status',
+            render: (c: any) => <StatusBadge status={c.marketing_status} />,
+          },
         ]}
         rows={consultants}
       />

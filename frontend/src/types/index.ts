@@ -1,14 +1,34 @@
-export type Role =
-  | 'SUPER_ADMIN' | 'CEO' | 'CTO' | 'DIRECTOR'
-  | 'MANAGER' | 'HR_MANAGER' | 'DEVELOPER'
-  | 'RECRUITER' | 'CONSULTANT';
+/**
+ * Frontend type surface.
+ *
+ * Role + tier + Task enums come from `@hireorbitai/shared` — the single
+ * source of truth for both halves of the monorepo. Any change to those
+ * definitions goes in `shared/src/`; the workspace symlink makes them visible
+ * here without a rebuild step in dev mode.
+ *
+ * This file also declares frontend-only domain shapes (UserProfile, Task UI
+ * shapes, etc.) and the UI-facing label maps.
+ */
 
-export const OWNER_TIER: Role[] = ['SUPER_ADMIN', 'CEO'];
-export const ADMIN_TIER: Role[] = ['SUPER_ADMIN', 'CEO', 'CTO', 'DIRECTOR'];
-export const MANAGER_TIER: Role[] = [...ADMIN_TIER, 'MANAGER', 'HR_MANAGER', 'DEVELOPER'];
-export const OPERATOR_TIER: Role[] = [...MANAGER_TIER, 'RECRUITER'];
-export const ALL_ROLES: Role[] = [...OPERATOR_TIER, 'CONSULTANT'];
+// Explicit named re-exports (not `export *`) — Rollup's static analysis
+// doesn't fully traverse `export *` chains through a CJS package main, so
+// the bundler can throw "X is not exported" even though the types resolve.
+export {
+  OWNER_TIER,
+  ADMIN_TIER,
+  MANAGER_TIER,
+  OPERATOR_TIER,
+  ALL_ROLES,
+  TASK_STATUSES,
+  TASK_PRIORITIES,
+  isAdmin,
+  isManagerOrUp,
+} from '@hireorbitai/shared';
+export type { Role, TaskStatus, TaskPriority } from '@hireorbitai/shared';
 
+import type { Role, TaskStatus, TaskPriority } from '@hireorbitai/shared';
+
+/** UI label for a role — display capitalisation lives with the UI. */
 export const ROLE_LABEL: Record<Role, string> = {
   SUPER_ADMIN: 'Super Admin',
   CEO: 'CEO',
@@ -20,6 +40,21 @@ export const ROLE_LABEL: Record<Role, string> = {
   RECRUITER: 'Recruiter',
   CONSULTANT: 'Consultant',
 };
+
+/** UI label for a task status. */
+export const TASK_STATUS_LABEL: Record<TaskStatus, string> = {
+  BACKLOG: 'Backlog',
+  TODO: 'To Do',
+  IN_PROGRESS: 'In Progress',
+  BLOCKED: 'Blocked',
+  REVIEW: 'Review',
+  COMPLETED: 'Completed',
+  CANCELLED: 'Cancelled',
+};
+
+// ---------------------------------------------------------------------------
+// Frontend-only domain shapes — used by pages / components, not by backend.
+// ---------------------------------------------------------------------------
 
 export interface UserProfile {
   id: string;
@@ -38,28 +73,14 @@ export interface UserProfile {
 
 export type MarketingStatus = 'ACTIVE' | 'PAUSED' | 'PLACED';
 export type ApplicationStatus =
-  | 'SUBMITTED' | 'SCREENING' | 'INTERVIEW' | 'OFFER' | 'REJECTED' | 'WITHDRAWN';
+  | 'SUBMITTED'
+  | 'SCREENING'
+  | 'INTERVIEW'
+  | 'OFFER'
+  | 'REJECTED'
+  | 'WITHDRAWN';
 export type InterviewType = 'PHONE' | 'TECHNICAL' | 'BEHAVIORAL' | 'ONSITE' | 'FINAL' | 'MOCK';
 export type InterviewStatus = 'SCHEDULED' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW';
-
-export type TaskStatus =
-  | 'BACKLOG' | 'TODO' | 'IN_PROGRESS' | 'BLOCKED' | 'REVIEW' | 'COMPLETED' | 'CANCELLED';
-export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
-
-export const TASK_STATUSES: TaskStatus[] = [
-  'BACKLOG', 'TODO', 'IN_PROGRESS', 'BLOCKED', 'REVIEW', 'COMPLETED', 'CANCELLED',
-];
-export const TASK_PRIORITIES: TaskPriority[] = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
-
-export const TASK_STATUS_LABEL: Record<TaskStatus, string> = {
-  BACKLOG: 'Backlog',
-  TODO: 'To Do',
-  IN_PROGRESS: 'In Progress',
-  BLOCKED: 'Blocked',
-  REVIEW: 'Review',
-  COMPLETED: 'Completed',
-  CANCELLED: 'Cancelled',
-};
 
 export interface Task {
   id: string;

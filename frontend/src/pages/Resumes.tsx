@@ -18,25 +18,47 @@ export function Resumes() {
 
   useEffect(() => {
     let cancelled = false;
-    api.get('/consultants')
-      .then((r) => { if (!cancelled) setConsultants(r.data ?? []); })
-      .catch((e) => { if (!cancelled) toast.error(e?.response?.data?.error ?? 'Failed to load consultants'); });
-    return () => { cancelled = true; };
+    api
+      .get('/consultants')
+      .then((r) => {
+        if (!cancelled) setConsultants(r.data ?? []);
+      })
+      .catch((e) => {
+        if (!cancelled) toast.error(e?.response?.data?.error ?? 'Failed to load consultants');
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
-    if (!consultantId) { setRows([]); return; }
+    if (!consultantId) {
+      setRows([]);
+      return;
+    }
     let cancelled = false;
     setLoading(true);
-    api.get(`/resumes/consultant/${consultantId}`)
-      .then((r) => { if (!cancelled) setRows(r.data ?? []); })
-      .catch((e) => { if (!cancelled) toast.error(e?.response?.data?.error ?? 'Failed to load resumes'); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
+    api
+      .get(`/resumes/consultant/${consultantId}`)
+      .then((r) => {
+        if (!cancelled) setRows(r.data ?? []);
+      })
+      .catch((e) => {
+        if (!cancelled) toast.error(e?.response?.data?.error ?? 'Failed to load resumes');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [consultantId]);
 
   async function upload(file: File) {
-    if (!consultantId) { toast.error('Pick a consultant first'); return; }
+    if (!consultantId) {
+      toast.error('Pick a consultant first');
+      return;
+    }
     if (uploading) return;
     setUploading(true);
     const form = new FormData();
@@ -57,8 +79,11 @@ export function Resumes() {
   async function download(id: string) {
     try {
       const { data } = await api.get(`/resumes/${id}/download-url`);
-      if (!data?.url) { toast.error('No download URL'); return; }
-      // Centralized opener — handles absolute (signed) Supabase URLs and
+      if (!data?.url) {
+        toast.error('No download URL');
+        return;
+      }
+      // Centralized opener — handles absolute (signed) download URLs and
       // relative paths, applies noopener/noreferrer.
       openExternal(data.url);
     } catch (e: any) {
@@ -90,7 +115,10 @@ export function Resumes() {
             placeholder="Select a consultant…"
             value={consultantId}
             onChange={(e) => setConsultantId(e.target.value)}
-            options={consultants.map((c) => ({ value: c.id, label: c.user?.full_name ?? c.user?.email }))}
+            options={consultants.map((c) => ({
+              value: c.id,
+              label: c.user?.full_name ?? c.user?.email,
+            }))}
           />
         </div>
         <div>
@@ -103,24 +131,62 @@ export function Resumes() {
       </div>
       <DataTable
         loading={loading}
-        empty={consultantId ? 'No resumes for this consultant yet.' : 'Select a consultant to view versions.'}
+        empty={
+          consultantId
+            ? 'No resumes for this consultant yet.'
+            : 'Select a consultant to view versions.'
+        }
         columns={[
-          { key: 'version', header: 'V', render: (r: any) =>
-            <span className="text-[11px] font-mono bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded">v{r.version}</span>
+          {
+            key: 'version',
+            header: 'V',
+            render: (r: any) => (
+              <span className="text-[11px] font-mono bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded">
+                v{r.version}
+              </span>
+            ),
           },
           { key: 'file_name', header: 'File' },
-          { key: 'ai_score', header: 'AI score', align: 'right', render: (r: any) => r.ai_score ?? '—' },
-          { key: 'current', header: 'Current', render: (r: any) => r.is_current
-            ? <span className="text-[11px] font-medium bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded">Current</span>
-            : <span className="text-slate-300 text-xs">—</span>
+          {
+            key: 'ai_score',
+            header: 'AI score',
+            align: 'right',
+            render: (r: any) => r.ai_score ?? '—',
           },
-          { key: 'date', header: 'Uploaded', render: (r: any) => r.created_at ? new Date(r.created_at).toLocaleDateString() : '—' },
-          { key: 'actions', header: '', align: 'right', render: (r: any) => (
-            <div className="flex items-center justify-end gap-1">
-              <Button size="sm" variant="ghost" onClick={() => download(r.id)}>Download</Button>
-              {!r.is_current && <Button size="sm" variant="ghost" onClick={() => setCurrent(r.id)}>Set current</Button>}
-            </div>
-          )},
+          {
+            key: 'current',
+            header: 'Current',
+            render: (r: any) =>
+              r.is_current ? (
+                <span className="text-[11px] font-medium bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded">
+                  Current
+                </span>
+              ) : (
+                <span className="text-slate-300 text-xs">—</span>
+              ),
+          },
+          {
+            key: 'date',
+            header: 'Uploaded',
+            render: (r: any) => (r.created_at ? new Date(r.created_at).toLocaleDateString() : '—'),
+          },
+          {
+            key: 'actions',
+            header: '',
+            align: 'right',
+            render: (r: any) => (
+              <div className="flex items-center justify-end gap-1">
+                <Button size="sm" variant="ghost" onClick={() => download(r.id)}>
+                  Download
+                </Button>
+                {!r.is_current && (
+                  <Button size="sm" variant="ghost" onClick={() => setCurrent(r.id)}>
+                    Set current
+                  </Button>
+                )}
+              </div>
+            ),
+          },
         ]}
         rows={rows}
       />

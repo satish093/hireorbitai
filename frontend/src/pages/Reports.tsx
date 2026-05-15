@@ -107,29 +107,44 @@ export function Reports() {
     const opts = { signal: controller.signal };
     if (tab === 'recruiters') {
       setRecruiters(null);
-      api.get('/reports/recruiter-performance', { params: { days }, ...opts })
+      api
+        .get('/reports/recruiter-performance', { params: { days }, ...opts })
         .then((r) => setRecruiters(r.data?.recruiters ?? []))
-        .catch((e) => { if (e?.code !== 'ERR_CANCELED') toast.error(e?.response?.data?.error ?? 'Failed to load'); });
+        .catch((e) => {
+          if (e?.code !== 'ERR_CANCELED') toast.error(e?.response?.data?.error ?? 'Failed to load');
+        });
     } else if (tab === 'consultants') {
       setConsultants(null);
-      api.get('/reports/consultant-pipeline', { params: { days }, ...opts })
+      api
+        .get('/reports/consultant-pipeline', { params: { days }, ...opts })
         .then((r) => setConsultants(r.data?.consultants ?? []))
-        .catch((e) => { if (e?.code !== 'ERR_CANCELED') toast.error(e?.response?.data?.error ?? 'Failed to load'); });
+        .catch((e) => {
+          if (e?.code !== 'ERR_CANCELED') toast.error(e?.response?.data?.error ?? 'Failed to load');
+        });
     } else if (tab === 'placement') {
       setPlacement(null);
-      api.get('/reports/placement-analytics', { params: { days }, ...opts })
+      api
+        .get('/reports/placement-analytics', { params: { days }, ...opts })
         .then((r) => setPlacement(r.data))
-        .catch((e) => { if (e?.code !== 'ERR_CANCELED') toast.error(e?.response?.data?.error ?? 'Failed to load'); });
+        .catch((e) => {
+          if (e?.code !== 'ERR_CANCELED') toast.error(e?.response?.data?.error ?? 'Failed to load');
+        });
     } else if (tab === 'user-time') {
       setUserTime(null);
       // Convert "Last N days" → from/to range using local-date YYYY-MM-DD,
       // not UTC, so users near day boundaries don't see "yesterday" picked.
       const to = new Date();
-      const from = new Date(); from.setDate(from.getDate() - (Number(days) - 1));
-      const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      api.get('/reports/user-time', { params: { from: ymd(from), to: ymd(to) }, ...opts })
+      const from = new Date();
+      from.setDate(from.getDate() - (Number(days) - 1));
+      const ymd = (d: Date) =>
+        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      api
+        .get('/reports/user-time', { params: { from: ymd(from), to: ymd(to) }, ...opts })
         .then((r) => setUserTime(r.data?.users ?? []))
-        .catch((e) => { if (e?.code !== 'ERR_CANCELED') toast.error(e?.response?.data?.error ?? 'Failed to load time-in-app report'); });
+        .catch((e) => {
+          if (e?.code !== 'ERR_CANCELED')
+            toast.error(e?.response?.data?.error ?? 'Failed to load time-in-app report');
+        });
     }
     return () => controller.abort();
   }, [tab, days]);
@@ -139,7 +154,9 @@ export function Reports() {
       <div className="flex flex-wrap items-end justify-between gap-3 mb-5">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Reports</h1>
-          <p className="text-sm text-slate-500 mt-1">Performance across recruiters, consultant pipeline, and placement analytics.</p>
+          <p className="text-sm text-slate-500 mt-1">
+            Performance across recruiters, consultant pipeline, and placement analytics.
+          </p>
         </div>
         <SelectInput
           label="Range"
@@ -159,7 +176,7 @@ export function Reports() {
               'relative pb-2.5 -mb-px text-sm transition-colors whitespace-nowrap press',
               tab === t.key
                 ? 'text-slate-900 font-semibold'
-                : 'text-slate-500 hover:text-slate-800'
+                : 'text-slate-500 hover:text-slate-800',
             )}
           >
             {t.label}
@@ -198,7 +215,7 @@ function RecruiterPerformance({ rows }: { rows: RecruiterRow[] | null }) {
       offers: a.offers + r.offers,
       placed: a.placed + r.placed_consultants,
     }),
-    { submissions: 0, interviews: 0, offers: 0, placed: 0 }
+    { submissions: 0, interviews: 0, offers: 0, placed: 0 },
   );
 
   const maxSubs = Math.max(1, ...rows.map((r) => r.submissions));
@@ -235,20 +252,26 @@ function RecruiterPerformance({ rows }: { rows: RecruiterRow[] | null }) {
                     <div className="leading-tight">
                       <div className="font-medium text-slate-900">{r.name}</div>
                       {r.target_per_week ? (
-                        <div className="text-[11px] text-slate-500">{r.target_per_week}/wk target</div>
+                        <div className="text-[11px] text-slate-500">
+                          {r.target_per_week}/wk target
+                        </div>
                       ) : null}
                     </div>
                   </div>
                 </td>
                 <td className="px-3 py-2.5 text-slate-700">{r.team ?? '—'}</td>
                 <td className="px-3 py-2.5 text-right tabular-nums">{r.active_consultants}</td>
-                <td className="px-3 py-2.5 text-right tabular-nums text-emerald-700">{r.placed_consultants}</td>
+                <td className="px-3 py-2.5 text-right tabular-nums text-emerald-700">
+                  {r.placed_consultants}
+                </td>
                 <td className="px-3 py-2.5">
                   <BarCell value={r.submissions} max={maxSubs} />
                 </td>
                 <td className="px-3 py-2.5 text-right tabular-nums">{r.interviews}</td>
                 <td className="px-3 py-2.5 text-right tabular-nums text-amber-700">{r.offers}</td>
-                <td className="px-3 py-2.5 text-right tabular-nums text-slate-500">{r.rejections}</td>
+                <td className="px-3 py-2.5 text-right tabular-nums text-slate-500">
+                  {r.rejections}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -301,7 +324,9 @@ function ConsultantPipeline({ rows }: { rows: ConsultantRow[] | null }) {
                   <Avatar name={c.name} email={c.email} size={26} />
                   <div className="leading-tight">
                     <div className="font-medium text-slate-900">{c.name}</div>
-                    {c.primary_skill && <div className="text-[11px] text-slate-500">{c.primary_skill}</div>}
+                    {c.primary_skill && (
+                      <div className="text-[11px] text-slate-500">{c.primary_skill}</div>
+                    )}
                   </div>
                 </div>
               </td>
@@ -309,13 +334,20 @@ function ConsultantPipeline({ rows }: { rows: ConsultantRow[] | null }) {
                 {c.recruiter_name ?? <span className="italic text-slate-400">Unassigned</span>}
               </td>
               <td className="px-3 py-2.5">
-                <span className={clsx('text-[11px] font-medium px-2 py-0.5 rounded-full border', STATUS_TONE[c.marketing_status])}>
+                <span
+                  className={clsx(
+                    'text-[11px] font-medium px-2 py-0.5 rounded-full border',
+                    STATUS_TONE[c.marketing_status],
+                  )}
+                >
                   {c.marketing_status}
                 </span>
               </td>
               <td className="px-3 py-2.5 text-right tabular-nums">{c.submissions}</td>
               <td className="px-3 py-2.5 text-right tabular-nums">{c.interviews_scheduled}</td>
-              <td className="px-3 py-2.5 text-right tabular-nums text-blue-700">{c.interviews_completed}</td>
+              <td className="px-3 py-2.5 text-right tabular-nums text-blue-700">
+                {c.interviews_completed}
+              </td>
               <td className="px-3 py-2.5 text-right tabular-nums text-emerald-700">{c.offers}</td>
               <td className="px-3 py-2.5 text-right text-slate-500 text-xs">
                 {c.last_activity_at ? new Date(c.last_activity_at).toLocaleDateString() : '—'}
@@ -346,10 +378,30 @@ function PlacementAnalytics({ data }: { data: PlacementSnapshot | null }) {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <DashboardCard label="Sub → Interview" value={`${f.sub_to_interview}%`} accent="blue" hint={`${f.interviews} of ${f.submissions}`} />
-        <DashboardCard label="Interview → Offer" value={`${f.interview_to_offer}%`} accent="amber" hint={`${f.offers} of ${f.interviews}`} />
-        <DashboardCard label="Offer → Placed" value={`${f.offer_to_placement}%`} accent="green" hint={`${f.placements} of ${f.offers}`} />
-        <DashboardCard label="Overall placement" value={`${f.overall_placement_rate}%`} accent="brand" hint={`${f.placements} of ${f.submissions}`} />
+        <DashboardCard
+          label="Sub → Interview"
+          value={`${f.sub_to_interview}%`}
+          accent="blue"
+          hint={`${f.interviews} of ${f.submissions}`}
+        />
+        <DashboardCard
+          label="Interview → Offer"
+          value={`${f.interview_to_offer}%`}
+          accent="amber"
+          hint={`${f.offers} of ${f.interviews}`}
+        />
+        <DashboardCard
+          label="Offer → Placed"
+          value={`${f.offer_to_placement}%`}
+          accent="green"
+          hint={`${f.placements} of ${f.offers}`}
+        />
+        <DashboardCard
+          label="Overall placement"
+          value={`${f.overall_placement_rate}%`}
+          accent="brand"
+          hint={`${f.placements} of ${f.submissions}`}
+        />
       </div>
 
       <div className="bg-white border border-slate-200 rounded-xl p-5">
@@ -376,7 +428,9 @@ function PlacementAnalytics({ data }: { data: PlacementSnapshot | null }) {
         <div className="bg-white border border-slate-200 rounded-xl p-5">
           <h3 className="font-semibold text-slate-900 mb-1">Interview health</h3>
           <p className="text-xs text-slate-500 mb-3">Scheduled vs. completed in window</p>
-          <div className="text-3xl font-semibold tabular-nums text-slate-900">{data.interviews.completion_rate}%</div>
+          <div className="text-3xl font-semibold tabular-nums text-slate-900">
+            {data.interviews.completion_rate}%
+          </div>
           <p className="text-xs text-slate-500 mt-1">
             {data.interviews.completed} completed of {data.interviews.scheduled} scheduled
           </p>
@@ -423,19 +477,27 @@ function DailyActivity() {
   const [recruiters, setRecruiters] = useState<any[]>([]);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<any>({
-    recruiter_id: '', activity_date: localYMD(new Date()),
-    submissions_count: 0, interviews_scheduled: 0, interviews_completed: 0,
-    vendor_calls: 0, offers: 0, placements: 0, notes: '',
+    recruiter_id: '',
+    activity_date: localYMD(new Date()),
+    submissions_count: 0,
+    interviews_scheduled: 0,
+    interviews_completed: 0,
+    vendor_calls: 0,
+    offers: 0,
+    placements: 0,
+    notes: '',
   });
 
   function load() {
-    api.get('/reports/daily')
+    api
+      .get('/reports/daily')
       .then((r) => setRows(r.data ?? []))
       .catch((e) => toast.error(e?.response?.data?.error ?? 'Failed to load daily activity'));
   }
   useEffect(() => {
     load();
-    api.get('/recruiters')
+    api
+      .get('/recruiters')
       .then((r) => setRecruiters(r.data ?? []))
       .catch((e) => toast.error(e?.response?.data?.error ?? 'Failed to load recruiters'));
   }, []);
@@ -443,22 +505,32 @@ function DailyActivity() {
   const [saving, setSaving] = useState(false);
   async function save() {
     if (saving) return;
-    if (!form.recruiter_id) { toast.error('Pick a recruiter'); return; }
+    if (!form.recruiter_id) {
+      toast.error('Pick a recruiter');
+      return;
+    }
     setSaving(true);
     try {
       await api.post('/reports/daily', form);
-      toast.success('Saved'); setOpen(false); load();
-    } catch (e: any) { toast.error(e?.response?.data?.error ?? 'Failed'); }
-    finally { setSaving(false); }
+      toast.success('Saved');
+      setOpen(false);
+      load();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error ?? 'Failed');
+    } finally {
+      setSaving(false);
+    }
   }
 
-  const recruiterName = (id: string) =>
-    recruiters.find((r) => r.id === id)?.user?.full_name ?? id;
+  const recruiterName = (id: string) => recruiters.find((r) => r.id === id)?.user?.full_name ?? id;
 
   return (
     <div>
       <div className="flex justify-end mb-3">
-        <button onClick={() => setOpen(true)} className="bg-slate-900 text-white text-sm px-3 py-2 rounded-lg hover:bg-slate-800">
+        <button
+          onClick={() => setOpen(true)}
+          className="bg-slate-900 text-white text-sm px-3 py-2 rounded-lg hover:bg-slate-800"
+        >
           + Log activity
         </button>
       </div>
@@ -478,15 +550,23 @@ function DailyActivity() {
           </thead>
           <tbody>
             {rows.length === 0 && (
-              <tr><td colSpan={8} className="px-3 py-6 text-center text-slate-400 italic">No daily logs yet.</td></tr>
+              <tr>
+                <td colSpan={8} className="px-3 py-6 text-center text-slate-400 italic">
+                  No daily logs yet.
+                </td>
+              </tr>
             )}
             {rows.map((r) => (
               <tr key={r.id} className="border-t border-slate-100 hover:bg-slate-50">
                 <td className="px-3 py-2.5">{r.activity_date}</td>
                 <td className="px-3 py-2.5 text-slate-700">{recruiterName(r.recruiter_id)}</td>
                 <td className="px-3 py-2.5 text-right tabular-nums">{r.submissions_count ?? 0}</td>
-                <td className="px-3 py-2.5 text-right tabular-nums">{r.interviews_scheduled ?? 0}</td>
-                <td className="px-3 py-2.5 text-right tabular-nums">{r.interviews_completed ?? 0}</td>
+                <td className="px-3 py-2.5 text-right tabular-nums">
+                  {r.interviews_scheduled ?? 0}
+                </td>
+                <td className="px-3 py-2.5 text-right tabular-nums">
+                  {r.interviews_completed ?? 0}
+                </td>
                 <td className="px-3 py-2.5 text-right tabular-nums">{r.vendor_calls ?? 0}</td>
                 <td className="px-3 py-2.5 text-right tabular-nums">{r.offers ?? 0}</td>
                 <td className="px-3 py-2.5 text-right tabular-nums">{r.placements ?? 0}</td>
@@ -496,44 +576,109 @@ function DailyActivity() {
         </table>
       </div>
 
-      <Modal open={open} onClose={() => setOpen(false)} title="Log daily activity"
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Log daily activity"
         footer={
-          <button onClick={save} disabled={saving} className="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm hover:bg-slate-800 disabled:opacity-50">
+          <button
+            onClick={save}
+            disabled={saving}
+            className="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm hover:bg-slate-800 disabled:opacity-50"
+          >
             {saving ? 'Saving…' : 'Save'}
           </button>
-        }>
+        }
+      >
         <div className="space-y-3">
-          <SelectInput label="Recruiter" placeholder="Select…"
+          <SelectInput
+            label="Recruiter"
+            placeholder="Select…"
             value={form.recruiter_id ?? ''}
-            options={recruiters.map((r) => ({ value: r.id, label: r.user?.full_name ?? r.user?.email ?? r.id }))}
+            options={recruiters.map((r) => ({
+              value: r.id,
+              label: r.user?.full_name ?? r.user?.email ?? r.id,
+            }))}
             onChange={(e) => setForm({ ...form, recruiter_id: e.target.value })}
           />
-          <FormInput label="Date" type="date" value={form.activity_date}
-            onChange={(e) => setForm({ ...form, activity_date: e.target.value })} />
+          <FormInput
+            label="Date"
+            type="date"
+            value={form.activity_date}
+            onChange={(e) => setForm({ ...form, activity_date: e.target.value })}
+          />
           {/* Number inputs — passing `value` makes them controlled. The
               previous uncontrolled form left a gap between visible-empty
               and the actual numeric state, so submitting an "empty" field
               would silently send 0 / NaN. Now what you see is what you
               send. */}
           <div className="grid grid-cols-2 gap-3">
-            <FormInput label="Submissions" type="number" min={0}
+            <FormInput
+              label="Submissions"
+              type="number"
+              min={0}
               value={form.submissions_count ?? 0}
-              onChange={(e) => setForm({ ...form, submissions_count: e.target.value === '' ? 0 : Number(e.target.value) })} />
-            <FormInput label="Interviews scheduled" type="number" min={0}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  submissions_count: e.target.value === '' ? 0 : Number(e.target.value),
+                })
+              }
+            />
+            <FormInput
+              label="Interviews scheduled"
+              type="number"
+              min={0}
               value={form.interviews_scheduled ?? 0}
-              onChange={(e) => setForm({ ...form, interviews_scheduled: e.target.value === '' ? 0 : Number(e.target.value) })} />
-            <FormInput label="Interviews completed" type="number" min={0}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  interviews_scheduled: e.target.value === '' ? 0 : Number(e.target.value),
+                })
+              }
+            />
+            <FormInput
+              label="Interviews completed"
+              type="number"
+              min={0}
               value={form.interviews_completed ?? 0}
-              onChange={(e) => setForm({ ...form, interviews_completed: e.target.value === '' ? 0 : Number(e.target.value) })} />
-            <FormInput label="Vendor calls" type="number" min={0}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  interviews_completed: e.target.value === '' ? 0 : Number(e.target.value),
+                })
+              }
+            />
+            <FormInput
+              label="Vendor calls"
+              type="number"
+              min={0}
               value={form.vendor_calls ?? 0}
-              onChange={(e) => setForm({ ...form, vendor_calls: e.target.value === '' ? 0 : Number(e.target.value) })} />
-            <FormInput label="Offers" type="number" min={0}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  vendor_calls: e.target.value === '' ? 0 : Number(e.target.value),
+                })
+              }
+            />
+            <FormInput
+              label="Offers"
+              type="number"
+              min={0}
               value={form.offers ?? 0}
-              onChange={(e) => setForm({ ...form, offers: e.target.value === '' ? 0 : Number(e.target.value) })} />
-            <FormInput label="Placements" type="number" min={0}
+              onChange={(e) =>
+                setForm({ ...form, offers: e.target.value === '' ? 0 : Number(e.target.value) })
+              }
+            />
+            <FormInput
+              label="Placements"
+              type="number"
+              min={0}
               value={form.placements ?? 0}
-              onChange={(e) => setForm({ ...form, placements: e.target.value === '' ? 0 : Number(e.target.value) })} />
+              onChange={(e) =>
+                setForm({ ...form, placements: e.target.value === '' ? 0 : Number(e.target.value) })
+              }
+            />
           </div>
         </div>
       </Modal>
@@ -561,7 +706,7 @@ function UserTimeTable({ rows }: { rows: UserTimeRow[] | null }) {
   if (rows === null) return <EmptyState label="Loading…" />;
   if (rows.length === 0) {
     return (
-      <EmptyState label="No activity recorded yet in this window. Sign in and click around — heartbeats are recorded every 30 seconds. If you've never seen data here, apply database/user-activity-tracking.sql in Supabase." />
+      <EmptyState label="No activity recorded yet in this window. Sign in and click around — heartbeats are recorded every 30 seconds. If you've never seen data here, apply database/user-activity-tracking.sql to your database." />
     );
   }
   return (
@@ -589,20 +734,34 @@ function UserTimeTable({ rows }: { rows: UserTimeRow[] | null }) {
                     <div className="flex items-center gap-2.5">
                       <Avatar name={r.full_name} email={r.email ?? undefined} size={28} />
                       <div className="leading-tight min-w-0">
-                        <div className="text-sm font-medium text-slate-900 truncate">{r.full_name ?? r.email ?? 'Unknown'}</div>
-                        {r.email && <div className="text-[11px] text-slate-500 truncate">{r.email}</div>}
+                        <div className="text-sm font-medium text-slate-900 truncate">
+                          {r.full_name ?? r.email ?? 'Unknown'}
+                        </div>
+                        {r.email && (
+                          <div className="text-[11px] text-slate-500 truncate">{r.email}</div>
+                        )}
                       </div>
                     </div>
                   </td>
                   <td className="px-3 py-2.5">
                     {r.role && (
-                      <span className="text-[10px] font-semibold uppercase tracking-wide bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded">{r.role}</span>
+                      <span className="text-[10px] font-semibold uppercase tracking-wide bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded">
+                        {r.role}
+                      </span>
                     )}
                   </td>
-                  <td className="px-3 py-2.5 text-right tabular-nums font-semibold text-slate-900">{formatDuration(r.total_seconds)}</td>
-                  <td className="px-3 py-2.5 text-right tabular-nums text-slate-700">{r.days_active}</td>
-                  <td className="px-3 py-2.5 text-right tabular-nums text-slate-700">{formatDuration(avg)}</td>
-                  <td className="px-3 py-2.5 text-xs text-slate-600">{r.last_seen_at ? relativeTime(r.last_seen_at) : '—'}</td>
+                  <td className="px-3 py-2.5 text-right tabular-nums font-semibold text-slate-900">
+                    {formatDuration(r.total_seconds)}
+                  </td>
+                  <td className="px-3 py-2.5 text-right tabular-nums text-slate-700">
+                    {r.days_active}
+                  </td>
+                  <td className="px-3 py-2.5 text-right tabular-nums text-slate-700">
+                    {formatDuration(avg)}
+                  </td>
+                  <td className="px-3 py-2.5 text-xs text-slate-600">
+                    {r.last_seen_at ? relativeTime(r.last_seen_at) : '—'}
+                  </td>
                   <td className="px-3 py-2.5">
                     {/* Sparkline-style bars — width relative to per-row peak. */}
                     <div className="flex items-end gap-[1px] h-4">
@@ -610,7 +769,9 @@ function UserTimeTable({ rows }: { rows: UserTimeRow[] | null }) {
                         <div
                           key={d.date}
                           className="w-1.5 bg-brand-500 rounded-sm"
-                          style={{ height: `${Math.max(2, Math.round((d.active_seconds / peak) * 100))}%` }}
+                          style={{
+                            height: `${Math.max(2, Math.round((d.active_seconds / peak) * 100))}%`,
+                          }}
                           title={`${d.date}: ${formatDuration(d.active_seconds)}`}
                         />
                       ))}

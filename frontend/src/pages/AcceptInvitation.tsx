@@ -33,7 +33,7 @@ interface SetupResponse {
  * Brevo-only invitation accept flow.
  *
  * The user lands here from the email link with `?token=…`. There is NO
- * Supabase session at this point (we removed `inviteUserByEmail` — Brevo
+ * backend session at this point (we removed the third-party invitation flow — Brevo
  * delivers a plain token URL, not a magic-link). The full flow:
  *
  *   1. GET  /invitations/preview?token=…   → fetch role + email + status
@@ -41,13 +41,13 @@ interface SetupResponse {
  *   3. POST /invitations/setup             → creates auth user + public.users,
  *                                            clears must_change_password,
  *                                            returns a fresh session pair
- *   4. push that session into supabase-js (via AuthContext.refreshSession)
+ *   4. push that session into the local store (via AuthContext.refreshSession)
  *   5. route to /onboarding/* or /dashboard based on role
  *
  * If the user happens to be signed in as someone else when they click the
- * link, we sign them out first — silently doing anything else (like the old
- * `supabase.auth.updateUser`) would change the signed-in user's password,
- * which is exactly the bug we used to have.
+ * link, we sign them out first — silently rotating the password on whoever
+ * is currently signed in (the bug the previous implementation had) would be
+ * a security incident.
  */
 export function AcceptInvitation() {
   const [params] = useSearchParams();
@@ -76,11 +76,18 @@ export function AcceptInvitation() {
   }, [token]);
 
   useEffect(() => {
-    if (!token) { setError('Missing invitation token'); setLoading(false); return; }
+    if (!token) {
+      setError('Missing invitation token');
+      setLoading(false);
+      return;
+    }
     const controller = new AbortController();
     (async () => {
       try {
-        const r = await axios.get(`${API_URL}/invitations/preview`, { params: { token }, signal: controller.signal });
+        const r = await axios.get(`${API_URL}/invitations/preview`, {
+          params: { token },
+          signal: controller.signal,
+        });
         if (controller.signal.aborted) return;
         setPreview(r.data);
       } catch (e: any) {
@@ -96,9 +103,18 @@ export function AcceptInvitation() {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setSubmitErr(null);
-    if (!fullName.trim())      { setSubmitErr('Please enter your full name.'); return; }
-    if (password.length < 12)  { setSubmitErr('Password must be at least 12 characters.'); return; }
-    if (password !== confirm)  { setSubmitErr("Passwords don't match."); return; }
+    if (!fullName.trim()) {
+      setSubmitErr('Please enter your full name.');
+      return;
+    }
+    if (password.length < 12) {
+      setSubmitErr('Password must be at least 12 characters.');
+      return;
+    }
+    if (password !== confirm) {
+      setSubmitErr("Passwords don't match.");
+      return;
+    }
     if (!preview) return;
     setSubmitting(true);
     try {
@@ -108,7 +124,7 @@ export function AcceptInvitation() {
         full_name: fullName.trim() || undefined,
       });
 
-      // Backend returned a session pair — push it into supabase-js so the
+      // Backend returned a session pair — push it into the local session store so the
       // app is immediately signed in. This avoids a second /auth/login
       // roundtrip that could race indexing lag on the just-created user.
       if (data.session) {
@@ -122,20 +138,22 @@ export function AcceptInvitation() {
         nav('/login', { replace: true });
         return;
       }
-      if (preview.role === 'CONSULTANT')      nav('/onboarding/consultant', { replace: true });
-      else if (preview.role === 'RECRUITER')  nav('/onboarding/recruiter',  { replace: true });
-      else                                    nav('/dashboard',             { replace: true });
+      if (preview.role === 'CONSULTANT') nav('/onboarding/consultant', { replace: true });
+      else if (preview.role === 'RECRUITER') nav('/onboarding/recruiter', { replace: true });
+      else nav('/dashboard', { replace: true });
     } catch (e: any) {
       const msg = e?.response?.data?.error ?? e?.message ?? 'Failed to complete sign-up';
       setSubmitErr(msg);
-    } finally { setSubmitting(false); }
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
       <div className="w-full max-w-md animate-fade-in-up">
         <div className="flex justify-center mb-6">
-          <Brand size="lg" caption="Bridging Talent · Building Futures" />
+          <Brand size="lg" />
         </div>
 
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8">
@@ -151,9 +169,16 @@ export function AcceptInvitation() {
             <ErrorState message="This invitation has been revoked." />
           ) : preview.status === 'ACCEPTED' ? (
             <div className="text-center space-y-3">
-              <h1 className="text-xl font-semibold tracking-tight text-slate-900">Already accepted</h1>
-              <p className="text-sm text-slate-600">This invitation has been used. Sign in to continue.</p>
-              <button onClick={() => nav('/login')} className="bg-slate-900 text-white text-sm px-4 py-2 rounded-lg press">
+              <h1 className="text-xl font-semibold tracking-tight text-slate-900">
+                Already accepted
+              </h1>
+              <p className="text-sm text-slate-600">
+                This invitation has been used. Sign in to continue.
+              </p>
+              <button
+                onClick={() => nav('/login')}
+                className="bg-slate-900 text-white text-sm px-4 py-2 rounded-lg press"
+              >
                 Go to sign in
               </button>
             </div>
@@ -163,9 +188,12 @@ export function AcceptInvitation() {
                 <div className="text-[10px] font-semibold tracking-widest text-brand-700 uppercase mb-1">
                   You've been invited
                 </div>
-                <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Set up your account</h1>
+                <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+                  Set up your account
+                </h1>
                 <p className="text-sm text-slate-600 mt-1">
-                  Joining as <span className="font-medium text-slate-900">{roleLabel(preview.role)}</span> ·{' '}
+                  Joining as{' '}
+                  <span className="font-medium text-slate-900">{roleLabel(preview.role)}</span> ·{' '}
                   <span className="text-slate-700">{preview.email}</span>
                 </p>
               </div>
@@ -225,7 +253,9 @@ function ErrorState({ message }: { message: string }) {
   const nav = useNavigate();
   return (
     <div className="text-center space-y-3">
-      <h1 className="text-xl font-semibold tracking-tight text-slate-900">Can't open this invitation</h1>
+      <h1 className="text-xl font-semibold tracking-tight text-slate-900">
+        Can't open this invitation
+      </h1>
       <p className="text-sm text-slate-600">{message}</p>
       <button onClick={() => nav('/login')} className="text-sm text-brand-700 hover:underline">
         Back to sign in
@@ -235,5 +265,8 @@ function ErrorState({ message }: { message: string }) {
 }
 
 function roleLabel(r: Role): string {
-  return r.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+  return r
+    .replace(/_/g, ' ')
+    .toLowerCase()
+    .replace(/\b\w/g, (c) => c.toUpperCase());
 }

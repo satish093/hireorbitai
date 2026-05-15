@@ -7,14 +7,14 @@
     </linearGradient>
   </defs>
   <rect width="64" height="64" rx="14" fill="url(#g)"/>
-  <!-- Stylized TB -->
-  <g fill="#ffffff">
-    <rect x="13" y="14" width="22" height="6" rx="1.5"/>
-    <rect x="21" y="14" width="6" height="36" rx="1.5"/>
-    <rect x="29" y="14" width="6" height="36" rx="1.5"/>
-    <path d="M35 14 h3 a9 9 0 0 1 0 18 h-3 z"/>
-    <path d="M35 30 h4 a9 9 0 0 1 0 18 h-4 z"/>
+  <!-- Orbit ring -->
+  <ellipse cx="32" cy="34" rx="22" ry="10" transform="rotate(-22 32 34)" fill="none" stroke="#ffffff" stroke-width="2" opacity="0.85"/>
+  <!-- Planet -->
+  <circle cx="32" cy="34" r="9" fill="#ffffff"/>
+  <circle cx="32" cy="34" r="9" fill="url(#g)" opacity="0.35"/>
+  <!-- AI spark -->
+  <g fill="#ffffff" opacity="0.95">
+    <path d="M48 16 l1.2 3 3 1.2 -3 1.2 -1.2 3 -1.2 -3 -3 -1.2 3 -1.2z"/>
+    <circle cx="53" cy="11" r="1.1"/>
   </g>
-  <!-- Bridge cable -->
-  <path d="M14 42 Q32 33 50 42" stroke="#ffffff" stroke-width="1.6" fill="none" opacity="0.8"/>
 </svg>

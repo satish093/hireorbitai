@@ -38,8 +38,8 @@ interface Conversation {
 // Two cadences. The active thread polls fast for snappy UX; the conversation
 // list + directory rarely change and don't need 4s polling. Combined this
 // drops the per-tab steady-state load from ~45 req/min to ~9 req/min.
-const THREAD_POLL_MS = 8_000;        // active thread only
-const SIDEBAR_POLL_MS = 60_000;      // conversations + directory
+const THREAD_POLL_MS = 8_000; // active thread only
+const SIDEBAR_POLL_MS = 60_000; // conversations + directory
 
 export function Messages() {
   const { profile } = useAuth();
@@ -98,36 +98,87 @@ export function Messages() {
     }
   }, []);
 
-  useEffect(() => { refresh(); }, [refresh]);
   useEffect(() => {
-    if (!activePeerId) { setMessages([]); inflightPeerRef.current = null; return; }
+    refresh();
+  }, [refresh]);
+  useEffect(() => {
+    if (!activePeerId) {
+      setMessages([]);
+      inflightPeerRef.current = null;
+      return;
+    }
     stickToBottomRef.current = true; // jump to bottom when switching threads
     loadThread(activePeerId);
   }, [activePeerId, loadThread]);
 
   // Two pollers: fast for the active thread, slow for the conversation list.
-  // Both pause when the tab is hidden to keep idle tabs from burning rate
-  // limit budget for users with many tabs open.
+  // Both pause when the tab is hidden, skip if a previous tick is still in
+  // flight, and self-schedule with jitter to avoid all-tabs-fire-at-once
+  // patterns when a backgrounded tab returns to the foreground.
 
   // Active-thread poller — only mounted when there IS an active peer.
   useEffect(() => {
     if (!activePeerId) return;
-    const t = setInterval(() => {
-      if (document.hidden) return;
-      loadThread(activePeerId);
-    }, THREAD_POLL_MS);
-    return () => clearInterval(t);
+    let cancelled = false;
+    let inflight = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const tick = async () => {
+      if (cancelled) return;
+      if (document.hidden || inflight) {
+        schedule();
+        return;
+      }
+      inflight = true;
+      try {
+        await loadThread(activePeerId);
+      } finally {
+        inflight = false;
+        schedule();
+      }
+    };
+    function schedule() {
+      if (cancelled) return;
+      const jitter = THREAD_POLL_MS * 0.1 * Math.random();
+      timer = setTimeout(tick, THREAD_POLL_MS + jitter);
+    }
+    schedule();
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
   }, [activePeerId, loadThread]);
 
   // Conversation list + directory poller — runs regardless of selection but
   // at a much slower cadence. The unread badge updates show up in <1 minute
   // even on the slow poll.
   useEffect(() => {
-    const t = setInterval(() => {
-      if (document.hidden) return;
-      refresh();
-    }, SIDEBAR_POLL_MS);
-    return () => clearInterval(t);
+    let cancelled = false;
+    let inflight = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const tick = async () => {
+      if (cancelled) return;
+      if (document.hidden || inflight) {
+        schedule();
+        return;
+      }
+      inflight = true;
+      try {
+        await refresh();
+      } finally {
+        inflight = false;
+        schedule();
+      }
+    };
+    function schedule() {
+      if (cancelled) return;
+      const jitter = SIDEBAR_POLL_MS * 0.1 * Math.random();
+      timer = setTimeout(tick, SIDEBAR_POLL_MS + jitter);
+    }
+    schedule();
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
   }, [refresh]);
 
   // Auto-scroll only when the user is already near the bottom.
@@ -162,7 +213,8 @@ export function Messages() {
       id: `tmp-${Date.now()}-${tmpIdRef.current}`,
       sender_id: profile?.id ?? '',
       recipient_id: activePeerId,
-      body, read_at: null,
+      body,
+      read_at: null,
       created_at: new Date().toISOString(),
     };
     setMessages((m) => [...m, optimistic]);
@@ -224,32 +276,36 @@ export function Messages() {
                   <p className="text-xs text-slate-400 italic px-2 py-3 text-center">
                     {directory.length === 0 ? 'No contacts yet' : 'No matches'}
                   </p>
-                ) : filteredDirectory.map((p) => (
-                  <button
-                    key={p.id}
-                    onClick={() => {
-                      setParams({ with: p.id });
-                      setComposerOpen(false);
-                      setComposeSearch('');
-                    }}
-                    className="w-full flex items-center gap-2 px-2 py-1.5 hover:bg-slate-100 rounded text-left"
-                  >
-                    <div className="relative">
-                      <Avatar name={p.full_name} email={p.email} size={28} />
-                      <PresenceDot
-                        lastSeenAt={p.last_seen_at}
-                        size={8}
-                        className="absolute -bottom-0.5 -right-0.5"
-                      />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="text-sm text-slate-900 truncate">{p.full_name ?? p.email}</div>
-                      <div className="text-[10px] uppercase tracking-wider text-slate-500">
-                        {p.role && ROLE_LABEL[p.role]}
+                ) : (
+                  filteredDirectory.map((p) => (
+                    <button
+                      key={p.id}
+                      onClick={() => {
+                        setParams({ with: p.id });
+                        setComposerOpen(false);
+                        setComposeSearch('');
+                      }}
+                      className="w-full flex items-center gap-2 px-2 py-1.5 hover:bg-slate-100 rounded text-left"
+                    >
+                      <div className="relative">
+                        <Avatar name={p.full_name} email={p.email} size={28} />
+                        <PresenceDot
+                          lastSeenAt={p.last_seen_at}
+                          size={8}
+                          className="absolute -bottom-0.5 -right-0.5"
+                        />
                       </div>
-                    </div>
-                  </button>
-                ))}
+                      <div className="min-w-0">
+                        <div className="text-sm text-slate-900 truncate">
+                          {p.full_name ?? p.email}
+                        </div>
+                        <div className="text-[10px] uppercase tracking-wider text-slate-500">
+                          {p.role && ROLE_LABEL[p.role]}
+                        </div>
+                      </div>
+                    </button>
+                  ))
+                )}
               </div>
             </div>
           )}
@@ -259,43 +315,58 @@ export function Messages() {
               <p className="text-xs text-slate-400 italic px-4 py-6 text-center">
                 No messages yet. Click + to start a chat.
               </p>
-            ) : conversations.map((c) => {
-              const active = c.peer.id === activePeerId;
-              return (
-                <button
-                  key={c.peer.id}
-                  onClick={() => setParams({ with: c.peer.id })}
-                  className={clsx(
-                    'w-full flex items-start gap-2.5 px-4 py-3 text-left border-b border-slate-100 hover:bg-white',
-                    active && 'bg-white border-l-2 border-l-brand-500'
-                  )}
-                >
-                  <div className="relative">
-                    <Avatar name={c.peer.full_name} email={c.peer.email} size={36} />
-                    <PresenceDot
-                      lastSeenAt={c.peer.last_seen_at}
-                      className="absolute -bottom-0.5 -right-0.5"
-                    />
-                    {c.unread_count > 0 && (
-                      <span className="absolute -top-1 -right-1 bg-brand-500 text-white text-[10px] font-semibold rounded-full px-1.5 min-w-[18px] h-[18px] flex items-center justify-center">
-                        {c.unread_count}
-                      </span>
+            ) : (
+              conversations.map((c) => {
+                const active = c.peer.id === activePeerId;
+                return (
+                  <button
+                    key={c.peer.id}
+                    onClick={() => setParams({ with: c.peer.id })}
+                    className={clsx(
+                      'w-full flex items-start gap-2.5 px-4 py-3 text-left border-b border-slate-100 hover:bg-white',
+                      active && 'bg-white border-l-2 border-l-brand-500',
                     )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-baseline justify-between gap-2">
-                      <span className={clsx('text-sm font-medium truncate', c.unread_count > 0 ? 'text-slate-900' : 'text-slate-800')}>
-                        {c.peer.full_name ?? c.peer.email}
-                      </span>
-                      <span className="text-[10px] text-slate-500 shrink-0">{relative(c.last_message.created_at)}</span>
+                  >
+                    <div className="relative">
+                      <Avatar name={c.peer.full_name} email={c.peer.email} size={36} />
+                      <PresenceDot
+                        lastSeenAt={c.peer.last_seen_at}
+                        className="absolute -bottom-0.5 -right-0.5"
+                      />
+                      {c.unread_count > 0 && (
+                        <span className="absolute -top-1 -right-1 bg-brand-500 text-white text-[10px] font-semibold rounded-full px-1.5 min-w-[18px] h-[18px] flex items-center justify-center">
+                          {c.unread_count}
+                        </span>
+                      )}
                     </div>
-                    <p className={clsx('text-xs truncate mt-0.5', c.unread_count > 0 ? 'text-slate-700 font-medium' : 'text-slate-500')}>
-                      {c.last_message.sender_id === profile?.id ? 'You: ' : ''}{c.last_message.body}
-                    </p>
-                  </div>
-                </button>
-              );
-            })}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <span
+                          className={clsx(
+                            'text-sm font-medium truncate',
+                            c.unread_count > 0 ? 'text-slate-900' : 'text-slate-800',
+                          )}
+                        >
+                          {c.peer.full_name ?? c.peer.email}
+                        </span>
+                        <span className="text-[10px] text-slate-500 shrink-0">
+                          {relative(c.last_message.created_at)}
+                        </span>
+                      </div>
+                      <p
+                        className={clsx(
+                          'text-xs truncate mt-0.5',
+                          c.unread_count > 0 ? 'text-slate-700 font-medium' : 'text-slate-500',
+                        )}
+                      >
+                        {c.last_message.sender_id === profile?.id ? 'You: ' : ''}
+                        {c.last_message.body}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })
+            )}
           </div>
         </aside>
 
@@ -320,7 +391,9 @@ export function Messages() {
                     {activePeer.full_name ?? activePeer.email}
                     <PresencePill lastSeenAt={activePeer.last_seen_at} />
                   </div>
-                  <div className="text-[11px] text-slate-500">{activePeer.role && ROLE_LABEL[activePeer.role]} · {activePeer.email}</div>
+                  <div className="text-[11px] text-slate-500">
+                    {activePeer.role && ROLE_LABEL[activePeer.role]} · {activePeer.email}
+                  </div>
                 </div>
               </header>
 
@@ -337,7 +410,9 @@ export function Messages() {
                   groupByDay(messages).map(({ day, items }) => (
                     <div key={day}>
                       <div className="text-center my-2">
-                        <span className="text-[10px] uppercase tracking-widest text-slate-400 bg-white border border-slate-200 px-2 py-0.5 rounded-full">{day}</span>
+                        <span className="text-[10px] uppercase tracking-widest text-slate-400 bg-white border border-slate-200 px-2 py-0.5 rounded-full">
+                          {day}
+                        </span>
                       </div>
                       <div className="space-y-2">
                         {items.map((m) => (
@@ -351,7 +426,10 @@ export function Messages() {
               </div>
 
               <form
-                onSubmit={(e) => { e.preventDefault(); send(); }}
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  send();
+                }}
                 className="border-t border-slate-200 px-4 py-3 flex items-end gap-2 bg-white"
               >
                 <textarea
@@ -359,7 +437,8 @@ export function Messages() {
                   onChange={(e) => setDraft(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault(); send();
+                      e.preventDefault();
+                      send();
                     }
                   }}
                   rows={1}
@@ -384,18 +463,26 @@ export function Messages() {
 
 function Bubble({ message, mine }: { message: Message; mine: boolean }) {
   return (
-    <div className={clsx('flex', mine ? 'justify-end animate-slide-in-right' : 'justify-start animate-slide-in-left')}>
+    <div
+      className={clsx(
+        'flex',
+        mine ? 'justify-end animate-slide-in-right' : 'justify-start animate-slide-in-left',
+      )}
+    >
       <div
         className={clsx(
           'max-w-[70%] px-3 py-2 rounded-2xl text-sm whitespace-pre-wrap break-words shadow-sm',
           mine
             ? 'bg-brand-600 text-white rounded-br-sm'
-            : 'bg-white border border-slate-200 text-slate-800 rounded-bl-sm'
+            : 'bg-white border border-slate-200 text-slate-800 rounded-bl-sm',
         )}
       >
         {message.body}
         <div className={clsx('text-[10px] mt-1', mine ? 'text-white/70' : 'text-slate-400')}>
-          {new Date(message.created_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+          {new Date(message.created_at).toLocaleTimeString([], {
+            hour: 'numeric',
+            minute: '2-digit',
+          })}
         </div>
       </div>
     </div>
@@ -419,7 +506,8 @@ function dayLabel(iso: string): string {
   const today = new Date();
   const sameDay = d.toDateString() === today.toDateString();
   if (sameDay) return 'Today';
-  const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
   if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
   return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 }

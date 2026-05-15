@@ -20,10 +20,12 @@ const PRIORITY_PILL: Record<TaskPriority, string> = {
 export function PriorityBadge({ priority }: { priority: TaskPriority }) {
   const label = priority.charAt(0) + priority.slice(1).toLowerCase();
   return (
-    <span className={clsx(
-      'inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-0.5 rounded-full border',
-      PRIORITY_PILL[priority],
-    )}>
+    <span
+      className={clsx(
+        'inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-0.5 rounded-full border',
+        PRIORITY_PILL[priority],
+      )}
+    >
       <span className={clsx('w-1.5 h-1.5 rounded-full', PRIORITY_DOT[priority])} />
       {label}
     </span>
@@ -55,10 +57,12 @@ const STATUS_DOT: Record<TaskStatus, string> = {
 export function TaskStatusBadge({ status }: { status: TaskStatus }) {
   const label = STATUS_LABELS[status];
   return (
-    <span className={clsx(
-      'inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-0.5 rounded-full',
-      STATUS_PILL[status],
-    )}>
+    <span
+      className={clsx(
+        'inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-0.5 rounded-full',
+        STATUS_PILL[status],
+      )}
+    >
       <span className={clsx('w-1.5 h-1.5 rounded-full', STATUS_DOT[status])} />
       {label}
     </span>
@@ -85,8 +89,10 @@ export function isOverdue(task: Task): boolean {
 
 function dueRelative(due: Date): string {
   const now = new Date();
-  const startToday = new Date(now); startToday.setHours(0, 0, 0, 0);
-  const startDue = new Date(due); startDue.setHours(0, 0, 0, 0);
+  const startToday = new Date(now);
+  startToday.setHours(0, 0, 0, 0);
+  const startDue = new Date(due);
+  startDue.setHours(0, 0, 0, 0);
   const diffDays = Math.round((startDue.getTime() - startToday.getTime()) / (24 * 3600 * 1000));
   if (diffDays === 0) return 'Today';
   if (diffDays === 1) return 'Due in 1d';
@@ -116,7 +122,9 @@ export function DuePill({ task }: { task: Task }) {
 }
 
 // Legacy export so existing imports keep working
-export function DueDate({ task }: { task: Task }) { return <DuePill task={task} />; }
+export function DueDate({ task }: { task: Task }) {
+  return <DuePill task={task} />;
+}
 
 // ---- Avatar ----------------------------------------------------------------
 
@@ -146,9 +154,15 @@ export function initialsOf(name?: string | null, email?: string | null): string 
 }
 
 export function Avatar({
-  name, email, size = 24,
-}: { name?: string | null; email?: string | null; size?: number }) {
-  const seed = (email ?? name ?? '?');
+  name,
+  email,
+  size = 24,
+}: {
+  name?: string | null;
+  email?: string | null;
+  size?: number;
+}) {
+  const seed = email ?? name ?? '?';
   return (
     <span
       className={clsx(
@@ -170,7 +184,9 @@ export function AssigneeChip({ task }: { task: Task }) {
   return (
     <span className="inline-flex items-center gap-1.5 text-xs text-slate-700">
       <Avatar name={task.assignee.full_name} email={task.assignee.email} size={20} />
-      <span className="truncate max-w-[110px]">{task.assignee.full_name ?? task.assignee.email}</span>
+      <span className="truncate max-w-[110px]">
+        {task.assignee.full_name ?? task.assignee.email}
+      </span>
     </span>
   );
 }
@@ -192,5 +208,5 @@ export function TagPill({ tag }: { tag: string }) {
 
 export function shortId(id: string): string {
   const tail = id.slice(-3);
-  return `TB-${tail.toUpperCase()}`;
+  return `HO-${tail.toUpperCase()}`;
 }

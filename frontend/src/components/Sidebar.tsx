@@ -2,15 +2,42 @@ import { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import clsx from 'clsx';
 import { useAuth } from '../context/AuthContext';
-import { Role, ROLE_LABEL, OPERATOR_TIER, MANAGER_TIER, ALL_ROLES, OWNER_TIER, ADMIN_TIER } from '../types';
+import {
+  Role,
+  ROLE_LABEL,
+  OPERATOR_TIER,
+  MANAGER_TIER,
+  ALL_ROLES,
+  OWNER_TIER,
+  ADMIN_TIER,
+} from '../types';
 import { api } from '../services/api';
 import { useFeatureFlags } from '../hooks/useFeatureFlags';
 import { Brand } from './Brand';
 import {
-  IconHome, IconTasks, IconCalendar, IconInbox, IconReminder,
-  IconUsers, IconUser, IconBriefcase, IconFileText, IconVideo, IconFile,
-  IconBuilding, IconBuilding2, IconBarChart, IconSparkles, IconMailPlus,
-  IconUsersCog, IconToggle, IconUserX, IconLogOut,
+  IconHome,
+  IconTasks,
+  IconCalendar,
+  IconInbox,
+  IconReminder,
+  IconUsers,
+  IconUser,
+  IconBriefcase,
+  IconFileText,
+  IconVideo,
+  IconFile,
+  IconBuilding,
+  IconBuilding2,
+  IconBarChart,
+  IconSparkles,
+  IconMailPlus,
+  IconUsersCog,
+  IconToggle,
+  IconUserX,
+  IconLogOut,
+  IconGraduation,
+  IconBookOpen,
+  IconClipboard,
 } from './Icons';
 import type { ComponentType, SVGProps } from 'react';
 
@@ -36,10 +63,31 @@ const sections: Section[] = [
     heading: 'Workspace',
     items: [
       { to: '/dashboard', label: 'Dashboard', icon: IconHome, roles: ALL_ROLES },
-      { to: '/tasks', label: 'Tasks', icon: IconTasks, roles: ALL_ROLES, badgeKey: 'tasks', flagKey: 'tasks' },
+      {
+        to: '/tasks',
+        label: 'Tasks',
+        icon: IconTasks,
+        roles: ALL_ROLES,
+        badgeKey: 'tasks',
+        flagKey: 'tasks',
+      },
       { to: '/calendar', label: 'Calendar', icon: IconCalendar, roles: ALL_ROLES },
-      { to: '/messages', label: 'Inbox', icon: IconInbox, roles: ALL_ROLES, badgeKey: 'inbox', flagKey: 'messages' },
-      { to: '/reminders', label: 'Reminders', icon: IconReminder, roles: ALL_ROLES, badgeKey: 'reminders', flagKey: 'reminders' },
+      {
+        to: '/messages',
+        label: 'Inbox',
+        icon: IconInbox,
+        roles: ALL_ROLES,
+        badgeKey: 'inbox',
+        flagKey: 'messages',
+      },
+      {
+        to: '/reminders',
+        label: 'Reminders',
+        icon: IconReminder,
+        roles: ALL_ROLES,
+        badgeKey: 'reminders',
+        flagKey: 'reminders',
+      },
     ],
   },
   {
@@ -49,7 +97,13 @@ const sections: Section[] = [
       { to: '/recruiters', label: 'Recruiters', icon: IconUser, roles: MANAGER_TIER },
       { to: '/jobs', label: 'Jobs', icon: IconBriefcase, roles: ALL_ROLES },
       { to: '/applications', label: 'Applications', icon: IconFileText, roles: ALL_ROLES },
-      { to: '/interviews', label: 'Interviews', icon: IconVideo, roles: ALL_ROLES, flagKey: 'interviews' },
+      {
+        to: '/interviews',
+        label: 'Interviews',
+        icon: IconVideo,
+        roles: ALL_ROLES,
+        flagKey: 'interviews',
+      },
       { to: '/resumes', label: 'Resumes', icon: IconFile, roles: ALL_ROLES },
     ],
   },
@@ -61,14 +115,71 @@ const sections: Section[] = [
     ],
   },
   {
+    heading: 'Training',
+    items: [
+      {
+        to: '/training',
+        label: 'Overview',
+        icon: IconGraduation,
+        roles: MANAGER_TIER,
+        flagKey: 'training',
+      },
+      {
+        to: '/training/courses',
+        label: 'Courses',
+        icon: IconBookOpen,
+        roles: MANAGER_TIER,
+        flagKey: 'training',
+      },
+      {
+        to: '/training/assignments',
+        label: 'Assignments',
+        icon: IconClipboard,
+        roles: MANAGER_TIER,
+        flagKey: 'training',
+      },
+      {
+        to: '/training/reports',
+        label: 'Reports',
+        icon: IconBarChart,
+        roles: MANAGER_TIER,
+        flagKey: 'training',
+      },
+      {
+        to: '/training/my',
+        label: 'My training',
+        icon: IconGraduation,
+        roles: ALL_ROLES,
+        flagKey: 'training',
+      },
+    ],
+  },
+  {
     heading: 'Admin',
     items: [
       { to: '/admin/users', label: 'All users', icon: IconUsers, roles: ADMIN_TIER },
-      { to: '/reports', label: 'Reports', icon: IconBarChart, roles: MANAGER_TIER, flagKey: 'reports' },
-      { to: '/ai-email', label: 'AI Email', icon: IconSparkles, roles: OPERATOR_TIER, flagKey: 'ai_email' },
+      {
+        to: '/reports',
+        label: 'Reports',
+        icon: IconBarChart,
+        roles: MANAGER_TIER,
+        flagKey: 'reports',
+      },
+      {
+        to: '/ai-email',
+        label: 'AI Email',
+        icon: IconSparkles,
+        roles: OPERATOR_TIER,
+        flagKey: 'ai_email',
+      },
       { to: '/invitations', label: 'Invitations', icon: IconMailPlus, roles: MANAGER_TIER },
       { to: '/admin/groups', label: 'User groups', icon: IconUsersCog, roles: MANAGER_TIER },
-      { to: '/admin/deactivated', label: 'Deactivated accounts', icon: IconUserX, roles: ADMIN_TIER },
+      {
+        to: '/admin/deactivated',
+        label: 'Deactivated accounts',
+        icon: IconUserX,
+        roles: ADMIN_TIER,
+      },
       { to: '/admin/features', label: 'Feature flags', icon: IconToggle, roles: OWNER_TIER },
     ],
   },
@@ -91,28 +202,83 @@ export function Sidebar() {
   useEffect(() => {
     if (!profile) return;
     let cancelled = false;
+    let inflight = false; // skip if the previous tick is still running
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    // Adaptive cadence: starts at 60s, doubles up to 5min on consecutive
+    // failures, resets to 60s on the first success. This stops a single 429
+    // burst from pinning the bucket for the full 15-minute window.
+    const BASE_MS = 60_000;
+    const MAX_MS = 5 * 60_000;
+    let currentMs = BASE_MS;
+
     const tick = async () => {
-      // Pause polling when the tab isn't visible — most "background" updates
-      // can wait until the user comes back, and this halves the request load
-      // for users with many open tabs.
-      if (typeof document !== 'undefined' && document.hidden) return;
-      const [t, r, u] = await Promise.all([
-        api.get('/tasks/assigned-to-me').catch(() => ({ data: [] })),
-        api.get('/reminders', { params: { status: 'PENDING' } }).catch(() => ({ data: [] })),
-        api.get('/messages/unread-count').catch(() => ({ data: { unread: 0 } })),
-      ]);
       if (cancelled) return;
-      setCounts({
-        tasks: (t.data ?? []).length,
-        reminders: (r.data ?? []).length,
-        inbox: u.data?.unread ?? 0,
-      });
+      // Pause polling when the tab isn't visible — most "background" updates
+      // can wait until the user comes back. We also reschedule rather than
+      // letting setInterval bunch up missed ticks behind a backgrounded tab.
+      if (typeof document !== 'undefined' && document.hidden) {
+        schedule();
+        return;
+      }
+      if (inflight) {
+        schedule();
+        return;
+      }
+      inflight = true;
+      try {
+        const [t, r, u] = await Promise.all([
+          api.get('/tasks/assigned-to-me').catch(() => null),
+          api.get('/reminders', { params: { status: 'PENDING' } }).catch(() => null),
+          api.get('/messages/unread-count').catch(() => null),
+        ]);
+        if (cancelled) return;
+        // If ANY request failed, back off; if ALL succeeded, reset.
+        if (t == null || r == null || u == null) {
+          currentMs = Math.min(MAX_MS, currentMs * 2);
+        } else {
+          currentMs = BASE_MS;
+        }
+        setCounts({
+          tasks: (t?.data ?? []).length,
+          reminders: (r?.data ?? []).length,
+          inbox: u?.data?.unread ?? 0,
+        });
+      } finally {
+        inflight = false;
+        schedule();
+      }
     };
-    tick();
-    // 60s cadence — was 15s, which produced ~720 requests/15min/user from
-    // this single hook and tripped the global rate limiter.
-    const i = setInterval(tick, 60_000);
-    return () => { cancelled = true; clearInterval(i); };
+
+    function schedule() {
+      if (cancelled) return;
+      // 10% jitter — when many tabs come out of background at once they
+      // don't all fire on the same millisecond.
+      const jitter = currentMs * 0.1 * Math.random();
+      timer = setTimeout(tick, currentMs + jitter);
+    }
+
+    // Fire once immediately; subsequent ticks self-schedule.
+    void tick();
+
+    // When the tab becomes visible again, do an opportunistic refresh —
+    // but only if we don't already have a tick in flight or scheduled
+    // imminently.
+    const onVisibility = () => {
+      if (cancelled || document.hidden || inflight) return;
+      if (timer) {
+        clearTimeout(timer);
+        timer = null;
+      }
+      void tick();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
   }, [profile?.id]);
 
   return (
@@ -149,7 +315,7 @@ export function Sidebar() {
                           'group relative flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-sm transition-all duration-200 ease-out',
                           isActive
                             ? 'bg-brand-50 text-brand-700 font-medium'
-                            : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900 hover:translate-x-0.5'
+                            : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900 hover:translate-x-0.5',
                         )
                       }
                     >
@@ -165,10 +331,15 @@ export function Sidebar() {
                               isActive ? 'scale-y-100' : 'scale-y-0',
                             )}
                           />
-                          <Icon size={17} className={clsx(
-                            'shrink-0 transition-colors',
-                            isActive ? 'text-brand-600' : 'text-slate-500 group-hover:text-slate-700',
-                          )} />
+                          <Icon
+                            size={17}
+                            className={clsx(
+                              'shrink-0 transition-colors',
+                              isActive
+                                ? 'text-brand-600'
+                                : 'text-slate-500 group-hover:text-slate-700',
+                            )}
+                          />
                           <span className="flex-1 truncate">{i.label}</span>
                           {typeof badge === 'number' && badge > 0 && (
                             <span
@@ -177,7 +348,7 @@ export function Sidebar() {
                                 'text-[10px] font-semibold px-1.5 py-0.5 rounded-full tabular-nums animate-pop',
                                 isActive
                                   ? 'bg-brand-600 text-white'
-                                  : 'bg-slate-200 text-slate-700'
+                                  : 'bg-slate-200 text-slate-700',
                               )}
                             >
                               {badge}
@@ -214,7 +385,9 @@ export function Sidebar() {
               <div className="text-[13px] font-medium text-slate-900 truncate">
                 {profile?.full_name ?? profile?.email}
               </div>
-              <div className="text-[10px] uppercase tracking-wider text-slate-500">{role && ROLE_LABEL[role]}</div>
+              <div className="text-[10px] uppercase tracking-wider text-slate-500">
+                {role && ROLE_LABEL[role]}
+              </div>
             </div>
           </NavLink>
           <button

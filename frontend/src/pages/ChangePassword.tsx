@@ -19,7 +19,7 @@ interface ChangeForm {
  *   - any time the user clicks "Change password" from settings
  *
  * The auth backend re-verifies the current password (defends against session
- * theft), updates Supabase, revokes existing sessions, and returns a fresh
+ * theft), rotates the password, revokes existing sessions, and returns a fresh
  * session so the user stays signed in.
  */
 export function ChangePassword() {
@@ -46,7 +46,7 @@ export function ChangePassword() {
     try {
       const { data } = await api.post('/auth/change-password', d);
       // Backend returns a fresh access_token/refresh_token. Push them into
-      // the Supabase client so the next API call uses the new bearer.
+      // the local session store so the next API call uses the new bearer.
       if (data?.access_token && data?.refresh_token) {
         await refreshSession(data.access_token, data.refresh_token);
       }
@@ -54,14 +54,16 @@ export function ChangePassword() {
       nav('/dashboard', { replace: true });
     } catch (e: any) {
       setError(e?.response?.data?.error ?? 'Password change failed');
-    } finally { setBusy(false); }
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
       <div className="w-full max-w-sm animate-fade-in-up">
         <div className="flex justify-center mb-6">
-          <Brand size="lg" caption="Bridging Talent · Building Futures" />
+          <Brand size="lg" />
         </div>
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-7">
           <div className="mb-4">
@@ -85,7 +87,10 @@ export function ChangePassword() {
             <PasswordField
               label="New password"
               autoComplete="new-password"
-              {...form.register('new_password', { required: 'Required', minLength: { value: 12, message: 'At least 12 characters' } })}
+              {...form.register('new_password', {
+                required: 'Required',
+                minLength: { value: 12, message: 'At least 12 characters' },
+              })}
               error={form.formState.errors.new_password?.message}
             />
             <PasswordStrengthHints password={newPwd} />
@@ -105,7 +110,10 @@ export function ChangePassword() {
             {forced && (
               <button
                 type="button"
-                onClick={async () => { await signOut(); nav('/login', { replace: true }); }}
+                onClick={async () => {
+                  await signOut();
+                  nav('/login', { replace: true });
+                }}
                 className="w-full text-xs text-slate-500 hover:text-slate-900 py-1"
               >
                 Sign out instead

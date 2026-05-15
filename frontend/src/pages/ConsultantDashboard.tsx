@@ -40,8 +40,14 @@ export function ConsultantDashboard() {
         if (!cancelled) setLoading(false);
       }
     })();
-    return () => { cancelled = true; };
-  }, [profile]);
+    return () => {
+      cancelled = true;
+    };
+    // Key on user.id ONLY — depending on the whole `profile` object would
+    // re-fire this effect every time AuthContext re-renders (e.g. on every
+    // silent token refresh), even though the data the effect cares about
+    // hasn't changed.
+  }, [profile?.id]);
 
   const offers = apps.filter((a) => a.status === 'OFFER').length;
   const upcomingInterviews = interviews.filter(
@@ -55,9 +61,18 @@ export function ConsultantDashboard() {
         description="Your marketing status, recent submissions, and upcoming interviews at a glance."
       />
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 stagger-children">
-        <DashboardCard label="Marketing status" value={consultant?.marketing_status ?? '—'} accent="blue" />
+        <DashboardCard
+          label="Marketing status"
+          value={consultant?.marketing_status ?? '—'}
+          accent="blue"
+        />
         <DashboardCard label="Submissions" value={apps.length} accent="amber" />
-        <DashboardCard label="Interviews" value={interviews.length} hint={upcomingInterviews > 0 ? `${upcomingInterviews} upcoming` : undefined} accent="green" />
+        <DashboardCard
+          label="Interviews"
+          value={interviews.length}
+          hint={upcomingInterviews > 0 ? `${upcomingInterviews} upcoming` : undefined}
+          accent="green"
+        />
         <DashboardCard label="Offers" value={offers} accent="slate" />
       </div>
 
@@ -68,8 +83,17 @@ export function ConsultantDashboard() {
         columns={[
           { key: 'job', header: 'Job', render: (a: any) => a.job?.title ?? '—' },
           { key: 'vendor', header: 'Vendor', render: (a: any) => a.vendor?.company_name ?? '—' },
-          { key: 'submitted_at', header: 'Date', render: (a: any) => a.submitted_at ? new Date(a.submitted_at).toLocaleDateString() : '—' },
-          { key: 'status', header: 'Status', render: (a: any) => <StatusBadge status={a.status} /> },
+          {
+            key: 'submitted_at',
+            header: 'Date',
+            render: (a: any) =>
+              a.submitted_at ? new Date(a.submitted_at).toLocaleDateString() : '—',
+          },
+          {
+            key: 'status',
+            header: 'Status',
+            render: (a: any) => <StatusBadge status={a.status} />,
+          },
         ]}
         rows={apps}
       />

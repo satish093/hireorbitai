@@ -7,10 +7,13 @@ import { Brand } from '../components/Brand';
 import { config as appConfig } from '../config/env';
 import { PasswordField, PasswordStrengthHints } from '../components/PasswordField';
 
-interface ResetForm { new_password: string; confirm_password: string }
+interface ResetForm {
+  new_password: string;
+  confirm_password: string;
+}
 
 /**
- * Custom reset-password flow (Brevo, not Supabase recovery). The page reads
+ * Custom reset-password flow (Brevo, backend-owned). The page reads
  * the token from `?token=` in the URL, posts it to the backend along with
  * the new password.
  */
@@ -39,7 +42,9 @@ export function ResetPassword() {
       nav('/login', { replace: true });
     } catch (e: any) {
       setError(e?.response?.data?.error ?? 'Reset failed');
-    } finally { setBusy(false); }
+    } finally {
+      setBusy(false);
+    }
   }
 
   if (!token) {
@@ -49,7 +54,10 @@ export function ResetPassword() {
         <p className="text-sm text-slate-600 mt-2">
           The link is missing a token. Request a new one from the sign-in page.
         </p>
-        <Link to="/forgot-password" className="text-sm text-brand-700 hover:underline inline-block mt-4">
+        <Link
+          to="/forgot-password"
+          className="text-sm text-brand-700 hover:underline inline-block mt-4"
+        >
           Request a new link
         </Link>
       </Shell>
@@ -69,7 +77,10 @@ export function ResetPassword() {
           label="New password"
           autoComplete="new-password"
           autoFocus
-          {...form.register('new_password', { required: 'Required', minLength: { value: 12, message: 'At least 12 characters' } })}
+          {...form.register('new_password', {
+            required: 'Required',
+            minLength: { value: 12, message: 'At least 12 characters' },
+          })}
           error={form.formState.errors.new_password?.message}
         />
         <PasswordStrengthHints password={pwd} />
@@ -96,7 +107,7 @@ function Shell({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
       <div className="w-full max-w-sm animate-fade-in-up">
         <div className="flex justify-center mb-6">
-          <Brand size="lg" caption="Bridging Talent · Building Futures" />
+          <Brand size="lg" />
         </div>
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-7">{children}</div>
       </div>

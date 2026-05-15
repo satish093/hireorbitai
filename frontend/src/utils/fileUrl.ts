@@ -10,7 +10,7 @@ import { config as appConfig } from '../config/env';
  *      typo elsewhere has bitten us before.
  *   2. CDN/domain-split: when a future build serves static asset URLs from
  *      a different host than the API, every call site doesn't have to know.
- *   3. Already-absolute URLs (signed Supabase Storage URLs) must be used
+ *   3. Already-absolute URLs (signed storage URLs) must be used
  *      as-is, NOT re-prefixed with our API base.
  *
  * Use these from any page that opens or renders a server-supplied URL.
