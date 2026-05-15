@@ -1,10 +1,15 @@
 import { Router } from 'express';
 import { requireRole } from '../middleware/auth';
+import { requireFeature } from '../middleware/featureFlag';
 import { MANAGER_TIER, OPERATOR_TIER } from '../types';
 import * as c from '../controllers/jobs.controller';
 import * as src from '../controllers/jobSources.controller';
 
 export const jobsRouter = Router();
+// `job_ingestion` flag — gates the SYNC/ENRICH/IMPORT endpoints only. The
+// read-side job board (recommended/liked/applied + GET /:id) keeps working
+// when ingestion is paused so existing rows stay visible.
+const ingest = requireFeature('job_ingestion');
 
 // More-specific routes BEFORE :id so they don't get matched as IDs.
 jobsRouter.get('/recommended', c.recommended);
@@ -16,17 +21,17 @@ jobsRouter.get('/match/consultant/:consultantId', c.matchForConsultant);
 jobsRouter.get('/sources/drivers', src.drivers);
 jobsRouter.get('/sources/health', src.sourcesHealth);
 jobsRouter.get('/sources', src.listSources);
-jobsRouter.post('/sources', requireRole(...MANAGER_TIER), src.createSource);
-jobsRouter.patch('/sources/:id', requireRole(...MANAGER_TIER), src.updateSource);
-jobsRouter.delete('/sources/:id', requireRole(...MANAGER_TIER), src.deleteSource);
-jobsRouter.post('/sources/:id/sync', requireRole(...MANAGER_TIER), src.syncOne);
-jobsRouter.post('/sync', requireRole(...MANAGER_TIER), src.sync);
+jobsRouter.post('/sources', ingest, requireRole(...MANAGER_TIER), src.createSource);
+jobsRouter.patch('/sources/:id', ingest, requireRole(...MANAGER_TIER), src.updateSource);
+jobsRouter.delete('/sources/:id', ingest, requireRole(...MANAGER_TIER), src.deleteSource);
+jobsRouter.post('/sources/:id/sync', ingest, requireRole(...MANAGER_TIER), src.syncOne);
+jobsRouter.post('/sync', ingest, requireRole(...MANAGER_TIER), src.sync);
 
 // AI batch enrichment (must come BEFORE /:id routes)
-jobsRouter.post('/enrich-pending', requireRole(...MANAGER_TIER), c.enrichPending);
+jobsRouter.post('/enrich-pending', ingest, requireRole(...MANAGER_TIER), c.enrichPending);
 
 // Manual external-URL import (paste-a-link). Operator-tier and above.
-jobsRouter.post('/import-url', requireRole(...OPERATOR_TIER), c.importByUrl);
+jobsRouter.post('/import-url', ingest, requireRole(...OPERATOR_TIER), c.importByUrl);
 
 jobsRouter.get('/', c.list);
 jobsRouter.post('/', requireRole(...OPERATOR_TIER), c.create);

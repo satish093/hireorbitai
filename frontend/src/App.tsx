@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { FeatureGuard } from './hooks/useFeatureFlags';
 import { useAuth } from './context/AuthContext';
 import { ADMIN_TIER, MANAGER_TIER, OPERATOR_TIER, OWNER_TIER } from './types';
 
@@ -71,19 +72,19 @@ export default function App() {
       <Route path="/recruiters" element={<ProtectedRoute allow={MANAGER_TIER}><Recruiters /></ProtectedRoute>} />
       <Route path="/jobs" element={<ProtectedRoute><JobSearch /></ProtectedRoute>} />
       <Route path="/applications" element={<ProtectedRoute><Applications /></ProtectedRoute>} />
-      <Route path="/interviews" element={<ProtectedRoute><Interviews /></ProtectedRoute>} />
+      <Route path="/interviews" element={<ProtectedRoute><FeatureGuard feature="interviews"><Interviews /></FeatureGuard></ProtectedRoute>} />
       <Route path="/calendar" element={<ProtectedRoute><Calendar /></ProtectedRoute>} />
       <Route path="/resumes" element={<ProtectedRoute><Resumes /></ProtectedRoute>} />
       <Route path="/vendors" element={<ProtectedRoute allow={OPERATOR_TIER}><Vendors /></ProtectedRoute>} />
       <Route path="/clients" element={<ProtectedRoute allow={OPERATOR_TIER}><Clients /></ProtectedRoute>} />
-      <Route path="/reminders" element={<ProtectedRoute><Reminders /></ProtectedRoute>} />
-      <Route path="/ai-email" element={<ProtectedRoute allow={OPERATOR_TIER}><AIEmail /></ProtectedRoute>} />
-      <Route path="/reports" element={<ProtectedRoute allow={MANAGER_TIER}><Reports /></ProtectedRoute>} />
+      <Route path="/reminders" element={<ProtectedRoute><FeatureGuard feature="reminders"><Reminders /></FeatureGuard></ProtectedRoute>} />
+      <Route path="/ai-email" element={<ProtectedRoute allow={OPERATOR_TIER}><FeatureGuard feature="ai_email"><AIEmail /></FeatureGuard></ProtectedRoute>} />
+      <Route path="/reports" element={<ProtectedRoute allow={MANAGER_TIER}><FeatureGuard feature="reports"><Reports /></FeatureGuard></ProtectedRoute>} />
       <Route path="/invitations" element={<ProtectedRoute allow={MANAGER_TIER}><Invitations /></ProtectedRoute>} />
-      <Route path="/tasks" element={<ProtectedRoute><Tasks /></ProtectedRoute>} />
-      <Route path="/tasks/me" element={<ProtectedRoute><TasksAssignedToMe /></ProtectedRoute>} />
-      <Route path="/tasks/:id" element={<ProtectedRoute><TaskDetail /></ProtectedRoute>} />
-      <Route path="/messages" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
+      <Route path="/tasks" element={<ProtectedRoute><FeatureGuard feature="tasks"><Tasks /></FeatureGuard></ProtectedRoute>} />
+      <Route path="/tasks/me" element={<ProtectedRoute><FeatureGuard feature="tasks"><TasksAssignedToMe /></FeatureGuard></ProtectedRoute>} />
+      <Route path="/tasks/:id" element={<ProtectedRoute><FeatureGuard feature="tasks"><TaskDetail /></FeatureGuard></ProtectedRoute>} />
+      <Route path="/messages" element={<ProtectedRoute><FeatureGuard feature="messages"><Messages /></FeatureGuard></ProtectedRoute>} />
       <Route path="/admin/features" element={<ProtectedRoute allow={OWNER_TIER}><FeatureFlags /></ProtectedRoute>} />
       <Route path="/admin/groups" element={<ProtectedRoute allow={MANAGER_TIER}><UserGroups /></ProtectedRoute>} />
       <Route path="/admin/deactivated" element={<ProtectedRoute allow={ADMIN_TIER}><DeactivatedAccounts /></ProtectedRoute>} />

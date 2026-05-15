@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Layout } from '../components/Layout';
 import { api } from '../services/api';
 import { useFeatureFlags } from '../hooks/useFeatureFlags';
+import { invalidate } from '../hooks/useInvalidate';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
 
@@ -62,6 +63,10 @@ export function FeatureFlags() {
     try {
       await api.put(`/feature-flags/groups/${groupId}/${key}`, { enabled: next });
       await refresh();
+      // Tell every other page (Sidebar, route guards, FeatureGuard) to
+      // re-fetch their effective flag map so the toggle is visible app-wide
+      // without a hard reload.
+      invalidate('feature-flags');
     } catch (e: any) {
       toast.error(e?.response?.data?.error ?? 'Failed to update override');
       // Reload to rebuild canonical state on failure.
@@ -77,6 +82,7 @@ export function FeatureFlags() {
     try {
       await api.patch(`/feature-flags/${row.key}`, { enabled: !previous });
       await refresh();
+      invalidate('feature-flags');
     } catch (e: any) {
       // Roll back.
       setRows((rs) => rs.map((r) => r.key === row.key ? { ...r, enabled: previous } : r));

@@ -3,11 +3,14 @@ import { z } from 'zod';
 import { supabaseAdmin } from '../config/supabase';
 import { httpError } from '../types';
 
-// In-memory cache so we don't hammer the DB on every request. Invalidated on
-// PATCH. 30-second hard TTL as a safety net.
+// In-memory cache so we don't hammer the DB on every request. Invalidated
+// synchronously on PATCH and on group-override change. 5-second hard TTL
+// as a safety net — short enough that even a missed invalidation in a
+// multi-process deploy reconciles quickly. Single-process deploys see
+// changes immediately because the same module instance owns the cache.
 let cache: { fetchedAt: number; flags: Record<string, boolean> } | null = null;
 let groupCache: { fetchedAt: number; overrides: Map<string, Record<string, boolean>> } | null = null;
-const TTL_MS = 30_000;
+const TTL_MS = 5_000;
 
 export async function loadFlags(): Promise<Record<string, boolean>> {
   if (cache && Date.now() - cache.fetchedAt < TTL_MS) return cache.flags;

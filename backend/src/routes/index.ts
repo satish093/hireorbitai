@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { requireAuth, blockIfMustChangePassword } from '../middleware/auth';
+import { requireFeature } from '../middleware/featureFlag';
 import { authRouter } from './auth.routes';
 import { invitationsRouter } from './invitations.routes';
 import * as invitationsCtl from '../controllers/invitations.controller';
@@ -54,14 +55,25 @@ router.use('/jobs', jobsRouter);
 router.use('/vendors', vendorsRouter);
 router.use('/clients', clientsRouter);
 router.use('/applications', applicationsRouter);
-router.use('/interviews', interviewsRouter);
-router.use('/reminders', remindersRouter);
-router.use('/reports', reportsRouter);
-router.use('/ai', aiRouter);
-router.use('/tasks', tasksRouter);
-router.use('/messages', messagesRouter);
 router.use('/feature-flags', featureFlagsRouter);
 router.use('/user-groups', userGroupsRouter);
 router.use('/users', usersRouter);
 router.use('/admin/users', adminUsersRouter);
 router.use('/glassdoor', glassdoorRouter);
+
+// --- Feature-flag gated routers ---------------------------------------------
+// Each module that maps 1:1 to a feature flag mounts behind requireFeature().
+// When the flag is OFF for the user's group, every route under the prefix
+// returns 403 with `{ error, details: { feature } }` — same envelope the
+// frontend reads to render "Feature disabled" cards.
+//
+// Adding a new feature flag for a new module:
+//   1. Insert into public.feature_flags (key, enabled).
+//   2. Add `router.use('/X', requireFeature('flag_name'), xRouter)` here.
+//   3. Add the flagKey to the matching Sidebar entry + ProtectedRoute guard.
+router.use('/interviews', requireFeature('interviews'), interviewsRouter);
+router.use('/reminders',  requireFeature('reminders'),  remindersRouter);
+router.use('/reports',    requireFeature('reports'),    reportsRouter);
+router.use('/ai',         requireFeature('ai_email'),   aiRouter);
+router.use('/tasks',      requireFeature('tasks'),      tasksRouter);
+router.use('/messages',   requireFeature('messages'),   messagesRouter);
