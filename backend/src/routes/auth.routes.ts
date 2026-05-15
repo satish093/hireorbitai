@@ -9,13 +9,13 @@ export const authRouter = Router();
 // the routes that are the most enumerate-able / brute-forceable.
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10,                       // 10 login attempts / IP / 15min
+  max: 10, // 10 login attempts / IP / 15min
   standardHeaders: 'draft-7',
   legacyHeaders: false,
 });
 const forgotLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
-  max: 5,                        // 5 forgot-password requests / IP / hour
+  max: 5, // 5 forgot-password requests / IP / hour
   standardHeaders: 'draft-7',
   legacyHeaders: false,
 });
@@ -28,6 +28,7 @@ const resetLimiter = rateLimit({
 
 // --- Public ------------------------------------------------------------------
 authRouter.post('/login', loginLimiter, auth.login);
+authRouter.post('/refresh', auth.refresh);
 authRouter.post('/forgot-password', forgotLimiter, auth.forgotPassword);
 authRouter.post('/reset-password', resetLimiter, auth.resetPassword);
 

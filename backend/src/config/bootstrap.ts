@@ -1,66 +1,86 @@
-import { supabaseAdmin } from './supabase';
+import { db } from './db';
+import type { AuthUser } from './auth.local';
 import { env } from './env';
 import { logger } from './logger';
 
 /**
- * Ensures a default SUPER_ADMIN account exists. Runs once on server boot
- * (see server.ts). Idempotent:
+ * Opt-in default-admin provisioner. Triggered from server.ts ONLY when
+ * `ENABLE_DEFAULT_ADMIN=true`. The canonical path for production is the
+ * Node helper script (`npm run bootstrap:admin`); this exists for ephemeral
+ * environments (CI, throwaway preview boxes) where you want an admin to be
+ * waiting the moment the API comes up.
  *
- *   - If the auth user already exists, we leave it alone unless RESET=true
- *     (which forces the password back to the default + arms must_change).
- *   - If only the auth.users row exists but public.users does not, we
- *     repair the link.
- *   - If both already exist with the right role, we no-op.
+ * Hard constraints:
+ *   1. No hardcoded credentials in source. Both `DEFAULT_ADMIN_EMAIL` and
+ *      `DEFAULT_ADMIN_PASSWORD` MUST be supplied via env. Missing either is
+ *      a refuse-to-bootstrap condition (logged + bailed, never silently
+ *      defaults).
+ *   2. The seeded password is always armed with `must_change_password=true`,
+ *      so it dies the moment the first human signs in.
+ *   3. `DEFAULT_ADMIN_RESET=true` rotates the password back to the
+ *      env-provided value + re-arms must_change. Useful for "I lost the
+ *      admin" recovery in a sealed env.
  *
- * The admin is created with `must_change_password = true`, so the very
- * first sign-in is forced through `/change-password` and the well-known
- * default password becomes unusable as soon as the human takes the bait.
- *
- * Skip the entire flow by setting DISABLE_DEFAULT_ADMIN=true in the env.
+ * Failures are logged but never thrown — the API stays up even if bootstrap
+ * can't provision the row.
  */
 export async function ensureDefaultAdmin(): Promise<void> {
-  if (process.env.DISABLE_DEFAULT_ADMIN === 'true') {
-    logger.info('default-admin bootstrap skipped (DISABLE_DEFAULT_ADMIN=true)');
+  const email = (process.env.DEFAULT_ADMIN_EMAIL ?? '').trim().toLowerCase();
+  const password = process.env.DEFAULT_ADMIN_PASSWORD ?? '';
+  const name = (process.env.DEFAULT_ADMIN_NAME ?? '').trim() || null;
+  const role = (process.env.DEFAULT_ADMIN_ROLE ?? 'SUPER_ADMIN').trim();
+  const reset = process.env.DEFAULT_ADMIN_RESET === 'true';
+
+  if (!email || !password) {
+    logger.warn(
+      'default-admin bootstrap skipped — DEFAULT_ADMIN_EMAIL and DEFAULT_ADMIN_PASSWORD must both be set when ENABLE_DEFAULT_ADMIN=true',
+    );
+    return;
+  }
+  if (!/^.+@.+\..+$/.test(email)) {
+    logger.warn(
+      { email },
+      'default-admin bootstrap skipped — DEFAULT_ADMIN_EMAIL is not a valid email',
+    );
+    return;
+  }
+  if (password.length < 12) {
+    logger.warn(
+      'default-admin bootstrap skipped — DEFAULT_ADMIN_PASSWORD must be at least 12 characters',
+    );
     return;
   }
 
-  const email = (process.env.DEFAULT_ADMIN_EMAIL ?? 'satish.flex07@gmail.com').toLowerCase();
-  const password = process.env.DEFAULT_ADMIN_PASSWORD ?? 'Admin@123';
-  const name = process.env.DEFAULT_ADMIN_NAME ?? 'Satish';
-  const role = process.env.DEFAULT_ADMIN_ROLE ?? 'SUPER_ADMIN';
-  const reset = process.env.DEFAULT_ADMIN_RESET === 'true';
-
   try {
-    // 1. Look for the auth user. listUsers paginates at 50/page — we ask for
-    //    up to 200, which is plenty for the bootstrap horizon (if you've grown
-    //    beyond that, the admin already exists and we'd hit an earlier match).
-    const { data: list, error: lookupErr } = await supabaseAdmin.auth.admin.listUsers({
-      page: 1, perPage: 200,
-    });
+    const { data: list, error: lookupErr } = await db.auth.admin.listUsers();
     if (lookupErr) {
-      logger.warn({ err: lookupErr.message }, 'default-admin: listUsers failed; skipping bootstrap');
+      logger.warn(
+        { err: lookupErr.message },
+        'default-admin: listUsers failed; skipping bootstrap',
+      );
       return;
     }
-    const existing = list.users.find((u) => (u.email ?? '').toLowerCase() === email);
+    const existing = list.users.find((u: AuthUser) => (u.email ?? '').toLowerCase() === email);
 
-    // 2. Check the matching public.users row.
-    let profileRoleOk = false;
+    // Already provisioned with the right role? Bail unless explicit reset.
     if (existing) {
-      const { data: profile } = await supabaseAdmin
+      const { data: profile } = await db
         .from('users')
         .select('id, role, must_change_password')
         .eq('id', existing.id)
         .maybeSingle();
-      profileRoleOk = profile?.role === role;
-      if (profile && profileRoleOk && !reset) {
-        logger.info({ email, userId: existing.id, role }, 'default-admin already provisioned — no action');
+      if (profile?.role === role && !reset) {
+        logger.info(
+          { email, userId: existing.id, role },
+          'default-admin already provisioned — no action',
+        );
         return;
       }
     }
 
     let userId: string;
     if (!existing) {
-      const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
+      const { data: created, error: createErr } = await db.auth.admin.createUser({
         email,
         password,
         email_confirm: true,
@@ -71,53 +91,45 @@ export async function ensureDefaultAdmin(): Promise<void> {
         return;
       }
       userId = created.user.id;
-      logger.info({ email, userId }, 'default-admin: created auth.users row');
+      logger.info({ email, userId }, 'default-admin: created users row');
     } else {
       userId = existing.id;
-      // Reset path: force the password back to the default + re-arm
-      // must_change_password. Useful for ops recovery; gated by the
-      // explicit DEFAULT_ADMIN_RESET env switch so we don't surprise
-      // anyone on a routine reboot.
       if (reset) {
-        const { error: updErr } = await supabaseAdmin.auth.admin.updateUserById(userId, {
-          password,
-          email_confirm: true,
-        });
+        const { error: updErr } = await db.auth.admin.updateUserById(userId, { password });
         if (updErr) {
           logger.error({ err: updErr.message }, 'default-admin: password reset failed');
           return;
         }
-        logger.warn({ email, userId }, 'default-admin: password reset to default (DEFAULT_ADMIN_RESET=true)');
+        logger.warn({ email, userId }, 'default-admin: password reset (DEFAULT_ADMIN_RESET=true)');
       }
     }
 
-    // 3. Upsert public.users with must_change_password=true so the first
-    //    sign-in is forced through /change-password and the public default
-    //    is rotated before the account is usable.
+    // Always arm must_change_password — the seeded password is meant to be
+    // single-use. Reset paths re-arm it too.
     const now = new Date().toISOString();
-    const { error: profileErr } = await supabaseAdmin
-      .from('users')
-      .upsert(
-        {
-          id: userId,
-          email,
-          full_name: name,
-          role,
-          must_change_password: true,
-          temporary_password_sent_at: now,
-          failed_login_attempts: 0,
-          locked_until: null,
-          is_active: true,
-        },
-        { onConflict: 'id' },
-      );
+    const { error: profileErr } = await db.from('users').upsert(
+      {
+        id: userId,
+        email,
+        full_name: name,
+        role,
+        must_change_password: true,
+        temporary_password_sent_at: now,
+        failed_login_attempts: 0,
+        locked_until: null,
+        is_active: true,
+      },
+      { onConflict: 'id' },
+    );
     if (profileErr) {
       logger.error({ err: profileErr.message }, 'default-admin: public.users upsert failed');
       return;
     }
 
+    // NEVER log the password. Operators read it from the env they themselves
+    // set; logging it would leak it into logfiles + log aggregators.
     logger.warn(
-      { email, role, defaultPassword: password },
+      { email, role },
       `default-admin ready — sign in once at ${env.frontendUrl}/login and rotate the password immediately`,
     );
   } catch (err) {

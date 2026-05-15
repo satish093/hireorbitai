@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import path from 'node:path';
 
 // Env vars are loaded by Node itself via the `--env-file=.env` flag on the
 // `dev` and `start` scripts (a Node 22 built-in, no `dotenv` package required).
@@ -17,7 +18,12 @@ import { z } from 'zod';
 const csvUrls = z
   .string()
   .min(1, 'CORS_ORIGIN must list at least one origin')
-  .transform((s) => s.split(',').map((x) => x.trim()).filter(Boolean))
+  .transform((s) =>
+    s
+      .split(',')
+      .map((x) => x.trim())
+      .filter(Boolean),
+  )
   .pipe(z.array(z.string().url()).min(1, 'CORS_ORIGIN must contain at least one valid URL'));
 
 // Optional API keys — empty string is treated as "not configured". The
@@ -27,7 +33,12 @@ const optionalKey = z.string().optional().default('');
 
 // Coerce numerics that arrive as strings from process.env.
 const portSchema = z.coerce.number().int().min(1).max(65535).default(4000);
-const hoursSchema = z.coerce.number().int().min(1).max(24 * 30).default(72);
+const hoursSchema = z.coerce
+  .number()
+  .int()
+  .min(1)
+  .max(24 * 30)
+  .default(72);
 
 const envSchema = z.object({
   // --- Server ---
@@ -36,11 +47,26 @@ const envSchema = z.object({
   APP_URL: z.string().url('APP_URL must be a fully-qualified URL'),
   CORS_ORIGIN: csvUrls,
 
-  // --- Supabase (required) ---
-  SUPABASE_URL: z.string().url('SUPABASE_URL must be a fully-qualified URL'),
-  SUPABASE_ANON_KEY: z.string().min(20, 'SUPABASE_ANON_KEY looks too short'),
-  SUPABASE_SERVICE_ROLE_KEY: z.string().min(20, 'SUPABASE_SERVICE_ROLE_KEY looks too short'),
-  SUPABASE_STORAGE_BUCKET: z.string().min(1).default('resumes'),
+  // --- Database (self-hosted PostgreSQL on the VPS) ---
+  DATABASE_URL: z
+    .string()
+    .min(10, 'DATABASE_URL is required (postgres://user:pass@host:5432/dbname)'),
+  DATABASE_SSL: z.enum(['disable', 'require', 'no-verify']).default('disable'),
+
+  // --- Filesystem storage (local uploads dir on the VPS) ---
+  // Absolute path. Created on boot if missing.
+  UPLOADS_DIR: z.string().min(1).default('/var/lib/hireorbitai/uploads'),
+  // Secret used to HMAC-sign download URLs.
+  STORAGE_URL_SECRET: z.string().min(32, 'STORAGE_URL_SECRET must be at least 32 chars'),
+
+  // --- Auth tokens ---
+  JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 chars'),
+  JWT_ACCESS_TTL_SECONDS: z.coerce.number().int().min(60).default(3600),
+  JWT_REFRESH_TTL_SECONDS: z.coerce
+    .number()
+    .int()
+    .min(3600)
+    .default(60 * 60 * 24 * 30),
 
   // --- Anthropic ---
   ANTHROPIC_API_KEY: optionalKey,
@@ -55,7 +81,7 @@ const envSchema = z.object({
   BREVO_SENDER_EMAIL: z.string().email().default('noreply@hireorbitai.com'),
   BREVO_SENDER_NAME: z.string().min(1).default('HireOrbit AI'),
 
-  // --- Auth ---
+  // --- Auth policy ---
   INVITATION_EXPIRY_HOURS: hoursSchema,
   // 24h temp-password TTL per spec.
   TEMP_PASSWORD_EXPIRY_HOURS: z.coerce.number().int().min(1).max(168).default(24),
@@ -67,14 +93,17 @@ const envSchema = z.object({
   // Used for cookie-signing if/when we add server-issued cookies. Required.
   COOKIE_SECRET: z.string().min(32, 'COOKIE_SECRET must be at least 32 chars'),
   // Frontend origin used in email links (reset / welcome).
-  FRONTEND_URL: z.string().url('FRONTEND_URL must be a fully-qualified URL').default('https://hireorbitai.com'),
+  FRONTEND_URL: z
+    .string()
+    .url('FRONTEND_URL must be a fully-qualified URL')
+    .default('https://hireorbitai.com'),
 
   // --- Rate limiting (configurable per env) ---
-  // Default budget is per authenticated user (see server.ts keyGenerator).
-  // 3000/15min covers a user with several open tabs + Messages thread polling
-  // (8s) + Sidebar polling (60s) + normal navigation. Tighten via env if a
-  // scraper shows up; loosen further for a high-tab-count internal team.
-  RATE_LIMIT_WINDOW_MS: z.coerce.number().int().min(1000).default(15 * 60 * 1000),
+  RATE_LIMIT_WINDOW_MS: z.coerce
+    .number()
+    .int()
+    .min(1000)
+    .default(15 * 60 * 1000),
   RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(3000),
 
   // --- Trust proxy (set to 1 behind Nginx/CloudPanel, 0 if direct) ---
@@ -88,9 +117,9 @@ if (!parsed.success) {
   // eslint-disable-next-line no-console
   console.error('\n✗ Invalid environment configuration:\n');
   for (const issue of parsed.error.issues) {
-    const path = issue.path.join('.') || '(root)';
+    const p = issue.path.join('.') || '(root)';
     // eslint-disable-next-line no-console
-    console.error(`  • ${path}: ${issue.message}`);
+    console.error(`  • ${p}: ${issue.message}`);
   }
   // eslint-disable-next-line no-console
   console.error('\nDouble-check backend/.env against backend/.env.example.\n');
@@ -114,11 +143,18 @@ export const env = {
     windowMs: e.RATE_LIMIT_WINDOW_MS,
     max: e.RATE_LIMIT_MAX,
   },
-  supabase: {
-    url: e.SUPABASE_URL,
-    anonKey: e.SUPABASE_ANON_KEY,
-    serviceRoleKey: e.SUPABASE_SERVICE_ROLE_KEY,
-    storageBucket: e.SUPABASE_STORAGE_BUCKET,
+  database: {
+    url: e.DATABASE_URL,
+    ssl: e.DATABASE_SSL,
+  },
+  storage: {
+    uploadsDir: path.resolve(e.UPLOADS_DIR),
+    urlSecret: e.STORAGE_URL_SECRET,
+  },
+  jwt: {
+    secret: e.JWT_SECRET,
+    accessTtlSeconds: e.JWT_ACCESS_TTL_SECONDS,
+    refreshTtlSeconds: e.JWT_REFRESH_TTL_SECONDS,
   },
   anthropic: {
     apiKey: e.ANTHROPIC_API_KEY,

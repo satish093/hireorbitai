@@ -1,33 +1,34 @@
-export type Role =
-  | 'SUPER_ADMIN' | 'CEO' | 'CTO' | 'DIRECTOR'
-  | 'MANAGER' | 'HR_MANAGER' | 'DEVELOPER'
-  | 'RECRUITER' | 'CONSULTANT';
+/**
+ * Backend type surface.
+ *
+ * Role + tier + Task enums come from `@hireorbitai/shared` — the single
+ * source of truth for both halves of the monorepo. Any change to those
+ * definitions goes in `shared/src/`; both backend and frontend pick it up
+ * automatically on the next `npm run shared:build`.
+ *
+ * This file also declares backend-only types: `AuthUser`, the `Express.Request`
+ * augmentation, the `ApiError` envelope, and the `httpError(status, msg)`
+ * helper used by every controller and middleware.
+ */
 
-/** Workspace owners — can toggle feature flags + irreversible workspace settings. */
-export const OWNER_TIER: Role[] = ['SUPER_ADMIN', 'CEO'];
-/** Roles with full-org visibility (everything an admin can do). */
-export const ADMIN_TIER: Role[] = ['SUPER_ADMIN', 'CEO', 'CTO', 'DIRECTOR'];
-/** Admin tier + people managers (incl. HR Manager) + internal Developer. */
-export const MANAGER_TIER: Role[] = [...ADMIN_TIER, 'MANAGER', 'HR_MANAGER', 'DEVELOPER'];
-/** Manager tier + Recruiter — operates on the talent pipeline. */
-export const OPERATOR_TIER: Role[] = [...MANAGER_TIER, 'RECRUITER'];
-/** Every authenticated role. */
-export const ALL_ROLES: Role[] = [...OPERATOR_TIER, 'CONSULTANT'];
+// Canonical types — re-exported from the workspace package so callers can
+// continue to `import { Role, MANAGER_TIER } from '../types'`.
+// Named exports (not `export *`) match the frontend pattern + are more robust
+// across bundlers that don't traverse `export *` through a CJS package main.
+export {
+  OWNER_TIER,
+  ADMIN_TIER,
+  MANAGER_TIER,
+  OPERATOR_TIER,
+  ALL_ROLES,
+  TASK_STATUSES,
+  TASK_PRIORITIES,
+  isAdmin,
+  isManagerOrUp,
+} from '@hireorbitai/shared';
+export type { Role, TaskStatus, TaskPriority } from '@hireorbitai/shared';
 
-export function isAdmin(role: Role | undefined): boolean {
-  return !!role && ADMIN_TIER.includes(role);
-}
-export function isManagerOrUp(role: Role | undefined): boolean {
-  return !!role && MANAGER_TIER.includes(role);
-}
-
-export type TaskStatus =
-  | 'BACKLOG' | 'TODO' | 'IN_PROGRESS' | 'BLOCKED' | 'REVIEW' | 'COMPLETED' | 'CANCELLED';
-export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
-export const TASK_STATUSES: TaskStatus[] = [
-  'BACKLOG', 'TODO', 'IN_PROGRESS', 'BLOCKED', 'REVIEW', 'COMPLETED', 'CANCELLED',
-];
-export const TASK_PRIORITIES: TaskPriority[] = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
+import type { Role } from '@hireorbitai/shared';
 
 export interface AuthUser {
   id: string;

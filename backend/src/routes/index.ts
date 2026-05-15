@@ -23,11 +23,18 @@ import { userGroupsRouter } from './userGroups.routes';
 import { usersRouter } from './users.routes';
 import { adminUsersRouter } from './adminUsers.routes';
 import { glassdoorRouter } from './glassdoor.routes';
+import { trainingRouter } from './training.routes';
+import { filesRouter } from './files.routes';
 
 export const router = Router();
 
 // Public (auth handshake & invitation accept).
 router.use('/auth', authRouter);
+
+// Public file downloads. HMAC-signed URLs minted by storage.local — the route
+// validates the signature + expiry before streaming the file. No bearer token
+// required because we want the URLs embeddable in <a download> tags.
+router.use('/files', filesRouter);
 
 // Public invitation handshake (preview + set-password). Must be BEFORE requireAuth.
 router.get('/invitations/preview', invitationsCtl.preview);
@@ -72,8 +79,9 @@ router.use('/glassdoor', glassdoorRouter);
 //   2. Add `router.use('/X', requireFeature('flag_name'), xRouter)` here.
 //   3. Add the flagKey to the matching Sidebar entry + ProtectedRoute guard.
 router.use('/interviews', requireFeature('interviews'), interviewsRouter);
-router.use('/reminders',  requireFeature('reminders'),  remindersRouter);
-router.use('/reports',    requireFeature('reports'),    reportsRouter);
-router.use('/ai',         requireFeature('ai_email'),   aiRouter);
-router.use('/tasks',      requireFeature('tasks'),      tasksRouter);
-router.use('/messages',   requireFeature('messages'),   messagesRouter);
+router.use('/reminders', requireFeature('reminders'), remindersRouter);
+router.use('/reports', requireFeature('reports'), reportsRouter);
+router.use('/ai', requireFeature('ai_email'), aiRouter);
+router.use('/tasks', requireFeature('tasks'), tasksRouter);
+router.use('/messages', requireFeature('messages'), messagesRouter);
+router.use('/training', requireFeature('training'), trainingRouter);

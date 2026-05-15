@@ -1,5 +1,5 @@
 import type { Request } from 'express';
-import { supabaseAdmin, supabaseAnon } from '../config/supabase';
+import { db } from '../config/db';
 import { env } from '../config/env';
 import { httpError, Role } from '../types';
 import {
@@ -41,7 +41,7 @@ const USER_ROW_COLS =
   'id,email,full_name,role,is_active,status,must_change_password,temporary_password_sent_at,failed_login_attempts,locked_until';
 
 async function loadUserByEmail(email: string): Promise<UserRow | null> {
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await db
     .from('users')
     .select(USER_ROW_COLS)
     .ilike('email', email)
@@ -51,11 +51,7 @@ async function loadUserByEmail(email: string): Promise<UserRow | null> {
 }
 
 async function loadUserById(id: string): Promise<UserRow | null> {
-  const { data, error } = await supabaseAdmin
-    .from('users')
-    .select(USER_ROW_COLS)
-    .eq('id', id)
-    .maybeSingle();
+  const { data, error } = await db.from('users').select(USER_ROW_COLS).eq('id', id).maybeSingle();
   if (error) throw httpError(500, error.message);
   return data as UserRow | null;
 }
@@ -81,26 +77,19 @@ export interface LoginResult {
   must_change_password: boolean;
 }
 
-export async function login(
-  email: string,
-  password: string,
-  req: Request,
-): Promise<LoginResult> {
+export async function login(email: string, password: string, req: Request): Promise<LoginResult> {
   const norm = email.trim().toLowerCase();
   const user = await loadUserByEmail(norm);
 
-  // Lockout check — short-circuit before we even hit Supabase Auth.
+  // Lockout check — short-circuit before we even verify the password.
   if (user?.locked_until && new Date(user.locked_until) > new Date()) {
     audit({ action: 'login_blocked_locked', user_id: user.id, email: norm, req });
     throw httpError(423, 'Account is temporarily locked. Try again later.');
   }
 
-  // Verify the password via Supabase Auth (the source of truth for password
-  // storage). IMPORTANT: use the anon-key client, NOT supabaseAdmin —
-  // signInWithPassword mutates the client's auth state, which would replace
-  // the service-role key with the user's JWT on every subsequent admin call
-  // (and RLS would silently filter out our writes).
-  const { data, error } = await supabaseAnon.auth.signInWithPassword({
+  // Verify the password via the local auth module (the source of truth for
+  // password storage — bcrypt-hashed in public.users.password_hash).
+  const { data, error } = await db.auth.signInWithPassword({
     email: norm,
     password,
   });
@@ -110,17 +99,28 @@ export async function login(
       await bumpFailedLogins(user, req);
     } else {
       // Don't leak whether the email is known. Still audit with email-only.
-      audit({ action: 'login_failed', email: norm, req, metadata: { reason: 'unknown_email_or_bad_pw' } });
+      audit({
+        action: 'login_failed',
+        email: norm,
+        req,
+        metadata: { reason: 'unknown_email_or_bad_pw' },
+      });
     }
     throw httpError(401, 'Invalid email or password.');
   }
 
-  // Even if Supabase returned a session, we still gate against our app's
+  // Even if the auth module returned a session, we still gate against our app's
   // public.users row — if it's missing, the user is half-provisioned and
   // can't be admitted.
   const profile = user ?? (await loadUserById(data.user.id));
   if (!profile) {
-    audit({ action: 'login_failed', user_id: data.user.id, email: norm, req, metadata: { reason: 'no_profile_row' } });
+    audit({
+      action: 'login_failed',
+      user_id: data.user.id,
+      email: norm,
+      req,
+      metadata: { reason: 'no_profile_row' },
+    });
     throw httpError(403, 'Account is not provisioned. Contact an administrator.');
   }
 
@@ -130,13 +130,20 @@ export async function login(
   // refresh tokens for non-active accounts.
   const status = profile.status ?? (profile.is_active === false ? 'inactive' : 'active');
   if (status !== 'active') {
-    void supabaseAdmin.auth.admin.signOut(profile.id, 'global').catch(() => {});
-    audit({ action: 'login_failed', user_id: profile.id, email: norm, req, metadata: { reason: `status_${status}` } });
+    void db.auth.admin.signOut(profile.id, 'global').catch(() => {});
+    audit({
+      action: 'login_failed',
+      user_id: profile.id,
+      email: norm,
+      req,
+      metadata: { reason: `status_${status}` },
+    });
     const messages: Record<string, string> = {
       inactive: 'This account is inactive. Contact an administrator.',
       suspended: 'This account is suspended. Contact an administrator.',
       banned: 'This account has been banned.',
-      pending_verification: 'Your account is awaiting verification. We\'ll email you when it\'s ready.',
+      pending_verification:
+        "Your account is awaiting verification. We'll email you when it's ready.",
     };
     throw httpError(403, messages[status] ?? 'This account is not active.');
   }
@@ -148,14 +155,23 @@ export async function login(
     const ageMs = Date.now() - new Date(profile.temporary_password_sent_at).getTime();
     const ttlMs = env.tempPasswordExpiryHours * 3600 * 1000;
     if (ageMs > ttlMs) {
-      audit({ action: 'login_failed', user_id: profile.id, email: norm, req, metadata: { reason: 'temp_password_expired' } });
-      throw httpError(403, 'Your temporary password has expired. Ask an administrator to re-issue one.');
+      audit({
+        action: 'login_failed',
+        user_id: profile.id,
+        email: norm,
+        req,
+        metadata: { reason: 'temp_password_expired' },
+      });
+      throw httpError(
+        403,
+        'Your temporary password has expired. Ask an administrator to re-issue one.',
+      );
     }
   }
 
   // On a clean success: reset failure counters AND stamp last_login_at so
   // the admin user list can show "last active". Combined into one UPDATE.
-  await supabaseAdmin
+  await db
     .from('users')
     .update({
       failed_login_attempts: 0,
@@ -172,7 +188,12 @@ export async function login(
     metadata: { must_change_password: profile.must_change_password },
   });
   if (profile.must_change_password) {
-    audit({ action: 'must_change_password_enforced', user_id: profile.id, email: profile.email, req });
+    audit({
+      action: 'must_change_password_enforced',
+      user_id: profile.id,
+      email: profile.email,
+      req,
+    });
   }
 
   return {
@@ -196,15 +217,27 @@ async function bumpFailedLogins(user: UserRow, req: Request): Promise<void> {
   if (next >= env.maxFailedLogins) {
     const unlocksAt = new Date(Date.now() + env.lockoutMinutes * 60 * 1000);
     update.locked_until = unlocksAt.toISOString();
-    audit({ action: 'account_locked', user_id: user.id, email: user.email, req, metadata: { attempts: next, unlocks_at: unlocksAt.toISOString() } });
+    audit({
+      action: 'account_locked',
+      user_id: user.id,
+      email: user.email,
+      req,
+      metadata: { attempts: next, unlocks_at: unlocksAt.toISOString() },
+    });
     // Fire the email asynchronously — never block the login response.
     void sendAccountLockedNotice({
       to: { email: user.email, name: user.full_name ?? undefined },
       unlocksAt,
     }).catch((err) => logger.warn({ err }, 'lockout email failed'));
   }
-  await supabaseAdmin.from('users').update(update).eq('id', user.id);
-  audit({ action: 'login_failed', user_id: user.id, email: user.email, req, metadata: { attempts: next } });
+  await db.from('users').update(update).eq('id', user.id);
+  audit({
+    action: 'login_failed',
+    user_id: user.id,
+    email: user.email,
+    req,
+    metadata: { attempts: next },
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -213,7 +246,7 @@ async function bumpFailedLogins(user: UserRow, req: Request): Promise<void> {
 export async function logout(userId: string, req: Request): Promise<void> {
   // `scope: 'global'` revokes every refresh token for the user (this device + all others).
   // For a single-device logout, pass 'local' or call signOut with the access token.
-  await supabaseAdmin.auth.admin.signOut(userId, 'global');
+  await db.auth.admin.signOut(userId, 'global');
   audit({ action: 'logout', user_id: userId, req });
 }
 
@@ -239,26 +272,32 @@ export async function changePassword(args: {
   // against session theft scenarios where the bearer token is valid but the
   // user doesn't actually know the password.
   // Anon client, not admin — see the comment on login() above.
-  const { error: verifyErr } = await supabaseAnon.auth.signInWithPassword({
+  const { error: verifyErr } = await db.auth.signInWithPassword({
     email,
     password: currentPassword,
   });
   if (verifyErr) {
-    audit({ action: 'login_failed', user_id: userId, email, req, metadata: { reason: 'change_password_verify_failed' } });
+    audit({
+      action: 'login_failed',
+      user_id: userId,
+      email,
+      req,
+      metadata: { reason: 'change_password_verify_failed' },
+    });
     throw httpError(401, 'Current password is incorrect.');
   }
 
   // Update the password via the admin API.
-  const { error: updErr } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+  const { error: updErr } = await db.auth.admin.updateUserById(userId, {
     password: newPassword,
   });
   if (updErr) throw httpError(500, updErr.message);
 
   // Invalidate every existing session for this user.
-  await supabaseAdmin.auth.admin.signOut(userId, 'global');
+  await db.auth.admin.signOut(userId, 'global');
 
   // Mark the profile as cleared from first-login flag.
-  await supabaseAdmin
+  await db
     .from('users')
     .update({
       must_change_password: false,
@@ -270,9 +309,12 @@ export async function changePassword(args: {
 
   // Issue a fresh session so the user stays signed in after rotation.
   // Anon client again — we just need the session pair to hand back.
-  const fresh = await supabaseAnon.auth.signInWithPassword({ email, password: newPassword });
+  const fresh = await db.auth.signInWithPassword({ email, password: newPassword });
   if (fresh.error || !fresh.data.session) {
-    throw httpError(500, 'Password updated, but failed to issue a new session. Please sign in again.');
+    throw httpError(
+      500,
+      'Password updated, but failed to issue a new session. Please sign in again.',
+    );
   }
 
   audit({ action: 'password_changed', user_id: userId, email, req });
@@ -307,7 +349,9 @@ export async function requestPasswordReset(email: string, req: Request): Promise
     // token is issued, no email is sent, but the client still sees 200.
     await sleep(150);
     audit({
-      action: 'password_reset_requested', email: norm, req,
+      action: 'password_reset_requested',
+      email: norm,
+      req,
       metadata: { existed: !!user, deactivated: user?.is_active === false },
     });
     return;
@@ -319,7 +363,7 @@ export async function requestPasswordReset(email: string, req: Request): Promise
   try {
     // Invalidate any prior unused tokens for this user so only the freshest
     // link works. Prevents reset-link accumulation across repeated requests.
-    await supabaseAdmin
+    await db
       .from('password_reset_tokens')
       .update({ used_at: new Date().toISOString() })
       .eq('user_id', user.id)
@@ -327,7 +371,7 @@ export async function requestPasswordReset(email: string, req: Request): Promise
 
     const raw = generateResetToken();
     const expires = new Date(Date.now() + env.resetTokenExpiryMinutes * 60 * 1000);
-    const { error } = await supabaseAdmin.from('password_reset_tokens').insert({
+    const { error } = await db.from('password_reset_tokens').insert({
       user_id: user.id,
       token_hash: hashToken(raw),
       expires_at: expires.toISOString(),
@@ -335,7 +379,13 @@ export async function requestPasswordReset(email: string, req: Request): Promise
     });
     if (error) {
       logger.error({ err: error, user_id: user.id }, 'failed to insert password_reset_tokens row');
-      audit({ action: 'password_reset_requested', user_id: user.id, email: user.email, req, metadata: { existed: true, delivered: false, reason: 'insert_failed' } });
+      audit({
+        action: 'password_reset_requested',
+        user_id: user.id,
+        email: user.email,
+        req,
+        metadata: { existed: true, delivered: false, reason: 'insert_failed' },
+      });
       return;
     }
 
@@ -346,15 +396,33 @@ export async function requestPasswordReset(email: string, req: Request): Promise
         resetUrl,
         expiresInMinutes: env.resetTokenExpiryMinutes,
       });
-      audit({ action: 'password_reset_requested', user_id: user.id, email: user.email, req, metadata: { existed: true, delivered: true } });
+      audit({
+        action: 'password_reset_requested',
+        user_id: user.id,
+        email: user.email,
+        req,
+        metadata: { existed: true, delivered: true },
+      });
     } catch (mailErr) {
       logger.error({ err: mailErr, user_id: user.id }, 'failed to send password reset email');
-      audit({ action: 'password_reset_requested', user_id: user.id, email: user.email, req, metadata: { existed: true, delivered: false, reason: 'mail_failed' } });
+      audit({
+        action: 'password_reset_requested',
+        user_id: user.id,
+        email: user.email,
+        req,
+        metadata: { existed: true, delivered: false, reason: 'mail_failed' },
+      });
     }
   } catch (e) {
     // Catch-all to preserve the anti-enumeration invariant.
     logger.error({ err: e, user_id: user.id }, 'unexpected error in requestPasswordReset');
-    audit({ action: 'password_reset_requested', user_id: user.id, email: user.email, req, metadata: { existed: true, delivered: false, reason: 'unexpected' } });
+    audit({
+      action: 'password_reset_requested',
+      user_id: user.id,
+      email: user.email,
+      req,
+      metadata: { existed: true, delivered: false, reason: 'unexpected' },
+    });
   }
 }
 
@@ -367,7 +435,7 @@ export async function completePasswordReset(args: {
   req: Request;
 }): Promise<void> {
   const tokenHash = hashToken(args.token);
-  const { data: row, error } = await supabaseAdmin
+  const { data: row, error } = await db
     .from('password_reset_tokens')
     .select('id,user_id,expires_at,used_at')
     .eq('token_hash', tokenHash)
@@ -375,15 +443,29 @@ export async function completePasswordReset(args: {
   if (error) throw httpError(500, error.message);
 
   if (!row) {
-    audit({ action: 'password_reset_invalid_token', req: args.req, metadata: { reason: 'not_found' } });
+    audit({
+      action: 'password_reset_invalid_token',
+      req: args.req,
+      metadata: { reason: 'not_found' },
+    });
     throw httpError(400, 'Reset link is invalid or has expired.');
   }
   if (row.used_at) {
-    audit({ action: 'password_reset_invalid_token', user_id: row.user_id, req: args.req, metadata: { reason: 'already_used' } });
+    audit({
+      action: 'password_reset_invalid_token',
+      user_id: row.user_id,
+      req: args.req,
+      metadata: { reason: 'already_used' },
+    });
     throw httpError(400, 'Reset link has already been used.');
   }
   if (new Date(row.expires_at) < new Date()) {
-    audit({ action: 'password_reset_invalid_token', user_id: row.user_id, req: args.req, metadata: { reason: 'expired' } });
+    audit({
+      action: 'password_reset_invalid_token',
+      user_id: row.user_id,
+      req: args.req,
+      metadata: { reason: 'expired' },
+    });
     throw httpError(400, 'Reset link is invalid or has expired.');
   }
 
@@ -396,7 +478,12 @@ export async function completePasswordReset(args: {
   // the token was issued. The login flow already blocks deactivated accounts,
   // but rotating the password under their feet would be a confusing signal.
   if (user.is_active === false) {
-    audit({ action: 'password_reset_invalid_token', user_id: user.id, req: args.req, metadata: { reason: 'account_deactivated' } });
+    audit({
+      action: 'password_reset_invalid_token',
+      user_id: user.id,
+      req: args.req,
+      metadata: { reason: 'account_deactivated' },
+    });
     throw httpError(403, 'This account has been deactivated. Contact an administrator.');
   }
 
@@ -404,20 +491,20 @@ export async function completePasswordReset(args: {
   if (!strength.ok) throw httpError(400, strength.problems.join(' '));
 
   // Update the password + revoke all sessions atomically (from the client's POV).
-  const { error: updErr } = await supabaseAdmin.auth.admin.updateUserById(row.user_id, {
+  const { error: updErr } = await db.auth.admin.updateUserById(row.user_id, {
     password: args.newPassword,
   });
   if (updErr) throw httpError(500, updErr.message);
-  await supabaseAdmin.auth.admin.signOut(row.user_id, 'global');
+  await db.auth.admin.signOut(row.user_id, 'global');
 
   // Mark token used (we keep the row for audit; the purge function in SQL
   // cleans it up after 7 days). Also clear must_change_password since the
   // user has demonstrably re-authenticated.
-  await supabaseAdmin
+  await db
     .from('password_reset_tokens')
     .update({ used_at: new Date().toISOString() })
     .eq('id', row.id);
-  await supabaseAdmin
+  await db
     .from('users')
     .update({
       must_change_password: false,
@@ -427,7 +514,12 @@ export async function completePasswordReset(args: {
     })
     .eq('id', row.user_id);
 
-  audit({ action: 'password_reset_completed', user_id: row.user_id, email: user.email, req: args.req });
+  audit({
+    action: 'password_reset_completed',
+    user_id: row.user_id,
+    email: user.email,
+    req: args.req,
+  });
   void sendPasswordChangedNotice({
     to: { email: user.email, name: user.full_name ?? undefined },
     when: new Date(),
@@ -448,9 +540,9 @@ export async function adminCreateUser(args: {
   const norm = args.email.trim().toLowerCase();
   const tempPassword = generateTempPassword(16);
 
-  // 1. Create the auth user. `email_confirm: true` skips the Supabase
-  //    confirmation email — we do all email ourselves via Brevo.
-  const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
+  // 1. Create the auth user. `email_confirm: true` is a no-op flag retained for
+  //    API compatibility — every email path runs through Brevo.
+  const { data: created, error: createErr } = await db.auth.admin.createUser({
     email: norm,
     password: tempPassword,
     email_confirm: true,
@@ -465,23 +557,21 @@ export async function adminCreateUser(args: {
 
   // 2. Insert the matching public.users row.
   const now = new Date().toISOString();
-  const { error: profileErr } = await supabaseAdmin
-    .from('users')
-    .upsert(
-      {
-        id: created.user.id,
-        email: norm,
-        full_name: args.fullName ?? null,
-        role: args.role,
-        must_change_password: true,
-        temporary_password_sent_at: now,
-        failed_login_attempts: 0,
-      },
-      { onConflict: 'id' },
-    );
+  const { error: profileErr } = await db.from('users').upsert(
+    {
+      id: created.user.id,
+      email: norm,
+      full_name: args.fullName ?? null,
+      role: args.role,
+      must_change_password: true,
+      temporary_password_sent_at: now,
+      failed_login_attempts: 0,
+    },
+    { onConflict: 'id' },
+  );
   if (profileErr) {
     // Roll back the auth user — otherwise we leave half-provisioned rows.
-    await supabaseAdmin.auth.admin.deleteUser(created.user.id).catch(() => {});
+    await db.auth.admin.deleteUser(created.user.id).catch(() => {});
     throw httpError(500, profileErr.message);
   }
 
@@ -498,8 +588,15 @@ export async function adminCreateUser(args: {
       expiresInHours: env.tempPasswordExpiryHours,
     });
   } catch (mailErr) {
-    await supabaseAdmin.from('users').delete().eq('id', created.user.id).then(() => {}, () => {});
-    await supabaseAdmin.auth.admin.deleteUser(created.user.id).catch(() => {});
+    await db
+      .from('users')
+      .delete()
+      .eq('id', created.user.id)
+      .then(
+        () => {},
+        () => {},
+      );
+    await db.auth.admin.deleteUser(created.user.id).catch(() => {});
     const msg = mailErr instanceof Error ? mailErr.message : 'Failed to send welcome email';
     throw httpError(502, `Account was not created: ${msg}`);
   }
@@ -533,7 +630,12 @@ function sleep(ms: number) {
 // flight access token dies at its TTL and refresh stops working immediately.
 // Always audit-logged.
 // ---------------------------------------------------------------------------
-export type AccountStatusValue = 'active' | 'inactive' | 'suspended' | 'pending_verification' | 'banned';
+export type AccountStatusValue =
+  | 'active'
+  | 'inactive'
+  | 'suspended'
+  | 'pending_verification'
+  | 'banned';
 
 export async function setUserStatus(args: {
   targetId: string;
@@ -541,11 +643,17 @@ export async function setUserStatus(args: {
   reason?: string | null;
   actor: { id: string; email: string };
   req: Request;
-}): Promise<{ id: string; email: string; status: AccountStatusValue; status_reason: string | null; is_active: boolean }> {
+}): Promise<{
+  id: string;
+  email: string;
+  status: AccountStatusValue;
+  status_reason: string | null;
+  is_active: boolean;
+}> {
   const { targetId, status, reason, actor, req } = args;
 
   // Snapshot the previous state for the audit metadata.
-  const { data: before, error: lookupErr } = await supabaseAdmin
+  const { data: before, error: lookupErr } = await db
     .from('users')
     .select('id, email, status, is_active')
     .eq('id', targetId)
@@ -554,7 +662,7 @@ export async function setUserStatus(args: {
   if (!before) throw httpError(404, 'User not found');
 
   const now = new Date().toISOString();
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await db
     .from('users')
     .update({
       status,
@@ -579,7 +687,7 @@ export async function setUserStatus(args: {
   // The access-token TTL is short (≤ 1h by default) so the in-flight token
   // ages out on its own; refresh is dead immediately.
   if (status !== 'active') {
-    await supabaseAdmin.auth.admin.signOut(targetId, 'global').catch((err) => {
+    await db.auth.admin.signOut(targetId, 'global').catch((err) => {
       logger.warn({ err, targetId }, 'lifecycle: signOut failed');
     });
   }

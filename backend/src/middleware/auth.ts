@@ -1,5 +1,5 @@
 import { RequestHandler } from 'express';
-import { supabaseAdmin } from '../config/supabase';
+import { db } from '../config/db';
 import { httpError, Role } from '../types';
 
 // Light-weight presence heartbeat. We bump last_seen_at at most once every
@@ -19,9 +19,13 @@ function heartbeat(userId: string) {
   lastHeartbeat.set(userId, now);
 
   // Fire-and-forget the last_seen_at write — never block the request.
-  supabaseAdmin
-    .from('users').update({ last_seen_at: new Date(now).toISOString() }).eq('id', userId)
-    .then(() => {}, () => {});
+  db.from('users')
+    .update({ last_seen_at: new Date(now).toISOString() })
+    .eq('id', userId)
+    .then(
+      () => {},
+      () => {},
+    );
 
   // Accumulate active seconds for today. If the user_activity_daily table
   // doesn't exist yet, the error is swallowed silently — the app keeps
@@ -38,22 +42,31 @@ async function bumpActivity(userId: string, isoDate: string, addSeconds: number)
   try {
     // No native atomic "add" in PostgREST, so read-modify-write with upsert.
     // Two concurrent heartbeats from the same user are ~impossible (30s throttle).
-    const { data } = await supabaseAdmin
+    const { data } = await db
       .from('user_activity_daily')
       .select('active_seconds')
-      .eq('user_id', userId).eq('activity_date', isoDate).maybeSingle();
+      .eq('user_id', userId)
+      .eq('activity_date', isoDate)
+      .maybeSingle();
     const next = (data?.active_seconds ?? 0) + addSeconds;
-    await supabaseAdmin
+    await db
       .from('user_activity_daily')
       .upsert(
-        { user_id: userId, activity_date: isoDate, active_seconds: next, updated_at: new Date().toISOString() },
+        {
+          user_id: userId,
+          activity_date: isoDate,
+          active_seconds: next,
+          updated_at: new Date().toISOString(),
+        },
         { onConflict: 'user_id,activity_date' },
       );
-  } catch { /* table missing → migration pending */ }
+  } catch {
+    /* table missing → migration pending */
+  }
 }
 
 /**
- * Verifies the bearer token via Supabase, then loads the user's role from
+ * Verifies the bearer JWT, then loads the user's role from
  * public.users. Attaches `req.user` for downstream handlers.
  */
 export const requireAuth: RequestHandler = async (req, _res, next) => {
@@ -61,7 +74,7 @@ export const requireAuth: RequestHandler = async (req, _res, next) => {
   const token = header.startsWith('Bearer ') ? header.slice(7) : null;
   if (!token) throw httpError(401, 'Missing bearer token');
 
-  const { data, error } = await supabaseAdmin.auth.getUser(token);
+  const { data, error } = await db.auth.getUser(token);
   if (error || !data.user) throw httpError(401, 'Invalid or expired token');
 
   // Pull role + group_id + must_change_password + status. `must_change_password`
@@ -69,13 +82,17 @@ export const requireAuth: RequestHandler = async (req, _res, next) => {
   // entirely if they've been deactivated/suspended/banned.
   // Defensive fallback: older deployments might be missing the status column,
   // so we narrow the select on schema-cache errors.
-  let { data: profile, error: pErr } = await supabaseAdmin
+  let { data: profile, error: pErr } = await db
     .from('users')
     .select('id, email, role, group_id, must_change_password, status')
     .eq('id', data.user.id)
     .single();
-  if (pErr && /status|must_change_password|group_id/.test(pErr.message) && /schema cache|column/i.test(pErr.message)) {
-    ({ data: profile, error: pErr } = await supabaseAdmin
+  if (
+    pErr &&
+    /status|must_change_password|group_id/.test(pErr.message) &&
+    /schema cache|column/i.test(pErr.message)
+  ) {
+    ({ data: profile, error: pErr } = await db
       .from('users')
       .select('id, email, role')
       .eq('id', data.user.id)
@@ -92,7 +109,9 @@ export const requireAuth: RequestHandler = async (req, _res, next) => {
   }
 
   req.user = {
-    id: profile.id, email: profile.email, role: profile.role as Role,
+    id: profile.id,
+    email: profile.email,
+    role: profile.role as Role,
     group_id: (profile as any).group_id ?? null,
     must_change_password: !!(profile as any).must_change_password,
   };
@@ -105,11 +124,13 @@ export const requireAuth: RequestHandler = async (req, _res, next) => {
  *
  *   router.post('/admin-only', requireAuth, requireRole('SUPER_ADMIN', 'CEO'), handler);
  */
-export const requireRole = (...allowed: Role[]): RequestHandler => (req, _res, next) => {
-  if (!req.user) throw httpError(401, 'Not authenticated');
-  if (!allowed.includes(req.user.role)) throw httpError(403, 'Forbidden — insufficient role');
-  next();
-};
+export const requireRole =
+  (...allowed: Role[]): RequestHandler =>
+  (req, _res, next) => {
+    if (!req.user) throw httpError(401, 'Not authenticated');
+    if (!allowed.includes(req.user.role)) throw httpError(403, 'Forbidden — insufficient role');
+    next();
+  };
 
 /**
  * RBAC — admin tier: SUPER_ADMIN, CEO, CTO, DIRECTOR. Use this on any admin

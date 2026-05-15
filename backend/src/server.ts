@@ -7,10 +7,12 @@ import hpp from 'hpp';
 import rateLimit from 'express-rate-limit';
 import pinoHttp from 'pino-http';
 import crypto from 'node:crypto';
+import jwt from 'jsonwebtoken';
 
 import { env } from './config/env';
 import { logger } from './config/logger';
 import { ensureDefaultAdmin } from './config/bootstrap';
+import { jobs } from './jobs';
 import { router } from './routes';
 import { errorHandler } from './middleware/errorHandler';
 
@@ -23,13 +25,15 @@ const app = express();
 app.set('trust proxy', env.trustProxy);
 
 // --- Security headers ---------------------------------------------------------
-app.use(helmet({
-  // Allow the frontend (served from a different origin) to read normal API
-  // responses. Disable COEP because we don't host cross-origin embeds that
-  // would benefit from it, and enabling it tends to break image previews.
-  crossOriginResourcePolicy: { policy: 'cross-origin' },
-  crossOriginEmbedderPolicy: false,
-}));
+app.use(
+  helmet({
+    // Allow the frontend (served from a different origin) to read normal API
+    // responses. Disable COEP because we don't host cross-origin embeds that
+    // would benefit from it, and enabling it tends to break image previews.
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+    crossOriginEmbedderPolicy: false,
+  }),
+);
 
 // --- CORS ---------------------------------------------------------------------
 // Strict allowlist sourced from env. No wildcard fallback — if CORS_ORIGIN is
@@ -39,21 +43,23 @@ app.use(helmet({
 // off env value (`https://hireorbitai.com/`) still matches the browser's
 // `Origin: https://hireorbitai.com` header.
 const normalizedAllowlist = env.corsOrigins.map((o) => o.toLowerCase().replace(/\/+$/, ''));
-app.use(cors({
-  origin: (origin, cb) => {
-    // No Origin header → same-origin, curl, or server-to-server. Allow.
-    if (!origin) return cb(null, true);
-    const norm = origin.toLowerCase().replace(/\/+$/, '');
-    if (normalizedAllowlist.includes(norm)) return cb(null, true);
-    // Loud log so misconfig is obvious in `pm2 logs`. Don't throw — returning
-    // (null, false) lets cors() respond without the Allow-Origin header,
-    // which is the correct CORS-spec behavior and avoids a 500 that lacks
-    // CORS headers entirely.
-    logger.warn({ origin, allowlist: normalizedAllowlist }, 'CORS: origin not in allowlist');
-    cb(null, false);
-  },
-  credentials: true,
-}));
+app.use(
+  cors({
+    origin: (origin, cb) => {
+      // No Origin header → same-origin, curl, or server-to-server. Allow.
+      if (!origin) return cb(null, true);
+      const norm = origin.toLowerCase().replace(/\/+$/, '');
+      if (normalizedAllowlist.includes(norm)) return cb(null, true);
+      // Loud log so misconfig is obvious in `pm2 logs`. Don't throw — returning
+      // (null, false) lets cors() respond without the Allow-Origin header,
+      // which is the correct CORS-spec behavior and avoids a 500 that lacks
+      // CORS headers entirely.
+      logger.warn({ origin, allowlist: normalizedAllowlist }, 'CORS: origin not in allowlist');
+      cb(null, false);
+    },
+    credentials: true,
+  }),
+);
 
 // --- Body parsing -------------------------------------------------------------
 app.use(express.json({ limit: '10mb' }));
@@ -102,12 +108,58 @@ app.use(
 // seconds (the default response is HTML "Too many requests"). The frontend
 // can read Retry-After to back off intelligently if we ever wire a retrying
 // client.
-function sendRateLimitResponse(_req: import('express').Request, res: import('express').Response, _next: unknown, opts: { windowMs: number }) {
-  res.setHeader('Retry-After', Math.ceil(opts.windowMs / 1000).toString());
+function sendRateLimitResponse(
+  _req: import('express').Request,
+  res: import('express').Response,
+  _next: unknown,
+  opts: { windowMs: number },
+) {
+  // express-rate-limit sets RateLimit-Reset on the response (in seconds until
+  // the bucket frees up). Echo that as Retry-After so clients can back off the
+  // right amount instead of the worst-case full window. We cap at 60s so a
+  // misconfigured client doesn't sleep forever; the next tick will retry if
+  // we're still over budget.
+  const resetSec = Number(res.getHeader('RateLimit-Reset'));
+  const fallback = Math.ceil(opts.windowMs / 1000);
+  const retryAfter = Math.min(60, Number.isFinite(resetSec) && resetSec > 0 ? resetSec : fallback);
+  res.setHeader('Retry-After', String(retryAfter));
   res.status(429).json({
     error: 'Too many requests. Please slow down.',
-    retry_after_seconds: Math.ceil(opts.windowMs / 1000),
+    retry_after_seconds: retryAfter,
   });
+}
+
+// The global limiter mounts BEFORE requireAuth runs, so `req.user` isn't
+// populated yet. Decode (verify) the JWT here directly so the bucket is keyed
+// per-user instead of per-IP — otherwise everyone behind a shared NAT / office
+// proxy shares a single bucket and the polling Sidebar burns the entire team's
+// budget. Falls back to IP for unauthenticated requests.
+function rateLimitKey(req: import('express').Request): string {
+  const header = req.headers.authorization ?? '';
+  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+  if (token) {
+    try {
+      const decoded = jwt.verify(token, env.jwt.secret, { algorithms: ['HS256'] }) as {
+        sub?: string;
+      };
+      if (decoded?.sub) return `u:${decoded.sub}`;
+    } catch {
+      // Falls through to IP key. The actual auth failure surfaces in
+      // requireAuth, not here.
+    }
+  }
+  return `ip:${req.ip ?? 'unknown'}`;
+}
+
+// Skip the global limiter on health/readiness/refresh:
+//   - /health, /ready  → uptime monitors mustn't burn budget.
+//   - /auth/refresh   → silent token refresh is a high-frequency interceptor
+//                       hook; if it gets 429'd we end up logging the user out
+//                       on a transient burst. The refresh endpoint has its own
+//                       narrow per-user cost (one DB hit) so it's safe.
+function skipGlobal(req: import('express').Request): boolean {
+  const p = req.path;
+  return p === '/health' || p === '/ready' || p === '/auth/refresh' || p === '/api/auth/refresh';
 }
 
 const globalLimiter = rateLimit({
@@ -115,14 +167,10 @@ const globalLimiter = rateLimit({
   max: env.rateLimit.max,
   standardHeaders: 'draft-7', // RateLimit-* headers
   legacyHeaders: false,
-  skip: (req) => req.path === '/health' || req.path === '/ready',
-  keyGenerator: (req) => {
-    // requireAuth sets req.user; before that we only have the IP.
-    const u = (req as unknown as { user?: { id?: string } }).user;
-    if (u?.id) return `u:${u.id}`;
-    return `ip:${req.ip ?? 'unknown'}`;
-  },
-  handler: (req, res, next) => sendRateLimitResponse(req, res, next, { windowMs: env.rateLimit.windowMs }),
+  skip: skipGlobal,
+  keyGenerator: rateLimitKey,
+  handler: (req, res, next) =>
+    sendRateLimitResponse(req, res, next, { windowMs: env.rateLimit.windowMs }),
 });
 app.use(globalLimiter);
 
@@ -135,7 +183,8 @@ const authLimiter = rateLimit({
   max: 20, // 20 attempts per 15min per IP
   standardHeaders: 'draft-7',
   legacyHeaders: false,
-  handler: (req, res, next) => sendRateLimitResponse(req, res, next, { windowMs: AUTH_LIMITER_WINDOW_MS }),
+  handler: (req, res, next) =>
+    sendRateLimitResponse(req, res, next, { windowMs: AUTH_LIMITER_WINDOW_MS }),
 });
 app.use('/auth/login', authLimiter);
 app.use('/auth/forgot-password', authLimiter);
@@ -160,14 +209,12 @@ app.get('/health', (_req, res) => {
 });
 
 app.get('/ready', async (_req, res) => {
-  // Cheap readiness probe — verifies the Supabase URL is reachable from this
-  // process. Doesn't actually hit Postgres so it stays fast.
+  // Readiness probe — runs a trivial query against Postgres so an orchestrator
+  // can distinguish "process up" (/healthz) from "database reachable" (/ready).
   try {
-    const ctl = new AbortController();
-    const t = setTimeout(() => ctl.abort(), 1500);
-    const r = await fetch(`${env.supabase.url}/auth/v1/health`, { signal: ctl.signal });
-    clearTimeout(t);
-    res.status(r.ok ? 200 : 503).json({ ok: r.ok, supabase: r.status });
+    const { pool } = await import('./config/db');
+    await pool.query('SELECT 1');
+    res.status(200).json({ ok: true, db: 'reachable' });
   } catch (e: unknown) {
     res.status(503).json({ ok: false, error: e instanceof Error ? e.message : 'unknown' });
   }
@@ -184,6 +231,12 @@ app.use('/api', router);
 // --- Error handler (must be last) ---------------------------------------------
 app.use(errorHandler);
 
+// Ensure the uploads root exists before we start accepting requests. Lazy
+// import so we don't pay the fs cost in unit tests that import server.ts.
+import('node:fs').then(({ promises: fs }) => {
+  void fs.mkdir(env.storage.uploadsDir, { recursive: true });
+});
+
 // --- Listen + graceful shutdown ----------------------------------------------
 const server = app.listen(env.port, () => {
   logger.info({ port: env.port, env: env.nodeEnv }, 'HireOrbit API listening');
@@ -193,6 +246,12 @@ const server = app.listen(env.port, () => {
   // from Node (e.g. on a fresh deploy where you can't reach the SQL editor).
   if (process.env.ENABLE_DEFAULT_ADMIN === 'true') {
     void ensureDefaultAdmin();
+  }
+  // In-process background scheduler — reminders dispatch, session purge,
+  // etc. See ./jobs/index.ts for the registry. Off by default in test mode
+  // and when DISABLE_JOBS=true so unit-test runs don't fire timers.
+  if (env.nodeEnv !== 'test' && process.env.DISABLE_JOBS !== 'true') {
+    jobs.start();
   }
 });
 
@@ -212,6 +271,9 @@ function shutdown(signal: NodeJS.Signals) {
     logger.warn('Graceful shutdown timed out — forcing exit');
     process.exit(1);
   }, 25_000);
+  // Stop the scheduler first so an in-flight job tick doesn't get killed
+  // mid-write by a hard process.exit. Best-effort — capped at 5s inside.
+  void jobs.stop();
   server.close((err) => {
     clearTimeout(forceClose);
     if (err) {

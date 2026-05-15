@@ -1,6 +1,6 @@
 import { RequestHandler } from 'express';
 import { z } from 'zod';
-import { supabaseAdmin } from '../config/supabase';
+import { db } from '../config/db';
 import { httpError } from '../types';
 import * as authSvc from '../services/auth.service';
 
@@ -9,19 +9,24 @@ import * as authSvc from '../services/auth.service';
 // ---------------------------------------------------------------------------
 export const me: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
-  const { data: user, error } = await supabaseAdmin
-    .from('users').select('*').eq('id', req.user.id).single();
+  const { data: user, error } = await db.from('users').select('*').eq('id', req.user.id).single();
   if (error) throw httpError(500, error.message);
 
   let consultant_id: string | null = null;
   let recruiter_id: string | null = null;
   if (user.role === 'CONSULTANT') {
-    const { data: c } = await supabaseAdmin
-      .from('consultants').select('id').eq('user_id', user.id).maybeSingle();
+    const { data: c } = await db
+      .from('consultants')
+      .select('id')
+      .eq('user_id', user.id)
+      .maybeSingle();
     consultant_id = c?.id ?? null;
   } else if (user.role === 'RECRUITER') {
-    const { data: r } = await supabaseAdmin
-      .from('recruiters').select('id').eq('user_id', user.id).maybeSingle();
+    const { data: r } = await db
+      .from('recruiters')
+      .select('id')
+      .eq('user_id', user.id)
+      .maybeSingle();
     recruiter_id = r?.id ?? null;
   }
   res.json({ ...user, consultant_id, recruiter_id });
@@ -39,7 +44,11 @@ const syncSchema = z.object({
   full_name: z.string().trim().max(120).optional(),
   phone: z.string().trim().max(40).optional(),
   // Only http(s) avatars — `javascript:` and `data:` get rejected at the schema layer.
-  avatar_url: z.string().trim().url().max(2048)
+  avatar_url: z
+    .string()
+    .trim()
+    .url()
+    .max(2048)
     .refine((v) => /^https?:\/\//i.test(v), 'avatar_url must be http(s)')
     .optional(),
 });
@@ -54,7 +63,7 @@ export const syncProfile: RequestHandler = async (req, res) => {
   if (parsed.data.full_name !== undefined) patch.full_name = parsed.data.full_name;
   if (parsed.data.phone !== undefined) patch.phone = parsed.data.phone;
   if (parsed.data.avatar_url !== undefined) patch.avatar_url = parsed.data.avatar_url;
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await db
     .from('users')
     .upsert(patch, { onConflict: 'id' })
     .select()
@@ -76,6 +85,29 @@ export const login: RequestHandler = async (req, res) => {
   if (!parsed.success) throw httpError(400, 'Email and password are required.');
   const result = await authSvc.login(parsed.data.email, parsed.data.password, req);
   res.json(result);
+};
+
+// ---------------------------------------------------------------------------
+// /refresh — exchanges a refresh token for a fresh access/refresh pair.
+//
+// Public route (no requireAuth) — the refresh token itself is the credential.
+// The api.ts interceptor on the frontend fires this when the access token is
+// within ~60s of expiry.
+// ---------------------------------------------------------------------------
+const refreshSchema = z.object({
+  refresh_token: z.string().min(20).max(500),
+});
+
+export const refresh: RequestHandler = async (req, res) => {
+  const parsed = refreshSchema.safeParse(req.body);
+  if (!parsed.success) throw httpError(400, 'refresh_token required');
+  const { data, error } = await db.auth.refreshSession(parsed.data.refresh_token);
+  if (error || !data.session) throw httpError(401, error?.message ?? 'Invalid refresh token');
+  res.json({
+    access_token: data.session.access_token,
+    refresh_token: data.session.refresh_token,
+    expires_at: data.session.expires_at,
+  });
 };
 
 // ---------------------------------------------------------------------------
