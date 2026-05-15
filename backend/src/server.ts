@@ -98,6 +98,18 @@ app.use(
 //   - Skip /health and /ready so uptime monitors don't burn budget.
 //   - Public auth + invitation routes get their own much stricter limiter
 //     mounted below — those are the brute-force surface.
+// Shared 429 handler — emits a clean JSON body and a Retry-After header in
+// seconds (the default response is HTML "Too many requests"). The frontend
+// can read Retry-After to back off intelligently if we ever wire a retrying
+// client.
+function sendRateLimitResponse(_req: import('express').Request, res: import('express').Response, _next: unknown, opts: { windowMs: number }) {
+  res.setHeader('Retry-After', Math.ceil(opts.windowMs / 1000).toString());
+  res.status(429).json({
+    error: 'Too many requests. Please slow down.',
+    retry_after_seconds: Math.ceil(opts.windowMs / 1000),
+  });
+}
+
 const globalLimiter = rateLimit({
   windowMs: env.rateLimit.windowMs,
   max: env.rateLimit.max,
@@ -110,17 +122,20 @@ const globalLimiter = rateLimit({
     if (u?.id) return `u:${u.id}`;
     return `ip:${req.ip ?? 'unknown'}`;
   },
+  handler: (req, res, next) => sendRateLimitResponse(req, res, next, { windowMs: env.rateLimit.windowMs }),
 });
 app.use(globalLimiter);
 
 // Stricter limiter on the brute-forceable surfaces. These are public routes
 // where one IP can guess many credentials. Per-IP keying is correct here —
 // we WANT to throttle a single attacker even across many candidate emails.
+const AUTH_LIMITER_WINDOW_MS = 15 * 60 * 1000;
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
+  windowMs: AUTH_LIMITER_WINDOW_MS,
   max: 20, // 20 attempts per 15min per IP
   standardHeaders: 'draft-7',
   legacyHeaders: false,
+  handler: (req, res, next) => sendRateLimitResponse(req, res, next, { windowMs: AUTH_LIMITER_WINDOW_MS }),
 });
 app.use('/auth/login', authLimiter);
 app.use('/auth/forgot-password', authLimiter);

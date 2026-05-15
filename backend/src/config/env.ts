@@ -70,12 +70,12 @@ const envSchema = z.object({
   FRONTEND_URL: z.string().url('FRONTEND_URL must be a fully-qualified URL').default('https://hireorbitai.com'),
 
   // --- Rate limiting (configurable per env) ---
-  // Default budget is per authenticated user (see server.ts keyGenerator) so
-  // 1500/15min is generous enough for the Sidebar's 15s poll cadence + normal
-  // page navigation without 429-ing real traffic. Tighten via env if you ever
-  // get hit by a scraper.
+  // Default budget is per authenticated user (see server.ts keyGenerator).
+  // 3000/15min covers a user with several open tabs + Messages thread polling
+  // (8s) + Sidebar polling (60s) + normal navigation. Tighten via env if a
+  // scraper shows up; loosen further for a high-tab-count internal team.
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().min(1000).default(15 * 60 * 1000),
-  RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(1500),
+  RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(3000),
 
   // --- Trust proxy (set to 1 behind Nginx/CloudPanel, 0 if direct) ---
   TRUST_PROXY: z.coerce.number().int().min(0).max(10).default(1),

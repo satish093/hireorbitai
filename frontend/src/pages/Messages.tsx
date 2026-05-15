@@ -35,7 +35,11 @@ interface Conversation {
   unread_count: number;
 }
 
-const POLL_MS = 4000;
+// Two cadences. The active thread polls fast for snappy UX; the conversation
+// list + directory rarely change and don't need 4s polling. Combined this
+// drops the per-tab steady-state load from ~45 req/min to ~9 req/min.
+const THREAD_POLL_MS = 8_000;        // active thread only
+const SIDEBAR_POLL_MS = 60_000;      // conversations + directory
 
 export function Messages() {
   const { profile } = useAuth();
@@ -101,15 +105,30 @@ export function Messages() {
     loadThread(activePeerId);
   }, [activePeerId, loadThread]);
 
-  // Poll for new messages — pause when the tab is hidden to save bandwidth.
+  // Two pollers: fast for the active thread, slow for the conversation list.
+  // Both pause when the tab is hidden to keep idle tabs from burning rate
+  // limit budget for users with many tabs open.
+
+  // Active-thread poller — only mounted when there IS an active peer.
+  useEffect(() => {
+    if (!activePeerId) return;
+    const t = setInterval(() => {
+      if (document.hidden) return;
+      loadThread(activePeerId);
+    }, THREAD_POLL_MS);
+    return () => clearInterval(t);
+  }, [activePeerId, loadThread]);
+
+  // Conversation list + directory poller — runs regardless of selection but
+  // at a much slower cadence. The unread badge updates show up in <1 minute
+  // even on the slow poll.
   useEffect(() => {
     const t = setInterval(() => {
       if (document.hidden) return;
       refresh();
-      if (activePeerId) loadThread(activePeerId);
-    }, POLL_MS);
+    }, SIDEBAR_POLL_MS);
     return () => clearInterval(t);
-  }, [activePeerId, refresh, loadThread]);
+  }, [refresh]);
 
   // Auto-scroll only when the user is already near the bottom.
   useEffect(() => {
