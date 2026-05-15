@@ -91,12 +91,19 @@ export const update: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   if (!canEditProfile(req.user, req.params.id)) throw httpError(403, 'Forbidden');
 
+  // URL fields restrict to http(s) so a stored `javascript:` or `data:`
+  // URL can't render later in another user's browser. Same refinement we
+  // use in syncProfile (auth.controller.ts). `.max()` MUST come before
+  // `.refine()` — refine returns ZodEffects which doesn't expose .max.
+  const httpUrl = z.string().max(2048).url()
+    .refine((v) => /^https?:\/\//i.test(v), 'must be an http(s) URL');
+
   const schema = z.object({
     full_name: z.string().max(120).optional(),
     first_name: z.string().max(60).optional(),
     last_name: z.string().max(60).optional(),
     phone: z.string().max(40).optional().nullable(),
-    avatar_url: z.string().url().optional().or(z.literal('')).nullable(),
+    avatar_url: httpUrl.optional().or(z.literal('')).nullable(),
     address_line1: z.string().max(120).optional().nullable(),
     address_line2: z.string().max(120).optional().nullable(),
     city: z.string().max(80).optional().nullable(),
@@ -104,8 +111,8 @@ export const update: RequestHandler = async (req, res) => {
     postal_code: z.string().max(20).optional().nullable(),
     country: z.string().max(60).optional().nullable(),
     timezone: z.string().max(60).optional().nullable(),
-    linkedin_url: z.string().url().optional().or(z.literal('')).nullable(),
-  });
+    linkedin_url: httpUrl.optional().or(z.literal('')).nullable(),
+  }).strict();   // reject unknown fields outright instead of silently stripping
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
 

@@ -4,7 +4,7 @@ import * as tc from '../controllers/taskComments.controller';
 import * as ta from '../controllers/taskAttachments.controller';
 import { requireRole } from '../middleware/auth';
 import { MANAGER_TIER } from '../types';
-import { upload } from '../middleware/upload';
+import { uploadAttachment } from '../middleware/upload';
 
 export const tasksRouter = Router();
 
@@ -28,5 +28,7 @@ tasksRouter.delete('/comments/:id', tc.remove);
 
 // Attachments
 tasksRouter.get('/:taskId/attachments', ta.list);
-tasksRouter.post('/:taskId/attachments', upload.single('file'), ta.upload);
+// Docs / images / spreadsheets / text only, max 15 MB. See uploadAttachment
+// in middleware/upload.ts for the exact mime+ext allowlist.
+tasksRouter.post('/:taskId/attachments', uploadAttachment.single('file'), ta.upload);
 tasksRouter.delete('/attachments/:id', ta.remove);
