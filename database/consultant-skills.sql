@@ -1,4 +1,4 @@
--- TalentBridge AI — multi-skill array on consultants.
+-- HireOrbit AI — multi-skill array on consultants.
 -- `primary_skill` was a single text field, too coarse for the recommender.
 -- This array lets consultants pick the 6-12 skills they want jobs matched
 -- against (Jobright-style "Add skill" chip picker).

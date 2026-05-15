@@ -1,4 +1,4 @@
--- TalentBridge AI — unified source_companies seed.
+-- HireOrbit AI — unified source_companies seed.
 --
 -- Idempotent: re-run any time to bring every driver online at once. Each
 -- block is the same content as its individual file (kept separate so you

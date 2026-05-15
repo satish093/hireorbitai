@@ -1,4 +1,4 @@
--- TalentBridge AI — extra job sources (Remotive, Arbeitnow + more Greenhouse companies)
+-- HireOrbit AI — extra job sources (Remotive, Arbeitnow + more Greenhouse companies)
 -- Idempotent: safe to re-run.
 
 insert into public.source_companies (source, slug, display_name) values

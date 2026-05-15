@@ -1,4 +1,4 @@
--- TalentBridge AI — Jobs module extras (Jobright-style features)
+-- HireOrbit AI — Jobs module extras (Jobright-style features)
 -- Idempotent: safe to re-run.
 
 -- liked_jobs: user-level bookmark of a job

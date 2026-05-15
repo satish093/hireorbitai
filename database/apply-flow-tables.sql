@@ -1,4 +1,4 @@
--- TalentBridge AI — Apply-flow tables (Jobright-style).
+-- HireOrbit AI — Apply-flow tables (Jobright-style).
 --
 -- Adds three coupled tables to complete the Apply pipeline:
 --

@@ -1,4 +1,4 @@
--- TalentBridge AI — direct messaging
+-- HireOrbit AI — direct messaging
 -- Simple 1:1 DMs. Sender + recipient are both users; read_at is set when the
 -- recipient first opens the thread.
 -- Idempotent: safe to re-run.

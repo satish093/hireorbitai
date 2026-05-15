@@ -1,4 +1,4 @@
--- TalentBridge AI — broaden JSearch ingestion so the recommended feed shows
+-- HireOrbit AI — broaden JSearch ingestion so the recommended feed shows
 -- listings from Dice / LinkedIn / Monster / CareerBuilder / Indeed / Glassdoor
 -- / ZipRecruiter. These boards do not expose free direct APIs, but JSearch
 -- (RapidAPI) is a legal aggregator over all of them. Each row below is a

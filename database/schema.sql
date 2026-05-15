@@ -1,6 +1,7 @@
--- TalentBridge AI — Database Schema
--- PostgreSQL / Supabase
--- Run inside the Supabase SQL editor or via `psql`.
+-- HireOrbit AI — Database Schema
+-- PostgreSQL (self-hosted on the VPS)
+-- Run via `psql` against the application database, e.g.
+--   psql "$DATABASE_URL" -f database/schema.sql
 
 create extension if not exists "pgcrypto";
 
@@ -37,19 +38,44 @@ exception when duplicate_object then null; end $$;
 
 -- ---------------------------------------------------------------------------
 -- USERS
--- One row per auth.users user. `id` mirrors Supabase auth.users.id.
+-- Canonical user table. Owns the password hash and the session-version
+-- counter that lets us revoke all access tokens for a user with one UPDATE.
 -- ---------------------------------------------------------------------------
 create table if not exists public.users (
-  id uuid primary key references auth.users(id) on delete cascade,
+  id uuid primary key default gen_random_uuid(),
   email text unique not null,
+  password_hash text,
   full_name text,
   phone text,
   role user_role not null default 'CONSULTANT',
   avatar_url text,
   is_active boolean not null default true,
+  session_version integer not null default 0,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+comment on column public.users.password_hash is
+  'bcrypt hash of the user''s password. Null only during the brief window between createUser and the welcome email being sent.';
+comment on column public.users.session_version is
+  'Monotonic counter bumped on global sign-out / password change. JWTs embed the version at issue time; mismatch on /auth/me forces re-login.';
+
+-- ---------------------------------------------------------------------------
+-- AUTH SESSIONS
+-- Refresh-token store. We keep bcrypt hashes (never the raw secret) so a DB
+-- leak doesn''t hand the attacker a usable refresh credential.
+-- ---------------------------------------------------------------------------
+create table if not exists public.auth_sessions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.users(id) on delete cascade,
+  refresh_hash text not null,
+  issued_at timestamptz not null default now(),
+  expires_at timestamptz not null,
+  user_agent text,
+  ip_address text
+);
+create index if not exists auth_sessions_user_id_idx on public.auth_sessions (user_id);
+create index if not exists auth_sessions_expires_idx on public.auth_sessions (expires_at);
 
 -- ---------------------------------------------------------------------------
 -- RECRUITERS
@@ -113,7 +139,7 @@ create table if not exists public.resumes (
   consultant_id uuid not null references public.consultants(id) on delete cascade,
   version int not null,
   file_name text not null,
-  storage_path text not null,           -- Supabase Storage object path
+  storage_path text not null,           -- storage object path
   mime_type text,
   size_bytes bigint,
   ai_score numeric(5,2),                -- 0-100
@@ -299,25 +325,15 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------------
--- Row Level Security (enable; refine policies per your needs)
+-- Access control
+--
+-- The backend is the single client of this database. All authorization
+-- happens in the Express layer (middleware/auth.ts + per-route guards), so
+-- we deliberately leave RLS disabled — the API enforces who can read what.
+--
+-- If you ever expose this database directly to a non-server consumer, you
+-- MUST re-enable RLS and write role-aware policies before doing so.
 -- ---------------------------------------------------------------------------
-alter table public.users enable row level security;
-alter table public.recruiters enable row level security;
-alter table public.consultants enable row level security;
-alter table public.invitations enable row level security;
-alter table public.resumes enable row level security;
-alter table public.vendors enable row level security;
-alter table public.clients enable row level security;
-alter table public.jobs enable row level security;
-alter table public.applications enable row level security;
-alter table public.interviews enable row level security;
-alter table public.reminders enable row level security;
-alter table public.recruiter_daily_activity enable row level security;
-
--- Simple "users see their own row" example; backend uses service-role key.
-drop policy if exists "users self read" on public.users;
-create policy "users self read" on public.users
-  for select using (auth.uid() = id);
 
 -- ---------------------------------------------------------------------------
 -- TASKS module (see also database/tasks.sql)

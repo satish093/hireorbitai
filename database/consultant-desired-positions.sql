@@ -1,4 +1,4 @@
--- TalentBridge AI — desired employment types for a consultant
+-- HireOrbit AI — desired employment types for a consultant
 -- Idempotent: safe to re-run.
 
 alter table public.consultants

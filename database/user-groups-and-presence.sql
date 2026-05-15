@@ -1,4 +1,4 @@
--- TalentBridge AI — three coupled features:
+-- HireOrbit AI — three coupled features:
 --   1) Online/idle/offline presence: a last_seen_at heartbeat on users.
 --   2) User groups (multi-tenant style: Cloudfen, Zangle IT, Xeronix, Okta Solutions).
 --   3) Per-group feature flag overrides so the same flag can be on for one
@@ -58,7 +58,7 @@ alter table public.user_groups       enable row level security;
 alter table public.group_feature_flags enable row level security;
 
 -- ---------------------------------------------------------------------------
--- Tell Supabase's PostgREST to reload its schema cache *now*. Without this
+-- Reload the PostgREST schema cache if you are running one in front of this database. Otherwise this NOTIFY is a no-op.
 -- the newly created tables / columns are sometimes invisible to API calls
 -- for up to a minute (and the symptom is a confusing "schema cache" error).
 -- ---------------------------------------------------------------------------

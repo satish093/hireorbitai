@@ -1,4 +1,4 @@
--- TalentBridge AI — backfill empty apply_url values to a Google-for-jobs
+-- HireOrbit AI — backfill empty apply_url values to a Google-for-jobs
 -- search so the "Apply on company site" button never opens an empty tab.
 -- Existing rows where apply_url is null/empty get a query built from title +
 -- company_name. New ingests already use the same fallback in code.

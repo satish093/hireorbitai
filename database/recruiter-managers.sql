@@ -1,4 +1,4 @@
--- TalentBridge AI — many-to-many recruiter ↔ manager / director assignment
+-- HireOrbit AI — many-to-many recruiter ↔ manager / director assignment
 -- A recruiter can now report into multiple managers / directors at once.
 -- Backfills from the existing single-manager column on recruiters.
 -- Idempotent: safe to re-run.

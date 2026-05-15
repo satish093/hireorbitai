@@ -1,4 +1,4 @@
--- TalentBridge AI — seed Monster ingestion via the "Monster Jobs API" on
+-- HireOrbit AI — seed Monster ingestion via the "Monster Jobs API" on
 -- RapidAPI. Reuses RAPIDAPI_KEY (falls back to JSEARCH_API_KEY).
 --
 -- Slug format: "<keyword>|<location>|<countryCode>"  (location + country

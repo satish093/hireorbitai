@@ -1,4 +1,4 @@
--- TalentBridge AI — extended user profile fields.
+-- HireOrbit AI — extended user profile fields.
 --
 -- Adds first/last name and address fields on the shared users table so that
 -- recruiters, managers, and directors can view full contact details for any

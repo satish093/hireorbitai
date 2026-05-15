@@ -1,4 +1,4 @@
--- TalentBridge AI — Tasks module migration
+-- HireOrbit AI — Tasks module migration
 -- Adds: tasks, task_comments, task_attachments + enums + RLS.
 -- Idempotent: safe to re-run.
 

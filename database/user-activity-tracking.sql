@@ -1,4 +1,4 @@
--- TalentBridge AI — per-user time-in-app tracking.
+-- HireOrbit AI — per-user time-in-app tracking.
 --
 -- Piggybacks on the existing presence heartbeat (auth middleware fires every
 -- 30s per active user). Each heartbeat upserts +30s into today's row. Time in

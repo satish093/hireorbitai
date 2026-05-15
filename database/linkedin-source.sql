@@ -1,4 +1,4 @@
--- TalentBridge AI — seed LinkedIn ingestion via the Fantastic Jobs
+-- HireOrbit AI — seed LinkedIn ingestion via the Fantastic Jobs
 -- "LinkedIn Job Search API" on RapidAPI. Reuses RAPIDAPI_KEY (falls back to
 -- JSEARCH_API_KEY) since they're typically the same RapidAPI account.
 --

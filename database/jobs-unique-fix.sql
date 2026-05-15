@@ -1,4 +1,4 @@
--- TalentBridge AI — fix the (source, external_id) dedupe index.
+-- HireOrbit AI — fix the (source, external_id) dedupe index.
 -- The original index used a WHERE clause (partial unique index). PostgREST's
 -- onConflict=source,external_id doesn't pass that WHERE through, so Postgres
 -- can't match it and upserts fail with:

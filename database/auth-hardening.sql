@@ -30,7 +30,7 @@ comment on column public.users.password_expires_at is
 -- (delivered in the Brevo email). We index by user_id so cleanup is cheap.
 create table if not exists public.password_reset_tokens (
   id          uuid primary key default gen_random_uuid(),
-  user_id     uuid references auth.users(id) on delete cascade,
+  user_id     uuid references public.users(id) on delete cascade,
   token_hash  text not null,
   expires_at  timestamptz not null,
   used_at     timestamptz,
@@ -87,9 +87,8 @@ begin
 end;
 $$;
 
--- --- RLS — both new tables are server-only (service-role) for now ------------
-alter table public.password_reset_tokens enable row level security;
-alter table public.auth_audit_logs        enable row level security;
--- No client-facing policies. The backend uses the service_role key which
--- bypasses RLS. If you ever want admins to read auth_audit_logs from the
--- client, add a SELECT policy keyed off public.users.role.
+-- --- Access control ----------------------------------------------------------
+-- After the migration off PostgREST, the backend owns every query against
+-- these tables. We leave RLS disabled — the API enforces who can read what.
+-- If the database is ever exposed directly to clients, re-enable RLS and add
+-- the appropriate role-based policies before doing so.

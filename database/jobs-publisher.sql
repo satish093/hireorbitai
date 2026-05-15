@@ -1,4 +1,4 @@
--- TalentBridge AI — record the publishing board (LinkedIn, Dice, Monster,
+-- HireOrbit AI — record the publishing board (LinkedIn, Dice, Monster,
 -- CareerBuilder, Indeed, Glassdoor, ZipRecruiter, …) for each job. Aggregators
 -- like JSearch surface `job_publisher` on every result; we store it so the UI
 -- can show & filter by the user-facing brand name even though all of those

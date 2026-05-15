@@ -1,4 +1,4 @@
--- TalentBridge AI — extended role hierarchy
+-- HireOrbit AI — extended role hierarchy
 -- Adds CEO / CTO / DIRECTOR to the user_role enum + a generic reports_to
 -- pointer on users so org chains beyond the recruiter→manager link are
 -- representable.

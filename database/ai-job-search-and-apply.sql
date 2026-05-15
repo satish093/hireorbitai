@@ -1,4 +1,4 @@
--- TalentBridge AI — AI Job Search and Apply module (Jobright-style).
+-- HireOrbit AI — AI Job Search and Apply module (Jobright-style).
 --
 -- Adds the schema needed for:
 --   1) AI-tailored resume versions (parent ↔ tailored linkage + metadata)

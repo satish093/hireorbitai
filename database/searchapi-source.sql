@@ -1,4 +1,4 @@
--- TalentBridge AI — seed SearchApi.io Google Jobs ingestion queries.
+-- HireOrbit AI — seed SearchApi.io Google Jobs ingestion queries.
 --
 -- SearchApi.io (https://www.searchapi.io/) hits the Google for Jobs SERP — same
 -- aggregation as Jobright/Indeed/Dice/Monster/LinkedIn — at a cheaper rate than

@@ -33,7 +33,7 @@ alter table public.users
   add column if not exists status              user_status not null default 'active',
   add column if not exists status_reason       text,
   add column if not exists status_changed_at   timestamptz,
-  add column if not exists status_changed_by   uuid references auth.users(id) on delete set null,
+  add column if not exists status_changed_by   uuid references public.users(id) on delete set null,
   add column if not exists last_login_at       timestamptz,
   add column if not exists admin_notes         text;
 
@@ -42,7 +42,7 @@ comment on column public.users.status is
 comment on column public.users.status_reason is
   'Free-text reason set by the admin when status moves away from active.';
 comment on column public.users.status_changed_by is
-  'auth.users.id of the admin who last changed the status.';
+  'public.users.id of the admin who last changed the status.';
 comment on column public.users.last_login_at is
   'Stamped on every successful sign-in by /auth/login.';
 comment on column public.users.admin_notes is
@@ -75,5 +75,5 @@ create index if not exists users_last_login_at_idx   on public.users (last_login
 --   admin_user_password_reset
 --   admin_user_deactivated     (status -> inactive/suspended/banned)
 --   admin_user_reactivated     (status -> active)
---   admin_user_deleted         (hard delete via auth.admin.deleteUser)
+--   admin_user_deleted         (hard delete via db.auth.admin.deleteUser)
 --   admin_user_impersonated    (future)

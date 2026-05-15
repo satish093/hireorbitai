@@ -1,4 +1,4 @@
--- TalentBridge AI — Feature flags
+-- HireOrbit AI — Feature flags
 -- Super admin can toggle modules on/off here. Backend exposes them on
 -- GET /api/feature-flags; the sidebar + routes read these to hide modules.
 -- Idempotent: safe to re-run.
@@ -19,7 +19,8 @@ insert into public.feature_flags (key, description, enabled) values
   ('job_ingestion',     'Live job ingestion from Greenhouse / Lever',  true),
   ('interviews',        'Interview scheduling',                        true),
   ('reminders',         'Reminders / follow-ups',                      true),
-  ('reports',           'Reports module',                              true)
+  ('reports',           'Reports module',                              true),
+  ('training',          'Training / Learning module',                  true)
 on conflict (key) do nothing;
 
 alter table public.feature_flags enable row level security;

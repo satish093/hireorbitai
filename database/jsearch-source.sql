@@ -1,4 +1,4 @@
--- TalentBridge AI — seed a JSearch (RapidAPI) ingestion source.
+-- HireOrbit AI — seed a JSearch (RapidAPI) ingestion source.
 -- JSearch indexes Indeed / LinkedIn / Glassdoor / ZipRecruiter / Monster
 -- listings legitimately. Requires JSEARCH_API_KEY in backend/.env.
 -- Idempotent: safe to re-run.

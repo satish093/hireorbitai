@@ -1,4 +1,4 @@
--- TalentBridge AI — Live job ingestion (Jobright-style)
+-- HireOrbit AI — Live job ingestion (Jobright-style)
 -- Idempotent: safe to re-run.
 
 -- Identify which source pulled the job, the original ID at that source, and
