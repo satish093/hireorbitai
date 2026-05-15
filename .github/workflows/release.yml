@@ -1,0 +1,93 @@
+name: Release
+
+# Triggers:
+#   - Manual:  Actions → Release → "Run workflow" with a version like `v0.2.0`.
+#   - Auto:    Push a tag of shape vX.Y.Z to main; this workflow attaches it
+#              to a GitHub Release with the changelog excerpt for that version.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g. v0.2.0). Must already exist or be a new tag to create.'
+        required: true
+        type: string
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write # required to push a tag and create a release
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Publish release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full history for tag + changelog)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve version
+        id: ver
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION="${GITHUB_REF_NAME}"
+          fi
+          # Strip leading "v" for any tools that want a bare semver.
+          BARE="${VERSION#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "bare=$BARE"       >> "$GITHUB_OUTPUT"
+
+      - name: Create tag (workflow_dispatch only, if absent)
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        run: |
+          if git rev-parse "refs/tags/${{ steps.ver.outputs.version }}" >/dev/null 2>&1; then
+            echo "Tag ${{ steps.ver.outputs.version }} already exists — skipping create."
+          else
+            git config user.name  "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag -a "${{ steps.ver.outputs.version }}" -m "Release ${{ steps.ver.outputs.version }}"
+            git push origin "${{ steps.ver.outputs.version }}"
+          fi
+
+      - name: Extract changelog section for this version
+        id: cl
+        shell: bash
+        run: |
+          VERSION="${{ steps.ver.outputs.bare }}"
+          # Pull just the section between "## [VERSION]" and the next "## " heading.
+          # Falls back to a generic note if the changelog hasn't been updated.
+          if grep -q "^## \[${VERSION}\]" CHANGELOG.md; then
+            awk -v v="^## \\[${VERSION}\\]" '
+              $0 ~ v { capture=1; next }
+              /^## \[/ && capture { exit }
+              capture
+            ' CHANGELOG.md > /tmp/notes.md
+          else
+            echo "Release ${{ steps.ver.outputs.version }}." > /tmp/notes.md
+            echo "" >> /tmp/notes.md
+            echo "No changelog entry for ${VERSION} — update CHANGELOG.md and re-run." >> /tmp/notes.md
+          fi
+          # Show what we'll publish for visibility in the Actions log.
+          echo "----- release notes -----"
+          cat /tmp/notes.md
+          echo "-------------------------"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.version }}
+          name: ${{ steps.ver.outputs.version }}
+          body_path: /tmp/notes.md
+          draft: false
+          prerelease: false

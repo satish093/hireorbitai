@@ -3,7 +3,7 @@
 #
 # Run as the CloudPanel site user (e.g. hireorbit). Assumes the layout from
 # DEPLOY.md:
-#   - repo lives at ~/talentbridgeai
+#   - repo lives at ~/hireorbitai
 #   - frontend webroot at /home/<user>/htdocs/hireorbitai.com
 #   - backend is run under PM2 with name "hireorbit-api"
 #

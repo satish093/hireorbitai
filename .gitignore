@@ -17,3 +17,18 @@ dist/
 # PM2 + Node 22 build artifacts
 .pm2/
 *.tsbuildinfo
+
+# Husky internals (the templates we commit live at .husky/<hook>; the
+# `.husky/_` directory is created by `husky` at install time).
+.husky/_/
+
+# Backups (local + production stamped dirs from scripts/backup.sh)
+backups/
+~backups/
+
+# IDE
+.idea/
+.vscode/
+
+# Coverage
+coverage/

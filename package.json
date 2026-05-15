@@ -1,0 +1,38 @@
+{
+  "name": "hireorbitai",
+  "version": "0.1.0",
+  "private": true,
+  "description": "HireOrbit AI monorepo — npm workspaces over backend/, frontend/, shared/.",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "workspaces": [
+    "shared",
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "prepare": "husky || true",
+    "shared:build": "npm --workspace @hireorbitai/shared run build",
+    "format": "prettier --write \"**/*.{ts,tsx,js,mjs,cjs,json,md,yml,yaml,css}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,cjs,json,md,yml,yaml,css}\"",
+    "lint": "npm --prefix backend run lint && npm --prefix frontend run lint",
+    "lint:fix": "npm --prefix backend run lint:fix && npm --prefix frontend run lint:fix",
+    "typecheck": "npm run shared:build && npm --prefix backend run typecheck && npm --prefix frontend run typecheck",
+    "build": "npm run shared:build && npm --prefix backend run build && npm --prefix frontend run build",
+    "release": "bash scripts/release.sh"
+  },
+  "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^15.2.10",
+    "prettier": "^3.3.3"
+  },
+  "lint-staged": {
+    "**/*.{ts,tsx,js,mjs,cjs}": [
+      "prettier --write"
+    ],
+    "**/*.{json,md,yml,yaml,css}": [
+      "prettier --write"
+    ]
+  }
+}

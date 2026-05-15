@@ -1,0 +1,48 @@
+# =============================================================================
+# HireOrbit AI — example cloud-init (Ubuntu 22.04).
+#
+# Paste this into the "User Data" / "cloud-init" field when provisioning a new
+# Hostinger KVM (or any cloud-init-aware host). On first boot the VM will:
+#   - update apt
+#   - create the `hireorbitai` user with your SSH key
+#   - run infrastructure/bootstrap-vps.sh
+#
+# You still need to:
+#   - install CloudPanel separately (the official installer is interactive)
+#   - clone + deploy the app as the `hireorbitai` user (see docs/deployment/cloudpanel.md)
+#
+# Replace the placeholders before pasting:
+#   <YOUR_SSH_PUBLIC_KEY>
+#   <PICK_A_POSTGRES_PASSWORD>
+#   <YOUR_GITHUB_USER_OR_ORG>
+# =============================================================================
+
+#cloud-config
+users:
+  - name: hireorbitai
+    groups: [sudo]
+    shell: /bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    ssh_authorized_keys:
+      - <YOUR_SSH_PUBLIC_KEY>
+
+package_update: true
+package_upgrade: true
+
+packages:
+  - ca-certificates
+  - curl
+  - gnupg
+  - git
+  - rsync
+  - ufw
+  - wget
+
+runcmd:
+  # Pull and run the bootstrap script. Pin to a known SHA in production rather
+  # than a moving `main` tip.
+  - |
+    curl -fsSL https://raw.githubusercontent.com/<YOUR_GITHUB_USER_OR_ORG>/hireorbitai/main/infrastructure/bootstrap-vps.sh \
+      -o /root/bootstrap-vps.sh
+    chmod +x /root/bootstrap-vps.sh
+    APP_USER=hireorbitai DB_PASSWORD='<PICK_A_POSTGRES_PASSWORD>' /root/bootstrap-vps.sh

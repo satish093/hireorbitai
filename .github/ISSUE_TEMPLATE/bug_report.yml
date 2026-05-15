@@ -1,0 +1,54 @@
+name: Bug report
+description: Something is broken or behaving unexpectedly
+labels: [bug, triage]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Clear description of the bug. Include error messages verbatim.
+      placeholder: When I click X on /jobs, the page shows a blank screen and the console logs ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Sign in as RECRUITER
+        2. Navigate to /applications
+        3. Click "Add" — page errors
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Where does it happen?
+      options:
+        - Frontend (browser)
+        - Backend (API)
+        - Both
+        - Database / migrations
+        - Email / Brevo
+        - Auth / login flow
+        - Deployment / infra
+    validations:
+      required: true
+  - type: input
+    id: env
+    attributes:
+      label: Environment
+      description: prod, staging, local — and browser/OS if frontend
+      placeholder: prod, Chrome 130, macOS
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / screenshots
+      description: Backend pino logs, browser console, network tab, or screenshots. Redact tokens.
+      render: shell

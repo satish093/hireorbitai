@@ -1,0 +1,27 @@
+#!/usr/bin/env sh
+# Run prettier across all staged files, plus a quick TS typecheck on whichever
+# halves have staged changes. Falls back gracefully on a fresh clone where
+# node_modules isn't installed yet (the hook bails non-fatally).
+
+# Format staged files.
+if [ -x "node_modules/.bin/lint-staged" ]; then
+  node_modules/.bin/lint-staged || exit 1
+else
+  echo "  (skipping lint-staged — root node_modules missing; run \`npm install\`)"
+fi
+
+# Typecheck only the half with staged TS changes. Avoids running both halves
+# every commit when you only touched one.
+staged="$(git diff --cached --name-only --diff-filter=ACMR)"
+if echo "$staged" | grep -q '^backend/.*\.tsx\?$'; then
+  if [ -x "backend/node_modules/.bin/tsc" ]; then
+    echo "  → backend typecheck"
+    (cd backend && node_modules/.bin/tsc --noEmit) || exit 1
+  fi
+fi
+if echo "$staged" | grep -q '^frontend/.*\.tsx\?$'; then
+  if [ -x "frontend/node_modules/.bin/tsc" ]; then
+    echo "  → frontend typecheck"
+    (cd frontend && node_modules/.bin/tsc --noEmit) || exit 1
+  fi
+fi
