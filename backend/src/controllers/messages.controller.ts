@@ -13,7 +13,9 @@ function partySelect(): string {
   return partyCols;
 }
 function msgSelect(): string {
-  return '*, sender:sender_id(' + partyCols + '), recipient:recipient_id(' + partyCols + ')';
+  return (
+    '*, sender:users!sender_id(' + partyCols + '), recipient:users!recipient_id(' + partyCols + ')'
+  );
 }
 function isSchemaError(err: { message?: string } | null | undefined): boolean {
   if (!err?.message) return false;

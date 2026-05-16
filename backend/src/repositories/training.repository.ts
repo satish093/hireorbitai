@@ -6,7 +6,8 @@
  * mocked without rewriting business logic.
  */
 
-const COURSE_SELECT = '*, lessons:training_lessons(count), assignments:training_assignments(count)';
+const COURSE_SELECT =
+  '*, lessons:training_lessons!course_id(count), assignments:training_assignments!course_id(count)';
 const LESSON_SELECT = '*';
 const ASSIGNMENT_SELECT =
   '*, course:training_courses(id, title, category, thumbnail_url, difficulty, estimated_duration_hours),' +
@@ -27,7 +28,7 @@ export const courses = {
   async get(id: string) {
     return db
       .from('training_courses')
-      .select('*, lessons:training_lessons(*), quizzes:training_quizzes(*)')
+      .select('*, lessons:training_lessons!course_id(*), quizzes:training_quizzes!course_id(*)')
       .eq('id', id)
       .single();
   },

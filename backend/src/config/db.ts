@@ -208,13 +208,27 @@ function renderOr(orString: string, a: Args): string {
 }
 
 // ---------------------------------------------------------------------------
-// Select-clause parsing for embedded FK joins ("*, vendor:vendors(*)").
+// Select-clause parsing for embedded FK joins.
+//
+// Supports:
+//   - To-one with explicit FK:   user:users!user_id(id, email)
+//   - To-one inferred FK:        vendor:vendors(*)   → parent.vendor_id = vendors.id
+//   - To-many (plural alias):    managers:recruiter_managers(...)   → child.recruiter_id = parent.id
+//   - Nested embeds:             consultant:consultants!related_consultant_id ( id, user:users!user_id ( full_name ) )
+//   - Count aggregator:          lessons:training_lessons(count)
+//   - Whitespace anywhere:       "x : table ! fk ( id , y )"
+//
+// Cardinality heuristic when no explicit FK is given:
+//   - alias ends with 's'  → to-many (child.<singular(parent)>_id = parent.id)
+//   - alias does not end in 's' → to-one (parent.<singular(table)>_id = child.id)
+// This matches every embed usage in the codebase (vendor:vendors = to-one,
+// managers:recruiter_managers = to-many, etc.).
 // ---------------------------------------------------------------------------
 interface EmbedSpec {
   alias: string; // result key on parent row
   table: string; // child table
   fkColumn?: string; // explicit FK like users!user_id (parent column name)
-  fields: string; // child field list ("*" or "id,full_name")
+  fields: string; // child field list, raw — recursively parsed during SQL build
 }
 
 interface ParsedSelect {
@@ -223,30 +237,36 @@ interface ParsedSelect {
   embeds: EmbedSpec[];
 }
 
-function parseSelect(input: string): ParsedSelect {
-  if (!input || input.trim() === '') return { parentCols: '*', embeds: [] };
-  // Tokenize at top-level commas (commas inside parens belong to embeds).
-  const tokens: string[] = [];
+function splitTopLevelCommas(s: string): string[] {
+  const out: string[] = [];
   let depth = 0;
   let buf = '';
-  for (const ch of input) {
+  for (const ch of s) {
     if (ch === '(') depth++;
     if (ch === ')') depth--;
     if (ch === ',' && depth === 0) {
-      tokens.push(buf.trim());
+      out.push(buf.trim());
       buf = '';
     } else {
       buf += ch;
     }
   }
-  if (buf.trim()) tokens.push(buf.trim());
+  if (buf.trim()) out.push(buf.trim());
+  return out;
+}
 
+// Whitespace-tolerant: allows spaces around `:`, `!`, `(`, `)`.
+const EMBED_RE =
+  /^(?:([a-zA-Z_][a-zA-Z0-9_]*)\s*:\s*)?([a-zA-Z_][a-zA-Z0-9_]*)(?:\s*!\s*([a-zA-Z_][a-zA-Z0-9_]*))?\s*\(([\s\S]*)\)\s*$/;
+
+function parseSelect(input: string): ParsedSelect {
+  if (!input || input.trim() === '') return { parentCols: '*', embeds: [] };
+
+  const tokens = splitTopLevelCommas(input);
   const parentCols: string[] = [];
   const embeds: EmbedSpec[] = [];
   for (const t of tokens) {
-    const m = t.match(
-      /^(?:([a-zA-Z_][a-zA-Z0-9_]*):)?([a-zA-Z_][a-zA-Z0-9_]*)(?:!([a-zA-Z_][a-zA-Z0-9_]*))?\((.*)\)$/s,
-    );
+    const m = t.match(EMBED_RE);
     if (m) {
       embeds.push({
         alias: m[1] ?? m[2]!,
@@ -267,35 +287,65 @@ function parseSelect(input: string): ParsedSelect {
   };
 }
 
-// Build a LATERAL subquery for an embed, returning either a single object
-// (when fkColumn references parent) or an array.
-//
-// Strategy:
-//   - If `fkColumn` is provided (e.g. "user:users!user_id"), treat as a
-//     to-one relationship: parent.<fkColumn> = child.id. Result is a single
-//     object or null.
-//   - Otherwise, infer by table name: try `child.<parent_singular>_id =
-//     parent.id` (to-many) OR `parent.<child_singular>_id = child.id`
-//     (to-one). We can't introspect at runtime, so we go to-one by default
-//     (parent.<table_singular>_id = child.id), which matches every usage in
-//     this codebase. If you need to-many, write the SQL by hand.
+// Build a correlated subquery for an embed. Recurses for nested embeds.
 function buildEmbedSubquery(parentTable: string, e: EmbedSpec, a: Args): string {
-  const fk = e.fkColumn ?? `${singularize(e.table)}_id`;
-  const childPK = 'id';
-  const fields =
-    e.fields === '*'
-      ? `${qi(e.table)}.*`
-      : e.fields
-          .split(',')
-          .map((c) => `${qi(e.table)}.${qi(c.trim())}`)
-          .join(', ');
+  // PostgREST `(count)` aggregator: return COUNT(*) of related rows.
+  if (e.fields.trim().toLowerCase() === 'count') {
+    return buildCountEmbed(parentTable, e);
+  }
+
+  // Cardinality: explicit FK = to-one; plural alias = to-many; else to-one.
+  const isToMany = !e.fkColumn && e.alias.endsWith('s');
+
+  // Recursively parse the inner field list so nested embeds get their own
+  // correlated subquery rendered as a child column.
+  const sub = parseSelect(e.fields);
+  const childCols: string[] = [];
+  if (sub.parentCols === '*') {
+    childCols.push(`${qi(e.table)}.*`);
+  } else {
+    // Re-prefix parent cols (which parseSelect quoted but didn't qualify) with
+    // the embed's table name. Easiest path: re-tokenize the raw fields and
+    // skip anything that contains embed-syntax characters.
+    const rawCols = splitTopLevelCommas(e.fields).filter((tok) => !/[():!]/.test(tok));
+    for (const c of rawCols) {
+      const name = c.trim();
+      childCols.push(name === '*' ? `${qi(e.table)}.*` : `${qi(e.table)}.${qi(name)}`);
+    }
+  }
+  for (const nested of sub.embeds) {
+    childCols.push(buildEmbedSubquery(e.table, nested, a));
+  }
+
+  if (isToMany) {
+    // For to-many, fkColumn is the column ON THE CHILD that references the
+    // parent. If not given, fall back to `<singular(parent)>_id`.
+    const childFK = e.fkColumn ?? `${singularize(parentTable)}_id`;
+    return `(
+      SELECT COALESCE(json_agg(emb), '[]'::json) FROM (
+        SELECT ${childCols.join(', ')}
+        FROM ${qi(e.table)}
+        WHERE ${qi(e.table)}.${qi(childFK)} = ${qi(parentTable)}.${qi('id')}
+      ) AS emb
+    ) AS ${qi(e.alias)}`;
+  }
+  const parentFK = e.fkColumn ?? `${singularize(e.table)}_id`;
   return `(
     SELECT row_to_json(emb) FROM (
-      SELECT ${fields}
+      SELECT ${childCols.join(', ')}
       FROM ${qi(e.table)}
-      WHERE ${qi(e.table)}.${qi(childPK)} = ${qi(parentTable)}.${qi(fk)}
+      WHERE ${qi(e.table)}.${qi('id')} = ${qi(parentTable)}.${qi(parentFK)}
       LIMIT 1
     ) AS emb
+  ) AS ${qi(e.alias)}`;
+}
+
+function buildCountEmbed(parentTable: string, e: EmbedSpec): string {
+  const childFK = e.fkColumn ?? `${singularize(parentTable)}_id`;
+  return `(
+    SELECT COUNT(*)::int
+    FROM ${qi(e.table)}
+    WHERE ${qi(e.table)}.${qi(childFK)} = ${qi(parentTable)}.${qi('id')}
   ) AS ${qi(e.alias)}`;
 }
 

@@ -14,10 +14,9 @@ import { logger } from '../config/logger';
 
 interface ReminderRow {
   id: string;
-  user_id: string | null;
-  email: string | null;
-  subject: string;
-  body: string;
+  owner_id: string;
+  title: string;
+  description: string | null;
   due_at: string;
   status: 'PENDING' | 'SENT' | 'DONE' | 'SNOOZED';
 }
@@ -30,7 +29,7 @@ export const remindersJob = {
     // Pull a bounded batch — never drain unbounded queues in one tick.
     const { data, error } = await db
       .from('reminders')
-      .select('id, user_id, email, subject, body, due_at, status')
+      .select('id, owner_id, title, description, due_at, status')
       .eq('status', 'PENDING')
       .lte('due_at', new Date().toISOString())
       .order('due_at', { ascending: true })
