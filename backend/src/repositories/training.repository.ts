@@ -10,7 +10,7 @@ const COURSE_SELECT =
   '*, lessons:training_lessons!course_id(count), assignments:training_assignments!course_id(count)';
 const LESSON_SELECT = '*';
 const ASSIGNMENT_SELECT =
-  '*, course:training_courses(id, title, category, thumbnail_url, difficulty, estimated_duration_hours),' +
+  '*, course:training_courses!course_id(id, title, category, thumbnail_url, difficulty, estimated_duration_hours),' +
   ' assignee:users!assigned_to_user_id(id, full_name, email, role, avatar_url),' +
   ' assigner:users!assigned_by_user_id(id, full_name, email)';
 

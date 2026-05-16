@@ -351,8 +351,14 @@ function buildCountEmbed(parentTable: string, e: EmbedSpec): string {
 
 function singularize(t: string): string {
   // Naive English singularization. Good enough for our table names.
+  //   companies → company       (ies → y)
+  //   classes   → class         (sses → ss)
+  //   matches   → match         (ches → ch)
+  //   boxes     → box           (xes  → x)
+  //   courses   → course        (s    → ∅)   ← do NOT strip "es" here
+  //   users     → user          (s    → ∅)
   if (t.endsWith('ies')) return t.slice(0, -3) + 'y';
-  if (t.endsWith('ses')) return t.slice(0, -2);
+  if (/(ss|sh|ch|x)es$/.test(t)) return t.slice(0, -2);
   if (t.endsWith('s')) return t.slice(0, -1);
   return t;
 }
