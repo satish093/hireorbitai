@@ -55,11 +55,7 @@ const groups = [
   },
   {
     name: 'Applications + interview pipeline',
-    files: [
-      'apply-flow-tables.sql',
-      'applications-archived-status.sql',
-      'ai-job-search-and-apply.sql',
-    ],
+    files: ['apply-flow-tables.sql', 'applications-archived-status.sql'],
   },
   {
     name: 'Tasks',
@@ -84,6 +80,7 @@ const groups = [
       'monster-source.sql',
       'searchapi-source.sql',
       'all-sources-seed.sql',
+      'ai-job-search-and-apply.sql',
     ],
   },
   {
