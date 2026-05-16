@@ -1,0 +1,84 @@
+name: Deploy to production
+
+# Push-to-deploy. Every commit on `main` SSHes into the production VPS and runs
+# `scripts/update.sh`, which:
+#   1. git fetch + git pull --ff-only
+#   2. npm install + build (only if relevant files changed)
+#   3. pm2 restart hireorbit-api --update-env
+#   4. rsync the new frontend bundle to the CloudPanel webroot
+#   5. curl /api/healthz to confirm the process came back up
+#
+# Aborts non-zero on the first failure — a broken deploy never silently takes
+# production offline. Can also be triggered manually from the Actions UI via
+# "Run workflow".
+#
+# Required repo secrets (Settings → Secrets and variables → Actions):
+#   DEPLOY_HOST     — VPS IP or hostname
+#   DEPLOY_USER     — SSH username (typically `hireorbitai`)
+#   DEPLOY_PORT     — SSH port (typically 22)
+#   DEPLOY_SSH_KEY  — private key, full contents incl. BEGIN/END markers
+#
+# Tracked via a GitHub Deployment with environment `production`, so the
+# Deployments tab on the repo shows a history with success/failure status.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {} # manual trigger button in the Actions UI
+
+# Never run two deploys at the same time. If a second push arrives while the
+# first is still running, the second is queued and runs after — never
+# cancelled, never parallelised. Keeps update.sh from racing itself.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Push to VPS + run update.sh
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://hireorbitai.com
+
+    steps:
+      - name: Verify secrets are configured
+        run: |
+          for var in DEPLOY_HOST DEPLOY_USER DEPLOY_PORT DEPLOY_SSH_KEY; do
+            if [ -z "${!var}" ]; then
+              echo "::error::Missing required secret: $var"
+              echo "Configure it at Settings → Secrets and variables → Actions."
+              exit 1
+            fi
+          done
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT }}
+          # 10 minute deploy cap. Real deploys are 30-90s; 10min is the timeout
+          # for "something is genuinely wrong" rather than "this is slow".
+          command_timeout: 10m
+          script_stop: true
+          script: |
+            set -euo pipefail
+            cd ~/hireorbitai
+            echo "→ deploying commit ${{ github.sha }} (triggered by ${{ github.actor }})"
+            bash scripts/update.sh
+
+      - name: Post-deploy smoke test
+        # Independent verification from the GitHub runner, not the VPS — proves
+        # the public URL is healthy, not just the loopback.
+        run: |
+          set -e
+          curl -fsS https://hireorbitai.com/api/healthz | tee /tmp/healthz.json
+          # Optional: check that .ok === true in the response body
+          grep -q '"ok":true' /tmp/healthz.json || { echo "::error::healthz did not report ok=true"; exit 1; }

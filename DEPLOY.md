@@ -2,14 +2,15 @@
 
 This file is a pointer. The canonical deployment guides live under [`docs/deployment/`](docs/deployment/).
 
-| Where you want to go                                            | Read                                                             |
-| --------------------------------------------------------------- | ---------------------------------------------------------------- |
-| Run the app on your laptop                                      | [`docs/deployment/local.md`](docs/deployment/local.md)           |
-| First-time production setup on a Hostinger VPS + CloudPanel     | [`docs/deployment/cloudpanel.md`](docs/deployment/cloudpanel.md) |
-| Day-2 operations: deploys, backups, restore, incident playbooks | [`docs/deployment/production.md`](docs/deployment/production.md) |
-| System design overview                                          | [`docs/architecture.md`](docs/architecture.md)                   |
-| API contract (status codes, rate limits, signed URLs)           | [`docs/api-conventions.md`](docs/api-conventions.md)             |
-| Branch model + release flow                                     | [`docs/branching.md`](docs/branching.md)                         |
+| Where you want to go                                            | Read                                                               |
+| --------------------------------------------------------------- | ------------------------------------------------------------------ |
+| Run the app on your laptop                                      | [`docs/deployment/local.md`](docs/deployment/local.md)             |
+| First-time production setup on a Hostinger VPS + CloudPanel     | [`docs/deployment/cloudpanel.md`](docs/deployment/cloudpanel.md)   |
+| Day-2 operations: deploys, backups, restore, incident playbooks | [`docs/deployment/production.md`](docs/deployment/production.md)   |
+| Push-to-deploy (auto-deploy on `git push`)                      | [`docs/deployment/auto-deploy.md`](docs/deployment/auto-deploy.md) |
+| System design overview                                          | [`docs/architecture.md`](docs/architecture.md)                     |
+| API contract (status codes, rate limits, signed URLs)           | [`docs/api-conventions.md`](docs/api-conventions.md)               |
+| Branch model + release flow                                     | [`docs/branching.md`](docs/branching.md)                           |
 
 ## Quick links by audience
 

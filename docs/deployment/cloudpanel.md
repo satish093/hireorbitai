@@ -378,6 +378,7 @@ The in-process job scheduler is leader-elected — only the worker with `NODE_AP
 
 ## 10. What's next
 
+- Push-to-deploy (auto-deploy on every `git push` to `main`) → [auto-deploy.md](auto-deploy.md)
 - Day-2 operations: deploys, backups, restore, incident playbooks → [production.md](production.md)
 - System design: layered architecture, query builder, auth flow → [../architecture.md](../architecture.md)
 - API contract: endpoint shapes, status codes, rate-limit tiers → [../api-conventions.md](../api-conventions.md)

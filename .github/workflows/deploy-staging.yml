@@ -1,0 +1,53 @@
+name: Deploy to staging
+
+# Optional companion to deploy-production.yml. Identical shape, different
+# secrets, different branch. Enable by adding the STAGING_* secrets at
+# Settings → Secrets and variables → Actions.
+#
+# If you don't run a staging VPS, this workflow is dormant — pushes to `dev`
+# fail the "verify secrets" step and the action exits cleanly without
+# touching anything.
+
+on:
+  push:
+    branches: [dev]
+  workflow_dispatch: {}
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Push to staging VPS
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+      url: https://staging.hireorbitai.com
+    steps:
+      - name: Skip if staging secrets not configured
+        id: gate
+        run: |
+          if [ -z "${{ secrets.STAGING_HOST }}" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::STAGING_HOST not set — skipping staging deploy (no staging VPS configured)"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Deploy via SSH
+        if: steps.gate.outputs.skip != 'true'
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          port: ${{ secrets.STAGING_PORT }}
+          command_timeout: 10m
+          script_stop: true
+          script: |
+            set -euo pipefail
+            cd ~/hireorbitai
+            git fetch --tags --prune
+            git checkout dev
+            bash scripts/update.sh
