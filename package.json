@@ -20,7 +20,8 @@
     "lint:fix": "npm --prefix backend run lint:fix && npm --prefix frontend run lint:fix",
     "typecheck": "npm run shared:build && npm --prefix backend run typecheck && npm --prefix frontend run typecheck",
     "build": "npm run shared:build && npm --prefix backend run build && npm --prefix frontend run build",
-    "release": "bash scripts/release.sh"
+    "release": "bash scripts/release.sh",
+    "db:build-init": "node scripts/build-init-sql.mjs"
   },
   "devDependencies": {
     "husky": "^9.1.7",

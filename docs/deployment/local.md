@@ -90,6 +90,16 @@ createdb hireorbitai
 psql -d hireorbitai -c 'CREATE EXTENSION IF NOT EXISTS pgcrypto'
 export DATABASE_URL='postgres://localhost/hireorbitai'
 
+# One file does the whole schema (recommended):
+psql "$DATABASE_URL" -f database/init.sql
+```
+
+`database/init.sql` is the consolidated baseline — every per-feature SQL file concatenated in dependency order. Idempotent; safe to re-run. Regenerate after editing any individual source file with `npm run db:build-init`.
+
+<details>
+<summary>Or apply individual files (advanced)</summary>
+
+```bash
 # Baseline (order matters):
 psql "$DATABASE_URL" -f database/schema.sql
 psql "$DATABASE_URL" -f database/auth-hardening.sql
@@ -101,6 +111,8 @@ for f in database/{tasks,messages,training,user-groups-and-presence,user-activit
   [ -f "$f" ] && psql "$DATABASE_URL" -f "$f"
 done
 ```
+
+</details>
 
 ### 3. Install + build the workspace
 

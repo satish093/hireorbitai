@@ -172,6 +172,20 @@ cd ~/hireorbitai
 ```bash
 export DATABASE_URL='postgres://hireorbitai:<password-you-set>@127.0.0.1:5432/hireorbitai'
 
+# One file does the whole baseline (recommended for fresh installs):
+psql "$DATABASE_URL" -f database/init.sql
+
+# Future schema changes use the migration runner (see backend/migrations/README.md):
+cd backend && npm run migrate:up
+cd ..
+```
+
+`database/init.sql` is the consolidated baseline — every per-feature SQL file concatenated in dependency order. Idempotent and safe to re-run. To regenerate after editing any individual source file, run `npm run db:build-init` from the repo root.
+
+<details>
+<summary>Or apply individual files (advanced / partial installs)</summary>
+
+```bash
 # Baseline (order matters):
 psql "$DATABASE_URL" -f database/schema.sql
 psql "$DATABASE_URL" -f database/auth-hardening.sql
@@ -182,11 +196,9 @@ psql "$DATABASE_URL" -f database/feature-flags.sql
 for f in database/{tasks,messages,training,user-groups-and-presence,user-activity-tracking}.sql; do
   [ -f "$f" ] && psql "$DATABASE_URL" -f "$f"
 done
-
-# Future schema changes use the migration runner (see backend/migrations/README.md):
-cd backend && npm run migrate:up
-cd ..
 ```
+
+</details>
 
 ### 4.2 Configure backend environment
 
