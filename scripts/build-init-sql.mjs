@@ -87,9 +87,9 @@ const groups = [
     name: 'Training / LMS module',
     files: [
       'training.sql',
+      'training-i983.sql',
       'training-content.sql',
       'training-ai-data.sql',
-      'training-i983.sql',
       'training-cybersecurity.sql',
       'training-security.sql',
     ],
