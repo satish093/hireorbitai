@@ -18,7 +18,9 @@
     "bootstrap:admin": "node --env-file=.env scripts/bootstrap-admin.mjs",
     "migrate:up": "node --env-file=.env scripts/migrate.mjs up --migrations-dir migrations --migration-file-language sql",
     "migrate:down": "node --env-file=.env scripts/migrate.mjs down --migrations-dir migrations --migration-file-language sql --count 1",
-    "migrate:create": "node --env-file=.env scripts/migrate.mjs create --migrations-dir migrations --migration-file-language sql"
+    "migrate:create": "node --env-file=.env scripts/migrate.mjs create --migrations-dir migrations --migration-file-language sql",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.95.1",
@@ -56,6 +58,7 @@
     "node-pg-migrate": "^7.6.1",
     "pino-pretty": "^11.3.0",
     "tsx": "^4.19.1",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.8"
   }
 }

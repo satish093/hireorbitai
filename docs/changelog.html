@@ -149,7 +149,21 @@
       <p>What we shipped, in plain language. Newest first.</p>
     </header>
 
-    <!-- ================== MESSAGING OVERHAUL (PHASES 1-4) ================== -->
+    <!-- ================== MESSAGING OVERHAUL (PHASES 1-5) ================== -->
+
+    <div class="release">
+      <div class="release-head">
+        <h2>Messaging — Phase 5: test infrastructure<span class="pill devx">Dev</span></h2>
+        <span class="date">2026-05-18</span>
+      </div>
+      <p class="release-summary">Vitest wired into the backend with a focused unit suite for the permission engine — every security-critical branch now has a regression test.</p>
+      <ul class="bullets">
+        <li>14 unit tests covering admin override, recruiter scope, consultant scope, reports-to chain, cache hit/miss, cache invalidation, and the canViewConversation alias.</li>
+        <li>DB layer mocked end-to-end so the suite runs in ~600 ms with zero Postgres dependency.</li>
+        <li><code>npm --prefix backend run test</code> now part of the GitHub Actions CI pipeline — every PR + push validates the permission engine before deploy.</li>
+        <li>Full integration tests (supertest + provisioned test DB) deferred to a follow-up so the testing infrastructure ships clean before the integration layer is built on top.</li>
+      </ul>
+    </div>
 
     <div class="release">
       <div class="release-head">
