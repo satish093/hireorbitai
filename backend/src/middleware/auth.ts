@@ -49,17 +49,15 @@ async function bumpActivity(userId: string, isoDate: string, addSeconds: number)
       .eq('activity_date', isoDate)
       .maybeSingle();
     const next = (data?.active_seconds ?? 0) + addSeconds;
-    await db
-      .from('user_activity_daily')
-      .upsert(
-        {
-          user_id: userId,
-          activity_date: isoDate,
-          active_seconds: next,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: 'user_id,activity_date' },
-      );
+    await db.from('user_activity_daily').upsert(
+      {
+        user_id: userId,
+        activity_date: isoDate,
+        active_seconds: next,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'user_id,activity_date' },
+    );
   } catch {
     /* table missing → migration pending */
   }
@@ -71,7 +69,14 @@ async function bumpActivity(userId: string, isoDate: string, addSeconds: number)
  */
 export const requireAuth: RequestHandler = async (req, _res, next) => {
   const header = req.headers.authorization ?? '';
-  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+  // Browser EventSource and <img> tags cannot set custom headers, so we
+  // also accept ?token=<jwt> on the query string. Same JWT validation,
+  // same revocation path; the only difference is the carrier. HTTPS
+  // protects the token in transit, and the JWT itself is short-lived
+  // (1h TTL by default).
+  const token =
+    (header.startsWith('Bearer ') ? header.slice(7) : null) ??
+    (typeof req.query.token === 'string' ? req.query.token : null);
   if (!token) throw httpError(401, 'Missing bearer token');
 
   const { data, error } = await db.auth.getUser(token);

@@ -8,6 +8,7 @@ import {
   getAccessibleUserIds,
 } from '../services/permission.service';
 import { audit } from '../services/audit.service';
+import { publishToUser } from '../services/realtime.service';
 
 // Build the SELECT lazily so we can downgrade to a legacy column set the first
 // time we see "column doesn't exist" — that way the endpoints work both before
@@ -297,6 +298,11 @@ export const send: RequestHandler = async (req, res) => {
       .single());
   }
   if (error) throw httpError(500, error.message);
+  // Fan out to both ends. Recipient gets the message:new event for inbox /
+  // active-thread updates; sender gets it too so a second tab on the
+  // sender's side mirrors the new message without a poll cycle.
+  void publishToUser(parsed.data.recipient_id, 'message:new', data);
+  void publishToUser(req.user.id, 'message:new', data);
   res.status(201).json(data);
 };
 
@@ -328,6 +334,11 @@ export const remove: RequestHandler = async (req, res) => {
     // All three should look identical to a caller to avoid an oracle.
     throw httpError(404, 'Message not found');
   }
+  // Fan out the delete event to both parties so the message disappears
+  // from every open tab instantly — no 60s poll wait.
+  const u = updated as { id: string; sender_id: string; recipient_id: string };
+  void publishToUser(u.recipient_id, 'message:deleted', { id: u.id });
+  void publishToUser(u.sender_id, 'message:deleted', { id: u.id });
   res.json({ ok: true });
 };
 
@@ -351,5 +362,9 @@ export const edit: RequestHandler = async (req, res) => {
     .maybeSingle();
   if (error) throw httpError(500, error.message);
   if (!data) throw httpError(404, 'Message not found');
+  // Push the edited body to both ends so live tabs reflect the update.
+  const m = data as { recipient_id: string; sender_id: string };
+  void publishToUser(m.recipient_id, 'message:edited', data);
+  void publishToUser(m.sender_id, 'message:edited', data);
   res.json(data);
 };

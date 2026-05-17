@@ -149,7 +149,23 @@
       <p>What we shipped, in plain language. Newest first.</p>
     </header>
 
-    <!-- ================== MESSAGING OVERHAUL (PHASES 1-5) ================== -->
+    <!-- ================== MESSAGING OVERHAUL (PHASES 1-6) ================== -->
+
+    <div class="release">
+      <div class="release-head">
+        <h2>Realtime messaging — Phase 6<span class="pill new">New</span></h2>
+        <span class="date">2026-05-18</span>
+      </div>
+      <p class="release-summary">Messages now appear instantly across every open tab — no more 8-second polling wait. The same channel will power notifications, presence, and live task updates without further plumbing.</p>
+      <ul class="bullets">
+        <li>New persistent push channel: every signed-in browser keeps one Server-Sent Events stream open against the API. New messages, edits, and deletes arrive within ~50 ms instead of every 8 s.</li>
+        <li>Cross-server delivery via Postgres LISTEN/NOTIFY — no Redis, no new dependency. Each backend worker listens on its own connection; Postgres broadcasts to all workers so the recipient always gets the push regardless of which worker the sender hit.</li>
+        <li>Reusable infrastructure: the same <code>publishToUser(userId, event, payload)</code> helper will power future notifications, presence indicators, typing dots, and any other "the server needs to tell the browser something" feature without new endpoints.</li>
+        <li>Graceful fallback: if the stream drops mid-session, the existing 60-second sidebar poller catches anything missed during the gap. Auto-reconnect with exponential backoff (1s → 30s cap) handles network blips automatically.</li>
+        <li>Heartbeat every 25 s keeps proxies / load balancers from killing idle connections.</li>
+        <li>One operations note: the production Nginx vhost needs <code>proxy_buffering off</code> for the <code>/api/realtime/stream</code> location so SSE chunks flush as they're sent. Without it, events would batch into multi-second clumps.</li>
+      </ul>
+    </div>
 
     <div class="release">
       <div class="release-head">

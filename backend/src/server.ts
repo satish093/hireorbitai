@@ -13,6 +13,7 @@ import { env } from './config/env';
 import { logger } from './config/logger';
 import { ensureDefaultAdmin } from './config/bootstrap';
 import { jobs } from './jobs';
+import { startRealtime, stopRealtime } from './services/realtime.service';
 import { router } from './routes';
 import { errorHandler } from './middleware/errorHandler';
 
@@ -316,6 +317,14 @@ const server = app.listen(env.port, () => {
   if (env.nodeEnv !== 'test' && process.env.DISABLE_JOBS !== 'true') {
     jobs.start();
   }
+  // Boot the realtime LISTEN client. Best-effort: if it fails, the app
+  // still works (frontends fall back to polling). Reconnect logic inside
+  // the service keeps trying.
+  if (env.nodeEnv !== 'test' && process.env.DISABLE_REALTIME !== 'true') {
+    startRealtime().catch((err) =>
+      logger.error({ err }, 'realtime: initial connect failed, will retry'),
+    );
+  }
 });
 
 // Tolerate slow clients but cap header send time. Nginx in front has its own
@@ -337,6 +346,9 @@ function shutdown(signal: NodeJS.Signals) {
   // Stop the scheduler first so an in-flight job tick doesn't get killed
   // mid-write by a hard process.exit. Best-effort — capped at 5s inside.
   void jobs.stop();
+  // Close the realtime LISTEN client so we don't dangle the dedicated PG
+  // connection across the restart.
+  void stopRealtime();
   server.close((err) => {
     clearTimeout(forceClose);
     if (err) {

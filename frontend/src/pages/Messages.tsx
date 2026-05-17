@@ -6,6 +6,7 @@ import { PresenceDot, PresencePill } from '../components/PresenceDot';
 import { GroupBadge } from '../components/GroupBadge';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useRealtime } from '../hooks/useRealtime';
 import { Role, ROLE_LABEL } from '../types';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
@@ -203,6 +204,41 @@ export function Messages() {
       if (timer) clearTimeout(timer);
     };
   }, [refresh]);
+
+  // Realtime push channel — server pushes message:new / message:edited /
+  // message:deleted events as soon as they happen, so the active thread
+  // updates with <100ms latency instead of waiting for the 8s polling
+  // tick. The polling stays as a fallback for the case where the SSE
+  // connection drops mid-session.
+  useRealtime({
+    'message:new': (raw) => {
+      const m = raw as Message;
+      // Active-thread merge — only if this message belongs to the open
+      // conversation. Skip if we already have it (an optimistic local
+      // insert from our own send call may have beaten the push).
+      if (
+        activePeerId &&
+        ((m.sender_id === activePeerId && m.recipient_id === profile?.id) ||
+          (m.recipient_id === activePeerId && m.sender_id === profile?.id))
+      ) {
+        setMessages((arr) => (arr.some((x) => x.id === m.id) ? arr : [...arr, m]));
+        stickToBottomRef.current = true;
+      }
+      // Refresh the sidebar so the conversation list reorders + the
+      // unread count bumps. The refresh is debounced naturally by the
+      // 60s poller already in place; one extra fetch here is cheap.
+      void refresh();
+    },
+    'message:edited': (raw) => {
+      const m = raw as Message;
+      setMessages((arr) => arr.map((x) => (x.id === m.id ? m : x)));
+    },
+    'message:deleted': (raw) => {
+      const { id } = raw as { id: string };
+      setMessages((arr) => arr.filter((x) => x.id !== id));
+      void refresh();
+    },
+  });
 
   // Auto-scroll only when the user is already near the bottom.
   useEffect(() => {

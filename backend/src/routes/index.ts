@@ -17,6 +17,7 @@ import { reportsRouter } from './reports.routes';
 import { aiRouter } from './ai.routes';
 import { tasksRouter } from './tasks.routes';
 import { messagesRouter } from './messages.routes';
+import { realtimeRouter } from './realtime.routes';
 import { featureFlagsRouter } from './featureFlags.routes';
 import * as featureFlagsCtl from '../controllers/featureFlags.controller';
 import { userGroupsRouter } from './userGroups.routes';
@@ -85,3 +86,9 @@ router.use('/ai', requireFeature('ai_email'), aiRouter);
 router.use('/tasks', requireFeature('tasks'), tasksRouter);
 router.use('/messages', requireFeature('messages'), messagesRouter);
 router.use('/training', requireFeature('training'), trainingRouter);
+
+// Realtime SSE stream — generic push channel used by messages,
+// notifications, and any future feature that wants to push to a logged-in
+// user without polling. Not behind a feature flag: the stream is the
+// transport, individual features still gate their own events.
+router.use('/realtime', realtimeRouter);
