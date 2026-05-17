@@ -85,6 +85,7 @@ const groups = [
       'searchapi-source.sql',
       'all-sources-seed.sql',
       'ai-job-search-and-apply.sql',
+      'source-companies-self-heal.sql',
     ],
   },
   {

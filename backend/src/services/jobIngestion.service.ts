@@ -1,7 +1,104 @@
 import axios from 'axios';
 import { db } from '../config/db';
+import { logger } from '../config/logger';
 import { matchJobsForConsultant } from './ai.service';
 import { loadFlags } from '../controllers/featureFlags.controller';
+
+// ---------------------------------------------------------------------------
+// Driver self-healing — auto-deactivate misbehaving source_companies rows.
+//
+// Three rules:
+//   1. Permanent failures (404, board moved off ATS): deactivate after
+//      CONSECUTIVE_FAILURES_BEFORE_DEACTIVATE consecutive failures (default 3).
+//      Three strikes lets a flaky upstream recover before we give up.
+//   2. Quota / billing failures: deactivate IMMEDIATELY. The quota will not
+//      reset by re-trying every 6h — only ops adding a key or upgrading the
+//      plan unblocks them, and we save the wasted attempts in the meantime.
+//   3. Successful syncs reset consecutive_failures to 0.
+//
+// Why a counter instead of just "deactivate on any 404": APIs occasionally
+// return 404 mid-traffic, especially RapidAPI. Don't kill the row on the
+// first flake — give it three chances over 18h (at 6h intervals) before
+// flipping the flag.
+// ---------------------------------------------------------------------------
+
+const CONSECUTIVE_FAILURES_BEFORE_DEACTIVATE = Math.max(
+  1,
+  Number(process.env.SOURCE_AUTODEACTIVATE_AFTER ?? 3),
+);
+
+/** Returns a human-readable reason if the error message indicates a permanent
+ *  problem (quota, billing, auth, 404 on first try, etc) that warrants
+ *  immediate deactivation. Returns null if the error is transient. */
+function permanentFailureReason(errorMessage: string): string | null {
+  const m = errorMessage.toLowerCase();
+  // RapidAPI quota / billing
+  if (m.includes('exceeded the monthly quota') || m.includes('exceeded the daily quota')) {
+    return 'Monthly/daily API quota exhausted';
+  }
+  if (m.includes('not subscribed') || m.includes('your plan')) {
+    return 'Plan limit / not subscribed';
+  }
+  // Auth failures — usually a key was rotated and not updated
+  if (m.includes('401') || m.includes('unauthorized') || m.includes('invalid api key')) {
+    return 'API key rejected (401)';
+  }
+  if (m.includes('403') || m.includes('forbidden')) {
+    return 'Access forbidden (403)';
+  }
+  // Missing env-key error from a driver
+  if (m.includes('not set in backend/.env') || m.includes('must be set in backend/.env')) {
+    return 'Required environment variable not set';
+  }
+  return null;
+}
+
+async function recordSyncSuccess(sourceCompanyId: string, upserted: number): Promise<void> {
+  await db
+    .from('source_companies')
+    .update({
+      last_synced_at: new Date().toISOString(),
+      last_sync_jobs_count: upserted,
+      last_sync_error: null,
+      consecutive_failures: 0,
+    })
+    .eq('id', sourceCompanyId);
+}
+
+async function recordSyncFailure(sourceCompanyId: string, errorMessage: string): Promise<void> {
+  // Read the row so we can decide whether this strike crosses the threshold.
+  // One extra query per failure is fine — failures are the rare path.
+  const { data: current } = await db
+    .from('source_companies')
+    .select('consecutive_failures, source, slug')
+    .eq('id', sourceCompanyId)
+    .maybeSingle();
+  const nextCount = (current?.consecutive_failures ?? 0) + 1;
+  const permanent = permanentFailureReason(errorMessage);
+  const shouldDeactivate = !!permanent || nextCount >= CONSECUTIVE_FAILURES_BEFORE_DEACTIVATE;
+
+  const patch: Record<string, unknown> = {
+    last_synced_at: new Date().toISOString(),
+    last_sync_error: errorMessage.slice(0, 1000),
+    consecutive_failures: nextCount,
+  };
+  if (shouldDeactivate) {
+    patch.is_active = false;
+    patch.auto_deactivated_at = new Date().toISOString();
+    patch.auto_deactivated_reason =
+      permanent ?? `Auto-deactivated after ${nextCount} consecutive failures`;
+    logger.warn(
+      {
+        source: current?.source,
+        slug: current?.slug ?? null,
+        consecutive_failures: nextCount,
+        reason: patch.auto_deactivated_reason,
+      },
+      'source-companies: row auto-deactivated',
+    );
+  }
+  await db.from('source_companies').update(patch).eq('id', sourceCompanyId);
+}
 
 /**
  * Pluggable real-time job ingestion. Each driver hits a legitimate public API
@@ -956,14 +1053,7 @@ export async function runSync(): Promise<FullSyncResult> {
         if (!driver) throw new Error(`Unknown source: ${s.source}`);
         const jobs = await driver(ctx);
         const { upserted, newJobIds } = await upsertJobs(jobs);
-        await db
-          .from('source_companies')
-          .update({
-            last_synced_at: new Date().toISOString(),
-            last_sync_jobs_count: upserted,
-            last_sync_error: null,
-          })
-          .eq('id', s.id);
+        await recordSyncSuccess(s.id, upserted);
         return {
           source: s.source,
           slug: s.slug ?? null,
@@ -973,13 +1063,7 @@ export async function runSync(): Promise<FullSyncResult> {
         };
       } catch (e: any) {
         const msg = e?.message ?? String(e);
-        await db
-          .from('source_companies')
-          .update({
-            last_synced_at: new Date().toISOString(),
-            last_sync_error: msg,
-          })
-          .eq('id', s.id);
+        await recordSyncFailure(s.id, msg);
         return {
           source: s.source,
           slug: s.slug ?? null,
@@ -1012,14 +1096,7 @@ export async function runSyncForId(
     if (!driver) throw new Error(`Unknown source: ${s.source}`);
     const jobs = await driver(ctx);
     const { upserted, newJobIds } = await upsertJobs(jobs);
-    await db
-      .from('source_companies')
-      .update({
-        last_synced_at: new Date().toISOString(),
-        last_sync_jobs_count: upserted,
-        last_sync_error: null,
-      })
-      .eq('id', s.id);
+    await recordSyncSuccess(s.id, upserted);
     const autoMatch = newJobIds.length > 0 ? await autoMatchAndNotify(newJobIds) : null;
     return {
       source: s.source,
@@ -1031,13 +1108,7 @@ export async function runSyncForId(
     };
   } catch (e: any) {
     const msg = e?.message ?? String(e);
-    await db
-      .from('source_companies')
-      .update({
-        last_synced_at: new Date().toISOString(),
-        last_sync_error: msg,
-      })
-      .eq('id', s.id);
+    await recordSyncFailure(s.id, msg);
     return { source: s.source, slug: s.slug ?? null, jobs_pulled: 0, jobs_upserted: 0, error: msg };
   }
 }
