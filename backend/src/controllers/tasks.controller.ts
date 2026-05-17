@@ -267,13 +267,27 @@ export const metrics: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   if (!isManagerLike(req.user.role)) throw httpError(403, 'Forbidden');
 
+  interface MetricsRow {
+    status: TaskStatus;
+    priority: TaskPriority;
+    due_at: string | null;
+    completed_at: string | null;
+  }
   const { data, error } = await db.from('tasks').select('status, priority, due_at, completed_at');
   if (error) throw httpError(500, error.message);
+  const rows = (data ?? []) as MetricsRow[];
 
-  const by_status: Record<string, number> = Object.fromEntries(TASK_STATUSES.map((s) => [s, 0]));
-  const by_priority: Record<string, number> = Object.fromEntries(
-    TASK_PRIORITIES.map((p) => [p, 0]),
-  );
+  // Seed with every enum value so the UI doesn't have to defend against missing
+  // keys; narrowed to the canonical enum so a stray status from the DB doesn't
+  // silently create a junk key.
+  const by_status = Object.fromEntries(TASK_STATUSES.map((s) => [s, 0])) as Record<
+    TaskStatus,
+    number
+  >;
+  const by_priority = Object.fromEntries(TASK_PRIORITIES.map((p) => [p, 0])) as Record<
+    TaskPriority,
+    number
+  >;
   let overdue = 0;
   let due_today = 0;
   let due_this_week = 0;
@@ -287,9 +301,12 @@ export const metrics: RequestHandler = async (req, res) => {
   const endOfTodayMs = endOfToday.getTime();
   const inSevenDays = now + 7 * 24 * 3600 * 1000;
 
-  for (const t of data ?? []) {
-    by_status[t.status] = (by_status[t.status] ?? 0) + 1;
-    by_priority[t.priority] = (by_priority[t.priority] ?? 0) + 1;
+  for (const t of rows) {
+    // Defensive: only count rows whose status/priority match the canonical
+    // enum. A migration that adds new values without a backend bump would
+    // otherwise create rogue map keys.
+    if (TASK_STATUSES.includes(t.status)) by_status[t.status] += 1;
+    if (TASK_PRIORITIES.includes(t.priority)) by_priority[t.priority] += 1;
     const isOpen = t.status !== 'COMPLETED' && t.status !== 'CANCELLED';
     if (isOpen) {
       open++;
@@ -304,7 +321,7 @@ export const metrics: RequestHandler = async (req, res) => {
     if (t.completed_at && Date.parse(t.completed_at) >= sevenDaysAgo) completed_last_7_days++;
   }
   res.json({
-    total: (data ?? []).length,
+    total: rows.length,
     open,
     critical_open,
     by_status,

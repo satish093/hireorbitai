@@ -2,6 +2,7 @@ import { Router } from 'express';
 import * as t from '../controllers/tasks.controller';
 import * as tc from '../controllers/taskComments.controller';
 import * as ta from '../controllers/taskAttachments.controller';
+import * as tf from '../controllers/taskFilters.controller';
 import { requireRole } from '../middleware/auth';
 import { MANAGER_TIER } from '../types';
 import { uploadAttachment } from '../middleware/upload';
@@ -12,6 +13,13 @@ export const tasksRouter = Router();
 tasksRouter.get('/metrics', requireRole(...MANAGER_TIER), t.metrics);
 tasksRouter.get('/assigned-to-me', t.assignedToMe);
 tasksRouter.get('/team', requireRole(...MANAGER_TIER), t.teamTasks);
+
+// Saved task filters (per-user presets). Scoped by req.user.id inside the
+// controller — every user has their own list, no role gate needed.
+tasksRouter.get('/filters', tf.list);
+tasksRouter.post('/filters', tf.create);
+tasksRouter.patch('/filters/:id', tf.update);
+tasksRouter.delete('/filters/:id', tf.remove);
 
 tasksRouter.get('/', t.list);
 tasksRouter.post('/', requireRole(...MANAGER_TIER), t.create);

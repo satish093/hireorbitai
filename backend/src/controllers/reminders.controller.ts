@@ -2,6 +2,21 @@ import { RequestHandler } from 'express';
 import { db } from '../config/db';
 import { httpError } from '../types';
 
+// Every mutation here checks ownership before applying — previously update,
+// complete, and remove would happily edit any reminder if the caller knew the
+// id (an IDOR). The list/create paths already scope by req.user.id.
+
+async function assertOwner(reminderId: string, userId: string): Promise<void> {
+  const { data, error } = await db
+    .from('reminders')
+    .select('id, owner_id')
+    .eq('id', reminderId)
+    .maybeSingle();
+  if (error) throw httpError(500, error.message);
+  if (!data) throw httpError(404, 'Reminder not found');
+  if (data.owner_id !== userId) throw httpError(403, 'Forbidden');
+}
+
 export const list: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   const status = req.query.status as string | undefined;
@@ -14,9 +29,19 @@ export const list: RequestHandler = async (req, res) => {
 
 export const create: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
+  // Strip any client-supplied owner_id so a malicious client can't create a
+  // reminder owned by another user.
+  const { owner_id: _ignore, ...body } = req.body ?? {};
+  void _ignore;
+  if (!body.title || typeof body.title !== 'string') {
+    throw httpError(400, 'title is required');
+  }
+  if (!body.due_at) {
+    throw httpError(400, 'due_at is required');
+  }
   const { data, error } = await db
     .from('reminders')
-    .insert({ ...req.body, owner_id: req.user.id })
+    .insert({ ...body, owner_id: req.user.id })
     .select()
     .single();
   if (error) throw httpError(500, error.message);
@@ -24,9 +49,14 @@ export const create: RequestHandler = async (req, res) => {
 };
 
 export const update: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  await assertOwner(req.params.id, req.user.id);
+  // Never let the caller change ownership via PATCH.
+  const { owner_id: _ignore, ...body } = req.body ?? {};
+  void _ignore;
   const { data, error } = await db
     .from('reminders')
-    .update(req.body)
+    .update(body)
     .eq('id', req.params.id)
     .select()
     .single();
@@ -35,6 +65,8 @@ export const update: RequestHandler = async (req, res) => {
 };
 
 export const complete: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  await assertOwner(req.params.id, req.user.id);
   const { data, error } = await db
     .from('reminders')
     .update({ status: 'DONE', completed_at: new Date().toISOString() })
@@ -46,6 +78,8 @@ export const complete: RequestHandler = async (req, res) => {
 };
 
 export const remove: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  await assertOwner(req.params.id, req.user.id);
   const { error } = await db.from('reminders').delete().eq('id', req.params.id);
   if (error) throw httpError(500, error.message);
   res.json({ ok: true });

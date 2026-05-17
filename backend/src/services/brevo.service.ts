@@ -408,6 +408,46 @@ export async function sendDailyMatchDigest(args: {
   });
 }
 
+// ---------------------------------------------------------------------------
+// Reminder dispatch — fired by the reminders.job dispatcher when a row's
+// `due_at` has passed. Plain enough to render inside Gmail without breaking,
+// includes the related entity link when one is available.
+// ---------------------------------------------------------------------------
+export async function sendReminderNotice(args: {
+  to: { email: string; name?: string };
+  title: string;
+  description?: string | null;
+  dueAt: Date;
+  relatedUrl?: string | null;
+}): Promise<void> {
+  const whenStr = args.dueAt.toUTCString();
+  const desc = args.description?.trim();
+  const body = `
+    <p>Hi ${escapeHtml(args.to.name ?? 'there')},</p>
+    <p>This is your reminder from ${escapeHtml(brand.productName)}:</p>
+    <div style="margin:16px 0;padding:14px 16px;background:${brand.bgColor};border:1px solid ${brand.borderColor};border-radius:10px;">
+      <div style="font-weight:600;color:${brand.textColor};font-size:15px;line-height:1.35;">
+        ${escapeHtml(args.title)}
+      </div>
+      ${desc ? `<div style="margin-top:6px;font-size:13px;color:${brand.textColor};line-height:1.5;">${escapeHtml(desc)}</div>` : ''}
+      <div style="margin-top:10px;font-size:12px;color:${brand.mutedColor};">Due: ${escapeHtml(whenStr)}</div>
+    </div>
+  `;
+  await sendViaBrevo({
+    to: args.to,
+    subject: `Reminder: ${args.title}`,
+    html: shell({
+      preheader: `Reminder due ${whenStr}`,
+      heading: 'Reminder',
+      body,
+      cta: args.relatedUrl ? { label: 'Open', href: args.relatedUrl } : undefined,
+    }),
+    text: `Reminder from ${brand.productName}: ${args.title}
+${desc ? desc + '\n' : ''}Due: ${whenStr}${args.relatedUrl ? '\n\nOpen: ' + args.relatedUrl : ''}`,
+    tag: 'reminder',
+  });
+}
+
 export async function sendAccountLockedNotice(args: {
   to: { email: string; name?: string };
   unlocksAt: Date;

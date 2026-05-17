@@ -15,6 +15,7 @@ import {
   isOverdue,
 } from '../components/TaskBits';
 import { GroupBadge } from '../components/GroupBadge';
+import { SavedTaskFilters } from '../components/SavedTaskFilters';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -41,6 +42,21 @@ interface FilterState {
   recruiter_id?: string;
   q?: string;
   overdue?: boolean;
+}
+
+// Local FilterState uses '' to represent "no filter" on the select inputs,
+// but the saved-filters API stores only the active values. Coerce here so
+// the dropdown can summarize / save without seeing those empty strings.
+function toCriteria(f: FilterState) {
+  return {
+    status: f.status || undefined,
+    priority: f.priority || undefined,
+    assignee_id: f.assignee_id || undefined,
+    consultant_id: f.consultant_id || undefined,
+    recruiter_id: f.recruiter_id || undefined,
+    q: f.q || undefined,
+    overdue: f.overdue ? true : undefined,
+  };
 }
 
 const STATUS_DOT: Record<TaskStatus, string> = {
@@ -211,7 +227,14 @@ export function Tasks() {
       </div>
 
       {/* Filter chips row */}
-      <FilterBar filters={filters} setFilters={setFilters} users={users} isManager={isManager} />
+      <div className="flex items-start justify-between gap-3">
+        <FilterBar filters={filters} setFilters={setFilters} users={users} isManager={isManager} />
+        <SavedTaskFilters
+          current={toCriteria(filters)}
+          onApply={(c) => setFilters(c as FilterState)}
+          onLoadDefault={(c) => setFilters(c as FilterState)}
+        />
+      </div>
 
       {loading ? (
         <div className="text-sm text-slate-500 mt-6">Loading…</div>
