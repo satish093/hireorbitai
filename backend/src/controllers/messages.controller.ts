@@ -2,7 +2,11 @@ import { RequestHandler } from 'express';
 import { z } from 'zod';
 import { db } from '../config/db';
 import { httpError, MANAGER_TIER } from '../types';
-import { canMessageUser, canViewConversation } from '../services/permission.service';
+import {
+  canMessageUser,
+  canViewConversation,
+  getAccessibleUserIds,
+} from '../services/permission.service';
 import { audit } from '../services/audit.service';
 
 // Build the SELECT lazily so we can downgrade to a legacy column set the first
@@ -45,82 +49,19 @@ export const directory: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   const me = req.user;
 
-  // Manager-tier sees everyone in the workspace.
-  if (isManagerTier(me.role)) {
-    let { data, error } = await db
-      .from('users')
-      .select(partySelect())
-      .neq('id', me.id)
-      .order('full_name');
-    if (error && isSchemaError(error)) {
-      downgrade();
-      ({ data, error } = await db
-        .from('users')
-        .select(partySelect())
-        .neq('id', me.id)
-        .order('full_name'));
-    }
-    if (error) throw httpError(500, error.message);
-    res.json(data);
-    return;
-  }
-
-  const peerIds = new Set<string>();
-
-  // Consultant → their recruiter (consultant.recruiter_id → recruiters.user_id).
-  // Recruiter → their consultants + their manager.
-  const { data: myConsultant } = await db
-    .from('consultants')
-    .select('recruiter_id')
-    .eq('user_id', me.id)
-    .maybeSingle();
-  if (myConsultant?.recruiter_id) {
-    const { data: rec } = await db
-      .from('recruiters')
-      .select('user_id')
-      .eq('id', myConsultant.recruiter_id)
-      .maybeSingle();
-    if (rec?.user_id) peerIds.add(rec.user_id);
-  }
-
-  const { data: myRecruiter } = await db
-    .from('recruiters')
-    .select('id, manager_id')
-    .eq('user_id', me.id)
-    .maybeSingle();
-  if (myRecruiter) {
-    if (myRecruiter.manager_id) peerIds.add(myRecruiter.manager_id);
-    const { data: cons } = await db
-      .from('consultants')
-      .select('user_id')
-      .eq('recruiter_id', myRecruiter.id);
-    for (const c of cons ?? []) if (c.user_id) peerIds.add(c.user_id);
-  }
-
-  // Reports-to chain (either direction).
-  const { data: meUser } = await db
-    .from('users')
-    .select('reports_to')
-    .eq('id', me.id)
-    .maybeSingle();
-  if (meUser?.reports_to) peerIds.add(meUser.reports_to);
-  const { data: directReports } = await db.from('users').select('id').eq('reports_to', me.id);
-  for (const u of directReports ?? []) peerIds.add(u.id);
-
-  // Always include anyone the caller has already messaged with.
-  const { data: existing } = await db
-    .from('messages')
-    .select('sender_id, recipient_id')
-    .or(`sender_id.eq.${me.id},recipient_id.eq.${me.id}`);
-  for (const m of existing ?? []) {
-    if (m.sender_id !== me.id) peerIds.add(m.sender_id);
-    if (m.recipient_id !== me.id) peerIds.add(m.recipient_id);
-  }
-
+  // Single source of truth — the permission engine resolves who this user is
+  // permitted to reach (manager-tier sees workspace; recruiter sees their
+  // consultants + managers; consultant sees their recruiter + that
+  // recruiter's managers; reports-to chain + existing-thread legitimacy
+  // included). When the engine grows new hierarchy rules, every messaging
+  // surface picks them up automatically — no risk of directory drifting
+  // from the per-endpoint canMessageUser() checks.
+  const peerIds = await getAccessibleUserIds({ id: me.id, role: me.role });
   if (peerIds.size === 0) {
     res.json([]);
     return;
   }
+
   let { data, error } = await db
     .from('users')
     .select(partySelect())
@@ -147,11 +88,14 @@ export const conversations: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   const me = req.user.id;
 
-  // Pull every message I'm part of, newest first, then bucket by other party.
+  // Pull every NON-DELETED message I'm part of, newest first, then bucket
+  // by other party. soft-deleted rows stay in the table for audit but
+  // never reach the API.
   let { data, error } = await db
     .from('messages')
     .select(msgSelect())
     .or(`sender_id.eq.${me},recipient_id.eq.${me}`)
+    .is('deleted_at', null)
     .order('created_at', { ascending: false });
   if (error && isSchemaError(error)) {
     downgrade();
@@ -187,11 +131,14 @@ export const conversations: RequestHandler = async (req, res) => {
 /** GET /messages/unread-count */
 export const unreadCount: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
+  // Exclude soft-deleted rows from the unread count so a retracted DM
+  // doesn't leave a phantom badge on the recipient's nav.
   const { count, error } = await db
     .from('messages')
     .select('*', { count: 'exact', head: true })
     .eq('recipient_id', req.user.id)
-    .is('read_at', null);
+    .is('read_at', null)
+    .is('deleted_at', null);
   if (error) throw httpError(500, error.message);
   res.json({ unread: count ?? 0 });
 };
@@ -230,6 +177,7 @@ export const thread: RequestHandler = async (req, res) => {
     .from('messages')
     .select(msgSelect())
     .or(filter)
+    .is('deleted_at', null)
     .order('created_at', { ascending: true });
   if (error && isSchemaError(error)) {
     downgrade();
@@ -237,6 +185,7 @@ export const thread: RequestHandler = async (req, res) => {
       .from('messages')
       .select(msgSelect())
       .or(filter)
+      .is('deleted_at', null)
       .order('created_at', { ascending: true }));
   }
   if (error) throw httpError(500, error.message);
@@ -349,4 +298,58 @@ export const send: RequestHandler = async (req, res) => {
   }
   if (error) throw httpError(500, error.message);
   res.status(201).json(data);
+};
+
+// ---------------------------------------------------------------------------
+// Sender-initiated retract + edit. Both gated to the sender of the message
+// being modified — other roles 403. Soft-delete sets deleted_at; the row
+// stays in the table for compliance, but every API surface filters it out.
+// ---------------------------------------------------------------------------
+
+/** DELETE /messages/:id — sender retracts. */
+export const remove: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const { id } = req.params;
+
+  // Only the sender can retract. We check this server-side and use a
+  // composite WHERE so a race condition (or a forged id) can't flip a
+  // message we don't own.
+  const { data: updated, error } = await db
+    .from('messages')
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('id', id)
+    .eq('sender_id', req.user.id)
+    .is('deleted_at', null)
+    .select('id, sender_id, recipient_id')
+    .maybeSingle();
+  if (error) throw httpError(500, error.message);
+  if (!updated) {
+    // Either the row doesn't exist, isn't ours, or was already deleted.
+    // All three should look identical to a caller to avoid an oracle.
+    throw httpError(404, 'Message not found');
+  }
+  res.json({ ok: true });
+};
+
+/** PATCH /messages/:id — sender edits the body. */
+export const edit: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const schema = z.object({ body: z.string().min(1).max(8000) });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
+
+  const { data, error } = await db
+    .from('messages')
+    .update({
+      body: parsed.data.body.trim(),
+      edited_at: new Date().toISOString(),
+    })
+    .eq('id', req.params.id)
+    .eq('sender_id', req.user.id)
+    .is('deleted_at', null)
+    .select(msgSelect())
+    .maybeSingle();
+  if (error) throw httpError(500, error.message);
+  if (!data) throw httpError(404, 'Message not found');
+  res.json(data);
 };

@@ -67,7 +67,7 @@ const groups = [
   },
   {
     name: 'Messages (DM + presence)',
-    files: ['messages.sql'],
+    files: ['messages.sql', 'messages-soft-delete.sql'],
   },
   {
     name: 'Jobs — ingestion + drivers',
