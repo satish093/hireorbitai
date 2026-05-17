@@ -78,10 +78,10 @@ export function FeatureFlags() {
     try {
       await api.put(`/feature-flags/groups/${groupId}/${key}`, { enabled: next });
       await refresh();
-      // Tell every other page (Sidebar, route guards, FeatureGuard) to
-      // re-fetch their effective flag map so the toggle is visible app-wide
-      // without a hard reload.
       invalidate('feature-flags');
+      // Same as the global toggle: reload so every component picks up the
+      // new override without depending on per-component re-render hooks.
+      window.location.reload();
     } catch (e: any) {
       toast.error(e?.response?.data?.error ?? 'Failed to update override');
       // Reload to rebuild canonical state on failure.
@@ -100,6 +100,13 @@ export function FeatureFlags() {
       await api.patch(`/feature-flags/${row.key}`, { enabled: !previous });
       await refresh();
       invalidate('feature-flags');
+      // Hard-reload the page so the sidebar, route guards, and every
+      // open module reflect the new flag state without any caching or
+      // stale-context concerns. The in-memory invalidate() above already
+      // updates the local context — the reload guarantees nothing
+      // residual is showing the old value (e.g. an already-mounted
+      // page that doesn't re-render on flag changes).
+      window.location.reload();
     } catch (e: any) {
       // Roll back.
       setRows((rs) => rs.map((r) => (r.key === row.key ? { ...r, enabled: previous } : r)));
