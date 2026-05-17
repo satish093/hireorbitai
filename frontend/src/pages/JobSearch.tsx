@@ -172,6 +172,14 @@ export function JobSearch() {
    *  a resume, skills only, or didn't run at all. */
   const [matchMode, setMatchMode] = useState<string | null>(null);
 
+  // Pagination — applies to the Recommended tab. Liked/Applied are usually
+  // short user-scoped lists; the backend doesn't paginate them and the
+  // frontend just shows them all.
+  const PER_PAGE = 40;
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalRows, setTotalRows] = useState(0);
+
   // Load the consultant's profile (skills + consultant row id) and their
   // current resume id. Used by the recommended ranker AND the apply flow so
   // we can record applications + open the customize wizard.
@@ -298,6 +306,9 @@ export function JobSearch() {
         if (jobFunction) params.job_function = jobFunction;
         // Recruiter mode: rank/score against the targeted consultant.
         if (target?.consultantId) params.consultant_id = target.consultantId;
+        // Pagination — recommended is the only paginated tab.
+        params.page = String(page);
+        params.per_page = String(PER_PAGE);
       }
       // The Applied tab is consultant-scoped — pass through the targeted
       // consultant so recruiters can see what they've submitted on their behalf.
@@ -306,7 +317,22 @@ export function JobSearch() {
       }
       const r = await api.get(url, { params, signal });
       if (signal?.aborted) return;
-      setRows(r.data ?? []);
+      // Recommended endpoint returns { rows, page, per_page, total, total_pages }.
+      // Liked/Applied return a plain array. Handle both shapes.
+      if (
+        currentTab === 'recommended' &&
+        r.data &&
+        typeof r.data === 'object' &&
+        Array.isArray(r.data.rows)
+      ) {
+        setRows(r.data.rows);
+        setTotalPages(Math.max(1, Number(r.data.total_pages) || 1));
+        setTotalRows(Number(r.data.total) || r.data.rows.length);
+      } else {
+        setRows(Array.isArray(r.data) ? r.data : (r.data?.rows ?? []));
+        setTotalPages(1);
+        setTotalRows(Array.isArray(r.data) ? r.data.length : 0);
+      }
       // The recommended endpoint sets x-match-mode so the UI can explain why
       // a card has no score (e.g. resume not on file). Axios lowercases headers.
       const mode = r.headers?.['x-match-mode'];
@@ -319,16 +345,33 @@ export function JobSearch() {
     }
   }
 
-  // Reload whenever the tab, the targeted consultant, OR any auto-apply filter
-  // pill changes. Manual filters (`q`, `location`, `remote`, `yearsMin`,
-  // `sourceFilter`) only fire on Apply click. Abort previous in-flight request
-  // so a slow earlier load can't clobber a newer one.
+  // Reload whenever the tab, the targeted consultant, any auto-apply filter,
+  // OR the page number changes. Manual filters (`q`, `location`, `remote`,
+  // `yearsMin`, `sourceFilter`) only fire on Apply click. Abort previous
+  // in-flight request so a slow earlier load can't clobber a newer one.
   useEffect(() => {
     const controller = new AbortController();
     load(tab, controller.signal);
     return () => controller.abort();
     // eslint-disable-next-line
-  }, [tab, target?.consultantId, postedAfter, publisherFilter, jobFunction]);
+  }, [tab, target?.consultantId, postedAfter, publisherFilter, jobFunction, page]);
+
+  // Whenever a filter changes (NOT page), snap back to page 1 so the user
+  // sees the top of the freshly-filtered feed instead of an empty page-50.
+  useEffect(() => {
+    setPage(1);
+    // eslint-disable-next-line
+  }, [
+    tab,
+    target?.consultantId,
+    postedAfter,
+    publisherFilter,
+    jobFunction,
+    q,
+    location,
+    remote,
+    yearsMin,
+  ]);
 
   /** Apply click — three modes:
    *   - Recruiter with a consultant targeted: open intercept (will route to wizard or plain apply).
@@ -708,6 +751,12 @@ export function JobSearch() {
           return <EmptyState tab={tab} onSync={isManager ? syncNow : undefined} />;
         return (
           <div className="space-y-3">
+            {tab === 'recommended' && totalRows > 0 && (
+              <div className="text-xs text-slate-500 px-1">
+                Page {page} of {totalPages} · showing {filtered.length} of{' '}
+                {totalRows.toLocaleString()} jobs
+              </div>
+            )}
             {filtered.map((j) => (
               <JobCard
                 key={j.id}
@@ -740,6 +789,16 @@ export function JobSearch() {
                 }
               />
             ))}
+            {tab === 'recommended' && totalPages > 1 && (
+              <Pagination
+                page={page}
+                totalPages={totalPages}
+                onChange={(p) => {
+                  setPage(p);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+              />
+            )}
           </div>
         );
       })()}
@@ -889,6 +948,73 @@ function PillSelect({
         ))}
       </select>
     </label>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Pagination — numbered pages with prev/next. Compact window around the
+// current page so the bar stays one line even with 100+ pages.
+// ---------------------------------------------------------------------------
+function Pagination({
+  page,
+  totalPages,
+  onChange,
+}: {
+  page: number;
+  totalPages: number;
+  onChange: (p: number) => void;
+}) {
+  // Build the page-number window: always include first and last, plus a
+  // 2-step radius around the current page. Gaps render as "…".
+  const window = new Set<number>([1, totalPages, page, page - 1, page + 1, page - 2, page + 2]);
+  const visible = [...window].filter((p) => p >= 1 && p <= totalPages).sort((a, b) => a - b);
+  const items: (number | 'gap')[] = [];
+  let prev = 0;
+  for (const p of visible) {
+    if (prev && p - prev > 1) items.push('gap');
+    items.push(p);
+    prev = p;
+  }
+  return (
+    <div className="mt-4 flex items-center justify-center gap-1 text-sm">
+      <button
+        type="button"
+        disabled={page <= 1}
+        onClick={() => onChange(Math.max(1, page - 1))}
+        className="px-2.5 py-1 rounded-md border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+      >
+        ‹ Prev
+      </button>
+      {items.map((it, i) =>
+        it === 'gap' ? (
+          <span key={`g${i}`} className="px-1 text-slate-400">
+            …
+          </span>
+        ) : (
+          <button
+            key={it}
+            type="button"
+            onClick={() => onChange(it)}
+            aria-current={it === page ? 'page' : undefined}
+            className={
+              it === page
+                ? 'px-2.5 py-1 rounded-md bg-brand-600 text-white font-semibold tabular-nums'
+                : 'px-2.5 py-1 rounded-md border border-slate-200 text-slate-700 hover:bg-slate-50 tabular-nums'
+            }
+          >
+            {it}
+          </button>
+        ),
+      )}
+      <button
+        type="button"
+        disabled={page >= totalPages}
+        onClick={() => onChange(Math.min(totalPages, page + 1))}
+        className="px-2.5 py-1 rounded-md border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+      >
+        Next ›
+      </button>
+    </div>
   );
 }
 

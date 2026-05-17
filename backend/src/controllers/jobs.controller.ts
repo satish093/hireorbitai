@@ -203,8 +203,13 @@ export const remove: RequestHandler = async (req, res) => {
  *  text when present — much richer than a bare skill list. */
 export const recommended: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
-  const { location, remote, posted_after, publisher, job_function, consultant_id } =
+  const { location, remote, posted_after, publisher, job_function, consultant_id, page, per_page } =
     req.query as Record<string, string | undefined>;
+
+  // Pagination params — bounded so a hostile query can't ask for page=99999
+  // with a 1000-per-page slice. Defaults: page 1, 40 rows per page.
+  const pageNum = Math.max(1, Math.min(1000, Number(page) || 1));
+  const perPage = Math.max(1, Math.min(200, Number(per_page) || 40));
 
   // Resolve the target consultant. If the request says so explicitly, use
   // that; otherwise fall back to the caller's own consultant row (if any).
@@ -388,8 +393,22 @@ export const recommended: RequestHandler = async (req, res) => {
     }
   }
   ranked = ranked.sort((a: any, b: any) => (b.match_score ?? -1) - (a.match_score ?? -1));
-  const annotated = await annotateLiked(ranked as any[], req.user.id);
-  res.json(annotated);
+
+  // Page-slice. Always sort BEFORE slicing — top-of-feed is the most useful
+  // page regardless of pagination params. annotateLiked is cheap enough to
+  // run on the page subset only (an extra row lookup per page is fine).
+  const total = ranked.length;
+  const totalPages = Math.max(1, Math.ceil(total / perPage));
+  const start = (pageNum - 1) * perPage;
+  const pageRows = ranked.slice(start, start + perPage);
+  const annotated = await annotateLiked(pageRows as any[], req.user.id);
+  res.json({
+    rows: annotated,
+    page: pageNum,
+    per_page: perPage,
+    total,
+    total_pages: totalPages,
+  });
 };
 
 export const liked: RequestHandler = async (req, res) => {
