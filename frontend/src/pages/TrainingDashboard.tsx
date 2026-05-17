@@ -5,6 +5,7 @@ import { Layout } from '../components/Layout';
 import { api } from '../services/api';
 import { TrainingProgressBar } from '../components/Training';
 import { DashboardCard } from '../components/DashboardCard';
+import { StemOptDisclaimer } from '../components/StemOptDisclaimer';
 
 export function TrainingDashboard() {
   const [data, setData] = useState<any | null>(null);
@@ -110,6 +111,7 @@ export function TrainingDashboard() {
           </div>
         </>
       )}
+      <StemOptDisclaimer />
     </Layout>
   );
 }

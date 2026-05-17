@@ -88,6 +88,8 @@ const groups = [
     files: [
       'training.sql',
       'training-i983.sql',
+      // Completion gates depend on training.sql tables + the i983 status enum.
+      'training-completion-gates.sql',
       'training-content.sql',
       'training-ai-data.sql',
       'training-cybersecurity.sql',

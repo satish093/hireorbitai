@@ -37,6 +37,48 @@ trainingRouter.post('/assignments/:id/evaluations', c.createEvaluation);
 trainingRouter.put('/evaluations/:evalId', c.updateEvaluation);
 trainingRouter.delete('/evaluations/:evalId', requireRole(...MANAGER_TIER), c.deleteEvaluation);
 
+// ---- Completion gates (server-side multi-gate check) ----
+trainingRouter.get('/assignments/:id/gates', c.getCompletionGates);
+
+// ---- Acknowledgement (consultant-only insert; both can read) ----
+trainingRouter.get('/assignments/:id/acknowledgement', c.getAcknowledgement);
+trainingRouter.post('/assignments/:id/acknowledgement', c.acknowledge);
+
+// ---- Final assessment (manager authors + grades, consultant submits) ----
+trainingRouter.get('/assignments/:id/final-assessment', c.getFinalAssessment);
+trainingRouter.post(
+  '/assignments/:id/final-assessment',
+  requireRole(...MANAGER_TIER),
+  c.authorFinalAssessment,
+);
+trainingRouter.post('/assignments/:id/final-assessment/submit', c.submitFinalAssessment);
+trainingRouter.post(
+  '/assignments/:id/final-assessment/grade',
+  requireRole(...MANAGER_TIER),
+  c.gradeFinalAssessment,
+);
+
+// ---- Supervision notes (trainer/manager journal) ----
+trainingRouter.get('/assignments/:id/supervision-notes', c.listSupervisionNotes);
+trainingRouter.post(
+  '/assignments/:id/supervision-notes',
+  requireRole(...MANAGER_TIER),
+  c.addSupervisionNote,
+);
+trainingRouter.put(
+  '/supervision-notes/:noteId',
+  requireRole(...MANAGER_TIER),
+  c.updateSupervisionNote,
+);
+trainingRouter.delete(
+  '/supervision-notes/:noteId',
+  requireRole(...MANAGER_TIER),
+  c.deleteSupervisionNote,
+);
+
+// ---- Training Compliance Report (JSON + CSV via ?format=csv) ----
+trainingRouter.get('/assignments/:id/compliance-report', c.complianceReport);
+
 // ---- Reports (manager-tier only) ----
 trainingRouter.get('/reports', requireRole(...MANAGER_TIER), c.reports);
 

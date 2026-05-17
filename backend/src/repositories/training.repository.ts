@@ -188,6 +188,61 @@ export const feedback = {
   },
 };
 
+// ===== FINAL ASSESSMENT — one row per assignment =====
+export const finalAssessments = {
+  async getForAssignment(assignmentId: string) {
+    return db
+      .from('training_final_assessments')
+      .select('*')
+      .eq('assignment_id', assignmentId)
+      .maybeSingle();
+  },
+  async upsert(row: any) {
+    return db
+      .from('training_final_assessments')
+      .upsert(row, { onConflict: 'assignment_id' })
+      .select()
+      .single();
+  },
+  async update(id: string, patch: any) {
+    return db.from('training_final_assessments').update(patch).eq('id', id).select().single();
+  },
+};
+
+// ===== ACKNOWLEDGEMENT — one row per assignment =====
+export const acknowledgements = {
+  async getForAssignment(assignmentId: string) {
+    return db
+      .from('training_acknowledgements')
+      .select('*')
+      .eq('assignment_id', assignmentId)
+      .maybeSingle();
+  },
+  async create(row: any) {
+    return db.from('training_acknowledgements').insert(row).select().single();
+  },
+};
+
+// ===== SUPERVISION NOTES — weekly trainer journal =====
+export const supervisionNotes = {
+  async listForAssignment(assignmentId: string) {
+    return db
+      .from('training_supervision_notes')
+      .select('*, trainer:users!trainer_user_id(id, full_name, email)')
+      .eq('assignment_id', assignmentId)
+      .order('observed_on', { ascending: false });
+  },
+  async create(row: any) {
+    return db.from('training_supervision_notes').insert(row).select().single();
+  },
+  async update(id: string, patch: any) {
+    return db.from('training_supervision_notes').update(patch).eq('id', id).select().single();
+  },
+  async remove(id: string) {
+    return db.from('training_supervision_notes').delete().eq('id', id);
+  },
+};
+
 // ===== I-983 EVALUATIONS =====
 export const evaluations = {
   async listForAssignment(assignmentId: string) {

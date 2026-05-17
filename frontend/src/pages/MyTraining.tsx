@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Layout } from '../components/Layout';
 import { api } from '../services/api';
+import { StemOptDisclaimer } from '../components/StemOptDisclaimer';
 import {
   TrainingProgressBar,
   TrainingStatusBadge,
@@ -86,6 +87,7 @@ export function MyTraining() {
           ))}
         </div>
       )}
+      <StemOptDisclaimer />
     </Layout>
   );
 }

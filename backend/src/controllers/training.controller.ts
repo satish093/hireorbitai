@@ -25,6 +25,16 @@ export const getCourse: RequestHandler = async (req, res) => {
   res.json(data);
 };
 
+const COMPLIANCE_CATEGORIES = [
+  'Technical Training',
+  'Client Project Preparation',
+  'Tool Training',
+  'Domain Training',
+  'Communication Training',
+  'Security Training',
+  'Process Training',
+] as const;
+
 const courseSchema = z.object({
   title: z.string().min(1).max(200),
   description: z.string().nullable().optional(),
@@ -41,6 +51,16 @@ const courseSchema = z.object({
   assessment_methods: z.array(z.string()).nullable().optional(),
   stem_relevance: z.string().nullable().optional(),
   weekly_hours: z.number().nullable().optional(),
+  // Completion gates (STEM OPT compliance spec).
+  compliance_category: z.enum(COMPLIANCE_CATEGORIES).nullable().optional(),
+  minimum_time_minutes: z.number().int().min(0).nullable().optional(),
+  required_completion_score: z.number().min(0).max(100).nullable().optional(),
+  quiz_passing_score: z.number().min(0).max(100).nullable().optional(),
+  quiz_max_attempts: z.number().int().min(1).nullable().optional(),
+  requires_manager_approval: z.boolean().optional(),
+  trainer_user_id: z.string().uuid().nullable().optional(),
+  expected_outcomes: z.array(z.string()).nullable().optional(),
+  related_job_duties: z.array(z.string()).nullable().optional(),
 });
 
 export const createCourse: RequestHandler = async (req, res) => {
@@ -77,6 +97,11 @@ const lessonSchema = z.object({
   document_url: z.string().url().nullable().optional(),
   lesson_order: z.number().int().default(0),
   estimated_minutes: z.number().int().nullable().optional(),
+  // Per-lesson gates (STEM OPT compliance spec).
+  lesson_objective: z.string().nullable().optional(),
+  practical_example: z.string().nullable().optional(),
+  knowledge_check_required: z.boolean().optional(),
+  minimum_time_minutes: z.number().int().min(0).nullable().optional(),
 });
 
 export const createLesson: RequestHandler = async (req, res) => {
@@ -286,11 +311,21 @@ export const listQuiz: RequestHandler = async (req, res) => {
 const quizAttemptSchema = z.object({
   quiz_id: z.string().uuid(),
   selected_answer: z.string(),
+  // Spec also wants the full jsonb envelope (e.g. multi-select / matrix
+  // questions in the future). Keep optional + store as-is.
+  selected_answers: z.any().optional(),
 });
 export const submitQuizAttempt: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   const parsed = quizAttemptSchema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
+
+  // Caller must own the assignment OR be manager-tier.
+  const { data: a } = await repo.assignments.get(req.params.id);
+  if (!a) throw httpError(404, 'Assignment not found');
+  if ((a as any).assigned_to_user_id !== req.user.id && !isManagerTier(req.user.role)) {
+    throw httpError(403, 'Forbidden');
+  }
 
   const { data: quiz, error: qErr } = await repo.quizzes.get(parsed.data.quiz_id);
   if (qErr || !quiz) throw httpError(404, 'Quiz not found');
@@ -298,21 +333,19 @@ export const submitQuizAttempt: RequestHandler = async (req, res) => {
   const isCorrect = parsed.data.selected_answer === (quiz as any).correct_answer;
   const score = isCorrect ? Number((quiz as any).points ?? 1) : 0;
 
-  const { data, error } = await repo.quizAttempts.record({
+  const saved = await svc.recordQuizAttempt({
     assignment_id: req.params.id,
     quiz_id: parsed.data.quiz_id,
     selected_answer: parsed.data.selected_answer,
+    selected_answers: parsed.data.selected_answers,
     is_correct: isCorrect,
     score,
   });
-  if (error) throw httpError(500, error.message);
-  res
-    .status(201)
-    .json({
-      ...data,
-      correct_answer: (quiz as any).correct_answer,
-      explanation: (quiz as any).explanation,
-    });
+  res.status(201).json({
+    ...saved,
+    correct_answer: (quiz as any).correct_answer,
+    explanation: (quiz as any).explanation,
+  });
 };
 
 // ---------------------------------------------------------------------------
@@ -460,4 +493,356 @@ export const aiSkillGap: RequestHandler = async (req, res) => {
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
   res.json(await ai.skillGapAnalysis(parsed.data));
+};
+
+// ---------------------------------------------------------------------------
+// COMPLETION GATES — inspect what's blocking COMPLETED for an assignment.
+// ---------------------------------------------------------------------------
+async function assertCanReadAssignment(req: any, assignmentId: string) {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const { data: a } = await repo.assignments.get(assignmentId);
+  if (!a) throw httpError(404, 'Assignment not found');
+  if (!isManagerTier(req.user.role) && (a as any).assigned_to_user_id !== req.user.id) {
+    throw httpError(403, 'Forbidden');
+  }
+  return a as any;
+}
+
+export const getCompletionGates: RequestHandler = async (req, res) => {
+  await assertCanReadAssignment(req, req.params.id);
+  const evalResult = await svc.evaluateCompletion(req.params.id);
+  res.json(evalResult);
+};
+
+// ---------------------------------------------------------------------------
+// ACKNOWLEDGEMENT — consultant attests they understand the material.
+// One row per assignment; idempotent insert.
+// ---------------------------------------------------------------------------
+const ackSchema = z.object({
+  acknowledgement_text: z.string().min(20).max(1000),
+});
+export const acknowledge: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const a = await assertCanReadAssignment(req, req.params.id);
+  // Only the assignee can acknowledge — managers can't sign for the consultant.
+  if (a.assigned_to_user_id !== req.user.id) {
+    throw httpError(403, 'Only the assigned consultant can submit acknowledgement');
+  }
+  const parsed = ackSchema.safeParse(req.body);
+  if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
+
+  const existing = await repo.acknowledgements.getForAssignment(req.params.id);
+  if ((existing as any)?.data) {
+    res.json((existing as any).data);
+    return;
+  }
+  const { data, error } = await repo.acknowledgements.create({
+    assignment_id: req.params.id,
+    user_id: req.user.id,
+    acknowledgement_text: parsed.data.acknowledgement_text,
+    ip_address: req.ip ?? null,
+    user_agent: req.headers['user-agent'] ?? null,
+  });
+  if (error) throw httpError(500, error.message);
+  await svc.recalcAssignmentStatus(req.params.id);
+  res.status(201).json(data);
+};
+
+export const getAcknowledgement: RequestHandler = async (req, res) => {
+  await assertCanReadAssignment(req, req.params.id);
+  const r = await repo.acknowledgements.getForAssignment(req.params.id);
+  res.json((r as any)?.data ?? null);
+};
+
+// ---------------------------------------------------------------------------
+// FINAL ASSESSMENT — manager authors prompts, consultant submits answers,
+// manager grades + approves. Single row per assignment.
+// ---------------------------------------------------------------------------
+const ASSESSMENT_KIND = z.enum([
+  'MULTIPLE_CHOICE',
+  'SHORT_ANSWER',
+  'PRACTICAL_ASSIGNMENT',
+  'MANAGER_REVIEW',
+]);
+const ASSESSMENT_STATUS = z.enum(['PENDING', 'SUBMITTED', 'APPROVED', 'REJECTED']);
+
+const finalAssessmentAuthorSchema = z.object({
+  assessment_type: ASSESSMENT_KIND,
+  questions: z.any().optional(),
+});
+const finalAssessmentSubmitSchema = z.object({
+  answers: z.any(),
+});
+const finalAssessmentGradeSchema = z.object({
+  score: z.number().min(0).max(100).nullable().optional(),
+  passed: z.boolean().nullable().optional(),
+  manager_feedback: z.string().max(4000).nullable().optional(),
+  approval_status: ASSESSMENT_STATUS.optional(),
+});
+
+export const getFinalAssessment: RequestHandler = async (req, res) => {
+  await assertCanReadAssignment(req, req.params.id);
+  const r = await repo.finalAssessments.getForAssignment(req.params.id);
+  res.json((r as any)?.data ?? null);
+};
+
+/** Manager-tier: create or replace the assessment prompt for an assignment. */
+export const authorFinalAssessment: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  if (!isManagerTier(req.user.role)) throw httpError(403, 'Manager-tier only');
+  const parsed = finalAssessmentAuthorSchema.safeParse(req.body);
+  if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
+  await assertCanReadAssignment(req, req.params.id);
+
+  const { data, error } = await repo.finalAssessments.upsert({
+    assignment_id: req.params.id,
+    assessment_type: parsed.data.assessment_type,
+    questions: parsed.data.questions ?? null,
+    approval_status: 'PENDING',
+  });
+  if (error) throw httpError(500, error.message);
+  await svc.recalcAssignmentStatus(req.params.id);
+  res.status(201).json(data);
+};
+
+/** Consultant: submit answers. Moves the row to SUBMITTED. */
+export const submitFinalAssessment: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const a = await assertCanReadAssignment(req, req.params.id);
+  if (a.assigned_to_user_id !== req.user.id) {
+    throw httpError(403, 'Only the assigned consultant can submit');
+  }
+  const parsed = finalAssessmentSubmitSchema.safeParse(req.body);
+  if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
+
+  const existing = await repo.finalAssessments.getForAssignment(req.params.id);
+  if (!(existing as any)?.data) throw httpError(409, 'Assessment not yet authored');
+
+  const { data, error } = await repo.finalAssessments.upsert({
+    assignment_id: req.params.id,
+    assessment_type: (existing as any).data.assessment_type,
+    questions: (existing as any).data.questions,
+    answers: parsed.data.answers,
+    submitted_at: new Date().toISOString(),
+    approval_status: 'SUBMITTED',
+  });
+  if (error) throw httpError(500, error.message);
+  await svc.recalcAssignmentStatus(req.params.id);
+  res.json(data);
+};
+
+/** Manager-tier: grade + approve / reject. */
+export const gradeFinalAssessment: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  if (!isManagerTier(req.user.role)) throw httpError(403, 'Manager-tier only');
+  const parsed = finalAssessmentGradeSchema.safeParse(req.body);
+  if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
+  await assertCanReadAssignment(req, req.params.id);
+
+  const existing = await repo.finalAssessments.getForAssignment(req.params.id);
+  if (!(existing as any)?.data) throw httpError(404, 'No final assessment to grade');
+
+  const patch: any = { ...parsed.data };
+  if (patch.approval_status === 'APPROVED') {
+    patch.approved_by = req.user.id;
+    patch.approved_at = new Date().toISOString();
+  }
+  const { data, error } = await repo.finalAssessments.update((existing as any).data.id, patch);
+  if (error) throw httpError(500, error.message);
+  await svc.recalcAssignmentStatus(req.params.id);
+  res.json(data);
+};
+
+// ---------------------------------------------------------------------------
+// SUPERVISION NOTES — trainer/manager journal of weekly observations.
+// ---------------------------------------------------------------------------
+const supervisionSchema = z.object({
+  note: z.string().min(1).max(4000),
+  skill_progress: z.string().max(2000).nullable().optional(),
+  areas_for_improvement: z.string().max(2000).nullable().optional(),
+  observed_performance: z.string().max(2000).nullable().optional(),
+  next_steps: z.string().max(2000).nullable().optional(),
+  observed_on: z.string().optional(),
+});
+
+export const listSupervisionNotes: RequestHandler = async (req, res) => {
+  await assertCanReadAssignment(req, req.params.id);
+  const { data, error } = await repo.supervisionNotes.listForAssignment(req.params.id);
+  if (error) throw httpError(500, error.message);
+  res.json(data ?? []);
+};
+
+export const addSupervisionNote: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  if (!isManagerTier(req.user.role)) throw httpError(403, 'Manager-tier only');
+  const parsed = supervisionSchema.safeParse(req.body);
+  if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
+  await assertCanReadAssignment(req, req.params.id);
+  const { data, error } = await repo.supervisionNotes.create({
+    ...parsed.data,
+    assignment_id: req.params.id,
+    trainer_user_id: req.user.id,
+  });
+  if (error) throw httpError(500, error.message);
+  res.status(201).json(data);
+};
+
+export const updateSupervisionNote: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  if (!isManagerTier(req.user.role)) throw httpError(403, 'Manager-tier only');
+  const parsed = supervisionSchema.partial().safeParse(req.body);
+  if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
+  const { data, error } = await repo.supervisionNotes.update(req.params.noteId, parsed.data);
+  if (error) throw httpError(500, error.message);
+  res.json(data);
+};
+
+export const deleteSupervisionNote: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  if (!isManagerTier(req.user.role)) throw httpError(403, 'Manager-tier only');
+  const { error } = await repo.supervisionNotes.remove(req.params.noteId);
+  if (error) throw httpError(500, error.message);
+  res.json({ ok: true });
+};
+
+// ---------------------------------------------------------------------------
+// TRAINING COMPLIANCE REPORT — every gate, every artifact, in one payload.
+// JSON by default; ?format=csv returns a flat row-per-artifact CSV.
+// ---------------------------------------------------------------------------
+function csvCell(v: unknown): string {
+  if (v === null || v === undefined) return '';
+  const s = typeof v === 'string' ? v : JSON.stringify(v);
+  if (/[",\r\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+function csvRow(cells: unknown[]): string {
+  return cells.map(csvCell).join(',');
+}
+
+export const complianceReport: RequestHandler = async (req, res) => {
+  const a = await assertCanReadAssignment(req, req.params.id);
+
+  const [course, lessons, progress, uploads, feedback, attempts, ack, finalA, evals, notes, gates] =
+    await Promise.all([
+      repo.courses.get(a.course_id),
+      repo.lessons.listByCourse(a.course_id),
+      repo.progress.listForAssignment(a.id),
+      repo.uploads.listForAssignment(a.id),
+      repo.feedback.listForAssignment(a.id),
+      repo.quizAttempts.listForAssignment(a.id),
+      repo.acknowledgements.getForAssignment(a.id),
+      repo.finalAssessments.getForAssignment(a.id),
+      repo.evaluations.listForAssignment(a.id),
+      repo.supervisionNotes.listForAssignment(a.id),
+      svc.evaluateCompletion(a.id),
+    ]);
+
+  const payload = {
+    assignment: a,
+    course: (course as any)?.data ?? null,
+    consultant: a.assignee ?? null,
+    trainer_or_manager: a.assigner ?? null,
+    progress: progress.data ?? [],
+    lessons: lessons.data ?? [],
+    quiz_attempts: attempts.data ?? [],
+    assignment_uploads: uploads.data ?? [],
+    feedback: feedback.data ?? [],
+    supervision_notes: notes.data ?? [],
+    acknowledgement: (ack as any)?.data ?? null,
+    final_assessment: (finalA as any)?.data ?? null,
+    evaluations: evals.data ?? [],
+    gates,
+    disclaimer:
+      'This training record supports internal training documentation. ' +
+      'Consult immigration counsel for official STEM OPT compliance requirements.',
+    generated_at: new Date().toISOString(),
+  };
+
+  if (String(req.query.format ?? '').toLowerCase() !== 'csv') {
+    res.json(payload);
+    return;
+  }
+
+  // CSV: one section per artifact group. Easy for an auditor to paste into
+  // Excel without a JSON-to-table tool.
+  const sections: string[] = [];
+  sections.push('Section,Field,Value');
+  const cv = payload.course ?? {};
+  for (const [k, v] of Object.entries({
+    consultant_name: payload.consultant?.full_name,
+    consultant_email: payload.consultant?.email,
+    course_title: cv.title,
+    compliance_category: cv.compliance_category,
+    trainer: payload.trainer_or_manager?.full_name,
+    start_date: a.training_start_date,
+    end_date: a.training_end_date,
+    due_date: a.due_date,
+    status: a.status,
+    progress_percentage: gates.progress_percentage,
+    acknowledgement_at: payload.acknowledgement?.acknowledged_at,
+    final_assessment_status: payload.final_assessment?.approval_status,
+    final_assessment_score: payload.final_assessment?.score,
+    blockers: gates.blockers.join('; '),
+  })) {
+    sections.push(csvRow(['Summary', k, v ?? '']));
+  }
+  sections.push('');
+  sections.push('Lesson,Completed,CompletedAt,TimeSpentMinutes');
+  for (const l of (lessons.data ?? []) as any[]) {
+    const p = (progress.data ?? []).find((p: any) => p.lesson_id === l.id) as any;
+    sections.push(
+      csvRow([l.title, p?.completed ?? false, p?.completed_at ?? '', p?.time_spent_minutes ?? 0]),
+    );
+  }
+  sections.push('');
+  sections.push('QuizAttempt,QuizId,AttemptNumber,Score,Passed,AttemptedAt');
+  for (const at of ((attempts.data ?? []) as any[]).sort(
+    (x, y) => Number(x.attempt_number ?? 0) - Number(y.attempt_number ?? 0),
+  )) {
+    sections.push(
+      csvRow([
+        'attempt',
+        at.quiz_id,
+        at.attempt_number,
+        at.score,
+        at.passed ?? at.is_correct,
+        at.attempted_at,
+      ]),
+    );
+  }
+  sections.push('');
+  sections.push('SupervisionNote,Date,Trainer,Note,SkillProgress,NextSteps');
+  for (const n of (notes.data ?? []) as any[]) {
+    sections.push(
+      csvRow([
+        'note',
+        n.observed_on,
+        n.trainer?.full_name ?? n.trainer_user_id,
+        n.note,
+        n.skill_progress,
+        n.next_steps,
+      ]),
+    );
+  }
+  sections.push('');
+  sections.push('Evaluation,Kind,Date,HoursCompleted,Rating,StudentSigned,SupervisorSigned');
+  for (const e of (evals.data ?? []) as any[]) {
+    sections.push(
+      csvRow([
+        'evaluation',
+        e.kind,
+        e.evaluation_date,
+        e.hours_completed,
+        e.rating,
+        e.student_signed_at,
+        e.supervisor_signed_at,
+      ]),
+    );
+  }
+  sections.push('');
+  sections.push(`Disclaimer,,${csvCell(payload.disclaimer)}`);
+
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="training-compliance-${a.id}.csv"`);
+  res.send(sections.join('\r\n'));
 };

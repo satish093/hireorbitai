@@ -4,6 +4,7 @@ import { Layout } from '../components/Layout';
 import { api } from '../services/api';
 import { TrainingProgressBar } from '../components/Training';
 import { DashboardCard } from '../components/DashboardCard';
+import { StemOptDisclaimer } from '../components/StemOptDisclaimer';
 
 export function TrainingReports() {
   const [data, setData] = useState<any | null>(null);
@@ -84,6 +85,7 @@ export function TrainingReports() {
           </div>
         </>
       )}
+      <StemOptDisclaimer />
     </Layout>
   );
 }
