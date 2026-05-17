@@ -22,6 +22,7 @@
  */
 
 import { db } from '../config/db';
+import { logger } from '../config/logger';
 import { ADMIN_TIER, MANAGER_TIER, type Role } from '../types';
 
 const MGR_ROLES = MANAGER_TIER as readonly Role[];
@@ -30,6 +31,84 @@ const ADMIN_ROLES = ADMIN_TIER as readonly Role[];
 export interface PermissionCaller {
   id: string;
   role: Role;
+}
+
+// ---------------------------------------------------------------------------
+// In-memory permission cache
+//
+// Hierarchy data (reports_to / recruiter_managers / consultants.recruiter_id)
+// changes infrequently — most user actions don't touch it at all. Re-resolving
+// the same caller's accessible-user set on every message route lookup is wasted
+// work. A 30-second TTL collapses N requests-in-quick-succession into one
+// real DB pass.
+//
+// Single-process cache only — each PM2 worker has its own. That's fine here:
+//   - We're not at cluster-wide scale (1-3 workers max on the current VPS).
+//   - Worst-case staleness across workers is bounded by TTL.
+//   - Cross-worker invalidation would need Redis pub/sub, which is not yet
+//     worth the dependency cost.
+//
+// Call `invalidatePermissionCache(userId)` from any code path that changes a
+// user's hierarchy (group reassignment, recruiter reassignment, status
+// flip, etc.) so stale caches don't keep a removed peer reachable. Until
+// those call sites land, the 30s TTL is the only safety net — acceptable
+// since the audit log records every blocked attempt regardless.
+// ---------------------------------------------------------------------------
+interface CacheEntry {
+  ids: Set<string>;
+  expiresAt: number;
+}
+const TTL_MS = 30_000;
+const cache = new Map<string, CacheEntry>();
+
+function cacheKey(caller: PermissionCaller): string {
+  // Role is part of the key because a role change must immediately re-route
+  // through the slow path. A user who gets demoted from MANAGER → RECRUITER
+  // shouldn't keep seeing the full workspace from the cache.
+  return `${caller.role}:${caller.id}`;
+}
+
+function cacheGet(caller: PermissionCaller): Set<string> | null {
+  const key = cacheKey(caller);
+  const hit = cache.get(key);
+  if (!hit) return null;
+  if (hit.expiresAt <= Date.now()) {
+    cache.delete(key);
+    return null;
+  }
+  return hit.ids;
+}
+
+function cacheSet(caller: PermissionCaller, ids: Set<string>): void {
+  cache.set(cacheKey(caller), { ids, expiresAt: Date.now() + TTL_MS });
+  // Bound memory: at ~32 bytes per entry × thousands of users this is
+  // basically nothing, but if it ever runs away the eviction below kicks in.
+  if (cache.size > 5_000) {
+    // Drop the oldest 1k to keep p99 lookup cost flat.
+    const drop = [...cache.entries()].slice(0, 1_000);
+    for (const [k] of drop) cache.delete(k);
+    logger.debug({ cacheSize: cache.size }, 'permission-cache: evicted oldest 1000');
+  }
+}
+
+/**
+ * Drop the cached accessible-user set for a single user. Call from any code
+ * path that mutates the user's hierarchy: group_id changes, recruiter
+ * assignment, reports_to edits, role changes, deactivation. Until every
+ * such call site invokes this, the 30s TTL remains the safety net.
+ */
+export function invalidatePermissionCache(userId: string): void {
+  // We don't know which role key is cached for this user (it could be any
+  // tier they had at the time of cache write), so wipe every entry whose
+  // userId matches. Cheap — entries-iteration over a bounded map.
+  for (const key of cache.keys()) {
+    if (key.endsWith(`:${userId}`)) cache.delete(key);
+  }
+}
+
+/** Wipe everything — used by tests + emergency cache stampede recovery. */
+export function clearPermissionCache(): void {
+  cache.clear();
 }
 
 /**
@@ -52,6 +131,11 @@ export interface PermissionCaller {
  * have added it.
  */
 export async function getAccessibleUserIds(caller: PermissionCaller): Promise<Set<string>> {
+  // Cache-first. The miss path is the one that does the 3-5 DB queries; the
+  // hit returns a same-process Set instantly.
+  const cached = cacheGet(caller);
+  if (cached) return cached;
+
   // Manager tier sees the whole workspace. Admin tier is a subset of
   // manager tier so this also covers admin override.
   if (MGR_ROLES.includes(caller.role)) {
@@ -60,7 +144,9 @@ export async function getAccessibleUserIds(caller: PermissionCaller): Promise<Se
       .select('id')
       .neq('id', caller.id)
       .neq('is_active', false);
-    return new Set((data ?? []).map((u: { id: string }) => u.id));
+    const ids: Set<string> = new Set((data ?? []).map((u: { id: string }) => u.id));
+    cacheSet(caller, ids);
+    return ids;
   }
 
   const peerIds = new Set<string>();
@@ -159,6 +245,7 @@ export async function getAccessibleUserIds(caller: PermissionCaller): Promise<Se
   }
 
   peerIds.delete(caller.id);
+  cacheSet(caller, peerIds);
   return peerIds;
 }
 

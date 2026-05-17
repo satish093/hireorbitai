@@ -149,13 +149,72 @@
       <p>What we shipped, in plain language. Newest first.</p>
     </header>
 
-    <!-- ================== UNRELEASED / IN-FLIGHT ================== -->
+    <!-- ================== MESSAGING OVERHAUL (PHASES 1-4) ================== -->
+
     <div class="release">
       <div class="release-head">
-        <h2>Messaging security &amp; hierarchy — Phase 1<span class="pill sec">Security</span></h2>
-        <span class="date">In flight · 2026-05-17</span>
+        <h2>Messaging — Phase 4: performance &amp; observability<span class="pill perf">Performance</span></h2>
+        <span class="date">2026-05-17</span>
       </div>
-      <p class="release-summary">Closed three direct-messaging vulnerabilities and centralized the rules that decide who can talk to whom.</p>
+      <p class="release-summary">Permission checks now run from a 30-second in-memory cache and from a unified org-relationship view, cutting messaging-route latency to near-zero on the cached path.</p>
+      <ul class="bullets">
+        <li>In-memory permission cache keyed by user + role. First request per 30-second window does the full hierarchy resolution; the next ~N requests in that window read from the cache instantly.</li>
+        <li>Self-bounded memory: cache evicts the oldest 1k entries if it ever exceeds 5k — basically free.</li>
+        <li>Invalidation hook exported (<code>invalidatePermissionCache(userId)</code>) — ready to wire into future relationship-mutation paths so changes propagate within milliseconds instead of waiting for TTL.</li>
+        <li>New Postgres view <code>v_user_relationships</code> unifies the four canonical sources (reports_to, recruiter_managers, recruiters.manager_id, consultants.recruiter_id) under one read-only shape. Symmetric — emits each relationship in both directions so a point-lookup answers reachability without an OR.</li>
+        <li>Defers full RLS policies to a follow-up: our single-connection-pool architecture doesn't map cleanly to per-row PostgreSQL policies. Application-level checks in the permission service remain the canonical boundary.</li>
+      </ul>
+    </div>
+
+    <div class="release">
+      <div class="release-head">
+        <h2>Messaging — Phase 3b: edit &amp; retract<span class="pill new">New</span></h2>
+        <span class="date">2026-05-17</span>
+      </div>
+      <p class="release-summary">Sender-side controls for fixing typos and deleting messages, with optimistic UI that snaps back on failure.</p>
+      <ul class="bullets">
+        <li>Hover any of your own messages to see ✎ Edit and ✕ Delete pills above the bubble.</li>
+        <li>Edit: in-place textarea. Enter saves, Esc cancels, Shift+Enter for newline. Recipients see &ldquo;· edited&rdquo; next to the timestamp.</li>
+        <li>Delete: confirm dialog → message removed for both sender and recipient. Row is soft-deleted in the DB for compliance (never hard-deleted).</li>
+        <li>Optimistic UI: edits and deletes apply instantly; on backend failure, the original message snaps back with a toast explaining what went wrong.</li>
+        <li>Edits and deletes are sender-only — atomic <code>sender_id = caller.id</code> check at the SQL layer means a forged id returns 404 with no oracle about whether the row exists.</li>
+      </ul>
+    </div>
+
+    <div class="release">
+      <div class="release-head">
+        <h2>Messaging — Phase 3: access-denied UX<span class="pill new">New</span></h2>
+        <span class="date">2026-05-17</span>
+      </div>
+      <p class="release-summary">When hierarchy changes remove your access to a conversation, the UI says so cleanly instead of failing silently.</p>
+      <ul class="bullets">
+        <li>403 on thread fetch → lock-icon panel: &ldquo;Conversation no longer available&rdquo; with a one-click &ldquo;Back to inbox&rdquo; button.</li>
+        <li>Send attempt to a now-unreachable peer rolls back the typed message and surfaces a clear &ldquo;You can no longer message this user&rdquo; toast.</li>
+        <li>Active-thread polling automatically suspends once denied — no more invisible 403 storm in the background.</li>
+        <li>Past messages stay in the database; if your access is restored later, the thread comes back intact.</li>
+      </ul>
+    </div>
+
+    <div class="release">
+      <div class="release-head">
+        <h2>Messaging — Phase 2: soft-delete &amp; cleanup<span class="pill new">New</span></h2>
+        <span class="date">2026-05-17</span>
+      </div>
+      <p class="release-summary">Schema additions + a unified directory implementation.</p>
+      <ul class="bullets">
+        <li>Messages now carry <code>deleted_at</code> and <code>edited_at</code> timestamps. Every API surface filters soft-deleted rows. Recipients no longer see ghost &ldquo;1 unread&rdquo; badges for retracted messages.</li>
+        <li>Partial indexes on the new columns keep performance flat — the deleted_at filter never full-scans the messages table.</li>
+        <li>Directory endpoint refactored to call the same permission engine as the per-message checks. Eliminates the historic risk of the contact list showing peers the send-message endpoint would reject.</li>
+        <li>New endpoints: <code>PATCH /messages/:id</code> (edit body, sender only), <code>DELETE /messages/:id</code> (soft-retract, sender only).</li>
+      </ul>
+    </div>
+
+    <div class="release">
+      <div class="release-head">
+        <h2>Messaging — Phase 1: closed 3 vulnerabilities<span class="pill sec">Security</span></h2>
+        <span class="date">2026-05-17</span>
+      </div>
+      <p class="release-summary">Three direct-messaging vulnerabilities closed, with a centralized permission engine to keep future endpoints safe by default.</p>
 
       <div class="group">
         <h3>Closed</h3>

@@ -39,6 +39,7 @@ const groups = [
       'roles-developer-hr.sql',
       'roles-hierarchy.sql',
       'recruiter-managers.sql',
+      'v-user-relationships.sql',
     ],
   },
   {
