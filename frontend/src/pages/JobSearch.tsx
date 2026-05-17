@@ -154,15 +154,15 @@ export function JobSearch() {
   const [myConsultantId, setMyConsultantId] = useState<string | null>(null);
   const [myResumeId, setMyResumeId] = useState<string | null>(null);
   const [q, setQ] = useState('');
-  // Default to US: most consultants on this platform are US-based, and
-  // the backend treats this filter as "USA + remote" (remote roles are
-  // US-eligible).
-  const [location, setLocation] = useState('United States');
+  // No default location — user picks if they want to narrow. Empty string
+  // means "no location filter applied" both in the UI pill ("Anywhere")
+  // and in the backend (no WHERE clause).
+  const [location, setLocation] = useState('');
   const [remote, setRemote] = useState<'' | 'true' | 'false'>('');
   /** Stable values for the Posted pill: '' (any), or a day count like '1' / '7' / '30'.
-   *  We convert to an ISO date at request time. Default to '1' (past 24 hours) to
-   *  match Jobright's default and keep the feed fresh. */
-  const [postedAfter, setPostedAfter] = useState<string>('1');
+   *  Default empty — show every job regardless of age. User narrows with the
+   *  pill if they want only fresh listings. */
+  const [postedAfter, setPostedAfter] = useState<string>('');
   const [yearsMin, setYearsMin] = useState<string>('');
   const [sourceFilter, setSourceFilter] = useState<string>('');
   const [publisherFilter, setPublisherFilter] = useState<string>('');
@@ -693,9 +693,9 @@ export function JobSearch() {
           <button
             onClick={() => {
               setQ('');
-              setLocation('United States');
+              setLocation('');
               setRemote('');
-              setPostedAfter('1');
+              setPostedAfter('');
               setYearsMin('');
               setSourceFilter('');
               setPublisherFilter('');
