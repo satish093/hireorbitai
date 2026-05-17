@@ -36,6 +36,11 @@ export const pool = new Pool({
   max: 20,
   idleTimeoutMillis: 30_000,
   connectionTimeoutMillis: 5_000,
+  // Server-side cap on any single statement. Prevents a runaway JOIN or a
+  // pathological GROUP BY from holding a connection forever and turning into
+  // a connection-pool DoS. Override via PG_STATEMENT_TIMEOUT_MS for one-off
+  // bulk imports that need to run longer.
+  statement_timeout: Math.max(1000, Number(process.env.PG_STATEMENT_TIMEOUT_MS ?? 15_000)),
 });
 
 pool.on('error', (err) => {

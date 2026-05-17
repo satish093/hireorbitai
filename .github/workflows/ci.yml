@@ -42,3 +42,22 @@ jobs:
       - run: npm run shared:build
       - run: npm --prefix frontend run typecheck
       - run: npm --prefix frontend run build
+
+  audit:
+    name: Dependency audit (high / critical only)
+    runs-on: ubuntu-latest
+    # Don't block merges on this — surface as a soft check so a transitive
+    # CVE doesn't freeze releases. Set continue-on-error: false later once
+    # the inventory is reliably clean.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      # `npm audit` returns non-zero on any vulnerability — restrict to high
+      # and above so dev-only / low-severity advisories don't cry wolf.
+      - name: Audit (high + critical)
+        run: npm audit --audit-level=high --omit=dev

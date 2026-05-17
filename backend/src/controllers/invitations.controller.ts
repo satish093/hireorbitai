@@ -83,6 +83,20 @@ export const accept: RequestHandler = async (req, res) => {
  * PUBLIC: preview an invitation by its token. Returns the email + role + status so
  * the accept page can pre-fill the form. Does NOT require auth.
  */
+/** Mask the local-part of an email so the preview confirms identity to the
+ *  invited person without exposing the full address to a token-bruteforcer.
+ *  "satish.flex07@gmail.com" → "s************@gmail.com". The invitee
+ *  recognizes their own address; an attacker harvesting tokens just sees
+ *  the masked form. */
+function maskEmail(email: string): string {
+  const at = email.lastIndexOf('@');
+  if (at <= 0) return '***';
+  const local = email.slice(0, at);
+  const domain = email.slice(at);
+  const head = local[0] ?? '';
+  return `${head}${'*'.repeat(Math.max(2, local.length - 1))}${domain}`;
+}
+
 export const preview: RequestHandler = async (req, res) => {
   const token = String(req.query.token ?? '');
   if (!token) throw httpError(400, 'Missing token');
@@ -93,7 +107,17 @@ export const preview: RequestHandler = async (req, res) => {
     .single();
   if (error || !data) throw httpError(404, 'Invitation not found');
   const expired = new Date(data.expires_at) < new Date();
-  res.json({ ...data, expired });
+  // Return a masked email so the invitee can confirm "yes, that's me"
+  // without giving a token-bruteforcer the actual address. Same masked
+  // form is fine to render in the accept-invitation UI — the user knows
+  // their own email.
+  res.json({
+    email: maskEmail(data.email),
+    role: data.role,
+    status: data.status,
+    expires_at: data.expires_at,
+    expired,
+  });
 };
 
 /**

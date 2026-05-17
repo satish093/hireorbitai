@@ -25,6 +25,8 @@ const app = express();
 app.set('trust proxy', env.trustProxy);
 
 // --- Security headers ---------------------------------------------------------
+// Helmet defaults are good; we tighten the policies that ship with weak
+// defaults (HSTS 180s, no Permissions-Policy, default-permissive referrer).
 app.use(
   helmet({
     // Allow the frontend (served from a different origin) to read normal API
@@ -32,8 +34,38 @@ app.use(
     // would benefit from it, and enabling it tends to break image previews.
     crossOriginResourcePolicy: { policy: 'cross-origin' },
     crossOriginEmbedderPolicy: false,
+    // 1 year HSTS + includeSubDomains + preload eligibility. Once the
+    // domain is added to the Chrome HSTS preload list, this becomes
+    // browser-enforced even on first visit.
+    hsts: {
+      maxAge: 31536000,
+      includeSubDomains: true,
+      preload: true,
+    },
+    // Don't leak the full URL as Referer to third-party sites. "strict-origin"
+    // sends only the origin on cross-origin, nothing on downgrade.
+    referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
   }),
 );
+
+// Permissions-Policy — disable browser APIs we don't use. Reduces fingerprint
+// surface + blocks third-party iframes from prompting users with our origin.
+app.use((_req, res, next) => {
+  res.setHeader(
+    'Permissions-Policy',
+    [
+      'accelerometer=()',
+      'camera=()',
+      'geolocation=()',
+      'gyroscope=()',
+      'magnetometer=()',
+      'microphone=()',
+      'payment=()',
+      'usb=()',
+    ].join(', '),
+  );
+  next();
+});
 
 // --- CORS ---------------------------------------------------------------------
 // Strict allowlist sourced from env. No wildcard fallback — if CORS_ORIGIN is
@@ -195,6 +227,34 @@ app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/forgot-password', authLimiter);
 app.use('/api/auth/reset-password', authLimiter);
 app.use('/api/invitations/setup', authLimiter);
+
+// --- AI-endpoint per-user limiter --------------------------------------------
+// Anthropic calls cost real money. The global 3000/15min ceiling is too high
+// for AI routes — a single user could burn through $10+ of Sonnet calls in
+// a minute. Tighter limit: 30 AI requests per 5 minutes per user, with the
+// same per-session keying as the global limiter.
+const aiLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: Math.max(1, Number(process.env.AI_RATE_LIMIT_MAX ?? 30)),
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  keyGenerator: rateLimitKey,
+  handler: (req, res, next) => sendRateLimitResponse(req, res, next, { windowMs: 5 * 60 * 1000 }),
+});
+app.use('/ai', aiLimiter);
+app.use('/api/ai', aiLimiter);
+// Also cap the AI-heavy endpoints under /jobs (resume tailoring, ATS match,
+// per-job match-for-me, enrich-pending). These all hit Anthropic.
+app.use('/jobs/:id/skill-match', aiLimiter);
+app.use('/jobs/:id/skill-match-for-me', aiLimiter);
+app.use('/jobs/:id/ats-match', aiLimiter);
+app.use('/jobs/:id/enrich', aiLimiter);
+app.use('/jobs/:id/customize-resume', aiLimiter);
+app.use('/api/jobs/:id/skill-match', aiLimiter);
+app.use('/api/jobs/:id/skill-match-for-me', aiLimiter);
+app.use('/api/jobs/:id/ats-match', aiLimiter);
+app.use('/api/jobs/:id/enrich', aiLimiter);
+app.use('/api/jobs/:id/customize-resume', aiLimiter);
 
 // --- Health + readiness -------------------------------------------------------
 // /health = liveness (the process is up and responsive)
