@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { Layout } from '../components/Layout';
 import { Modal } from '../components/Modal';
 import { api } from '../services/api';
+import { ComplianceReportButton } from '../components/TrainingCompliance';
 import { useAuth } from '../context/AuthContext';
 import { MANAGER_TIER } from '../types';
 
@@ -100,6 +101,7 @@ export function TrainingPlanView() {
             >
               Print / save PDF
             </button>
+            {id && <ComplianceReportButton assignmentId={id} />}
             {isManager && (
               <button
                 onClick={() => setEditOpen(true)}

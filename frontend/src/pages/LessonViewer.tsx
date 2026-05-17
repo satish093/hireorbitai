@@ -11,6 +11,14 @@ import {
   DocumentViewer,
   FeedbackModal,
 } from '../components/Training';
+import {
+  AcknowledgementCard,
+  ComplianceReportButton,
+  CompletionGatesPanel,
+  FinalAssessmentCard,
+  SupervisionNotesPanel,
+  useCompletionGates,
+} from '../components/TrainingCompliance';
 import { useAuth } from '../context/AuthContext';
 import { MANAGER_TIER } from '../types';
 
@@ -39,6 +47,12 @@ export function LessonViewer() {
   const [activeLessonId, setActiveLessonId] = useState<string | null>(null);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const nav = useNavigate();
+  const gates = useCompletionGates(id);
+  const isConsultantOwner = !!(
+    profile &&
+    assignment &&
+    profile.id === assignment.assigned_to_user_id
+  );
 
   async function load() {
     if (!id) return;
@@ -89,8 +103,23 @@ export function LessonViewer() {
       });
       const a = await api.get(`/training/assignments/${id}`);
       setAssignment(a.data);
+      gates.refresh();
     } catch (e: any) {
       toast.error(e?.response?.data?.error ?? 'Failed');
+    }
+  }
+
+  // Reload assignment + gates after any compliance action (ack, final-assessment,
+  // supervision note). The child components own the API call; we just need the
+  // parent's assignment row to reflect the new status.
+  async function refreshAll() {
+    if (!id) return;
+    try {
+      const a = await api.get(`/training/assignments/${id}`);
+      setAssignment(a.data);
+      gates.refresh();
+    } catch {
+      /* swallow — toast already fired in the child */
     }
   }
 
@@ -371,37 +400,46 @@ export function LessonViewer() {
             </article>
           )}
 
-          {/* When the student has hit 100%, surface the next-step actions */}
-          {assignment.progress_percentage >= 100 && (
-            <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 mt-5">
-              <div className="text-[10px] font-semibold uppercase tracking-widest text-emerald-700">
-                Curriculum complete
-              </div>
-              <h3 className="text-lg font-semibold tracking-tight mt-1">
-                Nice work — now finish the training plan.
-              </h3>
-              <p className="text-sm text-slate-700 mt-1">
-                Take the quiz if you haven't, and submit your evaluations from the I-983 plan page.
-                Your supervisor needs both signed before the engagement closes.
-              </p>
-              <div className="flex gap-2 mt-3">
+          {/* Completion workflow — always visible so the consultant can see
+              every remaining gate, not just lessons. Server-side multi-gate
+              evaluation: lessons + time + quiz + uploads + acknowledgement +
+              final assessment + manager approval. */}
+          <div className="mt-5 space-y-4">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <h2 className="text-lg font-semibold tracking-tight">Completion workflow</h2>
+              <div className="flex items-center gap-2">
                 {course.quizzes?.length > 0 && (
                   <button
                     onClick={() => nav(`/training/assignments/${id}/quiz`)}
-                    className="bg-slate-900 text-white text-sm px-4 py-1.5 rounded-lg hover:bg-slate-800"
+                    className="text-xs border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg hover:bg-slate-50"
                   >
-                    Take the quiz
+                    Take quiz
                   </button>
                 )}
                 <Link
                   to={`/training/assignments/${id}/plan`}
-                  className="border border-emerald-200 bg-white text-emerald-800 text-sm px-4 py-1.5 rounded-lg hover:bg-emerald-100"
+                  className="text-xs border border-emerald-200 bg-emerald-50 text-emerald-800 px-3 py-1.5 rounded-lg hover:bg-emerald-100"
                 >
-                  Open I-983 plan + submit evaluation
+                  I-983 plan + evaluation
                 </Link>
+                <ComplianceReportButton assignmentId={assignment.id} />
               </div>
             </div>
-          )}
+
+            <CompletionGatesPanel evaluation={gates.data} />
+            <AcknowledgementCard
+              assignmentId={assignment.id}
+              isConsultant={isConsultantOwner}
+              onChanged={refreshAll}
+            />
+            <FinalAssessmentCard
+              assignmentId={assignment.id}
+              isManager={isManager}
+              isConsultant={isConsultantOwner}
+              onChanged={refreshAll}
+            />
+            <SupervisionNotesPanel assignmentId={assignment.id} isManager={isManager} />
+          </div>
         </main>
       </div>
 
