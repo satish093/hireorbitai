@@ -93,25 +93,14 @@ export const setFlag: RequestHandler = async (req, res) => {
 };
 
 /** GET /feature-flags/me — effective flags for the calling user (global +
- *  group overrides). The sidebar polls this to gate modules.
- *
- *  Admin-tier bypass: SUPER_ADMIN / CEO / CTO / DIRECTOR get every defined
- *  flag forced-true so the sidebar exposes every module for testing. Their
- *  actual workspace flag config still drives non-admin users — the bypass
- *  is per-request, not global. */
+ *  group overrides). The sidebar polls this to gate modules. Admins and
+ *  non-admins receive the same resolved flag set — no role-based override
+ *  here. (We briefly forced flags to true for admins in an earlier PR;
+ *  removed by user request so flipping a flag actually hides the module
+ *  for everyone, admins included.) */
 export const myFlags: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
-  const flags = await effectiveFlagsForUser(req.user.group_id ?? null);
-  if ((ADMIN_TIER as Role[]).includes(req.user.role)) {
-    // Force every known flag ON for admins. We keep the same set of keys
-    // so the frontend's `flags[key]` lookups still work; we just flip
-    // every value to true.
-    const forced: Record<string, boolean> = {};
-    for (const key of Object.keys(flags)) forced[key] = true;
-    res.json(forced);
-    return;
-  }
-  res.json(flags);
+  res.json(await effectiveFlagsForUser(req.user.group_id ?? null));
 };
 
 /** GET /feature-flags/overrides — every group_feature_flags row, keyed by

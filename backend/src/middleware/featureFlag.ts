@@ -24,12 +24,11 @@ export const requireFeature =
   (key: string): RequestHandler =>
   async (req, _res, next) => {
     if (!req.user) throw httpError(401, 'Not authenticated');
-    // Admin-tier bypass — SUPER_ADMIN / CEO / CTO / DIRECTOR always pass
-    // feature-flag gates so they can test every module regardless of how
-    // flags are configured for their workspace. The DM digest, the AI
-    // match, every gated route — all reachable for admins. Non-admins
-    // hit the normal resolved-for-group flag check.
-    if ((ADMIN_TIER as Role[]).includes(req.user.role)) return next();
+    // No admin override here. Admins are subject to the same workspace flags
+    // as everyone else — to turn a module back on, flip it in
+    // /admin/feature-flags. (An admin-tier bypass briefly shipped in an
+    // earlier PR; removed by user request so the sidebar and API behave
+    // identically for every role.)
     const flags = await effectiveFlagsForUser(req.user.group_id ?? null);
     if (flags[key] === false) {
       throw httpError(403, `Feature "${key}" is disabled for your workspace.`, { feature: key });
