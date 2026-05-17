@@ -16,10 +16,9 @@
     "lint": "eslint \"src/**/*.{ts,tsx}\" --max-warnings 0",
     "lint:fix": "eslint \"src/**/*.{ts,tsx}\" --fix",
     "bootstrap:admin": "node --env-file=.env scripts/bootstrap-admin.mjs",
-    "migrate:up": "node --env-file=.env node_modules/.bin/node-pg-migrate up --migrations-dir migrations --migration-file-language sql",
-    "migrate:down": "node --env-file=.env node_modules/.bin/node-pg-migrate down --migrations-dir migrations --migration-file-language sql --count 1",
-    "migrate:create": "node --env-file=.env node_modules/.bin/node-pg-migrate create --migrations-dir migrations --migration-file-language sql",
-    "migrate:init-baseline": "node --env-file=.env scripts/migrate-init-baseline.mjs"
+    "migrate:up": "node --env-file=.env scripts/migrate.mjs up --migrations-dir migrations --migration-file-language sql",
+    "migrate:down": "node --env-file=.env scripts/migrate.mjs down --migrations-dir migrations --migration-file-language sql --count 1",
+    "migrate:create": "node --env-file=.env scripts/migrate.mjs create --migrations-dir migrations --migration-file-language sql"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.95.1",
