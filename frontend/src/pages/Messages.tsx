@@ -26,6 +26,7 @@ interface Message {
   body: string;
   read_at: string | null;
   created_at: string;
+  edited_at?: string | null;
   sender?: Party;
   recipient?: Party;
 }
@@ -479,7 +480,57 @@ export function Messages() {
                           </div>
                           <div className="space-y-2">
                             {items.map((m) => (
-                              <Bubble key={m.id} message={m} mine={m.sender_id === profile?.id} />
+                              <Bubble
+                                key={m.id}
+                                message={m}
+                                mine={m.sender_id === profile?.id}
+                                onEdit={async (newBody) => {
+                                  // Optimistic local update; PATCH in
+                                  // background. Roll back on failure.
+                                  const prev = m;
+                                  setMessages((arr) =>
+                                    arr.map((x) =>
+                                      x.id === m.id
+                                        ? {
+                                            ...x,
+                                            body: newBody,
+                                            edited_at: new Date().toISOString(),
+                                          }
+                                        : x,
+                                    ),
+                                  );
+                                  try {
+                                    await api.patch(`/messages/${m.id}`, { body: newBody });
+                                  } catch (e: any) {
+                                    setMessages((arr) =>
+                                      arr.map((x) => (x.id === m.id ? prev : x)),
+                                    );
+                                    toast.error(e?.response?.data?.error ?? 'Edit failed');
+                                  }
+                                }}
+                                onDelete={async () => {
+                                  if (
+                                    !confirm(
+                                      'Delete this message? Other people will no longer see it.',
+                                    )
+                                  )
+                                    return;
+                                  // Optimistic local remove; same roll-back
+                                  // pattern as edit on failure.
+                                  const prev = m;
+                                  setMessages((arr) => arr.filter((x) => x.id !== m.id));
+                                  try {
+                                    await api.delete(`/messages/${m.id}`);
+                                  } catch (e: any) {
+                                    setMessages((arr) =>
+                                      [...arr, prev].sort((a, b) =>
+                                        a.created_at.localeCompare(b.created_at),
+                                      ),
+                                    );
+                                    toast.error(e?.response?.data?.error ?? 'Delete failed');
+                                  }
+                                }}
+                              />
                             ))}
                           </div>
                         </div>
@@ -526,14 +577,80 @@ export function Messages() {
   );
 }
 
-function Bubble({ message, mine }: { message: Message; mine: boolean }) {
+function Bubble({
+  message,
+  mine,
+  onEdit,
+  onDelete,
+}: {
+  message: Message;
+  mine: boolean;
+  onEdit?: (newBody: string) => void | Promise<void>;
+  onDelete?: () => void | Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(message.body);
+  const [hovered, setHovered] = useState(false);
+
+  // Whenever the message body changes externally (e.g. another tab's edit
+  // poll-syncs into our local state) keep the draft in lockstep so opening
+  // the editor doesn't show stale text.
+  useEffect(() => {
+    if (!editing) setDraft(message.body);
+  }, [message.body, editing]);
+
+  function commitEdit() {
+    const trimmed = draft.trim();
+    if (!trimmed || trimmed === message.body || !onEdit) {
+      setEditing(false);
+      setDraft(message.body);
+      return;
+    }
+    void onEdit(trimmed);
+    setEditing(false);
+  }
+
+  function cancelEdit() {
+    setEditing(false);
+    setDraft(message.body);
+  }
+
   return (
     <div
       className={clsx(
-        'flex',
+        'flex group relative',
         mine ? 'justify-end animate-slide-in-right' : 'justify-start animate-slide-in-left',
       )}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
     >
+      {/* Sender-side action menu — only renders for own messages, only when
+          hovered. Edit/Delete callbacks come from the parent. */}
+      {mine && (onEdit || onDelete) && hovered && !editing && (
+        <div className="absolute -top-3 right-1 inline-flex gap-1 bg-white border border-slate-200 rounded-full shadow-sm px-1 py-0.5 text-[11px] z-10">
+          {onEdit && (
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              className="px-1.5 text-slate-600 hover:text-slate-900"
+              title="Edit message"
+            >
+              ✎
+            </button>
+          )}
+          {onDelete && (
+            <button
+              type="button"
+              onClick={() => void onDelete()}
+              className="px-1.5 text-rose-600 hover:text-rose-700"
+              title="Delete message"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+      )}
+
       <div
         className={clsx(
           'max-w-[70%] px-3 py-2 rounded-2xl text-sm whitespace-pre-wrap break-words shadow-sm',
@@ -542,13 +659,74 @@ function Bubble({ message, mine }: { message: Message; mine: boolean }) {
             : 'bg-white border border-slate-200 text-slate-800 rounded-bl-sm',
         )}
       >
-        {message.body}
-        <div className={clsx('text-[10px] mt-1', mine ? 'text-white/70' : 'text-slate-400')}>
-          {new Date(message.created_at).toLocaleTimeString([], {
-            hour: 'numeric',
-            minute: '2-digit',
-          })}
-        </div>
+        {editing ? (
+          <div className="space-y-1.5">
+            <textarea
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  commitEdit();
+                } else if (e.key === 'Escape') {
+                  e.preventDefault();
+                  cancelEdit();
+                }
+              }}
+              autoFocus
+              rows={Math.max(1, Math.min(6, draft.split('\n').length))}
+              className={clsx(
+                'w-full resize-none rounded text-sm px-1.5 py-1 focus:outline-none',
+                mine
+                  ? 'bg-brand-700/40 text-white placeholder:text-white/60'
+                  : 'bg-slate-50 text-slate-800',
+              )}
+            />
+            <div className="flex justify-end gap-1 text-[11px]">
+              <button
+                type="button"
+                onClick={cancelEdit}
+                className={clsx(
+                  'px-2 py-0.5 rounded',
+                  mine ? 'text-white/70 hover:text-white' : 'text-slate-500 hover:text-slate-800',
+                )}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={commitEdit}
+                disabled={!draft.trim() || draft.trim() === message.body}
+                className={clsx(
+                  'px-2 py-0.5 rounded font-semibold disabled:opacity-50',
+                  mine
+                    ? 'bg-white/15 text-white hover:bg-white/25'
+                    : 'bg-slate-900 text-white hover:bg-slate-800',
+                )}
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            {message.body}
+            <div
+              className={clsx(
+                'text-[10px] mt-1 inline-flex items-center gap-1',
+                mine ? 'text-white/70' : 'text-slate-400',
+              )}
+            >
+              {new Date(message.created_at).toLocaleTimeString([], {
+                hour: 'numeric',
+                minute: '2-digit',
+              })}
+              {message.edited_at && (
+                <span className={mine ? 'text-white/60' : 'text-slate-400'}>· edited</span>
+              )}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
