@@ -9,8 +9,10 @@
 import { register, start, stop } from './scheduler';
 import { remindersJob } from './reminders.job';
 import { sessionsPurgeJob } from './sessions-purge.job';
+import { jobsSyncJob } from './jobs-sync.job';
 
 register(remindersJob);
 register(sessionsPurgeJob);
+register(jobsSyncJob);
 
 export const jobs = { start, stop };
