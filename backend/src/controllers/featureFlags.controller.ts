@@ -1,7 +1,7 @@
 import { RequestHandler } from 'express';
 import { z } from 'zod';
 import { db } from '../config/db';
-import { httpError, ADMIN_TIER, Role } from '../types';
+import { httpError } from '../types';
 
 // In-memory cache so we don't hammer the DB on every request. Invalidated
 // synchronously on PATCH and on group-override change. 5-second hard TTL

@@ -1,7 +1,7 @@
 import { RequestHandler } from 'express';
 import { z } from 'zod';
 import { db } from '../config/db';
-import { httpError, MANAGER_TIER } from '../types';
+import { httpError } from '../types';
 import {
   canMessageUser,
   canViewConversation,
@@ -30,10 +30,6 @@ function isSchemaError(err: { message?: string } | null | undefined): boolean {
 }
 function downgrade() {
   partyCols = PARTY_COLS_LEGACY;
-}
-
-function isManagerTier(role: string | undefined): boolean {
-  return !!role && (MANAGER_TIER as string[]).includes(role);
 }
 
 // ---------------------------------------------------------------------------

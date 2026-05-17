@@ -47,6 +47,7 @@ export function ConsultantDashboard() {
     // re-fire this effect every time AuthContext re-renders (e.g. on every
     // silent token refresh), even though the data the effect cares about
     // hasn't changed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.id]);
 
   const offers = apps.filter((a) => a.status === 'OFFER').length;

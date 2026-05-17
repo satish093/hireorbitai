@@ -384,7 +384,6 @@ export const recommended: RequestHandler = async (req, res) => {
       });
       res.setHeader('x-match-ai', 'ok');
     } catch (e: any) {
-      // eslint-disable-next-line no-console
       console.warn(
         '[jobs.recommended] AI ranker failed; baseline scores retained:',
         e?.message ?? e,

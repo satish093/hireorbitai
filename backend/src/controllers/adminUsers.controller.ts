@@ -17,7 +17,6 @@ import { logger } from '../config/logger';
 // ---------------------------------------------------------------------------
 
 const STATUSES = ['active', 'inactive', 'suspended', 'pending_verification', 'banned'] as const;
-type Status = (typeof STATUSES)[number];
 
 // ---------------------------------------------------------------------------
 // GET /admin/users

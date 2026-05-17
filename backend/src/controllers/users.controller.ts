@@ -359,7 +359,7 @@ export const remove: RequestHandler = async (req, res) => {
     // public.users is already gone — log loudly, but report success since the
     // user can no longer log in (no profile row → 403 in login()).
     // The orphan auth row should be cleaned up manually.
-    // eslint-disable-next-line no-console
+
     console.warn(`auth user delete failed for ${targetId}:`, authErr.message);
   }
 

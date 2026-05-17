@@ -53,7 +53,10 @@ export const create: RequestHandler = async (req, res) => {
     throw httpError(409, 'Duplicate submission detected', { existing: dups });
   }
 
-  const { force, ...insertBody } = body;
+  // `force` is consumed by the duplicate-check guard above; strip it before
+  // we hand the rest of the body to the INSERT so it doesn't collide with
+  // the column allowlist. The `_force` rename signals "intentionally unused".
+  const { force: _force, ...insertBody } = body;
   const { data, error } = await db.from('applications').insert(insertBody).select().single();
   if (error) throw httpError(500, error.message);
   res.status(201).json(data);
@@ -166,7 +169,7 @@ export const fromJob: RequestHandler = async (req, res) => {
 
   if (error) {
     // Log the raw database error so we can diagnose if the toast is still vague.
-    // eslint-disable-next-line no-console
+
     console.error(
       '[applications.fromJob] database error:',
       error,
@@ -298,11 +301,9 @@ export async function logEvent(opts: {
       created_by: opts.created_by ?? null,
     });
     if (error && !/application_events|schema cache/i.test(error.message)) {
-      // eslint-disable-next-line no-console
       console.warn('[application_events.log] insert failed:', error.message);
     }
   } catch (e) {
-    // eslint-disable-next-line no-console
     console.warn('[application_events.log] threw:', e);
   }
 }

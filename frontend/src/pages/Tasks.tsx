@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState, DragEvent, ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { Modal } from '../components/Modal';
-import { FormInput } from '../components/FormInput';
 import { DateTimePicker } from '../components/DateTimePicker';
 import { SelectInput } from '../components/SelectInput';
 import {

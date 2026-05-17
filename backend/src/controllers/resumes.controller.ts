@@ -6,7 +6,6 @@ import {
   scoreResume,
   tailorResumeForJob,
   scoreResumeAgainstJob,
-  atsScore,
   extractJobRequirements,
 } from '../services/ai.service';
 import { httpError, MANAGER_TIER } from '../types';
@@ -99,7 +98,7 @@ export const upload: RequestHandler = async (req, res) => {
       aiFeedback = result;
     } catch (e) {
       // Non-fatal — resume is still saved; client can retry scoring.
-      // eslint-disable-next-line no-console
+
       console.warn('Resume AI scoring failed:', e);
     }
     // Keep the raw text on ai_feedback so /jobs/:id/skill-match-for-me can

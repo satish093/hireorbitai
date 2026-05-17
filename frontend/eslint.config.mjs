@@ -63,7 +63,11 @@ export default [
       // React hook correctness — errors. These catch real bugs.
       'react-hooks/rules-of-hooks': 'error',
       'react-hooks/exhaustive-deps': 'warn',
-      'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
+      // react-refresh: dev-server HMR convenience only. It fires when a
+      // module exports a component AND a hook/util, which our codebase
+      // does intentionally (small helpers + the component in one file is
+      // fine). Disabling — it has no effect on production builds.
+      'react-refresh/only-export-components': 'off',
       // Real-bug catchers.
       'no-unused-expressions': 'error',
       'no-throw-literal': 'error',

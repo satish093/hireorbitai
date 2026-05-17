@@ -114,14 +114,13 @@ const envSchema = z.object({
 // rather than throwing on the first one.
 const parsed = envSchema.safeParse(process.env);
 if (!parsed.success) {
-  // eslint-disable-next-line no-console
   console.error('\n✗ Invalid environment configuration:\n');
   for (const issue of parsed.error.issues) {
     const p = issue.path.join('.') || '(root)';
-    // eslint-disable-next-line no-console
+
     console.error(`  • ${p}: ${issue.message}`);
   }
-  // eslint-disable-next-line no-console
+
   console.error('\nDouble-check backend/.env against backend/.env.example.\n');
   process.exit(1);
 }

@@ -109,6 +109,5 @@ export function useRealtime(handlers: Record<string, (payload: unknown) => void>
     // Intentionally empty dep array — the hook opens once and the
     // handlers ref pattern lets the parent update behavior without a
     // reconnect.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 }

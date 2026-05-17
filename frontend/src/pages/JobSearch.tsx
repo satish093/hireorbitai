@@ -259,7 +259,7 @@ export function JobSearch() {
           { duration: 10000 },
         );
       }
-      // eslint-disable-next-line no-console
+
       console.info('[sync] breakdown:', breakdown, 'reports:', reports);
       await load(tab);
     } catch (e: any) {
@@ -360,7 +360,6 @@ export function JobSearch() {
   // sees the top of the freshly-filtered feed instead of an empty page-50.
   useEffect(() => {
     setPage(1);
-    // eslint-disable-next-line
   }, [
     tab,
     target?.consultantId,
@@ -477,7 +476,7 @@ export function JobSearch() {
       const status = e?.response?.status;
       const msg = e?.response?.data?.error || e?.message || 'Unknown error';
       toast.error(`Record application failed (${status ?? 'no status'}): ${msg}`);
-      // eslint-disable-next-line no-console
+
       console.error('[recordApplication]', e?.response?.data ?? e);
     }
   }

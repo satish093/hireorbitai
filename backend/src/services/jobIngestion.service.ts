@@ -1340,7 +1340,10 @@ async function upsertJobs(jobs: NormalizedJob[]): Promise<UpsertResult> {
   // If the `publisher` migration hasn't been applied yet, retry without it
   // rather than fail the whole sync. Same pattern used elsewhere.
   if (error && /publisher/.test(error.message) && /schema cache|column/i.test(error.message)) {
-    const stripped = rows.map(({ publisher, ...rest }) => rest);
+    // Destructure `publisher` out of every row so the retry doesn't send a
+    // column the DB doesn't have yet. Renamed to `_publisher` to signal
+    // "intentionally discarded" to the linter.
+    const stripped = rows.map(({ publisher: _publisher, ...rest }) => rest);
     ({ error, count } = await db
       .from('jobs')
       .upsert(stripped, { onConflict: 'source,external_id', count: 'exact' }));

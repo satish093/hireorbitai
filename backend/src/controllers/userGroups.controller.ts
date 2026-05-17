@@ -103,7 +103,7 @@ export const create: RequestHandler = async (req, res) => {
   if (error) {
     // Log the raw error server-side so we can diagnose if the front-end
     // toast still doesn't make the cause obvious.
-    // eslint-disable-next-line no-console
+
     console.error('[user_groups.create] database error:', error);
     if (/duplicate key|unique/i.test(error.message)) {
       throw httpError(409, `A group with slug "${parsed.data.slug.toLowerCase()}" already exists.`);

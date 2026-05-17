@@ -279,6 +279,12 @@ export function Sidebar() {
       if (timer) clearTimeout(timer);
       document.removeEventListener('visibilitychange', onVisibility);
     };
+    // We intentionally depend on `profile?.id` only — re-running on every
+    // profile-object reference change (which useAuth re-creates on minor
+    // session-state shifts) would tear down and re-arm the poller cycle
+    // every few seconds. id is the only thing that actually matters for
+    // "is this a different user".
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.id]);
 
   return (

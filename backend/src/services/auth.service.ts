@@ -318,8 +318,11 @@ export async function changePassword(args: {
   }
 
   audit({ action: 'password_changed', user_id: userId, email, req });
+  // brevo.service's `to.name` is already optional (`name?: string`). Just
+  // omit it — no need to fake a null through a double-cast. The email
+  // template falls back to "Hi there" when name is missing.
   void sendPasswordChangedNotice({
-    to: { email, name: null as unknown as string },
+    to: { email },
     when: new Date(),
     ipAddress: req.ip ?? null,
   }).catch((err) => logger.warn({ err }, 'password-changed email failed'));

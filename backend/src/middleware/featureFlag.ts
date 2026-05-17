@@ -1,6 +1,6 @@
 import { RequestHandler } from 'express';
 import { effectiveFlagsForUser } from '../controllers/featureFlags.controller';
-import { httpError, ADMIN_TIER, Role } from '../types';
+import { httpError } from '../types';
 
 /**
  * Block a route group when the named feature flag is OFF for the calling

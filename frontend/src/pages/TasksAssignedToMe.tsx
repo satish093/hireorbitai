@@ -2,9 +2,14 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { api } from '../services/api';
-import { useAuth } from '../context/AuthContext';
 import {
-  PriorityBadge, TaskStatusBadge, DuePill, Avatar, TagPill, shortId, isOverdue,
+  PriorityBadge,
+  TaskStatusBadge,
+  DuePill,
+  Avatar,
+  TagPill,
+  shortId,
+  isOverdue,
 } from '../components/TaskBits';
 import { Task } from '../types';
 import { useInvalidationListener } from '../hooks/useInvalidate';
@@ -28,15 +33,25 @@ const SECTION_DOT: Record<SectionKey, string> = {
 };
 
 function bucketize(tasks: Task[]): Record<SectionKey, Task[]> {
-  const buckets: Record<SectionKey, Task[]> = { overdue: [], today: [], this_week: [], later: [], no_due: [] };
+  const buckets: Record<SectionKey, Task[]> = {
+    overdue: [],
+    today: [],
+    this_week: [],
+    later: [],
+    no_due: [],
+  };
   const now = Date.now();
-  const endOfToday = new Date(); endOfToday.setHours(23, 59, 59, 999);
+  const endOfToday = new Date();
+  endOfToday.setHours(23, 59, 59, 999);
   const endOfTodayMs = endOfToday.getTime();
   const inSevenDays = now + 7 * 24 * 3600 * 1000;
 
   for (const t of tasks) {
     if (t.status === 'COMPLETED' || t.status === 'CANCELLED') continue;
-    if (!t.due_at) { buckets.no_due.push(t); continue; }
+    if (!t.due_at) {
+      buckets.no_due.push(t);
+      continue;
+    }
     const d = new Date(t.due_at).getTime();
     if (d < now) buckets.overdue.push(t);
     else if (d <= endOfTodayMs) buckets.today.push(t);
@@ -47,7 +62,6 @@ function bucketize(tasks: Task[]): Record<SectionKey, Task[]> {
 }
 
 export function TasksAssignedToMe() {
-  const { profile } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -77,11 +91,11 @@ export function TasksAssignedToMe() {
   }, [reloadTick]);
 
   const buckets = useMemo(() => bucketize(tasks), [tasks]);
-  const active = tasks.filter(t => t.status !== 'COMPLETED' && t.status !== 'CANCELLED');
+  const active = tasks.filter((t) => t.status !== 'COMPLETED' && t.status !== 'CANCELLED');
   const overdueCount = buckets.overdue.length;
   const dueThisWeek = buckets.today.length + buckets.this_week.length;
   const nextUp: Task | undefined = useMemo(() => {
-    const open = active.filter(t => t.due_at);
+    const open = active.filter((t) => t.due_at);
     if (open.length === 0) return active[0];
     open.sort((a, b) => {
       const pri = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 } as const;
@@ -106,7 +120,9 @@ export function TasksAssignedToMe() {
           <p className="text-sm text-slate-600 mt-1">
             <span className="font-semibold text-slate-900">{active.length} active</span>
             {' · '}
-            <span className={overdueCount > 0 ? 'font-semibold text-red-600' : ''}>{overdueCount} overdue</span>
+            <span className={overdueCount > 0 ? 'font-semibold text-red-600' : ''}>
+              {overdueCount} overdue
+            </span>
             {' · '}
             <span className="font-semibold text-slate-900">{dueThisWeek} due this week</span>
           </p>
@@ -116,7 +132,8 @@ export function TasksAssignedToMe() {
               previous render used <button> with no onClick which looked
               clickable but did nothing. */}
           <span className="border border-slate-200 bg-white rounded-lg px-3 py-1.5 text-sm text-slate-700">
-            📅 Today · {new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+            📅 Today ·{' '}
+            {new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
           </span>
           {/* "Log daily activity" link removed — it pointed at /reports which
               requires MANAGER_TIER and 403'd for every recruiter who clicked
@@ -146,8 +163,11 @@ export function TasksAssignedToMe() {
                 {humanDue(nextUp.due_at)}
               </span>
             )}
-            {(nextUp.tags ?? []).slice(0, 2).map(tg => (
-              <span key={tg} className="inline-flex items-center bg-white/15 backdrop-blur-sm rounded-full text-[10px] font-medium uppercase tracking-wide px-2 py-0.5">
+            {(nextUp.tags ?? []).slice(0, 2).map((tg) => (
+              <span
+                key={tg}
+                className="inline-flex items-center bg-white/15 backdrop-blur-sm rounded-full text-[10px] font-medium uppercase tracking-wide px-2 py-0.5"
+              >
                 {tg}
               </span>
             ))}
@@ -182,7 +202,9 @@ export function TasksAssignedToMe() {
                   <span className="text-xs text-slate-500 tabular-nums">{list.length}</span>
                 </div>
                 <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100">
-                  {list.map(t => <RowCard key={t.id} task={t} />)}
+                  {list.map((t) => (
+                    <RowCard key={t.id} task={t} />
+                  ))}
                 </div>
               </section>
             );
@@ -210,10 +232,14 @@ function RowCard({ task }: { task: Task }) {
           {task.assignee && (
             <span className="inline-flex items-center gap-1">
               <Avatar name={task.assignee.full_name} email={task.assignee.email} size={16} />
-              <span className="truncate max-w-[100px]">{task.assignee.full_name ?? task.assignee.email}</span>
+              <span className="truncate max-w-[100px]">
+                {task.assignee.full_name ?? task.assignee.email}
+              </span>
             </span>
           )}
-          {(task.tags ?? []).slice(0, 1).map(tg => <TagPill key={tg} tag={`#${tg}`} />)}
+          {(task.tags ?? []).slice(0, 1).map((tg) => (
+            <TagPill key={tg} tag={`#${tg}`} />
+          ))}
         </div>
       </span>
       <TaskStatusBadge status={task.status} />
@@ -226,8 +252,10 @@ function RowCard({ task }: { task: Task }) {
 function humanDue(iso: string): string {
   const d = new Date(iso);
   const now = new Date();
-  const startToday = new Date(now); startToday.setHours(0, 0, 0, 0);
-  const startDue = new Date(d); startDue.setHours(0, 0, 0, 0);
+  const startToday = new Date(now);
+  startToday.setHours(0, 0, 0, 0);
+  const startDue = new Date(d);
+  startDue.setHours(0, 0, 0, 0);
   const diffDays = Math.round((startDue.getTime() - startToday.getTime()) / (24 * 3600 * 1000));
   if (diffDays === 0) return 'Due today';
   if (diffDays === 1) return 'Due tomorrow';
