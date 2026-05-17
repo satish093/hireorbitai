@@ -248,22 +248,32 @@ export const recommended: RequestHandler = async (req, res) => {
   }
 
   let qb = db.from('jobs').select(JOB_SELECT).eq('is_active', true);
-  qb = applyLocationFilter(qb, location ?? 'United States');
+  // Only apply a location filter when the caller explicitly asked for one.
+  // The previous default of "United States" silently hid every non-US row
+  // (and most Greenhouse / Ashby orgs are global), so the recommended page
+  // looked like it only had ~40 jobs. Now the default returns the full
+  // active feed and the user opts into a location with the filter pill.
+  if (location && location.trim().length > 0) {
+    qb = applyLocationFilter(qb, location);
+  }
   if (remote === 'true') qb = qb.eq('remote', true);
   if (remote === 'false') qb = qb.eq('remote', false);
   if (posted_after) qb = qb.gte('posted_at', posted_after);
   if (publisher) qb = qb.eq('publisher', publisher);
-  // Pull a wider candidate pool when a job_function filter is on, so the
-  // post-filter still leaves enough rows for the AI ranker.
+  // No hard 40-row cap anymore — the page is the user's full feed. A high
+  // ceiling (2k) still protects the response size, prevents pathological
+  // payloads, and matches what the frontend can render without lag. Override
+  // via JOBS_RECOMMENDED_MAX env var if you ever need more.
   const fnMatcher = buildJobFunctionMatcher(job_function);
-  const fetchLimit = fnMatcher ? 200 : 40;
+  const fetchLimit = Math.max(
+    100,
+    Math.min(5000, Number(process.env.JOBS_RECOMMENDED_MAX ?? 2000)),
+  );
   const { data: jobs, error } = await qb.limit(fetchLimit);
   if (error) throw httpError(500, error.message);
 
   let ranked = jobs ?? [];
   if (fnMatcher) ranked = ranked.filter((j: any) => fnMatcher(j.title ?? ''));
-  // Cap to 40 once filtered so the AI ranker stays cheap.
-  ranked = ranked.slice(0, 40);
 
   // Compute a deterministic baseline score for every job from skill overlap
   // (consultant skills ∩ job.required_skills). This guarantees a score on
@@ -338,9 +348,21 @@ export const recommended: RequestHandler = async (req, res) => {
         preferredLocations: consultant.preferred_locations ?? [],
       };
       if (resumeText) profile.resume_excerpt = resumeText.slice(0, 4000);
+      // Only AI-rank the top N by deterministic baseline score. The rest of
+      // the feed (which can now be thousands of rows) keeps its baseline
+      // score from the loop above — perfectly serviceable, just less
+      // nuanced. Caps Anthropic spend to a single batched prompt regardless
+      // of feed size.
+      const AI_RANK_TOP_N = Math.max(
+        10,
+        Math.min(100, Number(process.env.JOBS_AI_RANK_TOP_N ?? 40)),
+      );
+      const topForAi = [...ranked]
+        .sort((a: any, b: any) => (b.match_score ?? -1) - (a.match_score ?? -1))
+        .slice(0, AI_RANK_TOP_N);
       const matches = await matchJobsForConsultant(
         profile,
-        ranked.map((j: any) => ({
+        topForAi.map((j: any) => ({
           id: j.id,
           title: j.title,
           required_skills: j.required_skills,
