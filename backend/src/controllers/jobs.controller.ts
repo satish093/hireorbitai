@@ -903,3 +903,138 @@ export const matchForConsultant: RequestHandler = async (req, res) => {
   );
   res.json(matches);
 };
+
+// ---------------------------------------------------------------------------
+// Skill gap — deterministic, no AI call.
+//
+// Returns the intersection + difference of a job's required_skills against a
+// consultant's skill list. Fast enough to call on every job-card expansion
+// (no Anthropic tokens, no LLM latency). Used by the "you have X / missing
+// Y" UI on the job detail card.
+//
+// Resolution order for the consultant:
+//   1. ?consultant_id=… in the query (manager-tier only — admin scoping the
+//      gap on someone else's behalf, e.g. a recruiter triaging)
+//   2. The calling user's own consultant row (the common case — consultants
+//      browsing jobs)
+//
+// Returns 200 with { have:[], missing:[], coverage:0 } if no consultant row
+// is resolvable, so the frontend can render a "complete your profile" hint
+// instead of a 404.
+// ---------------------------------------------------------------------------
+function normalizeSkill(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/[+]+$/g, '') // "java 8+" → "java 8"
+    .replace(/\bversion\s*\d+(\.\d+)*\b/g, '') // "react version 18.2" → "react"
+    .replace(/\b\d+(\.\d+)*\b/g, '') // strip bare version numbers
+    .replace(/[^a-z0-9\s#./-]/g, '') // keep tech chars: c#, .net, react-router, etc.
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** Match if either side is a substring (or token-set superset) of the other
+ *  after normalization. "react" matches "React 18+"; "aws" matches "AWS S3".
+ *  Conservative — false positives just inflate "have"; we'd rather over-credit
+ *  the candidate than under-credit them. */
+function skillsMatch(consultantSkill: string, jobSkill: string): boolean {
+  const a = normalizeSkill(consultantSkill);
+  const b = normalizeSkill(jobSkill);
+  if (!a || !b) return false;
+  if (a === b) return true;
+  if (a.includes(b) || b.includes(a)) return true;
+  // Token-set match: split on space, see if all tokens of the shorter side
+  // appear somewhere in the longer side. Handles "spring boot" / "Java
+  // Spring Boot framework".
+  const ta = a.split(' ').filter(Boolean);
+  const tb = b.split(' ').filter(Boolean);
+  const [short, long] = ta.length <= tb.length ? [ta, tb] : [tb, ta];
+  return short.length > 0 && short.every((t) => long.includes(t));
+}
+
+export const skillGap: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+
+  // Resolve the consultant row to compare against.
+  let consultant: { id: string; primary_skill: string | null; skills: string[] | null } | null =
+    null;
+  const explicitId = (req.query.consultant_id as string | undefined)?.trim();
+  if (explicitId) {
+    const role = req.user.role;
+    const isManagerTier = [
+      'SUPER_ADMIN',
+      'CEO',
+      'CTO',
+      'DIRECTOR',
+      'MANAGER',
+      'RECRUITER',
+    ].includes(role);
+    if (!isManagerTier) throw httpError(403, 'Only managers can request another consultant gap');
+    const { data } = await db
+      .from('consultants')
+      .select('id, primary_skill, skills')
+      .eq('id', explicitId)
+      .maybeSingle();
+    consultant = data;
+  } else {
+    const me = await getConsultantForUser(req.user.id);
+    if (me) {
+      const { data } = await db
+        .from('consultants')
+        .select('id, primary_skill, skills')
+        .eq('id', me.id)
+        .maybeSingle();
+      consultant = data;
+    }
+  }
+
+  const { data: job, error } = await db
+    .from('jobs')
+    .select('id, title, required_skills, requirements, match_score')
+    .eq('id', req.params.id)
+    .maybeSingle();
+  if (error || !job) throw httpError(404, 'Job not found');
+
+  const jobReqSkills: string[] = (() => {
+    const fromReq = (job.requirements as { required_skills?: string[] } | null)?.required_skills;
+    if (Array.isArray(fromReq) && fromReq.length > 0) return fromReq;
+    if (Array.isArray(job.required_skills) && job.required_skills.length > 0)
+      return job.required_skills;
+    return [];
+  })();
+
+  // If we couldn't resolve a consultant, return the empty-but-valid shape so
+  // the frontend can render "complete your profile" rather than a 404.
+  if (!consultant) {
+    res.json({
+      consultant_resolved: false,
+      have: [],
+      missing: jobReqSkills,
+      coverage: 0,
+      match_score: typeof job.match_score === 'number' ? job.match_score : null,
+    });
+    return;
+  }
+
+  const consultantSkills = skillsForMatching(consultant);
+  const have: string[] = [];
+  const missing: string[] = [];
+  for (const js of jobReqSkills) {
+    if (consultantSkills.some((cs) => skillsMatch(cs, js))) {
+      have.push(js);
+    } else {
+      missing.push(js);
+    }
+  }
+  const coverage =
+    jobReqSkills.length > 0 ? Math.round((have.length / jobReqSkills.length) * 100) : 0;
+
+  res.json({
+    consultant_resolved: true,
+    consultant_id: consultant.id,
+    have,
+    missing,
+    coverage,
+    match_score: typeof job.match_score === 'number' ? job.match_score : null,
+  });
+};

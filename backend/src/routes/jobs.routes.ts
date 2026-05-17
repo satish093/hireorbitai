@@ -45,6 +45,7 @@ jobsRouter.delete('/:id/like', c.unlike);
 
 jobsRouter.get('/:id/match-for-me', c.matchForMe);
 jobsRouter.get('/:id/requirements', c.requirementsFor);
+jobsRouter.get('/:id/skill-gap', c.skillGap);
 jobsRouter.post('/:id/ats-match', c.atsMatch);
 jobsRouter.post('/:id/enrich', c.enrichOne);
 jobsRouter.post('/:id/skill-match', c.skillMatchForMe);

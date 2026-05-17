@@ -8,6 +8,7 @@ import { CustomizeResumeWizard } from '../components/CustomizeResumeWizard';
 import { DuplicateSubmissionModal } from '../components/DuplicateSubmissionModal';
 import { invalidate } from '../hooks/useInvalidate';
 import { useFeatureFlag } from '../hooks/useFeatureFlags';
+import { SkillGap } from '../components/SkillGap';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
 
@@ -1063,6 +1064,13 @@ function JobCard({
                 {s}
               </span>
             ))}
+          </div>
+        )}
+
+        {/* Skill gap card — only when expanded; cheap deterministic call, no AI */}
+        {expanded && (
+          <div className="mt-4">
+            <SkillGap jobId={job.id} />
           </div>
         )}
 
