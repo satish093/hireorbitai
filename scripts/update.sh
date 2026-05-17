@@ -24,6 +24,17 @@ cd "$ROOT"
 
 before_sha="$(git rev-parse --short HEAD)"
 
+# Reset any tracked-file changes the previous deploy may have left behind.
+# npm install on the VPS occasionally rewrites package-lock.json (different
+# OS / npm version vs. CI), which blocks the next `git pull --ff-only` with
+# "Your local changes would be overwritten by merge". The deploy target has
+# no business holding manual edits — discard them. Untracked files (.env,
+# uploads, etc.) are NOT touched.
+if ! git diff --quiet || ! git diff --cached --quiet; then
+  echo "→ resetting tracked-file changes from previous deploy"
+  git checkout -- .
+fi
+
 echo "→ git fetch && pull (ff-only)"
 git fetch --tags --prune
 git pull --ff-only
