@@ -79,6 +79,5 @@ jobs:
         # the public URL is healthy, not just the loopback.
         run: |
           set -e
-          curl -fsS https://hireorbitai.com/api/healthz | tee /tmp/healthz.json
-          # Optional: check that .ok === true in the response body
-          grep -q '"ok":true' /tmp/healthz.json || { echo "::error::healthz did not report ok=true"; exit 1; }
+          curl -fsS https://hireorbitai.com/api/health | tee /tmp/health.json
+          grep -q '"ok":true' /tmp/health.json || { echo "::error::health did not report ok=true"; exit 1; }

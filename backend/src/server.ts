@@ -199,18 +199,17 @@ app.use('/api/invitations/setup', authLimiter);
 // --- Health + readiness -------------------------------------------------------
 // /health = liveness (the process is up and responsive)
 // /ready  = readiness (deps responding; safe to route traffic here)
-app.get('/health', (_req, res) => {
+// Registered on both root and /api so single-domain Nginx proxies (which only
+// forward /api/* to the backend) can hit them without an extra location block.
+const healthHandler: import('express').RequestHandler = (_req, res) => {
   res.json({
     ok: true,
     service: 'hireorbit-api',
     uptimeSeconds: Math.round(process.uptime()),
     nodeEnv: env.nodeEnv,
   });
-});
-
-app.get('/ready', async (_req, res) => {
-  // Readiness probe — runs a trivial query against Postgres so an orchestrator
-  // can distinguish "process up" (/healthz) from "database reachable" (/ready).
+};
+const readyHandler: import('express').RequestHandler = async (_req, res) => {
   try {
     const { pool } = await import('./config/db');
     await pool.query('SELECT 1');
@@ -218,7 +217,11 @@ app.get('/ready', async (_req, res) => {
   } catch (e: unknown) {
     res.status(503).json({ ok: false, error: e instanceof Error ? e.message : 'unknown' });
   }
-});
+};
+app.get('/health', healthHandler);
+app.get('/api/health', healthHandler);
+app.get('/ready', readyHandler);
+app.get('/api/ready', readyHandler);
 
 // --- API routes ---------------------------------------------------------------
 // Mounted at both root and /api so two deployment shapes work without code change:
