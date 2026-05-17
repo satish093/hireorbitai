@@ -7,6 +7,7 @@ import { ApplyInterceptModal, shouldShowApplyIntercept } from '../components/App
 import { CustomizeResumeWizard } from '../components/CustomizeResumeWizard';
 import { DuplicateSubmissionModal } from '../components/DuplicateSubmissionModal';
 import { invalidate } from '../hooks/useInvalidate';
+import { useFeatureFlag } from '../hooks/useFeatureFlags';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
 
@@ -25,11 +26,11 @@ type AppStatus =
 type AppliedSubTab = 'applied' | 'interviewing' | 'offer' | 'rejected' | 'archived';
 
 const APPLIED_SUB_TABS: { key: AppliedSubTab; label: string; statuses: AppStatus[] }[] = [
-  { key: 'applied',      label: 'Applied',        statuses: ['SUBMITTED', 'SCREENING'] },
-  { key: 'interviewing', label: 'Interviewing',   statuses: ['INTERVIEW'] },
-  { key: 'offer',        label: 'Offer Received', statuses: ['OFFER'] },
-  { key: 'rejected',     label: 'Rejected',       statuses: ['REJECTED'] },
-  { key: 'archived',     label: 'Archived',       statuses: ['ARCHIVED', 'WITHDRAWN'] },
+  { key: 'applied', label: 'Applied', statuses: ['SUBMITTED', 'SCREENING'] },
+  { key: 'interviewing', label: 'Interviewing', statuses: ['INTERVIEW'] },
+  { key: 'offer', label: 'Offer Received', statuses: ['OFFER'] },
+  { key: 'rejected', label: 'Rejected', statuses: ['REJECTED'] },
+  { key: 'archived', label: 'Archived', statuses: ['ARCHIVED', 'WITHDRAWN'] },
 ];
 
 /** Human-friendly labels for the status dropdown on each card. */
@@ -134,7 +135,9 @@ export function JobSearch() {
   const [insightFor, setInsightFor] = useState<JobRow | null>(null);
   const [interceptFor, setInterceptFor] = useState<JobRow | null>(null);
   const [customizeFor, setCustomizeFor] = useState<JobRow | null>(null);
-  const [confirmFor, setConfirmFor] = useState<{ job: JobRow; resumeId: string | null } | null>(null);
+  const [confirmFor, setConfirmFor] = useState<{ job: JobRow; resumeId: string | null } | null>(
+    null,
+  );
   const [dupWarning, setDupWarning] = useState<{
     job: JobRow;
     consultantName: string;
@@ -175,7 +178,7 @@ export function JobSearch() {
     if (!isConsultant) return;
     (async () => {
       try {
-        const r = await api.get('/consultants', { params: { } });
+        const r = await api.get('/consultants', { params: {} });
         const me = (r.data ?? [])[0];
         setSkills(Array.isArray(me?.skills) ? me.skills : []);
         if (me?.id) {
@@ -184,10 +187,15 @@ export function JobSearch() {
             const rr = await api.get(`/resumes/consultant/${me.id}`);
             const current = (rr.data ?? []).find((x: any) => x.is_current) ?? (rr.data ?? [])[0];
             if (current?.id) setMyResumeId(current.id);
-          } catch { /* no resume yet */ }
+          } catch {
+            /* no resume yet */
+          }
         }
-      } catch { /* silent — picker just starts empty */ }
-      finally { setSkillsLoaded(true); }
+      } catch {
+        /* silent — picker just starts empty */
+      } finally {
+        setSkillsLoaded(true);
+      }
     })();
   }, [isConsultant]);
 
@@ -209,7 +217,10 @@ export function JobSearch() {
       const reports: any[] = s.reports ?? [];
       const errs = reports.filter((rp) => rp.error);
       // Aggregate per source so the toast shows where the jobs came from.
-      const bySource = new Map<string, { pulled: number; upserted: number; errors: number; rows: number }>();
+      const bySource = new Map<
+        string,
+        { pulled: number; upserted: number; errors: number; rows: number }
+      >();
       for (const rp of reports) {
         const cur = bySource.get(rp.source) ?? { pulled: 0, upserted: 0, errors: 0, rows: 0 };
         cur.pulled += rp.jobs_pulled ?? 0;
@@ -224,33 +235,45 @@ export function JobSearch() {
         .join(', ');
       toast.success(
         `Pulled ${s.jobs_pulled} jobs across ${bySource.size} drivers · ${s.new_jobs ?? 0} new` +
-        (errs.length ? ` · ${errs.length} errors` : ''),
+          (errs.length ? ` · ${errs.length} errors` : ''),
         { duration: 6000 },
       );
       if (errs.length > 0) {
         // Show one extra toast listing the failing sources so the user knows
         // which keys / configs are broken without opening the drawer.
-        const failing = errs.slice(0, 3).map((e) => `${e.source}${e.slug ? `/${e.slug}` : ''}: ${e.error?.slice(0, 100)}`).join('\n');
-        toast.error(`Failures:\n${failing}${errs.length > 3 ? `\n…and ${errs.length - 3} more` : ''}`, { duration: 10000 });
+        const failing = errs
+          .slice(0, 3)
+          .map((e) => `${e.source}${e.slug ? `/${e.slug}` : ''}: ${e.error?.slice(0, 100)}`)
+          .join('\n');
+        toast.error(
+          `Failures:\n${failing}${errs.length > 3 ? `\n…and ${errs.length - 3} more` : ''}`,
+          { duration: 10000 },
+        );
       }
       // eslint-disable-next-line no-console
       console.info('[sync] breakdown:', breakdown, 'reports:', reports);
       await load(tab);
     } catch (e: any) {
       toast.error(e?.response?.data?.error ?? 'Sync failed');
-    } finally { setSyncing(false); }
+    } finally {
+      setSyncing(false);
+    }
   }
 
   async function enrichNow() {
     setSyncing(true);
     try {
       toast('Enriching jobs with AI… this may take a minute', { duration: 4000 });
-      const r = await api.post('/jobs/enrich-pending', null, { params: { limit: 30, concurrency: 5 } });
+      const r = await api.post('/jobs/enrich-pending', null, {
+        params: { limit: 30, concurrency: 5 },
+      });
       toast.success(`Enriched ${r.data.enriched} jobs (${r.data.failed} failed)`);
       await load(tab);
     } catch (e: any) {
       toast.error(e?.response?.data?.error ?? 'Enrichment failed');
-    } finally { setSyncing(false); }
+    } finally {
+      setSyncing(false);
+    }
   }
 
   async function load(currentTab: TabKey = tab, signal?: AbortSignal) {
@@ -318,7 +341,9 @@ export function JobSearch() {
     // Duplicate-submission warning — works in both modes.
     if (consultantId) {
       try {
-        const r = await api.get(`/jobs/${job.id}/duplicate-check`, { params: { consultant_id: consultantId } });
+        const r = await api.get(`/jobs/${job.id}/duplicate-check`, {
+          params: { consultant_id: consultantId },
+        });
         if (r.data?.duplicate) {
           setDupWarning({
             job,
@@ -328,14 +353,19 @@ export function JobSearch() {
           });
           return;
         }
-      } catch { /* non-fatal */ }
+      } catch {
+        /* non-fatal */
+      }
     }
 
     proceedToApply(job, consultantId);
   }
 
   function proceedToApply(job: JobRow, consultantId?: string | null) {
-    if (isRecruiterMode && consultantId) { setInterceptFor(job); return; }
+    if (isRecruiterMode && consultantId) {
+      setInterceptFor(job);
+      return;
+    }
     if (isConsultant && shouldShowApplyIntercept()) {
       setInterceptFor(job);
     } else {
@@ -372,9 +402,11 @@ export function JobSearch() {
     // their own submission. Without either we can't write the row.
     const consultantId = isRecruiterMode ? target?.consultantId : myConsultantId;
     if (!consultantId) {
-      toast.error(isRecruiterMode
-        ? 'No consultant selected — pick one in the targeting bar first'
-        : 'Your consultant profile is missing; finish onboarding to record applications');
+      toast.error(
+        isRecruiterMode
+          ? 'No consultant selected — pick one in the targeting bar first'
+          : 'Your consultant profile is missing; finish onboarding to record applications',
+      );
       return;
     }
     try {
@@ -408,22 +440,19 @@ export function JobSearch() {
 
   async function toggleLike(job: JobRow) {
     // optimistic
-    setRows(rs => rs.map(r => r.id === job.id ? { ...r, liked: !r.liked } : r));
+    setRows((rs) => rs.map((r) => (r.id === job.id ? { ...r, liked: !r.liked } : r)));
     try {
       if (job.liked) await api.delete(`/jobs/${job.id}/like`);
       else await api.post(`/jobs/${job.id}/like`);
     } catch (e: any) {
       // revert
-      setRows(rs => rs.map(r => r.id === job.id ? { ...r, liked: job.liked } : r));
+      setRows((rs) => rs.map((r) => (r.id === job.id ? { ...r, liked: job.liked } : r)));
       toast.error(e?.response?.data?.error ?? 'Failed to update like');
     }
   }
 
   return (
-    <Layout
-      title="Jobs"
-      crumbs={[{ label: 'Workspace', to: '/dashboard' }, { label: 'Jobs' }]}
-    >
+    <Layout title="Jobs" crumbs={[{ label: 'Workspace', to: '/dashboard' }, { label: 'Jobs' }]}>
       {/* Tabs + search */}
       <div className="flex items-center gap-4 mb-5">
         <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Jobs</h1>
@@ -436,7 +465,7 @@ export function JobSearch() {
                 'pb-1.5 text-sm border-b-2 transition',
                 tab === t.key
                   ? 'border-slate-900 text-slate-900 font-semibold'
-                  : 'border-transparent text-slate-500 hover:text-slate-800'
+                  : 'border-transparent text-slate-500 hover:text-slate-800',
               )}
             >
               {t.label}
@@ -450,10 +479,14 @@ export function JobSearch() {
               placeholder="Search by title or company"
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') load(); }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') load();
+              }}
               className="w-full bg-slate-50 border border-slate-200 rounded-full pl-9 pr-3 py-1.5 text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
             />
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">⌕</span>
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
+              ⌕
+            </span>
           </div>
           {isManager && (
             <>
@@ -493,11 +526,7 @@ export function JobSearch() {
 
       {/* Skills picker — consultants tune the recommender by adding their skills */}
       {isConsultant && skillsLoaded && tab === 'recommended' && (
-        <SkillsPicker
-          skills={skills}
-          onChange={saveSkills}
-          onRecompute={() => load()}
-        />
+        <SkillsPicker skills={skills} onChange={saveSkills} onRecompute={() => load()} />
       )}
 
       {/* Filter chips */}
@@ -507,7 +536,9 @@ export function JobSearch() {
             label="Location"
             value={location}
             placeholder="Anywhere"
-            onChange={(v) => { setLocation(v); }}
+            onChange={(v) => {
+              setLocation(v);
+            }}
             options={[
               { value: '', label: 'Anywhere' },
               { value: 'United States', label: 'United States' },
@@ -616,7 +647,16 @@ export function JobSearch() {
             Apply
           </button>
           <button
-            onClick={() => { setQ(''); setLocation('United States'); setRemote(''); setPostedAfter('1'); setYearsMin(''); setSourceFilter(''); setPublisherFilter(''); setJobFunction(''); }}
+            onClick={() => {
+              setQ('');
+              setLocation('United States');
+              setRemote('');
+              setPostedAfter('1');
+              setYearsMin('');
+              setSourceFilter('');
+              setPublisherFilter('');
+              setJobFunction('');
+            }}
             className="text-xs text-slate-500 hover:text-slate-900 ml-1"
           >
             Reset
@@ -629,8 +669,12 @@ export function JobSearch() {
         <div className="bg-amber-50 border border-amber-100 rounded-xl px-4 py-2.5 mb-3 text-xs text-amber-900 flex items-center gap-2">
           <span>⚠️</span>
           <span>
-            <strong>No resume on file</strong> — match scores below are based on the curated skill list only.
-            Upload a resume on <a className="underline" href="/resumes">Resumes</a> so we can rank against your actual experience.
+            <strong>No resume on file</strong> — match scores below are based on the curated skill
+            list only. Upload a resume on{' '}
+            <a className="underline" href="/resumes">
+              Resumes
+            </a>{' '}
+            so we can rank against your actual experience.
           </span>
         </div>
       )}
@@ -652,51 +696,56 @@ export function JobSearch() {
 
       {/* Applied sub-tabs — Jobright-style pipeline view. */}
       {tab === 'applied' && (
-        <AppliedSubTabs
-          rows={rows}
-          active={appliedSub}
-          onChange={setAppliedSub}
-        />
+        <AppliedSubTabs rows={rows} active={appliedSub} onChange={setAppliedSub} />
       )}
 
       {/* Results — apply source filter (Recommended/Liked) and sub-tab filter (Applied). */}
       {(() => {
         const filtered = filteredRows(rows, tab, sourceFilter, appliedSub);
         if (loading) return <div className="text-sm text-slate-500">Loading…</div>;
-        if (filtered.length === 0) return <EmptyState tab={tab} onSync={isManager ? syncNow : undefined} />;
+        if (filtered.length === 0)
+          return <EmptyState tab={tab} onSync={isManager ? syncNow : undefined} />;
         return (
-        <div className="space-y-3">
-          {filtered.map((j) => (
-            <JobCard
-              key={j.id}
-              job={j}
-              isConsultant={isConsultant}
-              onToggleLike={() => toggleLike(j)}
-              onOpenInsight={() => setInsightFor(j)}
-              onApply={() => handleApplyClick(j)}
-              // Only supply the dropdown handler when this row IS an application
-              // (the Applied tab). Recommended/Liked rows keep the Apply button.
-              onChangeStatus={j.application_id ? (async (next) => {
-                const appId = j.application_id;
-                if (!appId) return;
-                // Optimistic.
-                setRows((rs) => rs.map((r) => r.id === j.id ? { ...r, application_status: next } : r));
-                try {
-                  await api.patch(`/applications/${appId}`, { status: next });
-                  invalidate('applications');
-                } catch (e: any) {
-                  toast.error(e?.response?.data?.error ?? 'Failed to update status');
-                  // Roll back by reloading.
-                  load(tab);
+          <div className="space-y-3">
+            {filtered.map((j) => (
+              <JobCard
+                key={j.id}
+                job={j}
+                isConsultant={isConsultant}
+                onToggleLike={() => toggleLike(j)}
+                onOpenInsight={() => setInsightFor(j)}
+                onApply={() => handleApplyClick(j)}
+                // Only supply the dropdown handler when this row IS an application
+                // (the Applied tab). Recommended/Liked rows keep the Apply button.
+                onChangeStatus={
+                  j.application_id
+                    ? async (next) => {
+                        const appId = j.application_id;
+                        if (!appId) return;
+                        // Optimistic.
+                        setRows((rs) =>
+                          rs.map((r) => (r.id === j.id ? { ...r, application_status: next } : r)),
+                        );
+                        try {
+                          await api.patch(`/applications/${appId}`, { status: next });
+                          invalidate('applications');
+                        } catch (e: any) {
+                          toast.error(e?.response?.data?.error ?? 'Failed to update status');
+                          // Roll back by reloading.
+                          load(tab);
+                        }
+                      }
+                    : undefined
                 }
-              }) : undefined}
-            />
-          ))}
-        </div>
+              />
+            ))}
+          </div>
         );
       })()}
 
-      {sourcesOpen && <SourcesDrawer onClose={() => setSourcesOpen(false)} onAfterSync={() => load(tab)} />}
+      {sourcesOpen && (
+        <SourcesDrawer onClose={() => setSourcesOpen(false)} onAfterSync={() => load(tab)} />
+      )}
       {insightFor && <MatchInsightModal job={insightFor} onClose={() => setInsightFor(null)} />}
       {interceptFor && (
         <ApplyInterceptModal
@@ -727,33 +776,34 @@ export function JobSearch() {
           onApplyAnyway={() => handlePlainApply(interceptFor)}
         />
       )}
-      {customizeFor && (() => {
-        const ctxConsultantId = isRecruiterMode ? target?.consultantId : myConsultantId;
-        const ctxResumeId = isRecruiterMode ? target?.resumeId : myResumeId;
-        const ctxSkills = isRecruiterMode ? (target?.skills ?? []) : skills;
-        if (!ctxConsultantId || !ctxResumeId) return null;
-        return (
-          <CustomizeResumeWizard
-            job={customizeFor}
-            consultantId={ctxConsultantId}
-            sourceResumeId={ctxResumeId}
-            mySkills={ctxSkills}
-            onClose={() => setCustomizeFor(null)}
-            onApplied={(r) => {
-              const job = customizeFor;
-              setCustomizeFor(null);
-              recordApplication({
-                job,
-                method: 'CUSTOMIZED',
-                resumeId: ctxResumeId,
-                tailoredResumeId: r.tailoredResumeId,
-                matchScore: r.matchScore,
-                atsScore: r.atsScore,
-              });
-            }}
-          />
-        );
-      })()}
+      {customizeFor &&
+        (() => {
+          const ctxConsultantId = isRecruiterMode ? target?.consultantId : myConsultantId;
+          const ctxResumeId = isRecruiterMode ? target?.resumeId : myResumeId;
+          const ctxSkills = isRecruiterMode ? (target?.skills ?? []) : skills;
+          if (!ctxConsultantId || !ctxResumeId) return null;
+          return (
+            <CustomizeResumeWizard
+              job={customizeFor}
+              consultantId={ctxConsultantId}
+              sourceResumeId={ctxResumeId}
+              mySkills={ctxSkills}
+              onClose={() => setCustomizeFor(null)}
+              onApplied={(r) => {
+                const job = customizeFor;
+                setCustomizeFor(null);
+                recordApplication({
+                  job,
+                  method: 'CUSTOMIZED',
+                  resumeId: ctxResumeId,
+                  tailoredResumeId: r.tailoredResumeId,
+                  matchScore: r.matchScore,
+                  atsScore: r.atsScore,
+                });
+              }}
+            />
+          );
+        })()}
       {dupWarning && (
         <DuplicateSubmissionModal
           consultantName={dupWarning.consultantName}
@@ -787,7 +837,9 @@ export function JobSearch() {
                   consultant_id: consultantId ?? null,
                   payload: { reason: 'user_said_no' },
                 });
-              } catch { /* non-fatal */ }
+              } catch {
+                /* non-fatal */
+              }
               return;
             }
             recordApplication({
@@ -806,9 +858,15 @@ export function JobSearch() {
 }
 
 function PillSelect({
-  label, value, onChange, options, placeholder,
+  label,
+  value,
+  onChange,
+  options,
+  placeholder,
 }: {
-  label: string; value: string; onChange: (v: string) => void;
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
   options: { value: string; label: string }[];
   placeholder?: string;
 }) {
@@ -820,8 +878,14 @@ function PillSelect({
         onChange={(e) => onChange(e.target.value)}
         className="bg-transparent text-sm font-medium text-slate-900 outline-none pr-1"
       >
-        {placeholder && !options.find(o => o.value === '') && <option value="">{placeholder}</option>}
-        {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+        {placeholder && !options.find((o) => o.value === '') && (
+          <option value="">{placeholder}</option>
+        )}
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
       </select>
     </label>
   );
@@ -837,7 +901,10 @@ function EmptyState({ tab, onSync }: { tab: TabKey; onSync?: () => void }) {
     <div className="bg-white border border-slate-200 rounded-xl p-10 text-center text-slate-500">
       <div className="mb-3">{map[tab]}</div>
       {tab === 'recommended' && onSync && (
-        <button onClick={onSync} className="bg-slate-900 text-white text-sm px-4 py-2 rounded-full hover:bg-slate-800 inline-flex items-center gap-1.5">
+        <button
+          onClick={onSync}
+          className="bg-slate-900 text-white text-sm px-4 py-2 rounded-full hover:bg-slate-800 inline-flex items-center gap-1.5"
+        >
           <span>↻</span> Sync jobs now
         </button>
       )}
@@ -850,7 +917,12 @@ function EmptyState({ tab, onSync }: { tab: TabKey; onSync?: () => void }) {
 // ---------------------------------------------------------------------------
 
 function JobCard({
-  job, isConsultant, onToggleLike, onOpenInsight, onApply, onChangeStatus,
+  job,
+  isConsultant,
+  onToggleLike,
+  onOpenInsight,
+  onApply,
+  onChangeStatus,
 }: {
   job: JobRow;
   isConsultant: boolean;
@@ -861,9 +933,14 @@ function JobCard({
   onChangeStatus?: (next: AppStatus) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  // ai_match flag hides every AI match-score affordance (pill + circular
+  // score in the expanded view). Default-allow on missing flag so older
+  // installs keep showing the score.
+  const aiMatchEnabled = useFeatureFlag('ai_match');
   const companyName =
     job.company_name ?? job.client?.company_name ?? job.vendor?.company_name ?? 'Confidential';
-  const matchScore = typeof job.match_score === 'number' ? Math.round(job.match_score) : null;
+  const matchScore =
+    aiMatchEnabled && typeof job.match_score === 'number' ? Math.round(job.match_score) : null;
 
   const reqs = job.requirements ?? {};
   const recTags = reqs.recommendation_tags ?? [];
@@ -876,7 +953,8 @@ function JobCard({
   const minYears = reqs.min_years_of_experience ?? reqs.years_required ?? null;
   const seniority = reqs.job_seniority ?? reqs.level ?? job.level ?? null;
   const workModel = reqs.work_model ?? (job.remote ? 'Remote' : 'Onsite');
-  const requiredSkills = (reqs.required_skills?.length ? reqs.required_skills : job.required_skills) ?? [];
+  const requiredSkills =
+    (reqs.required_skills?.length ? reqs.required_skills : job.required_skills) ?? [];
   const enriched = !!job.requirements;
 
   return (
@@ -887,7 +965,9 @@ function JobCard({
           <Avatar name={companyName} size={44} />
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1 flex-wrap">
-              <span className="text-xs text-slate-500">{relative(job.posted_at ?? job.created_at)}</span>
+              <span className="text-xs text-slate-500">
+                {relative(job.posted_at ?? job.created_at)}
+              </span>
               {isEarly(job.posted_at ?? job.created_at) && (
                 <span className="text-[10px] font-semibold uppercase tracking-wide bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded">
                   Be an early applicant
@@ -895,14 +975,19 @@ function JobCard({
               )}
               {job.source && <SourceBadge source={job.source} />}
               {job.publisher && <PublisherBadge publisher={job.publisher} />}
-              {typeof job.match_score === 'number' && (
-                <span className={clsx(
-                  'text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded border',
-                  job.match_score >= 85 ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
-                  : job.match_score >= 70 ? 'bg-sky-50 text-sky-700 border-sky-100'
-                  : job.match_score >= 50 ? 'bg-amber-50 text-amber-700 border-amber-100'
-                  : 'bg-rose-50 text-rose-700 border-rose-100'
-                )}>
+              {aiMatchEnabled && typeof job.match_score === 'number' && (
+                <span
+                  className={clsx(
+                    'text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded border',
+                    job.match_score >= 85
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                      : job.match_score >= 70
+                        ? 'bg-sky-50 text-sky-700 border-sky-100'
+                        : job.match_score >= 50
+                          ? 'bg-amber-50 text-amber-700 border-amber-100'
+                          : 'bg-rose-50 text-rose-700 border-rose-100',
+                  )}
+                >
                   Match {Math.round(job.match_score)}%
                 </span>
               )}
@@ -941,7 +1026,7 @@ function JobCard({
               'shrink-0 w-9 h-9 rounded-full border flex items-center justify-center',
               job.liked
                 ? 'bg-red-50 border-red-200 text-red-500'
-                : 'bg-white border-slate-200 text-slate-400 hover:text-red-500 hover:border-red-200'
+                : 'bg-white border-slate-200 text-slate-400 hover:text-red-500 hover:border-red-200',
             )}
           >
             {job.liked ? '♥' : '♡'}
@@ -971,7 +1056,10 @@ function JobCard({
         {requiredSkills.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mt-3">
             {requiredSkills.slice(0, 8).map((s) => (
-              <span key={s} className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
+              <span
+                key={s}
+                className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-700"
+              >
                 {s}
               </span>
             ))}
@@ -983,40 +1071,60 @@ function JobCard({
           <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-5">
             {responsibilities.length > 0 && (
               <div>
-                <div className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase mb-1.5">Core responsibilities</div>
+                <div className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase mb-1.5">
+                  Core responsibilities
+                </div>
                 <ul className="space-y-1 text-sm text-slate-700">
                   {responsibilities.slice(0, 6).map((b, i) => (
-                    <li key={i} className="flex items-start gap-1.5"><span className="text-slate-400">•</span><span>{b}</span></li>
+                    <li key={i} className="flex items-start gap-1.5">
+                      <span className="text-slate-400">•</span>
+                      <span>{b}</span>
+                    </li>
                   ))}
                 </ul>
               </div>
             )}
             {skillSummaries.length > 0 && (
               <div>
-                <div className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase mb-1.5">Skill requirements</div>
+                <div className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase mb-1.5">
+                  Skill requirements
+                </div>
                 <ul className="space-y-1 text-sm text-slate-700">
                   {skillSummaries.slice(0, 6).map((b, i) => (
-                    <li key={i} className="flex items-start gap-1.5"><span className="text-slate-400">•</span><span>{b}</span></li>
+                    <li key={i} className="flex items-start gap-1.5">
+                      <span className="text-slate-400">•</span>
+                      <span>{b}</span>
+                    </li>
                   ))}
                 </ul>
               </div>
             )}
             {highlights.length > 0 && (
               <div>
-                <div className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase mb-1.5">Why it might fit</div>
+                <div className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase mb-1.5">
+                  Why it might fit
+                </div>
                 <ul className="space-y-1 text-sm text-slate-700">
                   {highlights.slice(0, 4).map((b, i) => (
-                    <li key={i} className="flex items-start gap-1.5"><span className="text-sky-500">★</span><span>{b}</span></li>
+                    <li key={i} className="flex items-start gap-1.5">
+                      <span className="text-sky-500">★</span>
+                      <span>{b}</span>
+                    </li>
                   ))}
                 </ul>
               </div>
             )}
             {benefits.length > 0 && (
               <div>
-                <div className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase mb-1.5">Benefits</div>
+                <div className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase mb-1.5">
+                  Benefits
+                </div>
                 <ul className="space-y-1 text-sm text-slate-700">
                   {benefits.slice(0, 4).map((b, i) => (
-                    <li key={i} className="flex items-start gap-1.5"><span className="text-emerald-500">+</span><span>{b}</span></li>
+                    <li key={i} className="flex items-start gap-1.5">
+                      <span className="text-emerald-500">+</span>
+                      <span>{b}</span>
+                    </li>
                   ))}
                 </ul>
               </div>
@@ -1027,7 +1135,12 @@ function JobCard({
         {/* Applied-on caption (only on the Applied tab). */}
         {job.applied_at && (
           <div className="mt-3 text-xs text-slate-500">
-            Applied on {new Date(job.applied_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
+            Applied on{' '}
+            {new Date(job.applied_at).toLocaleDateString(undefined, {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+            })}
           </div>
         )}
 
@@ -1096,16 +1209,20 @@ function JobCard({
             ))}
             {authBullets.slice(0, 2).map((w, i) => (
               <li key={`auth-${i}`} className="flex items-start gap-1.5">
-                <span className="text-amber-300">•</span><span>{w}</span>
+                <span className="text-amber-300">•</span>
+                <span>{w}</span>
               </li>
             ))}
             {highlights.slice(0, 1).map((h, i) => (
               <li key={`hl-${i}`} className="flex items-start gap-1.5">
-                <span className="text-sky-300">★</span><span>{h}</span>
+                <span className="text-sky-300">★</span>
+                <span>{h}</span>
               </li>
             ))}
           </ul>
-          <span className="mt-auto pt-3 text-[11px] text-white/60 hover:text-white">View details →</span>
+          <span className="mt-auto pt-3 text-[11px] text-white/60 hover:text-white">
+            View details →
+          </span>
         </button>
       )}
     </div>
@@ -1115,14 +1232,22 @@ function JobCard({
 function RecommendationTag({ tag }: { tag: string }) {
   // Color the tag based on what it implies.
   const t = tag.toLowerCase();
-  const tone =
-    /(no sponsor|no h1b)/.test(t) ? 'bg-red-50 text-red-700 border-red-100' :
-    /(sponsor|h1b)/.test(t) ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
-    /(clearance|secret)/.test(t) ? 'bg-amber-50 text-amber-800 border-amber-100' :
-    /(remote)/.test(t) ? 'bg-indigo-50 text-indigo-700 border-indigo-100' :
-    'bg-slate-50 text-slate-700 border-slate-200';
+  const tone = /(no sponsor|no h1b)/.test(t)
+    ? 'bg-red-50 text-red-700 border-red-100'
+    : /(sponsor|h1b)/.test(t)
+      ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+      : /(clearance|secret)/.test(t)
+        ? 'bg-amber-50 text-amber-800 border-amber-100'
+        : /(remote)/.test(t)
+          ? 'bg-indigo-50 text-indigo-700 border-indigo-100'
+          : 'bg-slate-50 text-slate-700 border-slate-200';
   return (
-    <span className={clsx('text-[11px] font-medium px-2 py-0.5 rounded-full border inline-flex items-center gap-1', tone)}>
+    <span
+      className={clsx(
+        'text-[11px] font-medium px-2 py-0.5 rounded-full border inline-flex items-center gap-1',
+        tone,
+      )}
+    >
       ✦ {tag}
     </span>
   );
@@ -1152,11 +1277,15 @@ function CircularScore({ score }: { score: number | null }) {
   const c = 2 * Math.PI * r;
   const offset = c - (pct / 100) * c;
   const color =
-    score == null     ? '#475569' :
-    score >= 90       ? '#10b981' :
-    score >= 75       ? '#22d3ee' :
-    score >= 50       ? '#fbbf24' :
-                        '#f87171';
+    score == null
+      ? '#475569'
+      : score >= 90
+        ? '#10b981'
+        : score >= 75
+          ? '#22d3ee'
+          : score >= 50
+            ? '#fbbf24'
+            : '#f87171';
   return (
     // Outer wrapper holds the rotated SVG; the number sits on top as a
     // plain absolutely-positioned span so it's always upright + centered.
@@ -1165,13 +1294,23 @@ function CircularScore({ score }: { score: number | null }) {
         <circle cx="32" cy="32" r={r} fill="none" stroke="rgba(255,255,255,0.18)" strokeWidth="6" />
         {score != null && (
           <circle
-            cx="32" cy="32" r={r} fill="none" stroke={color} strokeWidth="6"
-            strokeDasharray={c} strokeDashoffset={offset} strokeLinecap="round"
+            cx="32"
+            cy="32"
+            r={r}
+            fill="none"
+            stroke={color}
+            strokeWidth="6"
+            strokeDasharray={c}
+            strokeDashoffset={offset}
+            strokeLinecap="round"
           />
         )}
       </svg>
       <div className="absolute inset-0 flex items-center justify-center">
-        <span className="text-white font-bold leading-none tabular-nums" style={{ fontSize: '15px' }}>
+        <span
+          className="text-white font-bold leading-none tabular-nums"
+          style={{ fontSize: '15px' }}
+        >
           {score == null ? '—' : `${Math.round(score)}%`}
         </span>
       </div>
@@ -1183,22 +1322,39 @@ function CircularScore({ score }: { score: number | null }) {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function filteredRows(rows: JobRow[], tab: TabKey, sourceFilter: string, sub: AppliedSubTab): JobRow[] {
+function filteredRows(
+  rows: JobRow[],
+  tab: TabKey,
+  sourceFilter: string,
+  sub: AppliedSubTab,
+): JobRow[] {
   let out = rows;
   if (sourceFilter) out = out.filter((j) => j.source === sourceFilter);
   if (tab === 'applied') {
     const def = APPLIED_SUB_TABS.find((t) => t.key === sub)!;
-    out = out.filter((j) => (def.statuses as string[]).includes(j.application_status ?? 'SUBMITTED'));
+    out = out.filter((j) =>
+      (def.statuses as string[]).includes(j.application_status ?? 'SUBMITTED'),
+    );
   }
   return out;
 }
 
 function AppliedSubTabs({
-  rows, active, onChange,
-}: { rows: JobRow[]; active: AppliedSubTab; onChange: (k: AppliedSubTab) => void }) {
+  rows,
+  active,
+  onChange,
+}: {
+  rows: JobRow[];
+  active: AppliedSubTab;
+  onChange: (k: AppliedSubTab) => void;
+}) {
   // Bucket once.
   const counts: Record<AppliedSubTab, number> = {
-    applied: 0, interviewing: 0, offer: 0, rejected: 0, archived: 0,
+    applied: 0,
+    interviewing: 0,
+    offer: 0,
+    rejected: 0,
+    archived: 0,
   };
   for (const r of rows) counts[matchSubTab(r.application_status ?? 'SUBMITTED')]++;
   return (
@@ -1211,14 +1367,18 @@ function AppliedSubTabs({
             'pb-2 text-sm flex items-center gap-1.5 border-b-2 transition -mb-px',
             active === t.key
               ? 'border-slate-900 text-slate-900 font-semibold'
-              : 'border-transparent text-slate-500 hover:text-slate-800'
+              : 'border-transparent text-slate-500 hover:text-slate-800',
           )}
         >
           {t.label}
-          <span className={clsx(
-            'text-[10px] font-semibold tabular-nums rounded-full px-1.5 py-0.5',
-            active === t.key ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'
-          )}>{counts[t.key]}</span>
+          <span
+            className={clsx(
+              'text-[10px] font-semibold tabular-nums rounded-full px-1.5 py-0.5',
+              active === t.key ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600',
+            )}
+          >
+            {counts[t.key]}
+          </span>
         </button>
       ))}
     </div>
@@ -1226,21 +1386,32 @@ function AppliedSubTabs({
 }
 
 function StatusDropdown({
-  current, onChange,
-}: { current: AppStatus | string | undefined; onChange: (next: AppStatus) => void }) {
+  current,
+  onChange,
+}: {
+  current: AppStatus | string | undefined;
+  onChange: (next: AppStatus) => void;
+}) {
   const status = (current ?? 'SUBMITTED') as AppStatus;
   const label = STATUS_LABEL[status] ?? status;
   const tone =
-    status === 'OFFER'                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-    : status === 'INTERVIEW'                            ? 'bg-sky-50 text-sky-700 border-sky-200'
-    : status === 'REJECTED'                             ? 'bg-rose-50 text-rose-700 border-rose-200'
-    : status === 'ARCHIVED' || status === 'WITHDRAWN'   ? 'bg-slate-100 text-slate-600 border-slate-200'
-    : 'bg-amber-50 text-amber-800 border-amber-200';
+    status === 'OFFER'
+      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+      : status === 'INTERVIEW'
+        ? 'bg-sky-50 text-sky-700 border-sky-200'
+        : status === 'REJECTED'
+          ? 'bg-rose-50 text-rose-700 border-rose-200'
+          : status === 'ARCHIVED' || status === 'WITHDRAWN'
+            ? 'bg-slate-100 text-slate-600 border-slate-200'
+            : 'bg-amber-50 text-amber-800 border-amber-200';
   return (
     <select
       value={status}
       onChange={(e) => onChange(e.target.value as AppStatus)}
-      className={clsx('text-xs font-semibold border rounded-full px-2.5 py-1 outline-none focus:ring-2 focus:ring-brand-500/40', tone)}
+      className={clsx(
+        'text-xs font-semibold border rounded-full px-2.5 py-1 outline-none focus:ring-2 focus:ring-brand-500/40',
+        tone,
+      )}
       aria-label="Application status"
     >
       <option value="SUBMITTED">Applied</option>
@@ -1273,13 +1444,16 @@ function relative(iso: string): string {
 }
 
 function isEarly(iso: string): boolean {
-  return (Date.now() - new Date(iso).getTime()) < 24 * 3600 * 1000;
+  return Date.now() - new Date(iso).getTime() < 24 * 3600 * 1000;
 }
 
 function prettyType(t?: string | null): string {
   if (!t) return 'Full-time';
   const map: Record<string, string> = {
-    W2: 'W2', C2C: 'C2C', FTE: 'Full-time', '1099': '1099',
+    W2: 'W2',
+    C2C: 'C2C',
+    FTE: 'Full-time',
+    '1099': '1099',
   };
   return map[t] ?? t;
 }
@@ -1307,7 +1481,9 @@ function resolveApplyUrl(job: JobRow): string {
   const u = (job.apply_url ?? '').trim();
   if (u && /^https?:\/\//i.test(u)) return u;
   const company = job.company_name ?? job.client?.company_name ?? '';
-  return 'https://www.google.com/search?ibp=htl;jobs&q=' + encodeURIComponent(`${job.title} ${company}`);
+  return (
+    'https://www.google.com/search?ibp=htl;jobs&q=' + encodeURIComponent(`${job.title} ${company}`)
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -1315,15 +1491,22 @@ function resolveApplyUrl(job: JobRow): string {
 // onboard endpoint; the next /jobs/recommended call uses it for ranking.
 // ---------------------------------------------------------------------------
 function SkillsPicker({
-  skills, onChange, onRecompute,
-}: { skills: string[]; onChange: (next: string[]) => void; onRecompute: () => void }) {
+  skills,
+  onChange,
+  onRecompute,
+}: {
+  skills: string[];
+  onChange: (next: string[]) => void;
+  onRecompute: () => void;
+}) {
   const [input, setInput] = useState('');
 
   function add() {
     const v = input.trim();
     if (!v) return;
     if (skills.some((s) => s.toLowerCase() === v.toLowerCase())) {
-      setInput(''); return;
+      setInput('');
+      return;
     }
     onChange([...skills, v]);
     setInput('');
@@ -1334,28 +1517,50 @@ function SkillsPicker({
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl px-4 py-3 mb-3 flex items-center gap-2 flex-wrap">
-      <span className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase">My skills</span>
+      <span className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase">
+        My skills
+      </span>
       {skills.length === 0 && (
         <span className="text-xs text-slate-400 italic">
           Add skills (React, Java, AWS, Python…) to tune recommendations.
         </span>
       )}
       {skills.map((s) => (
-        <span key={s} className="inline-flex items-center gap-1 bg-slate-100 text-slate-800 text-xs font-medium px-2 py-0.5 rounded-full">
+        <span
+          key={s}
+          className="inline-flex items-center gap-1 bg-slate-100 text-slate-800 text-xs font-medium px-2 py-0.5 rounded-full"
+        >
           {s}
-          <button onClick={() => remove(s)} className="text-slate-400 hover:text-red-500 text-sm leading-none" title="Remove">×</button>
+          <button
+            onClick={() => remove(s)}
+            className="text-slate-400 hover:text-red-500 text-sm leading-none"
+            title="Remove"
+          >
+            ×
+          </button>
         </span>
       ))}
       <div className="flex items-center gap-1.5 ml-1">
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') add(); }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') add();
+          }}
           placeholder="Add skill…"
           className="text-xs bg-slate-50 border border-slate-200 rounded-full px-2.5 py-1 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
         />
-        <button onClick={add} className="text-xs bg-slate-900 text-white px-2.5 py-1 rounded-full hover:bg-slate-800">+</button>
-        <button onClick={onRecompute} className="text-xs text-slate-600 hover:text-slate-900 ml-1" title="Re-run AI ranking with these skills">
+        <button
+          onClick={add}
+          className="text-xs bg-slate-900 text-white px-2.5 py-1 rounded-full hover:bg-slate-800"
+        >
+          +
+        </button>
+        <button
+          onClick={onRecompute}
+          className="text-xs text-slate-600 hover:text-slate-900 ml-1"
+          title="Re-run AI ranking with these skills"
+        >
           Recompute ⟳
         </button>
       </div>
@@ -1407,7 +1612,9 @@ function MatchInsightModal({ job, onClose }: { job: JobRow; onClose: () => void 
         try {
           const a = await api.post(`/jobs/${job.id}/ats-match`, { resume_text: extraResumeText });
           setAts(a.data);
-        } catch { /* ATS is best-effort */ }
+        } catch {
+          /* ATS is best-effort */
+        }
       }
     } catch (e: any) {
       const msg = e?.response?.data?.error ?? 'Failed to score match';
@@ -1416,28 +1623,44 @@ function MatchInsightModal({ job, onClose }: { job: JobRow; onClose: () => void 
       } else {
         setError(msg);
       }
-    } finally { setLoading(false); }
+    } finally {
+      setLoading(false);
+    }
   }
 
-  useEffect(() => { run(); /* eslint-disable-next-line */ }, [job.id]);
+  useEffect(() => {
+    run(); /* eslint-disable-next-line */
+  }, [job.id]);
 
   const company = job.company_name ?? job.client?.company_name ?? 'Unknown';
   const overall = skillMatch?.overall_score != null ? Math.round(skillMatch.overall_score) : null;
   const atsScore = ats?.score != null ? Math.round(ats.score) : null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
       <div
         className="bg-white w-full max-w-3xl max-h-[90vh] rounded-2xl shadow-xl overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-6 py-4 border-b border-slate-200 flex items-start justify-between gap-4">
           <div>
-            <div className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase mb-0.5">Match Insight</div>
+            <div className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase mb-0.5">
+              Match Insight
+            </div>
             <h2 className="text-lg font-semibold text-slate-900 leading-tight">{job.title}</h2>
-            <div className="text-sm text-slate-600">{company} · {job.location ?? 'Unknown'}</div>
+            <div className="text-sm text-slate-600">
+              {company} · {job.location ?? 'Unknown'}
+            </div>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-900 text-2xl leading-none">×</button>
+          <button
+            onClick={onClose}
+            className="text-slate-400 hover:text-slate-900 text-2xl leading-none"
+          >
+            ×
+          </button>
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
@@ -1462,13 +1685,22 @@ function MatchInsightModal({ job, onClose }: { job: JobRow; onClose: () => void 
           {/* Required skills chips */}
           {(() => {
             const skills =
-              (job.requirements?.required_skills?.length ? job.requirements.required_skills : job.required_skills) ?? [];
+              (job.requirements?.required_skills?.length
+                ? job.requirements.required_skills
+                : job.required_skills) ?? [];
             return skills.length > 0 ? (
               <div>
-                <div className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase mb-1.5">Required skills</div>
+                <div className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase mb-1.5">
+                  Required skills
+                </div>
                 <div className="flex flex-wrap gap-1.5">
                   {skills.map((s) => (
-                    <span key={s} className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">{s}</span>
+                    <span
+                      key={s}
+                      className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-700"
+                    >
+                      {s}
+                    </span>
                   ))}
                 </div>
               </div>
@@ -1478,7 +1710,9 @@ function MatchInsightModal({ job, onClose }: { job: JobRow; onClose: () => void 
           {/* Full JD body */}
           {job.description && (
             <div>
-              <div className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase mb-1.5">Job description</div>
+              <div className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase mb-1.5">
+                Job description
+              </div>
               <div className="text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-xl p-4 max-h-72 overflow-y-auto whitespace-pre-wrap leading-relaxed">
                 {job.description}
               </div>
@@ -1488,7 +1722,9 @@ function MatchInsightModal({ job, onClose }: { job: JobRow; onClose: () => void 
           {loading && <div className="text-sm text-slate-500">Scoring against your resume…</div>}
 
           {error && !loading && (
-            <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-3">{error}</div>
+            <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-3">
+              {error}
+            </div>
           )}
 
           {needsResume && !loading && (
@@ -1518,33 +1754,56 @@ function MatchInsightModal({ job, onClose }: { job: JobRow; onClose: () => void 
             <>
               {/* Header scorecards */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <ScoreCard label="Overall match" value={overall} suffix="%" tone="primary" sub={skillMatch.rank_desc} />
-                <ScoreCard label="Skill match"
-                  value={Math.round((skillMatch.feature_scores?.skill_match ?? 0) * 100)} suffix="%" tone="info"
-                  sub={`${skillMatch.per_skill.length} skills evaluated`} />
-                <ScoreCard label="Seniority fit"
-                  value={Math.round((skillMatch.feature_scores?.seniority_match ?? 0) * 100)} suffix="%" tone="ok"
-                  sub="years vs requirement" />
+                <ScoreCard
+                  label="Overall match"
+                  value={overall}
+                  suffix="%"
+                  tone="primary"
+                  sub={skillMatch.rank_desc}
+                />
+                <ScoreCard
+                  label="Skill match"
+                  value={Math.round((skillMatch.feature_scores?.skill_match ?? 0) * 100)}
+                  suffix="%"
+                  tone="info"
+                  sub={`${skillMatch.per_skill.length} skills evaluated`}
+                />
+                <ScoreCard
+                  label="Seniority fit"
+                  value={Math.round((skillMatch.feature_scores?.seniority_match ?? 0) * 100)}
+                  suffix="%"
+                  tone="ok"
+                  sub="years vs requirement"
+                />
               </div>
 
               {atsScore != null && (
                 <div className="border border-slate-200 rounded-xl p-4 bg-slate-50">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase">ATS score</span>
-                    <span className="text-sm font-semibold text-slate-900 tabular-nums">{atsScore}%</span>
+                    <span className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase">
+                      ATS score
+                    </span>
+                    <span className="text-sm font-semibold text-slate-900 tabular-nums">
+                      {atsScore}%
+                    </span>
                   </div>
                   <div className="h-1.5 bg-slate-200 rounded overflow-hidden mb-2">
                     <div className="h-full bg-emerald-500" style={{ width: `${atsScore}%` }} />
                   </div>
-                  {ats && (
-                    <p className="text-xs text-slate-700">{ats.summary}</p>
-                  )}
+                  {ats && <p className="text-xs text-slate-700">{ats.summary}</p>}
                   {ats?.missing_keywords && ats.missing_keywords.length > 0 && (
                     <div className="mt-2">
-                      <div className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase mb-1">Missing keywords</div>
+                      <div className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase mb-1">
+                        Missing keywords
+                      </div>
                       <div className="flex flex-wrap gap-1">
                         {ats.missing_keywords.slice(0, 16).map((k) => (
-                          <span key={k} className="text-[11px] bg-red-50 text-red-700 border border-red-100 px-2 py-0.5 rounded-full">{k}</span>
+                          <span
+                            key={k}
+                            className="text-[11px] bg-red-50 text-red-700 border border-red-100 px-2 py-0.5 rounded-full"
+                          >
+                            {k}
+                          </span>
                         ))}
                       </div>
                     </div>
@@ -1555,10 +1814,15 @@ function MatchInsightModal({ job, onClose }: { job: JobRow; onClose: () => void 
               {/* Rationale */}
               {skillMatch.rationale?.length > 0 && (
                 <div>
-                  <div className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase mb-1.5">Why this score</div>
+                  <div className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase mb-1.5">
+                    Why this score
+                  </div>
                   <ul className="space-y-1 text-sm text-slate-700">
                     {skillMatch.rationale.map((r, i) => (
-                      <li key={i} className="flex items-start gap-1.5"><span className="text-slate-400">•</span><span>{r}</span></li>
+                      <li key={i} className="flex items-start gap-1.5">
+                        <span className="text-slate-400">•</span>
+                        <span>{r}</span>
+                      </li>
                     ))}
                   </ul>
                 </div>
@@ -1567,22 +1831,30 @@ function MatchInsightModal({ job, onClose }: { job: JobRow; onClose: () => void 
               {/* Per-skill table */}
               {skillMatch.per_skill.length > 0 && (
                 <div>
-                  <div className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase mb-1.5">Skill-by-skill</div>
+                  <div className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase mb-1.5">
+                    Skill-by-skill
+                  </div>
                   <div className="border border-slate-200 rounded-xl divide-y divide-slate-100">
                     {skillMatch.per_skill.map((s) => {
                       const pct = Math.round((s.score ?? 0) * 100);
                       const tone =
-                        pct >= 80 ? 'bg-emerald-500' :
-                        pct >= 50 ? 'bg-amber-400' : 'bg-red-400';
+                        pct >= 80 ? 'bg-emerald-500' : pct >= 50 ? 'bg-amber-400' : 'bg-red-400';
                       return (
                         <div key={s.skill} className="p-3 flex items-center gap-3">
-                          <div className="w-40 shrink-0 text-sm font-medium text-slate-900 truncate">{s.skill}</div>
+                          <div className="w-40 shrink-0 text-sm font-medium text-slate-900 truncate">
+                            {s.skill}
+                          </div>
                           <div className="flex-1 h-1.5 bg-slate-100 rounded overflow-hidden">
                             <div className={`h-full ${tone}`} style={{ width: `${pct}%` }} />
                           </div>
-                          <div className="w-12 text-right text-xs tabular-nums font-semibold text-slate-700">{pct}%</div>
+                          <div className="w-12 text-right text-xs tabular-nums font-semibold text-slate-700">
+                            {pct}%
+                          </div>
                           {s.evidence && (
-                            <div className="hidden lg:block flex-1 text-[11px] text-slate-500 italic truncate" title={s.evidence}>
+                            <div
+                              className="hidden lg:block flex-1 text-[11px] text-slate-500 italic truncate"
+                              title={s.evidence}
+                            >
                               “{s.evidence}”
                             </div>
                           )}
@@ -1615,16 +1887,32 @@ function MatchInsightModal({ job, onClose }: { job: JobRow; onClose: () => void 
 }
 
 function ScoreCard({
-  label, value, suffix = '', tone, sub,
-}: { label: string; value: number | null; suffix?: string; tone: 'primary' | 'info' | 'ok'; sub?: string }) {
+  label,
+  value,
+  suffix = '',
+  tone,
+  sub,
+}: {
+  label: string;
+  value: number | null;
+  suffix?: string;
+  tone: 'primary' | 'info' | 'ok';
+  sub?: string;
+}) {
   const toneClass =
-    tone === 'primary' ? 'from-brand-50 to-white border-brand-100 text-brand-700'
-    : tone === 'info' ? 'from-sky-50 to-white border-sky-100 text-sky-700'
-    : 'from-emerald-50 to-white border-emerald-100 text-emerald-700';
+    tone === 'primary'
+      ? 'from-brand-50 to-white border-brand-100 text-brand-700'
+      : tone === 'info'
+        ? 'from-sky-50 to-white border-sky-100 text-sky-700'
+        : 'from-emerald-50 to-white border-emerald-100 text-emerald-700';
   return (
     <div className={`rounded-xl border bg-gradient-to-br ${toneClass} p-4`}>
-      <div className="text-[10px] font-semibold tracking-widest uppercase mb-1 opacity-80">{label}</div>
-      <div className="text-2xl font-semibold tabular-nums text-slate-900">{value == null ? '—' : `${value}${suffix}`}</div>
+      <div className="text-[10px] font-semibold tracking-widest uppercase mb-1 opacity-80">
+        {label}
+      </div>
+      <div className="text-2xl font-semibold tabular-nums text-slate-900">
+        {value == null ? '—' : `${value}${suffix}`}
+      </div>
       {sub && <div className="text-[11px] text-slate-500 mt-0.5">{sub}</div>}
     </div>
   );
@@ -1670,8 +1958,14 @@ const SOURCE_LABEL: Record<string, string> = {
 };
 
 function SourceBreakdown({
-  rows, active, onClick,
-}: { rows: JobRow[]; active: string; onClick: (s: string) => void }) {
+  rows,
+  active,
+  onClick,
+}: {
+  rows: JobRow[];
+  active: string;
+  onClick: (s: string) => void;
+}) {
   const counts = new Map<string, number>();
   for (const r of rows) {
     if (!r.source) continue;
@@ -1681,7 +1975,9 @@ function SourceBreakdown({
   const ordered = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
   return (
     <div className="bg-white border border-slate-200 rounded-xl px-4 py-3 mb-4 flex items-center gap-2 flex-wrap">
-      <span className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase">By source</span>
+      <span className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase">
+        By source
+      </span>
       {ordered.map(([source, n]) => (
         <button
           key={source}
@@ -1690,7 +1986,8 @@ function SourceBreakdown({
             'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs transition',
             active === source
               ? 'bg-slate-900 text-white border-slate-900'
-              : (SOURCE_TONE[source] ?? 'bg-slate-100 text-slate-700 border-slate-200') + ' hover:opacity-80'
+              : (SOURCE_TONE[source] ?? 'bg-slate-100 text-slate-700 border-slate-200') +
+                  ' hover:opacity-80',
           )}
         >
           <span className="font-medium">{SOURCE_LABEL[source] ?? source}</span>
@@ -1705,7 +2002,12 @@ function SourceBreakdown({
 function SourceBadge({ source }: { source: string }) {
   const tone = SOURCE_TONE[source] ?? 'bg-slate-100 text-slate-700 border-slate-200';
   return (
-    <span className={clsx('text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded border', tone)}>
+    <span
+      className={clsx(
+        'text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded border',
+        tone,
+      )}
+    >
       {SOURCE_LABEL[source] ?? source}
     </span>
   );
@@ -1714,13 +2016,13 @@ function SourceBadge({ source }: { source: string }) {
 // Publisher = the user-facing job board (LinkedIn, Dice, Monster, …).
 // Distinct from `source`, which is the ingestion driver (e.g. JSearch).
 const PUBLISHER_TONE: Record<string, string> = {
-  LinkedIn:      'bg-sky-50 text-sky-700 border-sky-100',
-  Dice:          'bg-red-50 text-red-700 border-red-100',
-  Monster:       'bg-violet-50 text-violet-700 border-violet-100',
+  LinkedIn: 'bg-sky-50 text-sky-700 border-sky-100',
+  Dice: 'bg-red-50 text-red-700 border-red-100',
+  Monster: 'bg-violet-50 text-violet-700 border-violet-100',
   CareerBuilder: 'bg-emerald-50 text-emerald-700 border-emerald-100',
-  Indeed:        'bg-blue-50 text-blue-700 border-blue-100',
-  Glassdoor:     'bg-teal-50 text-teal-700 border-teal-100',
-  ZipRecruiter:  'bg-orange-50 text-orange-700 border-orange-100',
+  Indeed: 'bg-blue-50 text-blue-700 border-blue-100',
+  Glassdoor: 'bg-teal-50 text-teal-700 border-teal-100',
+  ZipRecruiter: 'bg-orange-50 text-orange-700 border-orange-100',
 };
 // ---------------------------------------------------------------------------
 // Recruiter targeting bar — pick a consultant + resume to apply on behalf of.
@@ -1740,20 +2042,31 @@ interface ResumeOption {
   ai_score?: number | null;
 }
 function RecruiterTargetingBar({
-  value, onChange,
-}: { value: ApplyTarget | null; onChange: (next: ApplyTarget | null) => void }) {
+  value,
+  onChange,
+}: {
+  value: ApplyTarget | null;
+  onChange: (next: ApplyTarget | null) => void;
+}) {
   const [consultants, setConsultants] = useState<ConsultantOption[]>([]);
   const [resumes, setResumes] = useState<ResumeOption[]>([]);
 
   useEffect(() => {
-    api.get('/consultants', { params: { } })
+    api
+      .get('/consultants', { params: {} })
       .then((r) => setConsultants(r.data ?? []))
-      .catch(() => { /* silent */ });
+      .catch(() => {
+        /* silent */
+      });
   }, []);
 
   useEffect(() => {
-    if (!value?.consultantId) { setResumes([]); return; }
-    api.get(`/resumes/consultant/${value.consultantId}`)
+    if (!value?.consultantId) {
+      setResumes([]);
+      return;
+    }
+    api
+      .get(`/resumes/consultant/${value.consultantId}`)
       .then((r) => {
         const list = (r.data ?? []) as ResumeOption[];
         setResumes(list);
@@ -1763,15 +2076,26 @@ function RecruiterTargetingBar({
           if (current) onChange({ ...value, resumeId: current.id });
         }
       })
-      .catch(() => { setResumes([]); });
+      .catch(() => {
+        setResumes([]);
+      });
     // eslint-disable-next-line
   }, [value?.consultantId]);
 
   function pickConsultant(c: ConsultantOption | null) {
-    if (!c) { onChange(null); return; }
-    const skills = Array.isArray(c.skills) && c.skills.length > 0
-      ? c.skills
-      : (c.primary_skill ? c.primary_skill.split(/[,;|/]/).map((s) => s.trim()).filter(Boolean) : []);
+    if (!c) {
+      onChange(null);
+      return;
+    }
+    const skills =
+      Array.isArray(c.skills) && c.skills.length > 0
+        ? c.skills
+        : c.primary_skill
+          ? c.primary_skill
+              .split(/[,;|/]/)
+              .map((s) => s.trim())
+              .filter(Boolean)
+          : [];
     onChange({
       consultantId: c.id,
       consultantName: c.user?.full_name ?? c.user?.email ?? 'Consultant',
@@ -1786,7 +2110,9 @@ function RecruiterTargetingBar({
 
   return (
     <div className="bg-brand-50 border border-brand-100 rounded-xl px-4 py-3 mb-3 flex items-center gap-3 flex-wrap">
-      <span className="text-[10px] font-semibold tracking-widest text-brand-700 uppercase">Apply on behalf of</span>
+      <span className="text-[10px] font-semibold tracking-widest text-brand-700 uppercase">
+        Apply on behalf of
+      </span>
       <select
         value={value?.consultantId ?? ''}
         onChange={(e) => {
@@ -1813,7 +2139,8 @@ function RecruiterTargetingBar({
             <option value="">— Select resume —</option>
             {resumes.map((r) => (
               <option key={r.id} value={r.id}>
-                v{r.version} · {r.file_name}{r.is_current ? ' (current)' : ''}
+                v{r.version} · {r.file_name}
+                {r.is_current ? ' (current)' : ''}
               </option>
             ))}
           </select>
@@ -1823,7 +2150,9 @@ function RecruiterTargetingBar({
           <button
             onClick={() => pickConsultant(null)}
             className="ml-auto text-xs text-slate-500 hover:text-slate-900"
-          >Clear ×</button>
+          >
+            Clear ×
+          </button>
         </>
       )}
     </div>
@@ -1835,20 +2164,47 @@ function RecruiterTargetingBar({
 // in recruiter mode so we can record the application.
 // ---------------------------------------------------------------------------
 function ApplyConfirmModal({
-  job, onClose, onConfirm,
-}: { job: JobRow; onClose: () => void; onConfirm: (yes: boolean) => void }) {
+  job,
+  onClose,
+  onConfirm,
+}: {
+  job: JobRow;
+  onClose: () => void;
+  onConfirm: (yes: boolean) => void;
+}) {
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
+    <div
+      className="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
         <h2 className="text-base font-semibold text-slate-900 mb-1">Did you apply?</h2>
         <p className="text-sm text-slate-600 mb-4">
           We just opened the apply page for <strong>{job.title}</strong>
-          {job.company_name ? <> at <strong>{job.company_name}</strong></> : null}.
-          Confirm Yes to record this submission against the consultant.
+          {job.company_name ? (
+            <>
+              {' '}
+              at <strong>{job.company_name}</strong>
+            </>
+          ) : null}
+          . Confirm Yes to record this submission against the consultant.
         </p>
         <div className="flex justify-end gap-2">
-          <button onClick={() => onConfirm(false)} className="border border-slate-200 text-slate-700 text-sm px-4 py-2 rounded-lg hover:bg-slate-50">No, not yet</button>
-          <button onClick={() => onConfirm(true)} className="bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold px-4 py-2 rounded-lg">Yes, applied</button>
+          <button
+            onClick={() => onConfirm(false)}
+            className="border border-slate-200 text-slate-700 text-sm px-4 py-2 rounded-lg hover:bg-slate-50"
+          >
+            No, not yet
+          </button>
+          <button
+            onClick={() => onConfirm(true)}
+            className="bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold px-4 py-2 rounded-lg"
+          >
+            Yes, applied
+          </button>
         </div>
       </div>
     </div>
@@ -1858,7 +2214,12 @@ function ApplyConfirmModal({
 function PublisherBadge({ publisher }: { publisher: string }) {
   const tone = PUBLISHER_TONE[publisher] ?? 'bg-slate-100 text-slate-700 border-slate-200';
   return (
-    <span className={clsx('text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded border', tone)}>
+    <span
+      className={clsx(
+        'text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded border',
+        tone,
+      )}
+    >
       {publisher}
     </span>
   );
@@ -1893,8 +2254,20 @@ function SourcesDrawer({ onClose, onAfterSync }: { onClose: () => void; onAfterS
   const [health, setHealth] = useState<SourceHealth[]>([]);
   const [loading, setLoading] = useState(true);
   const [newSource, setNewSource] = useState<
-    'greenhouse' | 'lever' | 'remoteok' | 'adzuna' | 'remotive' | 'arbeitnow'
-    | 'jsearch' | 'ashby' | 'jooble' | 'usajobs' | 'serpapi' | 'searchapi' | 'linkedin' | 'monster'
+    | 'greenhouse'
+    | 'lever'
+    | 'remoteok'
+    | 'adzuna'
+    | 'remotive'
+    | 'arbeitnow'
+    | 'jsearch'
+    | 'ashby'
+    | 'jooble'
+    | 'usajobs'
+    | 'serpapi'
+    | 'searchapi'
+    | 'linkedin'
+    | 'monster'
   >('greenhouse');
   const [newSlug, setNewSlug] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
@@ -1910,13 +2283,18 @@ function SourcesDrawer({ onClose, onAfterSync }: { onClose: () => void; onAfterS
       setHealth(h.data ?? []);
     } catch (e: any) {
       toast.error(e?.response?.data?.error ?? 'Failed to load sources');
-    } finally { setLoading(false); }
+    } finally {
+      setLoading(false);
+    }
   }
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+  }, []);
 
   async function add() {
     if ((newSource === 'greenhouse' || newSource === 'lever') && !newSlug.trim()) {
-      toast.error(`${newSource} needs a company slug (e.g. "stripe")`); return;
+      toast.error(`${newSource} needs a company slug (e.g. "stripe")`);
+      return;
     }
     try {
       await api.post('/jobs/sources', {
@@ -1924,7 +2302,9 @@ function SourcesDrawer({ onClose, onAfterSync }: { onClose: () => void; onAfterS
         slug: newSource === 'remoteok' || newSource === 'adzuna' ? null : newSlug.trim(),
         display_name: newSlug.trim() || newSource,
       });
-      setNewSlug(''); toast.success('Source added'); load();
+      setNewSlug('');
+      toast.success('Source added');
+      load();
     } catch (e: any) {
       toast.error(e?.response?.data?.error ?? 'Failed to add');
     }
@@ -1937,10 +2317,13 @@ function SourcesDrawer({ onClose, onAfterSync }: { onClose: () => void; onAfterS
       const rep = r.data;
       if (rep.error) toast.error(`Sync error: ${rep.error}`);
       else toast.success(`Pulled ${rep.jobs_pulled} jobs`);
-      onAfterSync(); load();
+      onAfterSync();
+      load();
     } catch (e: any) {
       toast.error(e?.response?.data?.error ?? 'Sync failed');
-    } finally { setBusy(null); }
+    } finally {
+      setBusy(null);
+    }
   }
 
   async function toggle(c: SourceCompany) {
@@ -1956,7 +2339,8 @@ function SourcesDrawer({ onClose, onAfterSync }: { onClose: () => void; onAfterS
     if (!confirm(`Remove ${c.display_name ?? c.slug ?? c.source}?`)) return;
     try {
       await api.delete(`/jobs/sources/${c.id}`);
-      toast.success('Removed'); load();
+      toast.success('Removed');
+      load();
     } catch (e: any) {
       toast.error(e?.response?.data?.error ?? 'Failed');
     }
@@ -1971,9 +2355,16 @@ function SourcesDrawer({ onClose, onAfterSync }: { onClose: () => void; onAfterS
         <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
           <div>
             <h2 className="text-lg font-semibold text-slate-900">Live job sources</h2>
-            <p className="text-xs text-slate-500">Pull real-time listings from legitimate public APIs.</p>
+            <p className="text-xs text-slate-500">
+              Pull real-time listings from legitimate public APIs.
+            </p>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-900 text-xl leading-none">×</button>
+          <button
+            onClick={onClose}
+            className="text-slate-400 hover:text-slate-900 text-xl leading-none"
+          >
+            ×
+          </button>
         </div>
 
         {/* Add new source */}
@@ -2004,20 +2395,39 @@ function SourcesDrawer({ onClose, onAfterSync }: { onClose: () => void; onAfterS
               value={newSlug}
               onChange={(e) => setNewSlug(e.target.value)}
               placeholder={
-                newSource === 'greenhouse' || newSource === 'lever' || newSource === 'ashby' ? 'e.g. stripe' :
-                newSource === 'linkedin' ? 'e.g. Data Engineer (title filter)' :
-                newSource === 'monster' ? 'e.g. python|New York|en_us' :
-                newSource === 'jsearch' || newSource === 'jooble' || newSource === 'serpapi' || newSource === 'searchapi' || newSource === 'usajobs' ? 'optional: search query' : '—'
+                newSource === 'greenhouse' || newSource === 'lever' || newSource === 'ashby'
+                  ? 'e.g. stripe'
+                  : newSource === 'linkedin'
+                    ? 'e.g. Data Engineer (title filter)'
+                    : newSource === 'monster'
+                      ? 'e.g. python|New York|en_us'
+                      : newSource === 'jsearch' ||
+                          newSource === 'jooble' ||
+                          newSource === 'serpapi' ||
+                          newSource === 'searchapi' ||
+                          newSource === 'usajobs'
+                        ? 'optional: search query'
+                        : '—'
               }
-              disabled={newSource === 'remoteok' || newSource === 'adzuna' || newSource === 'remotive' || newSource === 'arbeitnow'}
+              disabled={
+                newSource === 'remoteok' ||
+                newSource === 'adzuna' ||
+                newSource === 'remotive' ||
+                newSource === 'arbeitnow'
+              }
               className="border border-slate-300 rounded-lg px-2 py-1.5 text-sm col-span-1 disabled:bg-slate-100"
             />
-            <button onClick={add} className="bg-slate-900 text-white text-sm px-3 py-1.5 rounded-lg hover:bg-slate-800">
+            <button
+              onClick={add}
+              className="bg-slate-900 text-white text-sm px-3 py-1.5 rounded-lg hover:bg-slate-800"
+            >
               + Add
             </button>
           </div>
           <p className="text-[11px] text-slate-500 mt-2">
-            Greenhouse / Lever slugs come from the careers URL — e.g. <span className="font-mono">boards.greenhouse.io/stripe</span> → slug <span className="font-mono">stripe</span>.
+            Greenhouse / Lever slugs come from the careers URL — e.g.{' '}
+            <span className="font-mono">boards.greenhouse.io/stripe</span> → slug{' '}
+            <span className="font-mono">stripe</span>.
           </p>
         </div>
 
@@ -2030,19 +2440,25 @@ function SourcesDrawer({ onClose, onAfterSync }: { onClose: () => void; onAfterS
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
               {health.map((h) => (
                 <div key={h.source} className="flex items-center gap-2 text-xs">
-                  <span className={clsx(
-                    'w-2 h-2 rounded-full shrink-0',
-                    h.status === 'ok' ? 'bg-emerald-500'
-                    : h.status === 'missing_key' ? 'bg-amber-500'
-                    : h.status === 'no_rows' ? 'bg-slate-300'
-                    : 'bg-rose-500'
-                  )} />
+                  <span
+                    className={clsx(
+                      'w-2 h-2 rounded-full shrink-0',
+                      h.status === 'ok'
+                        ? 'bg-emerald-500'
+                        : h.status === 'missing_key'
+                          ? 'bg-amber-500'
+                          : h.status === 'no_rows'
+                            ? 'bg-slate-300'
+                            : 'bg-rose-500',
+                    )}
+                  />
                   <span className="font-medium text-slate-800 w-20 truncate">{h.source}</span>
                   <span className="text-slate-500">
                     {h.status === 'missing_key' && '⚠ API key missing'}
                     {h.status === 'no_rows' && 'no rows seeded'}
                     {h.status === 'error' && (h.last_error?.slice(0, 60) ?? 'error')}
-                    {h.status === 'ok' && `${h.rows_active}/${h.rows_total} active · ${h.last_sync_jobs_count} jobs`}
+                    {h.status === 'ok' &&
+                      `${h.rows_active}/${h.rows_total} active · ${h.last_sync_jobs_count} jobs`}
                   </span>
                 </div>
               ))}
@@ -2056,7 +2472,9 @@ function SourcesDrawer({ onClose, onAfterSync }: { onClose: () => void; onAfterS
         ) : (
           <div className="divide-y divide-slate-100">
             {rows.length === 0 && (
-              <div className="p-6 text-sm text-slate-400 italic text-center">No sources configured yet.</div>
+              <div className="p-6 text-sm text-slate-400 italic text-center">
+                No sources configured yet.
+              </div>
             )}
             {rows.map((c) => (
               <div key={c.id} className="p-4 flex items-start gap-3">
@@ -2067,14 +2485,22 @@ function SourcesDrawer({ onClose, onAfterSync }: { onClose: () => void; onAfterS
                       {c.display_name ?? c.slug ?? c.source}
                     </span>
                     {!c.is_active && (
-                      <span className="text-[10px] text-slate-400 uppercase tracking-wide">Paused</span>
+                      <span className="text-[10px] text-slate-400 uppercase tracking-wide">
+                        Paused
+                      </span>
                     )}
                   </div>
                   <div className="text-xs text-slate-500 mt-0.5">
                     {c.slug && <span className="font-mono">{c.slug}</span>}
                     {c.last_synced_at ? (
-                      <> · Last sync {new Date(c.last_synced_at).toLocaleString()} · {c.last_sync_jobs_count ?? 0} jobs</>
-                    ) : <> · Never synced</>}
+                      <>
+                        {' '}
+                        · Last sync {new Date(c.last_synced_at).toLocaleString()} ·{' '}
+                        {c.last_sync_jobs_count ?? 0} jobs
+                      </>
+                    ) : (
+                      <> · Never synced</>
+                    )}
                   </div>
                   {c.last_sync_error && (
                     <p className="text-[11px] text-red-600 mt-1 truncate" title={c.last_sync_error}>

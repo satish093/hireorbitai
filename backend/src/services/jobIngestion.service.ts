@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { db } from '../config/db';
 import { matchJobsForConsultant } from './ai.service';
+import { loadFlags } from '../controllers/featureFlags.controller';
 
 /**
  * Pluggable real-time job ingestion. Each driver hits a legitimate public API
@@ -1087,6 +1088,14 @@ async function autoMatchAndNotify(newJobIds: string[]): Promise<AutoMatchReport>
     threshold: MATCH_NOTIFY_THRESHOLD,
   };
   try {
+    // Feature flag gate. When `ai_match` is OFF, skip the entire AI pass —
+    // no scoring, no notifications, no Anthropic API spend. Default-allow
+    // when the flag is undefined so existing installs without the flag row
+    // continue to behave as before.
+    const flags = await loadFlags();
+    if (flags.ai_match === false) {
+      return { ...baseline, error: 'ai_match flag disabled' };
+    }
     if (newJobIds.length === 0) return baseline;
 
     // Cap the candidate pool so a huge sync doesn't blow up the AI bill.
