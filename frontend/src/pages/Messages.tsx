@@ -316,9 +316,10 @@ export function Messages() {
       title="Messages"
       crumbs={[{ label: 'Workspace', to: '/dashboard' }, { label: 'Messages' }]}
     >
-      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden h-[calc(100vh-180px)] min-h-[480px] flex">
-        {/* Left: conversation list */}
-        <aside className="w-72 shrink-0 border-r border-slate-200 flex flex-col bg-slate-50/50">
+      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden h-[calc(100dvh-180px)] min-h-[480px] flex flex-col sm:flex-row">
+        {/* Left: conversation list. Becomes a full-width column on phones
+            (stacked above the chat pane); fixed 18rem rail on tablet+. */}
+        <aside className="w-full sm:w-72 shrink-0 border-b sm:border-b-0 sm:border-r border-slate-200 flex flex-col bg-slate-50/50 max-h-64 sm:max-h-none">
           <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
             <h2 className="text-sm font-semibold text-slate-900">Conversations</h2>
             <button

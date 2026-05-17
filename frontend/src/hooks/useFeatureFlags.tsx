@@ -128,7 +128,7 @@ export function FeatureGuard({
   // keeps the page from flashing partial UI before the flag check resolves.
   if (!ctx || ctx.loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-slate-400 text-sm">
+      <div className="min-h-dvh flex items-center justify-center text-slate-400 text-sm">
         Loading…
       </div>
     );

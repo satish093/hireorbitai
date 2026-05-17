@@ -37,7 +37,7 @@ export function ProtectedRoute({ children, allow, bypassOnboarding, bypassPasswo
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-slate-400 text-sm">
+      <div className="min-h-dvh flex items-center justify-center text-slate-400 text-sm">
         Loading…
       </div>
     );
@@ -62,10 +62,18 @@ export function ProtectedRoute({ children, allow, bypassOnboarding, bypassPasswo
 
   // Role-specific onboarding gates (existing behavior, preserved).
   if (!bypassOnboarding) {
-    if (profile.role === 'CONSULTANT' && !profile.consultant_id && loc.pathname !== '/onboarding/consultant') {
+    if (
+      profile.role === 'CONSULTANT' &&
+      !profile.consultant_id &&
+      loc.pathname !== '/onboarding/consultant'
+    ) {
       return <Navigate to="/onboarding/consultant" replace />;
     }
-    if (profile.role === 'RECRUITER' && !profile.recruiter_id && loc.pathname !== '/onboarding/recruiter') {
+    if (
+      profile.role === 'RECRUITER' &&
+      !profile.recruiter_id &&
+      loc.pathname !== '/onboarding/recruiter'
+    ) {
       return <Navigate to="/onboarding/recruiter" replace />;
     }
   }

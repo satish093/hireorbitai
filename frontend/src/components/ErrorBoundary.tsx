@@ -40,7 +40,7 @@ export class ErrorBoundary extends Component<Props, State> {
     if (this.props.fallback) return this.props.fallback(error, this.reset);
 
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+      <div className="min-h-dvh bg-slate-50 flex items-center justify-center p-6">
         <div className="max-w-md w-full bg-white border border-slate-200 rounded-2xl shadow-sm p-7 text-center animate-fade-in-up">
           <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center text-red-600 text-2xl mx-auto mb-3">
             ⚠

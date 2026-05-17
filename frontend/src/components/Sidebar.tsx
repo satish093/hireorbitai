@@ -319,9 +319,10 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps = {}
         className={clsx(
           'w-60 shrink-0 bg-white border-r border-slate-200 flex flex-col',
           // Desktop: static column inside the flex shell.
-          'md:static md:min-h-screen md:translate-x-0',
-          // Mobile: fixed slide-over with a translate transition.
-          'fixed inset-y-0 left-0 z-50 h-screen transition-transform duration-200 ease-out',
+          'md:static md:min-h-dvh md:translate-x-0',
+          // Mobile: fixed slide-over with a translate transition. Uses dvh so
+          // the drawer height tracks the iOS Safari URL bar correctly.
+          'fixed inset-y-0 left-0 z-50 h-dvh transition-transform duration-200 ease-out safe-pt safe-pb',
           mobileOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full',
         )}
         aria-label="Primary navigation"

@@ -104,7 +104,7 @@ export function ResetPassword() {
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+    <div className="min-h-dvh bg-slate-50 flex items-center justify-center p-4 sm:p-6">
       <div className="w-full max-w-sm animate-fade-in-up">
         <div className="flex justify-center mb-6">
           <Brand size="lg" />

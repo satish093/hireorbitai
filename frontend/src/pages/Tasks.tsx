@@ -691,7 +691,7 @@ function CreateTaskModal({
           onChange={(e) => setForm({ ...form, description: e.target.value })}
           className="w-full text-sm text-slate-700 placeholder-slate-400 border-0 focus:outline-none px-0 resize-none"
         />
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <SelectInput
             label="Status"
             value={form.status}
