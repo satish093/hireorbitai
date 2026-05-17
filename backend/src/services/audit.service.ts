@@ -28,7 +28,9 @@ export type AuditAction =
   | 'group_deleted'
   | 'group_user_assigned'
   | 'group_user_removed'
-  | 'group_user_moved';
+  | 'group_user_moved'
+  | 'daily_digest_sent'
+  | 'daily_digest_skipped';
 
 interface AuditInput {
   action: AuditAction;

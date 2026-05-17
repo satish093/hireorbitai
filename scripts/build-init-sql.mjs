@@ -43,7 +43,7 @@ const groups = [
   },
   {
     name: 'Feature flags',
-    files: ['feature-flags.sql'],
+    files: ['feature-flags.sql', 'feature-flags-daily-digest.sql'],
   },
   {
     name: 'User groups + presence + activity',

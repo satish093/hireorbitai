@@ -301,6 +301,113 @@ If this wasn't you, reset immediately and email ${brand.supportEmail}.`,
   });
 }
 
+// ---------------------------------------------------------------------------
+// Daily match digest — top-N AI-matched jobs from the last 24 h.
+//
+// Rendered as a card list inside the same brand shell as the other
+// transactional emails. Each match shows title, company, score, optional
+// reason snippet, and a "View role" CTA that deeplinks into /jobs?focus=<id>.
+// ---------------------------------------------------------------------------
+export interface DigestMatch {
+  jobId: string;
+  title: string;
+  company: string;
+  matchScore: number; // 0-100
+  reason?: string; // 1-line "why this matched" from the AI
+  location?: string;
+  source?: string; // 'greenhouse' | 'lever' | ...
+}
+
+export async function sendDailyMatchDigest(args: {
+  to: { email: string; name?: string };
+  matches: DigestMatch[];
+  windowHours: number;
+}): Promise<void> {
+  if (args.matches.length === 0) return; // never send an empty digest
+
+  const dashboardUrl = `${env.frontendUrl}/jobs`;
+
+  const rows = args.matches
+    .map((m) => {
+      const dot =
+        m.matchScore >= 85
+          ? '#10b981' /* emerald-500 */
+          : m.matchScore >= 70
+            ? '#0ea5e9' /* sky-500 */
+            : m.matchScore >= 50
+              ? '#f59e0b' /* amber-500 */
+              : '#f43f5e'; /* rose-500 */
+      const focusUrl = `${env.frontendUrl}/jobs?focus=${encodeURIComponent(m.jobId)}`;
+      const meta = [m.company, m.location, m.source]
+        .filter(Boolean)
+        .map((x) => escapeHtml(String(x)))
+        .join(' · ');
+      return `
+        <tr>
+          <td style="padding:14px 0;border-bottom:1px solid ${brand.borderColor};">
+            <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+              <tr>
+                <td style="vertical-align:top;">
+                  <a href="${focusUrl}" style="color:${brand.textColor};text-decoration:none;font-weight:600;font-size:15px;line-height:1.35;">
+                    ${escapeHtml(m.title)}
+                  </a>
+                  <div style="margin-top:2px;font-size:12px;color:${brand.mutedColor};">${meta}</div>
+                  ${
+                    m.reason
+                      ? `<div style="margin-top:6px;font-size:12.5px;color:${brand.textColor};line-height:1.45;">${escapeHtml(m.reason)}</div>`
+                      : ''
+                  }
+                </td>
+                <td style="vertical-align:top;text-align:right;white-space:nowrap;padding-left:12px;">
+                  <span style="display:inline-flex;align-items:center;gap:6px;background:${dot}1A;color:${dot};font-weight:600;font-size:12px;padding:4px 8px;border-radius:999px;">
+                    <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${dot};"></span>
+                    ${Math.round(m.matchScore)}% match
+                  </span>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>`;
+    })
+    .join('');
+
+  const body = `
+    <p style="margin:0 0 8px 0;">Hi ${escapeHtml(args.to.name ?? 'there')},</p>
+    <p style="margin:0 0 16px 0;">
+      Here are your top ${args.matches.length} matched roles from the last ${args.windowHours} hours.
+    </p>
+    <table role="presentation" cellpadding="0" cellspacing="0" width="100%"
+           style="border-collapse:collapse;border-top:1px solid ${brand.borderColor};">
+      ${rows}
+    </table>
+    <p style="margin:18px 0 0 0;font-size:12.5px;color:${brand.mutedColor};">
+      You're receiving this because you're an active consultant in ${escapeHtml(brand.productName)}.
+      Manage notifications from your profile.
+    </p>
+  `;
+
+  await sendViaBrevo({
+    to: args.to,
+    subject: `Your daily job matches — ${args.matches.length} new role${args.matches.length === 1 ? '' : 's'}`,
+    html: shell({
+      preheader: `${args.matches.length} fresh match${args.matches.length === 1 ? '' : 'es'} for you today.`,
+      heading: 'Your daily matches',
+      body,
+      cta: { label: 'Browse all jobs', href: dashboardUrl },
+    }),
+    text:
+      `Your daily matches\n\n` +
+      args.matches
+        .map(
+          (m) =>
+            `${Math.round(m.matchScore)}% · ${m.title} — ${m.company}${m.location ? ' (' + m.location + ')' : ''}\n${env.frontendUrl}/jobs?focus=${m.jobId}`,
+        )
+        .join('\n\n') +
+      `\n\nBrowse all jobs: ${dashboardUrl}`,
+    tag: 'daily-digest',
+  });
+}
+
 export async function sendAccountLockedNotice(args: {
   to: { email: string; name?: string };
   unlocksAt: Date;

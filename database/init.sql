@@ -780,6 +780,17 @@ on conflict (key) do nothing;
 alter table public.feature_flags enable row level security;
 
 
+-- --- feature-flags-daily-digest.sql ---------------------------------------
+
+-- Mirror of backend/migrations/1700000000002_daily_digest_flag.sql for the
+-- fresh-install path (database/init.sql via build-init-sql.mjs).
+INSERT INTO public.feature_flags (key, enabled, description)
+VALUES ('daily_digest', false, 'Nightly per-consultant top-5 job-match email digest')
+ON CONFLICT (key) DO NOTHING;
+
+NOTIFY pgrst, 'reload schema';
+
+
 -- ###########################################################################
 -- # User groups + presence + activity
 -- ###########################################################################
@@ -5202,5 +5213,5 @@ notify pgrst, 'reload schema';
 
 
 -- =============================================================================
--- End of consolidated schema. 38 source files concatenated.
+-- End of consolidated schema. 39 source files concatenated.
 -- =============================================================================
