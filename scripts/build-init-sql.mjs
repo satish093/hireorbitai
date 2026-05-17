@@ -47,7 +47,11 @@ const groups = [
   },
   {
     name: 'User groups + presence + activity',
-    files: ['user-groups-and-presence.sql', 'user-activity-tracking.sql'],
+    files: [
+      'user-groups-and-presence.sql',
+      'user-groups-extended.sql',
+      'user-activity-tracking.sql',
+    ],
   },
   {
     name: 'Consultants (extends public.consultants)',

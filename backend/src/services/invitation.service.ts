@@ -9,6 +9,9 @@ interface CreateInvitationInput {
   email: string;
   role: Role;
   invitedBy: string;
+  // Optional pre-assigned group. null == "No Group" path; the new user lands
+  // with users.group_id = NULL at acceptance.
+  groupId?: string | null;
 }
 
 /**
@@ -37,6 +40,7 @@ export async function createInvitation(input: CreateInvitationInput) {
       role: input.role,
       token,
       invited_by: input.invitedBy,
+      group_id: input.groupId ?? null,
       expires_at: expiresAt,
     })
     .select()
@@ -107,12 +111,16 @@ export async function acceptInvitation(token: string, userId: string) {
     );
   }
 
-  // Promote the user's role and mark accepted.
-  await db.from('users').update({ role: invite.role }).eq('id', userId);
+  // Promote the user's role and, if the invitation pre-assigned a group,
+  // move the user into it. Null group_id on the invitation leaves the user's
+  // existing group untouched (no "demotion to No Group" surprises).
+  const userPatch: Record<string, unknown> = { role: invite.role };
+  if (invite.group_id) userPatch.group_id = invite.group_id;
+  await db.from('users').update(userPatch).eq('id', userId);
   await db
     .from('invitations')
     .update({ status: 'ACCEPTED', accepted_at: new Date().toISOString() })
     .eq('id', invite.id);
 
-  return { role: invite.role };
+  return { role: invite.role, group_id: invite.group_id ?? null };
 }

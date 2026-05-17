@@ -7,9 +7,10 @@ export const adminUsersRouter = Router();
 // Every route here requires the admin tier (SUPER_ADMIN / CEO / CTO / DIRECTOR).
 adminUsersRouter.use(requireAdmin);
 
-adminUsersRouter.get('/',                          c.list);
-adminUsersRouter.get('/:id',                       c.get);
-adminUsersRouter.get('/:id/audit',                 c.auditLog);
-adminUsersRouter.patch('/:id/status',              c.setStatus);
-adminUsersRouter.patch('/:id/notes',               c.setNotes);
-adminUsersRouter.post('/:id/send-password-reset',  c.sendPasswordReset);
+adminUsersRouter.get('/', c.list);
+adminUsersRouter.get('/:id', c.get);
+adminUsersRouter.get('/:id/audit', c.auditLog);
+adminUsersRouter.patch('/:id/status', c.setStatus);
+adminUsersRouter.patch('/:id/group', c.setGroup);
+adminUsersRouter.patch('/:id/notes', c.setNotes);
+adminUsersRouter.post('/:id/send-password-reset', c.sendPasswordReset);

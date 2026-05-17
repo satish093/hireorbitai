@@ -19,6 +19,9 @@ const createSchema = z.object({
     'RECRUITER',
     'CONSULTANT',
   ]),
+  // Optional group pre-assignment. null / undefined / omitted == "No Group" —
+  // the invited user lands with users.group_id = NULL.
+  group_id: z.string().uuid().nullable().optional(),
 });
 
 export const create: RequestHandler = async (req, res) => {
@@ -44,6 +47,7 @@ export const create: RequestHandler = async (req, res) => {
     email: parsed.data.email,
     role: parsed.data.role,
     invitedBy: req.user.id,
+    groupId: parsed.data.group_id ?? null,
   });
   res.status(201).json(invitation);
 };
@@ -146,6 +150,8 @@ export const setup: RequestHandler = async (req, res) => {
   // 4. Upsert the public.users row with the invited role. Explicitly clear
   //    must_change_password — the user just set their own password, no need
   //    to force a rotation on first login.
+  //    If the invitation pre-assigned a group, propagate it onto the new
+  //    user. Null/missing means the "No Group" path.
   const now = new Date().toISOString();
   const { error: upsertErr } = await db.from('users').upsert(
     {
@@ -153,6 +159,7 @@ export const setup: RequestHandler = async (req, res) => {
       email: invite.email,
       full_name: full_name ?? null,
       role: invite.role,
+      group_id: invite.group_id ?? null,
       must_change_password: false,
       last_password_changed_at: now,
       failed_login_attempts: 0,

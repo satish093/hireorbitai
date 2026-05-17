@@ -48,7 +48,7 @@ export const list: RequestHandler = async (req, res) => {
   let query = db
     .from('users')
     .select(
-      'id, email, full_name, role, status, must_change_password, ' +
+      'id, email, full_name, role, status, must_change_password, group_id, ' +
         'created_at, updated_at, last_login_at, last_seen_at, status_reason',
       { count: 'exact' },
     )
@@ -195,6 +195,54 @@ export const setStatus: RequestHandler = async (req, res) => {
     email: data.email,
     req,
     metadata: { from: before.status, to: status, reason: reason ?? null, by: req.user.id },
+  });
+
+  res.json(data);
+};
+
+// ---------------------------------------------------------------------------
+// PATCH /admin/users/:id/group
+//
+// Admin can move a user into a group, or out of any group (group_id: null
+// for the "No Group" path). Emits a different audit verb depending on
+// whether this is an initial assignment, removal, or move.
+// ---------------------------------------------------------------------------
+const groupSchema = z.object({ group_id: z.string().uuid().nullable() });
+export const setGroup: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const { id } = req.params;
+  const parsed = groupSchema.safeParse(req.body);
+  if (!parsed.success) throw httpError(400, parsed.error.issues[0]?.message ?? 'Invalid input');
+
+  const { data: before } = await db
+    .from('users')
+    .select('id, email, group_id')
+    .eq('id', id)
+    .maybeSingle();
+  if (!before) throw httpError(404, 'User not found');
+
+  const { data, error } = await db
+    .from('users')
+    .update({ group_id: parsed.data.group_id })
+    .eq('id', id)
+    .select('id, email, group_id')
+    .single();
+  if (error) throw httpError(500, error.message);
+
+  const from = before.group_id ?? null;
+  const to = parsed.data.group_id;
+  const action: 'group_user_assigned' | 'group_user_removed' | 'group_user_moved' =
+    from === null && to !== null
+      ? 'group_user_assigned'
+      : from !== null && to === null
+        ? 'group_user_removed'
+        : 'group_user_moved';
+  audit({
+    action,
+    user_id: id,
+    email: data.email,
+    req,
+    metadata: { from, to, by: req.user.id },
   });
 
   res.json(data);

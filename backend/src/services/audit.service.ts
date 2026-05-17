@@ -22,7 +22,13 @@ export type AuditAction =
   | 'admin_user_deactivated'
   | 'admin_user_reactivated'
   | 'admin_user_deleted'
-  | 'admin_user_impersonated';
+  | 'admin_user_impersonated'
+  | 'group_created'
+  | 'group_updated'
+  | 'group_deleted'
+  | 'group_user_assigned'
+  | 'group_user_removed'
+  | 'group_user_moved';
 
 interface AuditInput {
   action: AuditAction;

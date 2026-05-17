@@ -2,6 +2,11 @@ import { RequestHandler } from 'express';
 import { z } from 'zod';
 import { db } from '../config/db';
 import { httpError } from '../types';
+import { audit } from '../services/audit.service';
+
+// 7-char hex color (e.g. "#6366F1"). Empty/missing is accepted and falls
+// back to the column's server-side default at insert time.
+const HEX_COLOR = z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Use a 6-digit hex like #6366F1');
 
 /** Translate Postgres errors that hint the migration is missing into a clear
  *  4xx instead of a bare 500 message. */
@@ -74,9 +79,21 @@ export const create: RequestHandler = async (req, res) => {
       .min(1)
       .max(64),
     description: z.string().max(500).optional(),
+    color: HEX_COLOR.optional(),
   });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
+
+  // Prevent duplicate names too (case-insensitive). Slug uniqueness is
+  // enforced by the DB; this is a friendlier pre-check for the name.
+  const { data: existingName } = await db
+    .from('user_groups')
+    .select('id')
+    .ilike('name', parsed.data.name)
+    .maybeSingle();
+  if (existingName) {
+    throw httpError(409, `A group named "${parsed.data.name}" already exists.`);
+  }
 
   const { data, error } = await db
     .from('user_groups')
@@ -100,14 +117,28 @@ export const create: RequestHandler = async (req, res) => {
     // Surface the exact Postgres message — easier to diagnose than a fallback.
     throw httpError(500, `Database error: ${error.message} (code ${(error as any).code ?? '?'})`);
   }
+  audit({
+    action: 'group_created',
+    user_id: req.user.id,
+    email: req.user.email ?? null,
+    req,
+    metadata: {
+      group_id: data.id,
+      unique_group_id: data.unique_group_id,
+      name: data.name,
+      slug: data.slug,
+    },
+  });
   res.status(201).json(data);
 };
 
-/** PATCH /user-groups/:id — rename / toggle. */
+/** PATCH /user-groups/:id — rename / recolor / toggle. */
 export const update: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
   const schema = z.object({
     name: z.string().min(1).max(80).optional(),
     description: z.string().max(500).optional(),
+    color: HEX_COLOR.optional(),
     is_active: z.boolean().optional(),
   });
   const parsed = schema.safeParse(req.body);
@@ -124,15 +155,42 @@ export const update: RequestHandler = async (req, res) => {
     throw httpError(404, error.message);
   }
   if (!data) throw httpError(404, 'Group not found');
+  audit({
+    action: 'group_updated',
+    user_id: req.user.id,
+    email: req.user.email ?? null,
+    req,
+    metadata: { group_id: data.id, changes: parsed.data },
+  });
   res.json(data);
 };
 
 /** DELETE /user-groups/:id — members fall back to null group via ON DELETE SET NULL. */
 export const remove: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  // Snapshot for the audit row before we lose the data.
+  const { data: before } = await db
+    .from('user_groups')
+    .select('id, unique_group_id, name')
+    .eq('id', req.params.id)
+    .maybeSingle();
   const { error } = await db.from('user_groups').delete().eq('id', req.params.id);
   if (error) {
     const hint = migrationHint(error);
     throw hint ?? httpError(500, error.message);
+  }
+  if (before) {
+    audit({
+      action: 'group_deleted',
+      user_id: req.user.id,
+      email: req.user.email ?? null,
+      req,
+      metadata: {
+        group_id: before.id,
+        unique_group_id: before.unique_group_id,
+        name: before.name,
+      },
+    });
   }
   res.json({ ok: true });
 };
@@ -140,12 +198,21 @@ export const remove: RequestHandler = async (req, res) => {
 /** PUT /user-groups/assign  body: { user_id, group_id }
  *  Assigns a single user to a group (or clears their group when group_id is null). */
 export const assignOne: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
   const schema = z.object({
     user_id: z.string().uuid(),
     group_id: z.string().uuid().nullable(),
   });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
+
+  // Pre-read so the audit row can record the transition direction.
+  const { data: before } = await db
+    .from('users')
+    .select('id, email, group_id')
+    .eq('id', parsed.data.user_id)
+    .maybeSingle();
+
   const { error, data } = await db
     .from('users')
     .update({ group_id: parsed.data.group_id })
@@ -156,12 +223,35 @@ export const assignOne: RequestHandler = async (req, res) => {
     const hint = migrationHint(error);
     throw hint ?? httpError(500, error.message);
   }
+
+  // Pick the action verb that best describes the transition:
+  //   NULL    → group: assigned
+  //   group   → NULL:  removed
+  //   groupA  → groupB: moved
+  //   same           : no-op (still log as assigned for forensics)
+  const from = before?.group_id ?? null;
+  const to = parsed.data.group_id;
+  const action: 'group_user_assigned' | 'group_user_removed' | 'group_user_moved' =
+    from === null && to !== null
+      ? 'group_user_assigned'
+      : from !== null && to === null
+        ? 'group_user_removed'
+        : 'group_user_moved';
+  audit({
+    action,
+    user_id: parsed.data.user_id,
+    email: before?.email ?? null,
+    req,
+    metadata: { from, to, by: req.user.id },
+  });
+
   res.json(data);
 };
 
 /** PATCH /user-groups/:id/members  body: { user_ids: string[] }
  *  Bulk-assigns the listed users to this group (replacing any prior group). */
 export const setMembers: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
   const schema = z.object({ user_ids: z.array(z.string().uuid()) });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
@@ -176,6 +266,16 @@ export const setMembers: RequestHandler = async (req, res) => {
   if (error) {
     const hint = migrationHint(error);
     throw hint ?? httpError(500, error.message);
+  }
+  // One audit row per user — the activity log on each user's detail page
+  // can then surface the bulk move alongside the rest of their history.
+  for (const userId of parsed.data.user_ids) {
+    audit({
+      action: 'group_user_assigned',
+      user_id: userId,
+      req,
+      metadata: { group_id: req.params.id, via: 'bulk_set_members', by: req.user.id },
+    });
   }
   res.json({ updated: count ?? parsed.data.user_ids.length });
 };
