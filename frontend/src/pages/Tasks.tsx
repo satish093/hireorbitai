@@ -193,13 +193,19 @@ export function Tasks() {
         { label: view === 'board' ? 'Board' : 'List' },
       ]}
     >
-      {/* Page heading row */}
-      <div className="flex items-center gap-3 mb-5">
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Team tasks</h1>
-        <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
-          {tasks.length} total
-        </span>
-        <div className="ml-3 inline-flex rounded-lg bg-slate-100 p-0.5 text-sm">
+      {/* Page heading row — wraps on narrow viewports so the toolbar doesn't
+          overflow horizontally. Title + count stays as a unit; toggle and
+          actions can break to their own line on mobile. */}
+      <div className="flex flex-wrap items-center gap-3 mb-5">
+        <div className="flex items-center gap-2 min-w-0">
+          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-slate-900 truncate">
+            Team tasks
+          </h1>
+          <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 shrink-0">
+            {tasks.length} total
+          </span>
+        </div>
+        <div className="inline-flex rounded-lg bg-slate-100 p-0.5 text-sm">
           <ViewToggleBtn active={view === 'board'} onClick={() => setParams({ view: 'board' })}>
             Board
           </ViewToggleBtn>
@@ -211,24 +217,36 @@ export function Tasks() {
         <div className="ml-auto flex items-center gap-2">
           <Link
             to="/tasks/me"
-            className="text-sm text-slate-600 hover:text-slate-900 inline-flex items-center gap-1"
+            className="text-sm text-slate-600 hover:text-slate-900 inline-flex items-center gap-1 whitespace-nowrap"
           >
-            Assigned to me →
+            <span className="hidden sm:inline">Assigned to me</span>
+            <span className="sm:hidden">Mine</span>
+            <span>→</span>
           </Link>
           {isManager && (
             <button
               onClick={() => setCreateOpen(true)}
-              className="bg-slate-900 text-white text-sm px-3 py-1.5 rounded-lg hover:bg-slate-800 inline-flex items-center gap-1.5"
+              className="bg-slate-900 text-white text-sm px-3 py-1.5 rounded-lg hover:bg-slate-800 inline-flex items-center gap-1.5 whitespace-nowrap"
             >
-              <span>+</span> New task
+              <span>+</span>
+              <span className="hidden sm:inline">New task</span>
+              <span className="sm:hidden">New</span>
             </button>
           )}
         </div>
       </div>
 
-      {/* Filter chips row */}
-      <div className="flex items-start justify-between gap-3">
-        <FilterBar filters={filters} setFilters={setFilters} users={users} isManager={isManager} />
+      {/* Filter row — saved-filters dropdown drops below the chip bar on
+          narrow viewports rather than fighting it for horizontal space. */}
+      <div className="flex flex-wrap items-start gap-2">
+        <div className="flex-1 min-w-0">
+          <FilterBar
+            filters={filters}
+            setFilters={setFilters}
+            users={users}
+            isManager={isManager}
+          />
+        </div>
         <SavedTaskFilters
           current={toCriteria(filters)}
           onApply={(c) => setFilters(c as FilterState)}

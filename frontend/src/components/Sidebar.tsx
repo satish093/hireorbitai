@@ -193,7 +193,14 @@ function initials(name?: string | null, email?: string | null): string {
   return (parts[0]![0]! + parts[1]![0]!).toUpperCase();
 }
 
-export function Sidebar() {
+interface SidebarProps {
+  /** Whether the mobile slide-over is currently open. Layout owns this state. */
+  mobileOpen?: boolean;
+  /** Called when the user dismisses the overlay (tap-outside / Escape). */
+  onMobileClose?: () => void;
+}
+
+export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps = {}) {
   const { profile, signOut } = useAuth();
   const { flags } = useFeatureFlags();
   const role = profile?.role;
@@ -287,124 +294,164 @@ export function Sidebar() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.id]);
 
+  // Close on Escape when the mobile drawer is open.
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onMobileClose?.();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [mobileOpen, onMobileClose]);
+
   return (
-    <aside className="w-60 shrink-0 bg-white border-r border-slate-200 min-h-screen flex flex-col">
-      {/* Brand */}
-      <div className="px-4 py-4 border-b border-slate-100">
-        <Brand size="md" />
-      </div>
-
-      {/* Nav */}
-      <nav className="flex-1 overflow-y-auto p-3 space-y-5">
-        {sections.map((section) => {
-          const visible = section.items.filter((i) => {
-            if (role && !i.roles.includes(role)) return false;
-            if (i.flagKey && flags[i.flagKey] === false) return false;
-            return true;
-          });
-          if (visible.length === 0) return null;
-          return (
-            <div key={section.heading}>
-              <div className="px-2 mb-1.5 text-[10px] font-semibold tracking-widest text-slate-400 uppercase">
-                {section.heading}
-              </div>
-              <div className="space-y-0.5">
-                {visible.map((i) => {
-                  const badge = i.badgeKey ? counts[i.badgeKey] : undefined;
-                  const Icon = i.icon;
-                  return (
-                    <NavLink
-                      key={i.to}
-                      to={i.to}
-                      className={({ isActive }) =>
-                        clsx(
-                          'group relative flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-sm transition-all duration-200 ease-out',
-                          isActive
-                            ? 'bg-brand-50 text-brand-700 font-medium'
-                            : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900 hover:translate-x-0.5',
-                        )
-                      }
-                    >
-                      {({ isActive }) => (
-                        <>
-                          {/* Animated active indicator: a vertical bar that
-                              scales from 0 to full height when the link
-                              becomes active. */}
-                          <span
-                            aria-hidden="true"
-                            className={clsx(
-                              'absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-r-full bg-brand-600 origin-center transition-transform duration-200 ease-out',
-                              isActive ? 'scale-y-100' : 'scale-y-0',
-                            )}
-                          />
-                          <Icon
-                            size={17}
-                            className={clsx(
-                              'shrink-0 transition-colors',
-                              isActive
-                                ? 'text-brand-600'
-                                : 'text-slate-500 group-hover:text-slate-700',
-                            )}
-                          />
-                          <span className="flex-1 truncate">{i.label}</span>
-                          {typeof badge === 'number' && badge > 0 && (
-                            <span
-                              key={badge}
-                              className={clsx(
-                                'text-[10px] font-semibold px-1.5 py-0.5 rounded-full tabular-nums animate-pop',
-                                isActive
-                                  ? 'bg-brand-600 text-white'
-                                  : 'bg-slate-200 text-slate-700',
-                              )}
-                            >
-                              {badge}
-                            </span>
-                          )}
-                        </>
-                      )}
-                    </NavLink>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })}
-      </nav>
-
-      {/* User card pinned to bottom */}
-      <div className="border-t border-slate-100 p-3">
-        <div className="flex items-center gap-2.5 px-1.5 py-1.5 rounded-md hover:bg-slate-50">
-          <NavLink
-            to={profile?.id ? `/users/${profile.id}` : '#'}
-            className="flex items-center gap-2.5 flex-1 min-w-0 hover:bg-slate-50 rounded-md -mx-1 px-1 py-0.5"
-            title="View your profile"
-          >
-            <div className="relative">
-              <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-semibold">
-                {initials(profile?.full_name, profile?.email)}
-              </div>
-              <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-white rounded-full">
-                <span className="absolute inset-0 rounded-full bg-emerald-500 animate-ping opacity-60" />
-              </span>
-            </div>
-            <div className="flex-1 min-w-0 leading-tight">
-              <div className="text-[13px] font-medium text-slate-900 truncate">
-                {profile?.full_name ?? profile?.email}
-              </div>
-              <div className="text-[10px] uppercase tracking-wider text-slate-500">
-                {role && ROLE_LABEL[role]}
-              </div>
-            </div>
-          </NavLink>
+    <>
+      {/* Mobile backdrop — only rendered when the drawer is open. Tapping it
+          dismisses the menu. Hidden on md+ where the sidebar is inline. */}
+      {mobileOpen && (
+        <div
+          className="md:hidden fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-sm animate-fade-in"
+          onClick={onMobileClose}
+          aria-hidden="true"
+        />
+      )}
+      <aside
+        className={clsx(
+          'w-60 shrink-0 bg-white border-r border-slate-200 flex flex-col',
+          // Desktop: static column inside the flex shell.
+          'md:static md:min-h-screen md:translate-x-0',
+          // Mobile: fixed slide-over with a translate transition.
+          'fixed inset-y-0 left-0 z-50 h-screen transition-transform duration-200 ease-out',
+          mobileOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full',
+        )}
+        aria-label="Primary navigation"
+      >
+        {/* Brand */}
+        <div className="px-4 py-4 border-b border-slate-100 flex items-center justify-between">
+          <Brand size="md" />
+          {/* Close button on mobile only — desktop uses the inline sidebar. */}
           <button
-            onClick={signOut}
-            title="Sign out"
-            className="text-slate-400 hover:text-slate-700 p-1.5 rounded-md hover:bg-slate-100 transition-colors"
+            type="button"
+            onClick={onMobileClose}
+            aria-label="Close navigation"
+            className="md:hidden -mr-1 w-8 h-8 inline-flex items-center justify-center rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100"
           >
-            <IconLogOut size={16} />
+            ✕
           </button>
         </div>
-      </div>
-    </aside>
+
+        {/* Nav */}
+        <nav className="flex-1 overflow-y-auto p-3 space-y-5">
+          {sections.map((section) => {
+            const visible = section.items.filter((i) => {
+              if (role && !i.roles.includes(role)) return false;
+              if (i.flagKey && flags[i.flagKey] === false) return false;
+              return true;
+            });
+            if (visible.length === 0) return null;
+            return (
+              <div key={section.heading}>
+                <div className="px-2 mb-1.5 text-[10px] font-semibold tracking-widest text-slate-400 uppercase">
+                  {section.heading}
+                </div>
+                <div className="space-y-0.5">
+                  {visible.map((i) => {
+                    const badge = i.badgeKey ? counts[i.badgeKey] : undefined;
+                    const Icon = i.icon;
+                    return (
+                      <NavLink
+                        key={i.to}
+                        to={i.to}
+                        className={({ isActive }) =>
+                          clsx(
+                            'group relative flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-sm transition-all duration-200 ease-out',
+                            isActive
+                              ? 'bg-brand-50 text-brand-700 font-medium'
+                              : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900 hover:translate-x-0.5',
+                          )
+                        }
+                      >
+                        {({ isActive }) => (
+                          <>
+                            {/* Animated active indicator: a vertical bar that
+                              scales from 0 to full height when the link
+                              becomes active. */}
+                            <span
+                              aria-hidden="true"
+                              className={clsx(
+                                'absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-r-full bg-brand-600 origin-center transition-transform duration-200 ease-out',
+                                isActive ? 'scale-y-100' : 'scale-y-0',
+                              )}
+                            />
+                            <Icon
+                              size={17}
+                              className={clsx(
+                                'shrink-0 transition-colors',
+                                isActive
+                                  ? 'text-brand-600'
+                                  : 'text-slate-500 group-hover:text-slate-700',
+                              )}
+                            />
+                            <span className="flex-1 truncate">{i.label}</span>
+                            {typeof badge === 'number' && badge > 0 && (
+                              <span
+                                key={badge}
+                                className={clsx(
+                                  'text-[10px] font-semibold px-1.5 py-0.5 rounded-full tabular-nums animate-pop',
+                                  isActive
+                                    ? 'bg-brand-600 text-white'
+                                    : 'bg-slate-200 text-slate-700',
+                                )}
+                              >
+                                {badge}
+                              </span>
+                            )}
+                          </>
+                        )}
+                      </NavLink>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </nav>
+
+        {/* User card pinned to bottom */}
+        <div className="border-t border-slate-100 p-3">
+          <div className="flex items-center gap-2.5 px-1.5 py-1.5 rounded-md hover:bg-slate-50">
+            <NavLink
+              to={profile?.id ? `/users/${profile.id}` : '#'}
+              className="flex items-center gap-2.5 flex-1 min-w-0 hover:bg-slate-50 rounded-md -mx-1 px-1 py-0.5"
+              title="View your profile"
+            >
+              <div className="relative">
+                <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-semibold">
+                  {initials(profile?.full_name, profile?.email)}
+                </div>
+                <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-white rounded-full">
+                  <span className="absolute inset-0 rounded-full bg-emerald-500 animate-ping opacity-60" />
+                </span>
+              </div>
+              <div className="flex-1 min-w-0 leading-tight">
+                <div className="text-[13px] font-medium text-slate-900 truncate">
+                  {profile?.full_name ?? profile?.email}
+                </div>
+                <div className="text-[10px] uppercase tracking-wider text-slate-500">
+                  {role && ROLE_LABEL[role]}
+                </div>
+              </div>
+            </NavLink>
+            <button
+              onClick={signOut}
+              title="Sign out"
+              className="text-slate-400 hover:text-slate-700 p-1.5 rounded-md hover:bg-slate-100 transition-colors"
+            >
+              <IconLogOut size={16} />
+            </button>
+          </div>
+        </div>
+      </aside>
+    </>
   );
 }
