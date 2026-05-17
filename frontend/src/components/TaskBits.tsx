@@ -1,5 +1,6 @@
 import clsx from 'clsx';
 import { TaskPriority, TaskStatus, Task } from '../types';
+import { GroupBadge } from './GroupBadge';
 
 // ---- Priority --------------------------------------------------------------
 
@@ -183,6 +184,7 @@ export function AssigneeChip({ task }: { task: Task }) {
   }
   return (
     <span className="inline-flex items-center gap-1.5 text-xs text-slate-700">
+      <GroupBadge groupId={task.assignee.group_id ?? null} compact hideEmpty />
       <Avatar name={task.assignee.full_name} email={task.assignee.email} size={20} />
       <span className="truncate max-w-[110px]">
         {task.assignee.full_name ?? task.assignee.email}

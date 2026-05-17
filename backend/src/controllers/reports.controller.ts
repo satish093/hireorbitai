@@ -89,7 +89,9 @@ export const recruiterPerformance: RequestHandler = async (req, res) => {
     await Promise.all([
       db
         .from('recruiters')
-        .select('id, team, target_submissions_per_week, user:users!user_id(id, email, full_name)'),
+        .select(
+          'id, team, target_submissions_per_week, user:users!user_id(id, email, full_name, group_id)',
+        ),
       db.from('consultants').select('id, recruiter_id, marketing_status'),
       db
         .from('applications')
@@ -114,6 +116,7 @@ export const recruiterPerformance: RequestHandler = async (req, res) => {
     email: string;
     team: string | null;
     target_per_week: number | null;
+    group_id: string | null;
     active_consultants: number;
     placed_consultants: number;
     submissions: number;
@@ -129,6 +132,7 @@ export const recruiterPerformance: RequestHandler = async (req, res) => {
       email: r.user?.email ?? '',
       team: r.team ?? null,
       target_per_week: r.target_submissions_per_week ?? null,
+      group_id: r.user?.group_id ?? null,
       active_consultants: 0,
       placed_consultants: 0,
       submissions: 0,
@@ -178,8 +182,8 @@ export const consultantPipeline: RequestHandler = async (req, res) => {
       .from('consultants')
       .select(
         'id, marketing_status, primary_skill, total_experience_years, recruiter_id,' +
-          ' user:users!user_id(id, email, full_name),' +
-          ' recruiter:recruiters!recruiter_id(id, team, user:users!user_id(id, full_name, email))',
+          ' user:users!user_id(id, email, full_name, group_id),' +
+          ' recruiter:recruiters!recruiter_id(id, team, user:users!user_id(id, full_name, email, group_id))',
       ),
     db
       .from('applications')

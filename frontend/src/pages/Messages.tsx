@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { Avatar } from '../components/TaskBits';
 import { PresenceDot, PresencePill } from '../components/PresenceDot';
+import { GroupBadge } from '../components/GroupBadge';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { Role, ROLE_LABEL } from '../types';
@@ -299,8 +300,9 @@ export function Messages() {
                         <div className="text-sm text-slate-900 truncate">
                           {p.full_name ?? p.email}
                         </div>
-                        <div className="text-[10px] uppercase tracking-wider text-slate-500">
-                          {p.role && ROLE_LABEL[p.role]}
+                        <div className="text-[10px] uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                          <span>{p.role && ROLE_LABEL[p.role]}</span>
+                          <GroupBadge groupId={p.group_id ?? null} compact hideEmpty />
                         </div>
                       </div>
                     </button>
@@ -343,10 +345,11 @@ export function Messages() {
                       <div className="flex items-baseline justify-between gap-2">
                         <span
                           className={clsx(
-                            'text-sm font-medium truncate',
+                            'text-sm font-medium truncate inline-flex items-center gap-1.5',
                             c.unread_count > 0 ? 'text-slate-900' : 'text-slate-800',
                           )}
                         >
+                          <GroupBadge groupId={c.peer.group_id ?? null} compact hideEmpty />
                           {c.peer.full_name ?? c.peer.email}
                         </span>
                         <span className="text-[10px] text-slate-500 shrink-0">

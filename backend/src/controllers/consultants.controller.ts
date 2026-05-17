@@ -38,8 +38,8 @@ export const list: RequestHandler = async (req, res) => {
   let q = db
     .from('consultants')
     .select(
-      '*, user:users(id, email, full_name, phone),' +
-        'recruiter:recruiters!recruiter_id(id, team, user:users!user_id(id, email, full_name))',
+      '*, user:users(id, email, full_name, phone, group_id),' +
+        'recruiter:recruiters!recruiter_id(id, team, user:users!user_id(id, email, full_name, group_id))',
     )
     .order('created_at', { ascending: false });
 
@@ -73,8 +73,8 @@ export const get: RequestHandler = async (req, res) => {
   const { data, error } = await db
     .from('consultants')
     .select(
-      '*, user:users(id, email, full_name, phone, avatar_url),' +
-        'recruiter:recruiters!recruiter_id(id, team, user:users!user_id(id, email, full_name))',
+      '*, user:users(id, email, full_name, phone, avatar_url, group_id),' +
+        'recruiter:recruiters!recruiter_id(id, team, user:users!user_id(id, email, full_name, group_id))',
     )
     .eq('id', req.params.id)
     .single();

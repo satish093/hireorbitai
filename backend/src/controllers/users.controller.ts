@@ -388,7 +388,7 @@ export const listDeactivated: RequestHandler = async (req, res) => {
   let q = db
     .from('users')
     .select(
-      'id, email, full_name, role, status, status_reason, status_changed_at, is_active, updated_at, created_at, last_seen_at',
+      'id, email, full_name, role, status, status_reason, status_changed_at, is_active, updated_at, created_at, last_seen_at, group_id',
     )
     .or('status.neq.active,and(status.is.null,is_active.eq.false)')
     .order('updated_at', { ascending: false });

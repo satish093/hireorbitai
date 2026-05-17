@@ -4,9 +4,9 @@ import { db } from '../config/db';
 import { httpError } from '../types';
 
 const SELECT_WITH_JOINS =
-  '*, user:users!user_id(id, email, full_name), ' +
-  'manager:users!manager_id(id, email, full_name), ' +
-  'managers:recruiter_managers(is_primary, assigned_at, manager:users!manager_id(id, email, full_name, role))';
+  '*, user:users!user_id(id, email, full_name, group_id), ' +
+  'manager:users!manager_id(id, email, full_name, group_id), ' +
+  'managers:recruiter_managers(is_primary, assigned_at, manager:users!manager_id(id, email, full_name, role, group_id))';
 
 const onboardingSchema = z.object({
   // Personal details — write through to public.users on the same row.
@@ -30,7 +30,7 @@ export const list: RequestHandler = async (_req, res) => {
     const fallback = await db
       .from('recruiters')
       .select(
-        '*, user:users!user_id(id, email, full_name), manager:users!manager_id(id, email, full_name)',
+        '*, user:users!user_id(id, email, full_name, group_id), manager:users!manager_id(id, email, full_name, group_id)',
       )
       .order('created_at', { ascending: false });
     if (fallback.error) throw httpError(500, fallback.error.message);
@@ -51,7 +51,7 @@ export const get: RequestHandler = async (req, res) => {
     const fb = await db
       .from('recruiters')
       .select(
-        '*, user:users!user_id(id, email, full_name, phone, avatar_url), manager:users!manager_id(id, email, full_name)',
+        '*, user:users!user_id(id, email, full_name, phone, avatar_url, group_id), manager:users!manager_id(id, email, full_name, group_id)',
       )
       .eq('id', req.params.id)
       .single();

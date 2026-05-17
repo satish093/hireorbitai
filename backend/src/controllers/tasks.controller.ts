@@ -11,10 +11,10 @@ import {
 
 const SELECT_WITH_JOINS = `
   *,
-  assignee:users!assignee_id ( id, email, full_name, role ),
-  creator:users!created_by ( id, email, full_name, role ),
-  consultant:consultants!related_consultant_id ( id, user:users!user_id ( full_name, email ) ),
-  recruiter:recruiters!related_recruiter_id ( id, user:users!user_id ( full_name, email ) )
+  assignee:users!assignee_id ( id, email, full_name, role, group_id ),
+  creator:users!created_by ( id, email, full_name, role, group_id ),
+  consultant:consultants!related_consultant_id ( id, user:users!user_id ( full_name, email, group_id ) ),
+  recruiter:recruiters!related_recruiter_id ( id, user:users!user_id ( full_name, email, group_id ) )
 `;
 
 function isManagerLike(role?: string): boolean {

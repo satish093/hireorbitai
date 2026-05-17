@@ -6,6 +6,7 @@ import { DataTable } from '../components/DataTable';
 import { PageHeader } from '../components/PageHeader';
 import { SelectInput } from '../components/SelectInput';
 import { Button } from '../components/Button';
+import { GroupBadge } from '../components/GroupBadge';
 import { api } from '../services/api';
 import { invalidate, useInvalidationListener } from '../hooks/useInvalidate';
 import { ALL_ROLES, ROLE_LABEL, Role } from '../types';
@@ -24,14 +25,15 @@ interface DeactivatedRow {
   last_seen_at: string | null;
   updated_at: string | null;
   created_at: string | null;
+  group_id: string | null;
 }
 
 const STATUS_PILL: Record<Status, string> = {
-  active:               'bg-emerald-50 text-emerald-700 border-emerald-200',
-  inactive:             'bg-slate-100  text-slate-600  border-slate-200',
-  suspended:            'bg-amber-50   text-amber-800  border-amber-200',
+  active: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  inactive: 'bg-slate-100  text-slate-600  border-slate-200',
+  suspended: 'bg-amber-50   text-amber-800  border-amber-200',
   pending_verification: 'bg-sky-50     text-sky-700    border-sky-200',
-  banned:               'bg-red-50     text-red-700    border-red-200',
+  banned: 'bg-red-50     text-red-700    border-red-200',
 };
 
 type RoleFilter = 'ALL' | Role;
@@ -68,12 +70,16 @@ export function DeactivatedAccounts() {
     }
   }
 
-  useEffect(() => { load(role); }, [role]);
+  useEffect(() => {
+    load(role);
+  }, [role]);
 
   // Refetch whenever any sibling page mutates a user — keeps this list
   // honest if an admin reactivated someone from /admin/users or
   // /admin/users/:id and then comes back here.
-  useInvalidationListener('users', () => { load(role); });
+  useInvalidationListener('users', () => {
+    load(role);
+  });
 
   async function reactivate(row: DeactivatedRow) {
     if (busyId) return;
@@ -118,27 +124,27 @@ export function DeactivatedAccounts() {
           onChange={(e) => setRole(e.target.value as RoleFilter)}
           options={ROLE_OPTIONS.map((o) => ({
             value: o.value,
-            label: o.value !== 'ALL' && tally.get(o.value as Role)
-              ? `${o.label} (${tally.get(o.value as Role)})`
-              : o.label,
+            label:
+              o.value !== 'ALL' && tally.get(o.value as Role)
+                ? `${o.label} (${tally.get(o.value as Role)})`
+                : o.label,
           }))}
         />
       </div>
 
       <DataTable
         loading={loading}
-        empty={role === 'ALL'
-          ? 'No deactivated accounts. Nothing to see here.'
-          : `No deactivated ${ROLE_LABEL[role as Role]} accounts.`}
+        empty={
+          role === 'ALL'
+            ? 'No deactivated accounts. Nothing to see here.'
+            : `No deactivated ${ROLE_LABEL[role as Role]} accounts.`
+        }
         columns={[
           {
             key: 'email',
             header: 'User',
             render: (r: DeactivatedRow) => (
-              <button
-                onClick={() => nav(`/users/${r.id}`)}
-                className="text-left hover:underline"
-              >
+              <button onClick={() => nav(`/users/${r.id}`)} className="text-left hover:underline">
                 <div className="font-medium text-slate-900">{r.full_name || r.email}</div>
                 {r.full_name && <div className="text-xs text-slate-500">{r.email}</div>}
               </button>
@@ -154,12 +160,17 @@ export function DeactivatedAccounts() {
             ),
           },
           {
+            key: 'group',
+            header: 'Group',
+            render: (r: DeactivatedRow) => <GroupBadge groupId={r.group_id} />,
+          },
+          {
             key: 'status',
             header: 'Status',
             render: (r: DeactivatedRow) => {
               // status is the canonical field; fall back to is_active for
               // pre-migration rows so old deactivations still render.
-              const s: Status = (r.status ?? (r.is_active === false ? 'inactive' : 'active'));
+              const s: Status = r.status ?? (r.is_active === false ? 'inactive' : 'active');
               return (
                 <span
                   className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border ${STATUS_PILL[s]}`}
@@ -181,9 +192,12 @@ export function DeactivatedAccounts() {
           {
             key: 'last_seen_at',
             header: 'Last seen',
-            render: (r: DeactivatedRow) => r.last_seen_at
-              ? new Date(r.last_seen_at).toLocaleString()
-              : <span className="text-slate-400">Never</span>,
+            render: (r: DeactivatedRow) =>
+              r.last_seen_at ? (
+                new Date(r.last_seen_at).toLocaleString()
+              ) : (
+                <span className="text-slate-400">Never</span>
+              ),
           },
           {
             key: 'actions',
@@ -191,18 +205,18 @@ export function DeactivatedAccounts() {
             align: 'right',
             render: (r: DeactivatedRow) => (
               <div className="flex items-center justify-end gap-1">
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => nav(`/users/${r.id}`)}
-                >Open profile</Button>
+                <Button size="sm" variant="ghost" onClick={() => nav(`/users/${r.id}`)}>
+                  Open profile
+                </Button>
                 <Button
                   size="sm"
                   variant="ghost"
                   loading={busyId === r.id}
                   onClick={() => reactivate(r)}
                   className="text-emerald-700 hover:text-emerald-800"
-                >Reactivate</Button>
+                >
+                  Reactivate
+                </Button>
               </div>
             ),
           },

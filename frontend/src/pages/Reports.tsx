@@ -5,6 +5,7 @@ import { Avatar } from '../components/TaskBits';
 import { Modal } from '../components/Modal';
 import { FormInput } from '../components/FormInput';
 import { SelectInput } from '../components/SelectInput';
+import { GroupBadge } from '../components/GroupBadge';
 import { api } from '../services/api';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
@@ -29,6 +30,7 @@ interface RecruiterRow {
   email: string;
   team: string | null;
   target_per_week: number | null;
+  group_id: string | null;
   active_consultants: number;
   placed_consultants: number;
   submissions: number;
@@ -250,7 +252,10 @@ function RecruiterPerformance({ rows }: { rows: RecruiterRow[] | null }) {
                   <div className="inline-flex items-center gap-2">
                     <Avatar name={r.name} email={r.email} size={26} />
                     <div className="leading-tight">
-                      <div className="font-medium text-slate-900">{r.name}</div>
+                      <div className="font-medium text-slate-900 inline-flex items-center gap-1.5">
+                        {r.name}
+                        <GroupBadge groupId={r.group_id} compact hideEmpty />
+                      </div>
                       {r.target_per_week ? (
                         <div className="text-[11px] text-slate-500">
                           {r.target_per_week}/wk target
@@ -744,11 +749,14 @@ function UserTimeTable({ rows }: { rows: UserTimeRow[] | null }) {
                     </div>
                   </td>
                   <td className="px-3 py-2.5">
-                    {r.role && (
-                      <span className="text-[10px] font-semibold uppercase tracking-wide bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded">
-                        {r.role}
-                      </span>
-                    )}
+                    <div className="inline-flex items-center gap-1.5">
+                      {r.role && (
+                        <span className="text-[10px] font-semibold uppercase tracking-wide bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded">
+                          {r.role}
+                        </span>
+                      )}
+                      <GroupBadge groupId={r.group_id} compact hideEmpty />
+                    </div>
                   </td>
                   <td className="px-3 py-2.5 text-right tabular-nums font-semibold text-slate-900">
                     {formatDuration(r.total_seconds)}

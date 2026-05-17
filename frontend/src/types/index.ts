@@ -98,10 +98,28 @@ export interface Task {
   tags?: string[] | null;
   created_at: string;
   updated_at: string;
-  assignee?: { id: string; email: string; full_name?: string | null; role?: Role } | null;
-  creator?: { id: string; email: string; full_name?: string | null; role?: Role } | null;
-  consultant?: { id: string; user?: { full_name?: string | null; email: string } } | null;
-  recruiter?: { id: string; user?: { full_name?: string | null; email: string } } | null;
+  assignee?: {
+    id: string;
+    email: string;
+    full_name?: string | null;
+    role?: Role;
+    group_id?: string | null;
+  } | null;
+  creator?: {
+    id: string;
+    email: string;
+    full_name?: string | null;
+    role?: Role;
+    group_id?: string | null;
+  } | null;
+  consultant?: {
+    id: string;
+    user?: { full_name?: string | null; email: string; group_id?: string | null };
+  } | null;
+  recruiter?: {
+    id: string;
+    user?: { full_name?: string | null; email: string; group_id?: string | null };
+  } | null;
 }
 
 export interface TaskComment {
