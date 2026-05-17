@@ -579,16 +579,22 @@ export function JobSearch() {
           <PillSelect
             label="Location"
             value={location}
-            placeholder="Anywhere"
+            placeholder="Pick a location"
             onChange={(v) => {
               setLocation(v);
             }}
             options={[
-              { value: '', label: 'Anywhere' },
               { value: 'United States', label: 'United States' },
               { value: 'Remote', label: 'Remote' },
               { value: 'New York', label: 'New York' },
               { value: 'San Francisco', label: 'San Francisco' },
+              { value: 'Seattle', label: 'Seattle' },
+              { value: 'Austin', label: 'Austin' },
+              { value: 'Los Angeles', label: 'Los Angeles' },
+              { value: 'Boston', label: 'Boston' },
+              { value: 'Chicago', label: 'Chicago' },
+              { value: 'London', label: 'London' },
+              { value: 'Europe', label: 'Europe' },
             ]}
           />
           <PillSelect
@@ -1160,15 +1166,32 @@ function JobCard({
           </button>
         </div>
 
-        {/* Meta strip */}
+        {/* Meta strip — Jobright-style key facts */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-y-1.5 gap-x-6 mt-3 text-sm">
           <MetaItem icon="◎" label={job.location ?? 'Unknown location'} />
+          <MetaItem icon="⌂" label={workModel} />
           <MetaItem icon="◷" label={prettyType(job.job_type)} />
           <MetaItem icon="$" label={prettyRate(job.rate_min, job.rate_max)} />
-          <MetaItem icon="⌂" label={workModel} />
-          <MetaItem icon="◯" label={seniority ?? '—'} />
-          <MetaItem icon="⌛" label={minYears != null ? `${minYears}+ years exp` : '—'} />
+          <MetaItem icon="◯" label={seniority ?? 'Level not specified'} />
+          <MetaItem
+            icon="⌛"
+            label={minYears != null ? `${minYears}+ years exp` : 'Experience not specified'}
+          />
         </div>
+
+        {/* Description excerpt — visible even when AI enrichment hasn't run yet.
+            Strips HTML tags, caps at 200 chars. Hidden when expanded so the
+            expanded responsibilities + skills sections take over. */}
+        {!expanded && job.description && (
+          <p className="mt-3 text-sm text-slate-600 leading-snug line-clamp-2">
+            {job.description
+              .replace(/<[^>]+>/g, ' ')
+              .replace(/\s+/g, ' ')
+              .trim()
+              .slice(0, 200)}
+            {job.description.length > 200 ? '…' : ''}
+          </p>
+        )}
 
         {/* Recommendation tags (Jobright-style "H1B Sponsor Likely" etc.) */}
         {recTags.length > 0 && (
