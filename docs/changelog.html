@@ -147,7 +147,126 @@
     <header>
       <h1>HireOrbit AI — Product Changelog</h1>
       <p>What we shipped, in plain language. Newest first.</p>
+      <p style="margin-top:8px;font-size:12.5px;color:var(--muted);">
+        <strong style="color:var(--text);font-weight:600;">Last updated:</strong> 2026-05-18
+        &nbsp;·&nbsp;
+        <strong style="color:var(--text);font-weight:600;">Latest highlights:</strong>
+        mobile navigation, design polish, faster first load, saved task filters, reminders now actually deliver.
+      </p>
     </header>
+
+    <!-- ================== MOBILE + UI POLISH PASSES (2026-05-18) ================== -->
+
+    <div class="release">
+      <div class="release-head">
+        <h2>Design system tune-up &amp; faster first load<span class="pill perf">Performance</span></h2>
+        <span class="date">2026-05-18</span>
+      </div>
+      <p class="release-summary">A pass to unify the small repeated pieces of the interface — badges, inputs, buttons — so they look intentionally designed together. We also cut the time-to-first-paint roughly in half.</p>
+
+      <div class="group">
+        <h3>Visual polish</h3>
+        <ul class="bullets">
+          <li>Every status, priority, due-date, and tag pill now uses one shared component, so they share the same rounding, padding, and font. Small changes that add up to a more polished feel across every list and card.</li>
+          <li>Inputs, dropdowns, and buttons now align perfectly when placed side by side. Previously a row like <em>[search field] [filter dropdown] [primary button]</em> could be a pixel off — now it&rsquo;s flush.</li>
+          <li>Keyboard focus rings only appear when navigating by keyboard (Tab), not when clicking with a mouse. Cleaner look, same accessibility.</li>
+          <li>Dashboards now show animated placeholder cards while data loads instead of a row of em-dashes. Less of a &ldquo;is this broken?&rdquo; moment on slow connections.</li>
+          <li>Task detail page has tighter spacing on phones and its toolbar wraps cleanly on narrow widths.</li>
+        </ul>
+      </div>
+
+      <div class="group">
+        <h3>Speed</h3>
+        <ul class="bullets">
+          <li>The initial app download dropped from about 688 KB to 331 KB — roughly a 52% reduction. Pages people don&rsquo;t visit (admin tools, training, reports) no longer load until they&rsquo;re actually opened.</li>
+          <li>First paint is noticeably faster on slow networks and mid-range phones.</li>
+          <li>No behavioural changes — just smaller, smarter downloads.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="release">
+      <div class="release-head">
+        <h2>Works on every screen — iPhone, Android, tablet, desktop<span class="pill fix">Fix</span></h2>
+        <span class="date">2026-05-18</span>
+      </div>
+      <p class="release-summary">A focused pass on the browser-engine quirks that make a &ldquo;responsive&rdquo; site still break on real phones. The app now behaves predictably on iPhone (including notch models), Android, small phones, large phones, tablets, laptops, and desktops.</p>
+      <ul class="bullets">
+        <li>Content tucks correctly under the iPhone notch and gesture bar with proper safe-area padding.</li>
+        <li>No more layout jumping when the iPhone Safari URL bar shows or hides during scroll.</li>
+        <li>Tapping an input no longer causes iOS to auto-zoom in (and forget to zoom back).</li>
+        <li>The rubber-band scroll on iOS no longer exposes a strip of background past the content edge.</li>
+        <li>The blue flash on tap is gone — replaced with the app&rsquo;s own subtle press feedback.</li>
+        <li>A safety net at the page root prevents accidental horizontal scrolling on narrow viewports.</li>
+        <li>The Messages page stacks the conversation list above the chat on phones instead of squeezing them side-by-side.</li>
+        <li>The Create-task form switches to a single-column layout on phones so dropdowns and date pickers have room.</li>
+      </ul>
+    </div>
+
+    <div class="release">
+      <div class="release-head">
+        <h2>Mobile navigation + cleaner header<span class="pill new">New</span></h2>
+        <span class="date">2026-05-18</span>
+      </div>
+      <p class="release-summary">The sidebar now collapses into a slide-over menu on phones, and the header drops the placeholder controls that made the UI feel half-finished.</p>
+      <ul class="bullets">
+        <li>New hamburger menu on phones and small tablets — taps to open a slide-over sidebar with the full navigation. Closes automatically on route change, on Escape, or on tap-outside.</li>
+        <li>Removed the disabled &ldquo;Search (coming soon)&rdquo; field and the disabled bell icon from the header. They&rsquo;ll come back once those features actually land; until then the header looks intentional.</li>
+        <li>Modal dialogs now trap keyboard focus, restore focus to the trigger button on close, and scroll their own body instead of pushing the title and footer off the screen on tall content.</li>
+        <li>Tables now scroll horizontally on narrow screens instead of squashing columns into unreadable widths.</li>
+        <li>Page titles wrap gracefully instead of being cut off mid-word.</li>
+        <li>Two new shared building blocks &mdash; an empty-state card and a loading-skeleton primitive &mdash; available across the app for consistent &ldquo;nothing here yet&rdquo; and &ldquo;loading&rdquo; UI.</li>
+      </ul>
+    </div>
+
+    <!-- ================== FEATURES + BACKEND HARDENING (2026-05-18) ================== -->
+
+    <div class="release">
+      <div class="release-head">
+        <h2>Saved task filters &amp; real reminder delivery<span class="pill new">New</span></h2>
+        <span class="date">2026-05-18</span>
+      </div>
+      <p class="release-summary">Two practical improvements people will notice immediately: filter presets on the Tasks page, and reminders that actually send.</p>
+
+      <div class="group">
+        <h3>Saved task filters</h3>
+        <ul class="bullets">
+          <li>Set up any filter combination on the Tasks page (status, priority, assignee, search, overdue, etc.), then save it under a name.</li>
+          <li>Pin one filter as your default — it loads automatically every time you open the page.</li>
+          <li>Rename or delete saved filters at any time.</li>
+          <li>Filters are private to each person — your &ldquo;My open critical&rdquo; only shows in your dropdown.</li>
+        </ul>
+      </div>
+
+      <div class="group">
+        <h3>Reminders now deliver</h3>
+        <ul class="bullets">
+          <li>The reminders system was previously marking reminders as &ldquo;sent&rdquo; without actually emailing them. Reminders now go out through the same branded email channel as the rest of our transactional mail.</li>
+          <li>If a delivery fails (network glitch, mail-provider hiccup), the reminder is automatically retried with backoff &mdash; up to 5 attempts before giving up. No more silently dropped reminders.</li>
+          <li>Failure details are logged on the reminder row so an operator can inspect what happened.</li>
+        </ul>
+      </div>
+
+      <div class="group">
+        <h3>Security fix</h3>
+        <ul class="bullets">
+          <li>Closed a vulnerability where any signed-in user could edit, complete, or delete another user&rsquo;s reminders if they guessed an ID. Every change now verifies you own the reminder first.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="release">
+      <div class="release-head">
+        <h2>Codebase cleanup &amp; safer email path<span class="pill devx">Dev</span></h2>
+        <span class="date">2026-05-18</span>
+      </div>
+      <p class="release-summary">Internal hygiene with one user-visible improvement.</p>
+      <ul class="bullets">
+        <li>Cleaned up dead imports and stale lint suppressions across the codebase &mdash; no behaviour change, just a tidier foundation for future work.</li>
+        <li>Removed an unsafe type workaround in the password-changed email path that could in theory have sent a malformed payload to the email provider.</li>
+        <li>Same automated checks as before still pass: type checking, linting, and the security tests for the messaging permission engine.</li>
+      </ul>
+    </div>
 
     <!-- ================== MESSAGING OVERHAUL (PHASES 1-6) ================== -->
 
