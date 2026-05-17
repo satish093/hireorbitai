@@ -54,6 +54,10 @@ export function Messages() {
   const [composerOpen, setComposerOpen] = useState(false);
   const [composeSearch, setComposeSearch] = useState('');
   const [sending, setSending] = useState(false);
+  // True when the backend returned 403 for the currently-targeted thread.
+  // Triggers the "you no longer have access" panel + suppresses message-
+  // polling for the denied peer until the user picks a different peer.
+  const [accessDenied, setAccessDenied] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   // Tracks which peer's response is currently in flight so a late-arriving
   // older response can't clobber a newer thread.
@@ -91,10 +95,22 @@ export function Messages() {
       // Only apply if this response still matches the active peer.
       if (inflightPeerRef.current !== peerId) return;
       setMessages(r.data ?? []);
-      // Best-effort mark-read (no toast on failure).
+      setAccessDenied(false);
+      // Best-effort mark-read (no toast on failure). Skipping when access
+      // is denied so we don't fire a guaranteed-403 follow-up call.
       api.post(`/messages/with/${peerId}/read`).catch(() => {});
     } catch (e: any) {
       if (inflightPeerRef.current !== peerId) return;
+      // 403 = hierarchy says we can't see this thread (peer reassigned,
+      // group changed, role changed, etc.). Show the access-denied panel
+      // instead of a generic error toast. The user can click another
+      // conversation to clear the state.
+      if (e?.response?.status === 403) {
+        setMessages([]);
+        setAccessDenied(true);
+        return;
+      }
+      setAccessDenied(false);
       toast.error(e?.response?.data?.error ?? 'Failed to load thread');
     }
   }, []);
@@ -105,10 +121,12 @@ export function Messages() {
   useEffect(() => {
     if (!activePeerId) {
       setMessages([]);
+      setAccessDenied(false);
       inflightPeerRef.current = null;
       return;
     }
     stickToBottomRef.current = true; // jump to bottom when switching threads
+    setAccessDenied(false); // optimistic — clears any previous deny while the new load is inflight
     loadThread(activePeerId);
   }, [activePeerId, loadThread]);
 
@@ -117,9 +135,12 @@ export function Messages() {
   // flight, and self-schedule with jitter to avoid all-tabs-fire-at-once
   // patterns when a backgrounded tab returns to the foreground.
 
-  // Active-thread poller — only mounted when there IS an active peer.
+  // Active-thread poller — only mounted when there IS an active peer AND
+  // access isn't already denied. Once denied, polling is silenced until the
+  // user picks a different peer; otherwise we'd fire one guaranteed 403
+  // every 8 s for no benefit.
   useEffect(() => {
-    if (!activePeerId) return;
+    if (!activePeerId || accessDenied) return;
     let cancelled = false;
     let inflight = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
@@ -147,7 +168,7 @@ export function Messages() {
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [activePeerId, loadThread]);
+  }, [activePeerId, accessDenied, loadThread]);
 
   // Conversation list + directory poller — runs regardless of selection but
   // at a much slower cadence. The unread badge updates show up in <1 minute
@@ -226,10 +247,19 @@ export function Messages() {
       await loadThread(activePeerId);
       refresh();
     } catch (e: any) {
-      // Roll back optimistic message.
+      // Roll back optimistic message regardless of the failure reason.
       setMessages((m) => m.filter((x) => x.id !== optimistic.id));
-      toast.error(e?.response?.data?.error ?? 'Send failed');
-      setDraft(body);
+      if (e?.response?.status === 403) {
+        // Hierarchy says we can't message this peer (likely reassigned out
+        // from under us). Surface the access-denied panel and clear the
+        // composer — no point letting the user retry with the same payload.
+        setAccessDenied(true);
+        toast.error('You can no longer message this user.');
+        setDraft('');
+      } else {
+        toast.error(e?.response?.data?.error ?? 'Send failed');
+        setDraft(body);
+      }
     } finally {
       setSending(false);
     }
@@ -400,62 +430,94 @@ export function Messages() {
                 </div>
               </header>
 
-              <div
-                ref={scrollContainerRef}
-                onScroll={onScrollMessages}
-                className="flex-1 overflow-y-auto px-5 py-4 space-y-3 bg-slate-50/30"
-              >
-                {messages.length === 0 ? (
-                  <p className="text-center text-sm text-slate-400 italic mt-6">
-                    No messages yet — say hello!
-                  </p>
-                ) : (
-                  groupByDay(messages).map(({ day, items }) => (
-                    <div key={day}>
-                      <div className="text-center my-2">
-                        <span className="text-[10px] uppercase tracking-widest text-slate-400 bg-white border border-slate-200 px-2 py-0.5 rounded-full">
-                          {day}
-                        </span>
-                      </div>
-                      <div className="space-y-2">
-                        {items.map((m) => (
-                          <Bubble key={m.id} message={m} mine={m.sender_id === profile?.id} />
-                        ))}
-                      </div>
-                    </div>
-                  ))
-                )}
-                <div ref={messagesEndRef} />
-              </div>
+              {accessDenied ? (
+                // Hierarchy says we no longer have access to this peer. Shown
+                // instead of the messages + composer. The user can pick a
+                // different conversation from the sidebar, or hit the "Back
+                // to inbox" button to clear the ?with= URL param.
+                <div className="flex-1 flex items-center justify-center px-6 py-8 bg-slate-50/30">
+                  <div className="max-w-sm text-center space-y-3">
+                    <div className="text-4xl text-slate-300">🔒</div>
+                    <h3 className="text-base font-semibold text-slate-900">
+                      Conversation no longer available
+                    </h3>
+                    <p className="text-sm text-slate-600 leading-snug">
+                      You no longer have access to this conversation — your team assignment may have
+                      changed. Past messages are preserved; they'll come back if access is restored.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = new URLSearchParams(params);
+                        next.delete('with');
+                        setParams(next, { replace: true });
+                      }}
+                      className="mt-2 inline-flex items-center bg-slate-900 text-white text-sm px-4 py-2 rounded-lg hover:bg-slate-800"
+                    >
+                      ← Back to inbox
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div
+                    ref={scrollContainerRef}
+                    onScroll={onScrollMessages}
+                    className="flex-1 overflow-y-auto px-5 py-4 space-y-3 bg-slate-50/30"
+                  >
+                    {messages.length === 0 ? (
+                      <p className="text-center text-sm text-slate-400 italic mt-6">
+                        No messages yet — say hello!
+                      </p>
+                    ) : (
+                      groupByDay(messages).map(({ day, items }) => (
+                        <div key={day}>
+                          <div className="text-center my-2">
+                            <span className="text-[10px] uppercase tracking-widest text-slate-400 bg-white border border-slate-200 px-2 py-0.5 rounded-full">
+                              {day}
+                            </span>
+                          </div>
+                          <div className="space-y-2">
+                            {items.map((m) => (
+                              <Bubble key={m.id} message={m} mine={m.sender_id === profile?.id} />
+                            ))}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                    <div ref={messagesEndRef} />
+                  </div>
 
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  send();
-                }}
-                className="border-t border-slate-200 px-4 py-3 flex items-end gap-2 bg-white"
-              >
-                <textarea
-                  value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
+                  <form
+                    onSubmit={(e) => {
                       e.preventDefault();
                       send();
-                    }
-                  }}
-                  rows={1}
-                  placeholder="Write a message… (Shift+Enter for newline)"
-                  className="flex-1 resize-none border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40 max-h-32"
-                />
-                <button
-                  type="submit"
-                  disabled={sending || !draft.trim()}
-                  className="bg-slate-900 text-white text-sm px-4 py-2 rounded-lg disabled:opacity-50 hover:bg-slate-800"
-                >
-                  {sending ? 'Sending…' : 'Send'}
-                </button>
-              </form>
+                    }}
+                    className="border-t border-slate-200 px-4 py-3 flex items-end gap-2 bg-white"
+                  >
+                    <textarea
+                      value={draft}
+                      onChange={(e) => setDraft(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          send();
+                        }
+                      }}
+                      rows={1}
+                      placeholder="Write a message… (Shift+Enter for newline)"
+                      className="flex-1 resize-none border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40 max-h-32"
+                    />
+                    <button
+                      type="submit"
+                      disabled={sending || !draft.trim()}
+                      className="bg-slate-900 text-white text-sm px-4 py-2 rounded-lg disabled:opacity-50 hover:bg-slate-800"
+                    >
+                      {sending ? 'Sending…' : 'Send'}
+                    </button>
+                  </form>
+                </>
+              )}
             </>
           )}
         </main>
