@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Layout } from '../components/Layout';
 import { DashboardCard } from '../components/DashboardCard';
+import { SkeletonMetricGrid } from '../components/Skeleton';
 import { DataTable } from '../components/DataTable';
 import { StatusBadge } from '../components/StatusBadge';
 import { PageHeader } from '../components/PageHeader';
@@ -61,21 +62,27 @@ export function ConsultantDashboard() {
         title={`Welcome${profile?.full_name ? `, ${profile.full_name.split(' ')[0]}` : ''}`}
         description="Your marketing status, recent submissions, and upcoming interviews at a glance."
       />
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 stagger-children">
-        <DashboardCard
-          label="Marketing status"
-          value={consultant?.marketing_status ?? '—'}
-          accent="blue"
-        />
-        <DashboardCard label="Submissions" value={apps.length} accent="amber" />
-        <DashboardCard
-          label="Interviews"
-          value={interviews.length}
-          hint={upcomingInterviews > 0 ? `${upcomingInterviews} upcoming` : undefined}
-          accent="green"
-        />
-        <DashboardCard label="Offers" value={offers} accent="slate" />
-      </div>
+      {loading && !consultant ? (
+        <div className="mb-6">
+          <SkeletonMetricGrid count={4} />
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 stagger-children">
+          <DashboardCard
+            label="Marketing status"
+            value={consultant?.marketing_status ?? '—'}
+            accent="blue"
+          />
+          <DashboardCard label="Submissions" value={apps.length} accent="amber" />
+          <DashboardCard
+            label="Interviews"
+            value={interviews.length}
+            hint={upcomingInterviews > 0 ? `${upcomingInterviews} upcoming` : undefined}
+            accent="green"
+          />
+          <DashboardCard label="Offers" value={offers} accent="slate" />
+        </div>
+      )}
 
       <h2 className="text-sm font-semibold text-slate-900 mb-2">Recent submissions</h2>
       <DataTable

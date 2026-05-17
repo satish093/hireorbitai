@@ -1,74 +1,51 @@
 import clsx from 'clsx';
 import { TaskPriority, TaskStatus, Task } from '../types';
 import { GroupBadge } from './GroupBadge';
+import { Pill, PillTone, TagPillBase } from './Pill';
+
+// All badges in this file share the Pill primitive — same height, radius,
+// padding, font size, and gap. Only the tone tokens change per variant.
 
 // ---- Priority --------------------------------------------------------------
 
-const PRIORITY_DOT: Record<TaskPriority, string> = {
-  LOW: 'bg-blue-400',
-  MEDIUM: 'bg-yellow-400',
-  HIGH: 'bg-amber-500',
-  CRITICAL: 'bg-red-500',
-};
-
-const PRIORITY_PILL: Record<TaskPriority, string> = {
-  LOW: 'bg-blue-50 text-blue-700 border-blue-100',
-  MEDIUM: 'bg-yellow-50 text-yellow-800 border-yellow-100',
-  HIGH: 'bg-amber-50 text-amber-800 border-amber-100',
-  CRITICAL: 'bg-red-50 text-red-700 border-red-100',
+const PRIORITY_TONE: Record<TaskPriority, PillTone> = {
+  LOW: { bg: 'bg-blue-50', text: 'text-blue-700', dot: 'bg-blue-400', border: 'border-blue-100' },
+  MEDIUM: {
+    bg: 'bg-yellow-50',
+    text: 'text-yellow-800',
+    dot: 'bg-yellow-400',
+    border: 'border-yellow-100',
+  },
+  HIGH: {
+    bg: 'bg-amber-50',
+    text: 'text-amber-800',
+    dot: 'bg-amber-500',
+    border: 'border-amber-100',
+  },
+  CRITICAL: {
+    bg: 'bg-red-50',
+    text: 'text-red-700',
+    dot: 'bg-red-500',
+    border: 'border-red-100',
+  },
 };
 
 export function PriorityBadge({ priority }: { priority: TaskPriority }) {
   const label = priority.charAt(0) + priority.slice(1).toLowerCase();
-  return (
-    <span
-      className={clsx(
-        'inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-0.5 rounded-full border',
-        PRIORITY_PILL[priority],
-      )}
-    >
-      <span className={clsx('w-1.5 h-1.5 rounded-full', PRIORITY_DOT[priority])} />
-      {label}
-    </span>
-  );
+  return <Pill tone={PRIORITY_TONE[priority]}>{label}</Pill>;
 }
 
 // ---- Status ----------------------------------------------------------------
 
-const STATUS_PILL: Record<TaskStatus, string> = {
-  BACKLOG: 'bg-slate-100 text-slate-700',
-  TODO: 'bg-blue-50 text-blue-700',
-  IN_PROGRESS: 'bg-amber-50 text-amber-800',
-  BLOCKED: 'bg-red-50 text-red-700',
-  REVIEW: 'bg-purple-50 text-purple-700',
-  COMPLETED: 'bg-emerald-50 text-emerald-700',
-  CANCELLED: 'bg-slate-100 text-slate-500',
+const STATUS_TONE: Record<TaskStatus, PillTone> = {
+  BACKLOG: { bg: 'bg-slate-100', text: 'text-slate-700', dot: 'bg-slate-400' },
+  TODO: { bg: 'bg-blue-50', text: 'text-blue-700', dot: 'bg-blue-500' },
+  IN_PROGRESS: { bg: 'bg-amber-50', text: 'text-amber-800', dot: 'bg-amber-500' },
+  BLOCKED: { bg: 'bg-red-50', text: 'text-red-700', dot: 'bg-red-500' },
+  REVIEW: { bg: 'bg-purple-50', text: 'text-purple-700', dot: 'bg-purple-500' },
+  COMPLETED: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
+  CANCELLED: { bg: 'bg-slate-100', text: 'text-slate-500', dot: 'bg-slate-300' },
 };
-
-const STATUS_DOT: Record<TaskStatus, string> = {
-  BACKLOG: 'bg-slate-400',
-  TODO: 'bg-blue-500',
-  IN_PROGRESS: 'bg-amber-500',
-  BLOCKED: 'bg-red-500',
-  REVIEW: 'bg-purple-500',
-  COMPLETED: 'bg-emerald-500',
-  CANCELLED: 'bg-slate-300',
-};
-
-export function TaskStatusBadge({ status }: { status: TaskStatus }) {
-  const label = STATUS_LABELS[status];
-  return (
-    <span
-      className={clsx(
-        'inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-0.5 rounded-full',
-        STATUS_PILL[status],
-      )}
-    >
-      <span className={clsx('w-1.5 h-1.5 rounded-full', STATUS_DOT[status])} />
-      {label}
-    </span>
-  );
-}
 
 const STATUS_LABELS: Record<TaskStatus, string> = {
   BACKLOG: 'Backlog',
@@ -79,6 +56,10 @@ const STATUS_LABELS: Record<TaskStatus, string> = {
   COMPLETED: 'Completed',
   CANCELLED: 'Cancelled',
 };
+
+export function TaskStatusBadge({ status }: { status: TaskStatus }) {
+  return <Pill tone={STATUS_TONE[status]}>{STATUS_LABELS[status]}</Pill>;
+}
 
 // ---- Due date --------------------------------------------------------------
 
@@ -103,23 +84,16 @@ function dueRelative(due: Date): string {
   return due.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
+const DUE_OVERDUE: PillTone = { bg: 'bg-red-50', text: 'text-red-700', dot: 'bg-red-500' };
+const DUE_NORMAL: PillTone = { bg: 'bg-slate-100', text: 'text-slate-700', dot: 'bg-slate-400' };
+
 export function DuePill({ task }: { task: Task }) {
   if (!task.due_at) {
     return <span className="text-xs text-slate-400">No due date</span>;
   }
   const overdue = isOverdue(task);
   const due = new Date(task.due_at);
-  return (
-    <span
-      className={clsx(
-        'inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full',
-        overdue ? 'bg-red-50 text-red-700' : 'bg-slate-100 text-slate-700',
-      )}
-    >
-      <span className={clsx('w-1.5 h-1.5 rounded-full', overdue ? 'bg-red-500' : 'bg-slate-400')} />
-      {dueRelative(due)}
-    </span>
-  );
+  return <Pill tone={overdue ? DUE_OVERDUE : DUE_NORMAL}>{dueRelative(due)}</Pill>;
 }
 
 // Legacy export so existing imports keep working
@@ -199,11 +173,7 @@ export const AssigneeLabel = AssigneeChip;
 // ---- Tag pill --------------------------------------------------------------
 
 export function TagPill({ tag }: { tag: string }) {
-  return (
-    <span className="inline-flex items-center text-[10px] font-medium uppercase tracking-wide px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-mono">
-      {tag}
-    </span>
-  );
+  return <TagPillBase>{tag}</TagPillBase>;
 }
 
 // ---- Short id --------------------------------------------------------------

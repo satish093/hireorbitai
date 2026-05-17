@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Layout } from '../components/Layout';
 import { DashboardCard } from '../components/DashboardCard';
+import { SkeletonMetricGrid } from '../components/Skeleton';
 import { DataTable } from '../components/DataTable';
 import { StatusBadge } from '../components/StatusBadge';
 import { PageHeader } from '../components/PageHeader';
@@ -58,17 +59,23 @@ export function RecruiterDashboard() {
         title={`Welcome${profile?.full_name ? `, ${profile.full_name.split(' ')[0]}` : ''}`}
         description="Your assigned consultants and submission pipeline."
       />
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 stagger-children">
-        <DashboardCard label="My consultants" value={consultants.length} accent="blue" />
-        <DashboardCard label="Active" value={active} hint={`${placed} placed`} accent="green" />
-        <DashboardCard label="Submissions" value={apps.length} accent="amber" />
-        <DashboardCard
-          label="In pipeline"
-          value={interviewing}
-          hint="Screening or interview"
-          accent="brand"
-        />
-      </div>
+      {loading && consultants.length === 0 && apps.length === 0 ? (
+        <div className="mb-6">
+          <SkeletonMetricGrid count={4} />
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 stagger-children">
+          <DashboardCard label="My consultants" value={consultants.length} accent="blue" />
+          <DashboardCard label="Active" value={active} hint={`${placed} placed`} accent="green" />
+          <DashboardCard label="Submissions" value={apps.length} accent="amber" />
+          <DashboardCard
+            label="In pipeline"
+            value={interviewing}
+            hint="Screening or interview"
+            accent="brand"
+          />
+        </div>
+      )}
 
       <h2 className="text-sm font-semibold text-slate-900 mb-2">My consultants</h2>
       <DataTable
