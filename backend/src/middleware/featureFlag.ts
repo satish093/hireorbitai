@@ -1,6 +1,6 @@
 import { RequestHandler } from 'express';
 import { effectiveFlagsForUser } from '../controllers/featureFlags.controller';
-import { httpError } from '../types';
+import { httpError, ADMIN_TIER, Role } from '../types';
 
 /**
  * Block a route group when the named feature flag is OFF for the calling
@@ -20,11 +20,19 @@ import { httpError } from '../types';
  * `details` so the frontend can render "Tasks are turned off for your
  * workspace" instead of a generic forbidden error.
  */
-export const requireFeature = (key: string): RequestHandler => async (req, _res, next) => {
-  if (!req.user) throw httpError(401, 'Not authenticated');
-  const flags = await effectiveFlagsForUser(req.user.group_id ?? null);
-  if (flags[key] === false) {
-    throw httpError(403, `Feature "${key}" is disabled for your workspace.`, { feature: key });
-  }
-  next();
-};
+export const requireFeature =
+  (key: string): RequestHandler =>
+  async (req, _res, next) => {
+    if (!req.user) throw httpError(401, 'Not authenticated');
+    // Admin-tier bypass — SUPER_ADMIN / CEO / CTO / DIRECTOR always pass
+    // feature-flag gates so they can test every module regardless of how
+    // flags are configured for their workspace. The DM digest, the AI
+    // match, every gated route — all reachable for admins. Non-admins
+    // hit the normal resolved-for-group flag check.
+    if ((ADMIN_TIER as Role[]).includes(req.user.role)) return next();
+    const flags = await effectiveFlagsForUser(req.user.group_id ?? null);
+    if (flags[key] === false) {
+      throw httpError(403, `Feature "${key}" is disabled for your workspace.`, { feature: key });
+    }
+    next();
+  };

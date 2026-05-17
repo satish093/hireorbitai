@@ -1,7 +1,7 @@
 import { RequestHandler } from 'express';
 import { z } from 'zod';
 import { db } from '../config/db';
-import { httpError } from '../types';
+import { httpError, ADMIN_TIER, Role } from '../types';
 
 // In-memory cache so we don't hammer the DB on every request. Invalidated
 // synchronously on PATCH and on group-override change. 5-second hard TTL
@@ -93,10 +93,25 @@ export const setFlag: RequestHandler = async (req, res) => {
 };
 
 /** GET /feature-flags/me — effective flags for the calling user (global +
- *  group overrides). The sidebar polls this to gate modules. */
+ *  group overrides). The sidebar polls this to gate modules.
+ *
+ *  Admin-tier bypass: SUPER_ADMIN / CEO / CTO / DIRECTOR get every defined
+ *  flag forced-true so the sidebar exposes every module for testing. Their
+ *  actual workspace flag config still drives non-admin users — the bypass
+ *  is per-request, not global. */
 export const myFlags: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
-  res.json(await effectiveFlagsForUser(req.user.group_id ?? null));
+  const flags = await effectiveFlagsForUser(req.user.group_id ?? null);
+  if ((ADMIN_TIER as Role[]).includes(req.user.role)) {
+    // Force every known flag ON for admins. We keep the same set of keys
+    // so the frontend's `flags[key]` lookups still work; we just flip
+    // every value to true.
+    const forced: Record<string, boolean> = {};
+    for (const key of Object.keys(flags)) forced[key] = true;
+    res.json(forced);
+    return;
+  }
+  res.json(flags);
 };
 
 /** GET /feature-flags/overrides — every group_feature_flags row, keyed by
@@ -130,18 +145,16 @@ export const setGroupOverride: RequestHandler = async (req, res) => {
       .eq('key', key);
     if (error) throw httpError(500, error.message);
   } else {
-    const { error } = await db
-      .from('group_feature_flags')
-      .upsert(
-        {
-          group_id: groupId,
-          key,
-          enabled: parsed.data.enabled,
-          updated_at: new Date().toISOString(),
-          updated_by: req.user.id,
-        },
-        { onConflict: 'group_id,key' },
-      );
+    const { error } = await db.from('group_feature_flags').upsert(
+      {
+        group_id: groupId,
+        key,
+        enabled: parsed.data.enabled,
+        updated_at: new Date().toISOString(),
+        updated_by: req.user.id,
+      },
+      { onConflict: 'group_id,key' },
+    );
     if (error) throw httpError(500, error.message);
   }
   invalidateCache();
