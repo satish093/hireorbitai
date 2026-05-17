@@ -30,7 +30,8 @@ export type AuditAction =
   | 'group_user_removed'
   | 'group_user_moved'
   | 'daily_digest_sent'
-  | 'daily_digest_skipped';
+  | 'daily_digest_skipped'
+  | 'messages_permission_denied';
 
 interface AuditInput {
   action: AuditAction;

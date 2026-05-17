@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>HireOrbit AI — Changelog</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --muted: #64748b;
+      --brand: #4f46e5;
+      --brand-soft: #eef2ff;
+      --emerald: #059669;
+      --rose: #e11d48;
+      --amber: #b45309;
+      --sky: #0369a1;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 32px 16px;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      line-height: 1.55;
+      font-size: 14.5px;
+      -webkit-font-smoothing: antialiased;
+    }
+    .container { max-width: 820px; margin: 0 auto; }
+    header {
+      padding: 28px 32px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      margin-bottom: 24px;
+    }
+    header h1 {
+      margin: 0 0 8px 0;
+      font-size: 24px;
+      letter-spacing: -0.02em;
+      font-weight: 700;
+    }
+    header p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .release {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px 32px;
+      margin-bottom: 16px;
+    }
+    .release-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+    }
+    .release-head h2 {
+      margin: 0;
+      font-size: 17px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+    .release-head .date {
+      color: var(--muted);
+      font-size: 12.5px;
+      font-variant-numeric: tabular-nums;
+    }
+    .release-summary {
+      color: var(--muted);
+      font-size: 13.5px;
+      margin: 4px 0 16px 0;
+    }
+    .group {
+      margin-top: 14px;
+    }
+    .group h3 {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin: 0 0 8px 0;
+    }
+    ul.bullets {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    ul.bullets li {
+      position: relative;
+      padding-left: 18px;
+      margin-bottom: 6px;
+      font-size: 14px;
+      color: var(--text);
+    }
+    ul.bullets li::before {
+      content: '•';
+      position: absolute;
+      left: 4px;
+      color: var(--brand);
+      font-weight: 700;
+    }
+    .pill {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 2px 7px;
+      border-radius: 999px;
+      vertical-align: middle;
+      margin-left: 6px;
+    }
+    .pill.new { background: #ecfdf5; color: var(--emerald); }
+    .pill.fix { background: #eef2ff; color: var(--brand); }
+    .pill.sec { background: #fef2f2; color: var(--rose); }
+    .pill.perf { background: #fffbeb; color: var(--amber); }
+    .pill.devx { background: #f0f9ff; color: var(--sky); }
+    footer {
+      color: var(--muted);
+      font-size: 12px;
+      text-align: center;
+      padding: 24px 8px;
+    }
+    footer a { color: var(--brand); text-decoration: none; }
+    code {
+      background: #f1f5f9;
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-family: 'SF Mono', Menlo, Consolas, monospace;
+      font-size: 12.5px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <header>
+      <h1>HireOrbit AI — Product Changelog</h1>
+      <p>What we shipped, in plain language. Newest first.</p>
+    </header>
+
+    <!-- ================== UNRELEASED / IN-FLIGHT ================== -->
+    <div class="release">
+      <div class="release-head">
+        <h2>Messaging security &amp; hierarchy — Phase 1<span class="pill sec">Security</span></h2>
+        <span class="date">In flight · 2026-05-17</span>
+      </div>
+      <p class="release-summary">Closed three direct-messaging vulnerabilities and centralized the rules that decide who can talk to whom.</p>
+
+      <div class="group">
+        <h3>Closed</h3>
+        <ul class="bullets">
+          <li>Any signed-in user could read another pair's private thread by guessing the URL. Now requires you to be in the same hierarchy or have an existing thread with the peer.</li>
+          <li>Any signed-in user could silently mark a stranger's messages as &ldquo;read&rdquo; on their own inbox. Same authorization rule now applies.</li>
+          <li>Any signed-in user could send a message to any other user, bypassing reporting structure. <code>POST /messages</code> now refuses recipients outside your scope.</li>
+        </ul>
+      </div>
+
+      <div class="group">
+        <h3>Behind the scenes</h3>
+        <ul class="bullets">
+          <li>New centralized permission service — every check (send, view thread, mark read, future features) reads the same rule set. No more drift between endpoints.</li>
+          <li>Denied requests now write a <code>messages_permission_denied</code> row to the audit log so admins can see attempts.</li>
+          <li>No schema changes, no breaking API changes. Existing conversations stay reachable; only new boundary-crossing attempts are blocked.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- ================== RECENT RELEASES ================== -->
+    <div class="release">
+      <div class="release-head">
+        <h2>Job feed — pagination, full coverage, polish<span class="pill new">New</span></h2>
+        <span class="date">2026-05-17</span>
+      </div>
+      <p class="release-summary">The Recommended feed now shows every active job, paginated 40 per page, with a cleaner card design.</p>
+      <ul class="bullets">
+        <li>40 jobs per page with numbered pagination — click any page to jump.</li>
+        <li>Removed silent &ldquo;United States&rdquo; default filter — the feed lands on everything; you opt-in to a location with the pill.</li>
+        <li>Removed the &ldquo;Anywhere&rdquo; option from the location dropdown — explicit picks only.</li>
+        <li>Description excerpt visible on every card so even un-enriched roles have context to read.</li>
+        <li>Meta strip ("Level not specified" / "Experience not specified") replaces blank em-dashes for cleaner card aesthetics.</li>
+        <li>Self-healing source ingestion: a board that 404s three syncs in a row auto-deactivates with a reason. Quota-exhausted RapidAPI keys deactivate immediately. Resolves once the underlying issue is fixed.</li>
+      </ul>
+    </div>
+
+    <div class="release">
+      <div class="release-head">
+        <h2>Skill gap — see what you're missing per job<span class="pill new">New</span></h2>
+        <span class="date">2026-05-17</span>
+      </div>
+      <p class="release-summary">Opens on every job card expansion. No AI tokens spent — instant, deterministic.</p>
+      <ul class="bullets">
+        <li>Coverage % with colored progress bar (emerald 80%+, sky 60%+, amber 40%+, rose otherwise).</li>
+        <li>&ldquo;You have&rdquo; pills for matched skills, &ldquo;Missing&rdquo; pills for the gap.</li>
+        <li>Manager-tier can pass a <code>consultant_id</code> to inspect another consultant's gap.</li>
+        <li>Renders &ldquo;Complete your profile&rdquo; hint when no skills are set, instead of an empty card.</li>
+      </ul>
+    </div>
+
+    <div class="release">
+      <div class="release-head">
+        <h2>Daily match digest email<span class="pill new">New</span></h2>
+        <span class="date">2026-05-17</span>
+      </div>
+      <p class="release-summary">Every active consultant can receive a nightly email of their top 5 matched roles from the last 24 hours.</p>
+      <ul class="bullets">
+        <li>Per-consultant AI scoring on a candidate pool, top picks emailed via Brevo.</li>
+        <li>Each match card shows title, company, location, source, AI reason snippet, colored score pill.</li>
+        <li>Off by default. Admins enable via <em>Admin → Feature flags → daily_digest</em>.</li>
+        <li>Tunable: digest hour (UTC), candidate window, top-N, minimum score — all via env vars.</li>
+      </ul>
+    </div>
+
+    <div class="release">
+      <div class="release-head">
+        <h2>Admin always-on access<span class="pill new">New</span></h2>
+        <span class="date">2026-05-17</span>
+      </div>
+      <p class="release-summary">Admin-tier users (Super Admin, CEO, CTO, Director) can verify every module regardless of which feature flags are toggled.</p>
+      <ul class="bullets">
+        <li>Every gated route returns 200 for admins, even when the workspace flag is off.</li>
+        <li>Sidebar shows every module for admins — handy for previewing what end users will see when you flip a flag on.</li>
+        <li>Non-admin behavior unchanged: workspace flags + per-group overrides still apply to recruiters, consultants, etc.</li>
+      </ul>
+    </div>
+
+    <div class="release">
+      <div class="release-head">
+        <h2>Security hardening — round 1<span class="pill sec">Security</span></h2>
+        <span class="date">2026-05-17</span>
+      </div>
+      <p class="release-summary">Five high-impact, low-effort fixes from a full-stack audit.</p>
+      <ul class="bullets">
+        <li>Invitation preview email now masked (<code>s************@gmail.com</code>) — blocks email-harvesting via leaked tokens.</li>
+        <li>HSTS bumped to 1 year + includeSubDomains + preload eligibility.</li>
+        <li>Referrer-Policy: strict-origin-when-cross-origin so outbound links don't leak the full URL.</li>
+        <li>Permissions-Policy: camera, microphone, geolocation, payment, USB all denied at the browser level.</li>
+        <li>Per-route rate limit on AI endpoints (30 requests per 5 minutes) — prevents runaway Anthropic spend from a tight loop.</li>
+        <li>Postgres statement timeout (15s default) — prevents a slow query from holding a connection pool slot forever.</li>
+        <li><code>npm audit</code> wired into CI to catch high/critical CVEs at PR time.</li>
+      </ul>
+    </div>
+
+    <div class="release">
+      <div class="release-head">
+        <h2>User groups system<span class="pill new">New</span></h2>
+        <span class="date">2026-05-17</span>
+      </div>
+      <p class="release-summary">Admins can organize users into named groups (e.g. Cloudfen, Zangle IT, Xeronix, Okta Solutions) with color badges and unique IDs.</p>
+      <ul class="bullets">
+        <li>Display IDs like <code>GRP-0001</code> auto-generated.</li>
+        <li>Colored badges show on every page that displays a user (Users list, Consultants, Recruiters, Tasks assignees, Messages directory, Reports, Profile header).</li>
+        <li>Per-group feature-flag overrides — turn Tasks off for one group, on for another.</li>
+        <li>Invitations can pre-assign a group at send-time, including a &ldquo;No Group&rdquo; option.</li>
+        <li>Admins can move users between groups from the user detail page.</li>
+        <li>Audit log entries for every group lifecycle event (created, updated, deleted, user assigned/removed/moved).</li>
+      </ul>
+    </div>
+
+    <div class="release">
+      <div class="release-head">
+        <h2>Push-to-deploy CI/CD<span class="pill devx">Dev</span></h2>
+        <span class="date">2026-05-16</span>
+      </div>
+      <p class="release-summary">Every push to <code>main</code> auto-deploys to production in ~40 seconds.</p>
+      <ul class="bullets">
+        <li>GitHub Actions workflow SSHes into the VPS, pulls, builds, applies any new SQL migrations, restarts PM2, republishes the frontend bundle, and smoke-tests <code>/api/health</code>.</li>
+        <li>Workspace-aware install + shared package build (npm workspaces).</li>
+        <li>Independent post-deploy curl from the GitHub runner verifies the public URL is healthy.</li>
+        <li>Bails on first failure — broken deploys never silently take production offline.</li>
+      </ul>
+    </div>
+
+    <div class="release">
+      <div class="release-head">
+        <h2>Multi-source job ingestion<span class="pill new">New</span></h2>
+        <span class="date">2026-05-16</span>
+      </div>
+      <p class="release-summary">Pulls live postings from 14 public job-board APIs into a single feed.</p>
+      <ul class="bullets">
+        <li>Free sources: Greenhouse, Lever, Ashby, RemoteOK, Arbeitnow, Remotive (no API keys).</li>
+        <li>Optional paid: JSearch, SearchAPI, SerpAPI, LinkedIn, Monster (RapidAPI), Adzuna, Jooble, USAJobs.</li>
+        <li>Auto-sync every 6 hours, gated by a feature flag for instant kill-switch.</li>
+        <li>AI auto-matching to active consultants on new postings, with recruiter DM on strong matches.</li>
+        <li>AI resume tailoring + cover letter generation in the apply flow.</li>
+      </ul>
+    </div>
+
+    <div class="release">
+      <div class="release-head">
+        <h2>Frontend polish<span class="pill fix">Fix</span></h2>
+        <span class="date">2026-05-16</span>
+      </div>
+      <ul class="bullets">
+        <li>Page scrolls to top on every route change (no more landing halfway down a fresh page).</li>
+        <li>Empty state &amp; loading states across pages cleaned up.</li>
+      </ul>
+    </div>
+
+    <div class="release">
+      <div class="release-head">
+        <h2>Self-hosted Postgres migration<span class="pill devx">Dev</span></h2>
+        <span class="date">2026-05-16</span>
+      </div>
+      <p class="release-summary">Moved off third-party BaaS to a self-hosted Postgres on the same VPS.</p>
+      <ul class="bullets">
+        <li>40-table consolidated baseline schema. One <code>psql -f init.sql</code> on a fresh DB and the app boots.</li>
+        <li>Production + development databases provisioned separately with isolated credentials.</li>
+        <li>JWT + refresh token auth with bcrypt + session-version revocation.</li>
+        <li>Filesystem storage with HMAC-signed short-lived download URLs.</li>
+        <li>Backwards-compatible data layer — controllers kept their familiar query shape.</li>
+      </ul>
+    </div>
+
+    <footer>
+      <p>HireOrbit AI · <a href="https://hireorbitai.com">hireorbitai.com</a></p>
+    </footer>
+  </div>
+</body>
+</html>

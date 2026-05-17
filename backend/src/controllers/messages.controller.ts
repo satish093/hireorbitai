@@ -2,6 +2,8 @@ import { RequestHandler } from 'express';
 import { z } from 'zod';
 import { db } from '../config/db';
 import { httpError, MANAGER_TIER } from '../types';
+import { canMessageUser, canViewConversation } from '../services/permission.service';
+import { audit } from '../services/audit.service';
 
 // Build the SELECT lazily so we can downgrade to a legacy column set the first
 // time we see "column doesn't exist" — that way the endpoints work both before
@@ -205,6 +207,22 @@ export const thread: RequestHandler = async (req, res) => {
   const other = req.params.userId;
   if (me === other) throw httpError(400, "Can't chat with yourself");
 
+  // Authorize the thread fetch. Without this, any signed-in user could read
+  // any thread by walking UUIDs (the original IDOR). canViewConversation
+  // applies the same hierarchy rules as the directory + lets prior-thread
+  // legitimacy carry over so reassignments don't kill in-flight chats.
+  const allowed = await canViewConversation({ id: me, role: req.user.role }, other);
+  if (!allowed) {
+    audit({
+      action: 'messages_permission_denied',
+      user_id: me,
+      email: req.user.email ?? null,
+      req,
+      metadata: { route: 'thread', peer: other },
+    });
+    throw httpError(403, 'You cannot view this conversation.');
+  }
+
   const filter =
     `and(sender_id.eq.${me},recipient_id.eq.${other}),` +
     `and(sender_id.eq.${other},recipient_id.eq.${me})`;
@@ -230,6 +248,23 @@ export const markRead: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   const me = req.user.id;
   const other = req.params.userId;
+
+  // Authorize. Closes the IDOR where any user could call this with any UUID
+  // and silently mark the victim's outgoing messages as "read" on the
+  // caller's inbox — a social-engineering vector even though the data
+  // returned is empty.
+  const allowed = await canViewConversation({ id: me, role: req.user.role }, other);
+  if (!allowed) {
+    audit({
+      action: 'messages_permission_denied',
+      user_id: me,
+      email: req.user.email ?? null,
+      req,
+      metadata: { route: 'markRead', peer: other },
+    });
+    throw httpError(403, 'You cannot mark this conversation as read.');
+  }
+
   const { error } = await db
     .from('messages')
     .update({ read_at: new Date().toISOString() })
@@ -265,6 +300,25 @@ export const send: RequestHandler = async (req, res) => {
     .maybeSingle();
   if (!recipient) throw httpError(404, 'Recipient not found');
   if (recipient.is_active === false) throw httpError(400, 'Recipient is inactive');
+
+  // Hierarchy-aware send authorization. Without this, any signed-in user
+  // could POST a message to any other user (the original IDOR). The check
+  // is server-side only — frontend filtering of the directory does NOT
+  // protect against direct API calls.
+  const allowed = await canMessageUser(
+    { id: req.user.id, role: req.user.role },
+    parsed.data.recipient_id,
+  );
+  if (!allowed) {
+    audit({
+      action: 'messages_permission_denied',
+      user_id: req.user.id,
+      email: req.user.email ?? null,
+      req,
+      metadata: { route: 'send', recipient: parsed.data.recipient_id },
+    });
+    throw httpError(403, 'You cannot message this user.');
+  }
 
   // Insert first (no embed) so we get the row id, then fetch with the embed.
   // Two-step avoids the failure mode where the embed errors and we lose the
