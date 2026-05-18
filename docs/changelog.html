@@ -151,9 +151,52 @@
         <strong style="color:var(--text);font-weight:600;">Last updated:</strong> 2026-05-18
         &nbsp;·&nbsp;
         <strong style="color:var(--text);font-weight:600;">Latest highlights:</strong>
-        mobile navigation, design polish, faster first load, saved task filters, reminders now actually deliver.
+        security hardening pass (7 access-control fixes), messaging reliability fixes, mobile navigation, design polish, saved task filters.
       </p>
     </header>
+
+    <!-- ================== SECURITY HARDENING (2026-05-18) ================== -->
+
+    <div class="release">
+      <div class="release-head">
+        <h2>Access-control hardening pass<span class="pill sec">Security</span></h2>
+        <span class="date">2026-05-18</span>
+      </div>
+      <p class="release-summary">A focused security review of the codebase found seven access-control issues. All seven are now closed. None had been observed in use; the fixes are precautionary.</p>
+
+      <div class="group">
+        <h3>What was tightened</h3>
+        <ul class="bullets">
+          <li><strong>Consultant profiles.</strong> Edits to a consultant&rsquo;s profile now require the editor to either be that consultant, their assigned recruiter, or a manager. Previously any signed-in user could edit any consultant&rsquo;s profile if they knew the row&rsquo;s ID.</li>
+          <li><strong>Applications &amp; pipeline.</strong> Listing, editing, and ATS scoring on the Applications surface are now scoped per user: consultants see only their own, recruiters see only their pipeline, managers see everything. The list endpoint also no longer returns the whole database when called without filters.</li>
+          <li><strong>Interviews.</strong> Scheduling, rescheduling, and submitting feedback on interviews now require the caller to either be the assigned consultant&rsquo;s recruiter, the assigned consultant themselves, or a manager. Previously these were unscoped.</li>
+          <li><strong>Training uploads.</strong> Uploading a completion artifact (used as compliance evidence on STEM-OPT / I-983 reports) now requires the uploader to actually be the assignee or a manager.</li>
+          <li><strong>Admin lifecycle.</strong> A lower-tier admin (Director, CTO, or CEO) can no longer change the status, group, or password of a Super Admin. The system also refuses to deactivate the last active Super Admin, so the org can never lock itself out.</li>
+          <li><strong>Login email lookup.</strong> The login flow now treats the email as an exact case-insensitive match instead of a pattern match. Closes a path where a pattern like <code>admin%@example.com</code> could be used to target a specific account.</li>
+        </ul>
+      </div>
+
+      <div class="group">
+        <h3>How we found them</h3>
+        <ul class="bullets">
+          <li>A multi-agent review walked every API endpoint and traced who can call what.</li>
+          <li>Each candidate finding went through an independent verification pass before being acted on. Two suspected issues were downgraded to lower-impact information notes and are not part of this fix bundle.</li>
+          <li>The existing permission-engine test suite (14 tests) still passes; no behaviour change for legitimate callers.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="release">
+      <div class="release-head">
+        <h2>Messaging reliability fixes<span class="pill fix">Fix</span></h2>
+        <span class="date">2026-05-18</span>
+      </div>
+      <p class="release-summary">Two issues affecting the Messages page are resolved.</p>
+      <ul class="bullets">
+        <li><strong>Conversations failed to load.</strong> Opening a thread returned a server error because the underlying database adapter didn&rsquo;t understand a particular query shape used by the messaging feature. The adapter now handles it, and threads load normally.</li>
+        <li><strong>Sending &ldquo;hi&rdquo; sometimes showed two copies.</strong> A race between the optimistic local append and the realtime push from the server could surface the same message twice for a moment. The local row is now reconciled against the real server message as soon as the send completes, so the deduplication that was always meant to happen actually fires.</li>
+      </ul>
+    </div>
 
     <!-- ================== MOBILE + UI POLISH PASSES (2026-05-18) ================== -->
 
