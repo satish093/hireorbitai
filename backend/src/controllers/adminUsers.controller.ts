@@ -6,6 +6,61 @@ import { audit } from '../services/audit.service';
 import { requestPasswordReset } from '../services/auth.service';
 import { logger } from '../config/logger';
 
+// Role-rank ladder. Used to refuse status / group / password-reset changes
+// when the actor would otherwise be tampering with an equal- or higher-rank
+// admin's account. Without this guard, a DIRECTOR could lock out the
+// SUPER_ADMIN — and once the access token TTL elapses, the SUPER_ADMIN is
+// permanently locked out unless another super-admin exists to reactivate
+// them. The ladder mirrors shared/src/roles.ts ordering.
+const ROLE_RANK: Record<Role, number> = {
+  SUPER_ADMIN: 100,
+  CEO: 90,
+  CTO: 80,
+  DIRECTOR: 70,
+  MANAGER: 60,
+  HR_MANAGER: 60,
+  DEVELOPER: 50,
+  RECRUITER: 40,
+  CONSULTANT: 10,
+};
+
+/** Throws 403 if the actor is trying to mutate an equal- or higher-ranked
+ *  user — admins below SUPER_ADMIN can never reach above their own tier. */
+function assertOutranks(actor: { role: Role }, targetRole: Role | null | undefined): void {
+  if (!targetRole) return;
+  const a = ROLE_RANK[actor.role] ?? 0;
+  const t = ROLE_RANK[targetRole] ?? 0;
+  if (t >= a) {
+    throw httpError(403, `You cannot change a user with role ${targetRole}. Ask a SUPER_ADMIN.`);
+  }
+}
+
+/** Throws 409 if removing this user (or making them inactive) would leave
+ *  zero active SUPER_ADMINs in the org. Same guard the legacy
+ *  `users.controller.deactivate` route uses — without it, the admin surface
+ *  can lock the org out of its only super-admin. */
+async function assertNotLastSuperAdmin(targetId: string): Promise<void> {
+  const { data: target } = await db
+    .from('users')
+    .select('role, is_active')
+    .eq('id', targetId)
+    .maybeSingle();
+  if (!target) return; // 404 surfaces elsewhere
+  const row = target as { role: Role; is_active: boolean };
+  if (row.role !== 'SUPER_ADMIN' || row.is_active === false) return;
+  const { count } = await db
+    .from('users')
+    .select('id', { count: 'exact', head: true })
+    .eq('role', 'SUPER_ADMIN')
+    .eq('is_active', true);
+  if ((count ?? 0) <= 1) {
+    throw httpError(
+      409,
+      'Refusing to remove the last active SUPER_ADMIN. Promote another admin first.',
+    );
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Admin user-management surface (mounted at /admin/users).
 //
@@ -155,10 +210,21 @@ export const setStatus: RequestHandler = async (req, res) => {
 
   const { data: before } = await db
     .from('users')
-    .select('id, email, status')
+    .select('id, email, status, role')
     .eq('id', id)
     .maybeSingle();
   if (!before) throw httpError(404, 'User not found');
+  const beforeRow = before as { id: string; email: string; status: string | null; role: Role };
+
+  // Rank check: only a SUPER_ADMIN can flip the status of another tier-A
+  // admin. Without this a DIRECTOR/CTO could lock out the only SUPER_ADMIN.
+  assertOutranks({ role: req.user.role }, beforeRow.role);
+
+  // Don't allow the org to drop its last active SUPER_ADMIN. Mirrors the
+  // legacy /users/:id/deactivate handler.
+  if (status !== 'active') {
+    await assertNotLastSuperAdmin(id);
+  }
 
   const now = new Date().toISOString();
   const { data, error } = await db
@@ -193,7 +259,7 @@ export const setStatus: RequestHandler = async (req, res) => {
     user_id: id,
     email: data.email,
     req,
-    metadata: { from: before.status, to: status, reason: reason ?? null, by: req.user.id },
+    metadata: { from: beforeRow.status, to: status, reason: reason ?? null, by: req.user.id },
   });
 
   res.json(data);
@@ -215,10 +281,15 @@ export const setGroup: RequestHandler = async (req, res) => {
 
   const { data: before } = await db
     .from('users')
-    .select('id, email, group_id')
+    .select('id, email, group_id, role')
     .eq('id', id)
     .maybeSingle();
   if (!before) throw httpError(404, 'User not found');
+  const beforeRow = before as { id: string; email: string; group_id: string | null; role: Role };
+
+  // Same rank rule as setStatus — a DIRECTOR shouldn't be able to move a
+  // SUPER_ADMIN out of their group.
+  assertOutranks({ role: req.user.role }, beforeRow.role);
 
   const { data, error } = await db
     .from('users')
@@ -228,7 +299,7 @@ export const setGroup: RequestHandler = async (req, res) => {
     .single();
   if (error) throw httpError(500, error.message);
 
-  const from = before.group_id ?? null;
+  const from = beforeRow.group_id ?? null;
   const to = parsed.data.group_id;
   const action: 'group_user_assigned' | 'group_user_removed' | 'group_user_moved' =
     from === null && to !== null
@@ -278,10 +349,18 @@ export const setNotes: RequestHandler = async (req, res) => {
 export const sendPasswordReset: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   const { id } = req.params;
-  const { data: target } = await db.from('users').select('email').eq('id', id).maybeSingle();
+  const { data: target } = await db.from('users').select('email, role').eq('id', id).maybeSingle();
   if (!target) throw httpError(404, 'User not found');
+  const targetRow = target as { email: string; role: Role };
 
-  await requestPasswordReset(target.email, req);
+  // Only a SUPER_ADMIN can trigger a password reset for another admin-tier
+  // account. Without this rule, a DIRECTOR could send themselves the reset
+  // link for the SUPER_ADMIN's email (they don't see the link directly, but
+  // it's still a privilege-escalation primitive if they control the mailbox
+  // — and absent that, it's a nuisance + audit-trail noise we can avoid).
+  assertOutranks({ role: req.user.role }, targetRow.role);
+
+  await requestPasswordReset(targetRow.email, req);
   audit({
     action: 'admin_user_password_reset',
     user_id: id,

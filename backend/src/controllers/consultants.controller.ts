@@ -127,9 +127,42 @@ export const onboard: RequestHandler = async (req, res) => {
 };
 
 export const update: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  // Field allowlist — `user_id`, `recruiter_id`, and `marketing_status` are
+  // intentionally not patchable here; they have their own dedicated routes
+  // with stricter role gates. Without this allowlist, any caller who passes
+  // the ownership check below could still smuggle in those columns.
+  const parsed = onboardingSchema.safeParse(req.body);
+  if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
+
+  // Ownership scope — mirrors the rules in `get`. CONSULTANT may edit only
+  // their own row, RECRUITER only the consultants assigned to them, manager-
+  // tier may edit anyone. Without this, the route's `requireRole(...ALL_ROLES)`
+  // gate would let any signed-in user mutate any consultant by id.
+  const { data: row, error: lookupErr } = await db
+    .from('consultants')
+    .select('id, user_id, recruiter_id')
+    .eq('id', req.params.id)
+    .maybeSingle();
+  if (lookupErr) throw httpError(500, lookupErr.message);
+  if (!row) throw httpError(404, 'Not found');
+
+  if (!isManagerTier(req.user.role)) {
+    if (req.user.role === 'RECRUITER') {
+      const myRecId = await getCallerRecruiterRowId(req.user.id);
+      if (!myRecId || (row as { recruiter_id: string | null }).recruiter_id !== myRecId) {
+        throw httpError(403, 'Forbidden');
+      }
+    } else if (req.user.role === 'CONSULTANT') {
+      if ((row as { user_id: string }).user_id !== req.user.id) throw httpError(403, 'Forbidden');
+    } else {
+      throw httpError(403, 'Forbidden');
+    }
+  }
+
   const { data, error } = await db
     .from('consultants')
-    .update(req.body ?? {})
+    .update(parsed.data)
     .eq('id', req.params.id)
     .select()
     .single();

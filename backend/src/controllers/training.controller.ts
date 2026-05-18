@@ -267,6 +267,11 @@ const uploadSchema = z.object({
 });
 export const recordUpload: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
+  // Caller must own this assignment (or be manager-tier). Without this, any
+  // signed-in user could plant compliance-evidence rows on another user's
+  // assignment — those rows surface in the manager-facing CSV and feed the
+  // upload-gate completion check.
+  await assertCanReadAssignment(req, req.params.id);
   const parsed = uploadSchema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
   const { data, error } = await repo.uploads.create({

@@ -2,15 +2,104 @@ import { RequestHandler } from 'express';
 import { z } from 'zod';
 import { db } from '../config/db';
 import { atsScore } from '../services/ai.service';
-import { httpError } from '../types';
+import { httpError, MANAGER_TIER } from '../types';
 
+// ---------------------------------------------------------------------------
+// Authorization helpers
+//
+// The applications router is mounted behind requireAuth but has no per-route
+// role gate (every signed-in user reaches these handlers). Every endpoint
+// therefore has to scope by the caller's principal:
+//   - MANAGER_TIER (super-admin, ceo, cto, director, manager, …) — full view.
+//   - RECRUITER  — only applications where applications.recruiter_id ==
+//                   <their recruiters.id>.
+//   - CONSULTANT — only applications where applications.consultant_id ==
+//                   <their consultants.id>.
+// ---------------------------------------------------------------------------
+
+function isManagerTier(role?: string): boolean {
+  return !!role && (MANAGER_TIER as string[]).includes(role);
+}
+
+async function getCallerRecruiterRowId(userId: string): Promise<string | null> {
+  const { data } = await db.from('recruiters').select('id').eq('user_id', userId).maybeSingle();
+  return (data as { id?: string } | null)?.id ?? null;
+}
+
+async function getCallerConsultantRowId(userId: string): Promise<string | null> {
+  const { data } = await db.from('consultants').select('id').eq('user_id', userId).maybeSingle();
+  return (data as { id?: string } | null)?.id ?? null;
+}
+
+interface ApplicationOwnership {
+  id: string;
+  recruiter_id: string | null;
+  consultant_id: string | null;
+}
+
+/** Throws 404 if the application doesn't exist, 403 if the caller can't see
+ *  it. Returns the loaded row for downstream use. */
+async function loadAndAuthorize(
+  caller: { id: string; role: string },
+  applicationId: string,
+): Promise<ApplicationOwnership> {
+  const { data, error } = await db
+    .from('applications')
+    .select('id, recruiter_id, consultant_id')
+    .eq('id', applicationId)
+    .maybeSingle();
+  if (error) throw httpError(500, error.message);
+  if (!data) throw httpError(404, 'Application not found');
+  const row = data as ApplicationOwnership;
+
+  if (isManagerTier(caller.role)) return row;
+
+  if (caller.role === 'RECRUITER') {
+    const myRecId = await getCallerRecruiterRowId(caller.id);
+    if (myRecId && row.recruiter_id === myRecId) return row;
+  } else if (caller.role === 'CONSULTANT') {
+    const myConsId = await getCallerConsultantRowId(caller.id);
+    if (myConsId && row.consultant_id === myConsId) return row;
+  }
+  // 404 instead of 403 so the endpoint doesn't double as an existence oracle.
+  throw httpError(404, 'Application not found');
+}
+
+// ---------------------------------------------------------------------------
+// GET /applications — scoped list.
+// ---------------------------------------------------------------------------
 export const list: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
   const { consultant_id, recruiter_id, status } = req.query as Record<string, string | undefined>;
   let qb = db
     .from('applications')
     .select('*, job:jobs(*), vendor:vendors(*), consultant:consultants(*)');
-  if (consultant_id) qb = qb.eq('consultant_id', consultant_id);
-  if (recruiter_id) qb = qb.eq('recruiter_id', recruiter_id);
+
+  if (isManagerTier(req.user.role)) {
+    if (consultant_id) qb = qb.eq('consultant_id', consultant_id);
+    if (recruiter_id) qb = qb.eq('recruiter_id', recruiter_id);
+  } else if (req.user.role === 'RECRUITER') {
+    const myRecId = await getCallerRecruiterRowId(req.user.id);
+    if (!myRecId) {
+      res.json([]);
+      return;
+    }
+    qb = qb.eq('recruiter_id', myRecId);
+    // Optional consultant filter is still honoured but only within the
+    // recruiter's own pipeline.
+    if (consultant_id) qb = qb.eq('consultant_id', consultant_id);
+  } else if (req.user.role === 'CONSULTANT') {
+    const myConsId = await getCallerConsultantRowId(req.user.id);
+    if (!myConsId) {
+      res.json([]);
+      return;
+    }
+    qb = qb.eq('consultant_id', myConsId);
+  } else {
+    res.json([]);
+    return;
+  }
+
   if (status) qb = qb.eq('status', status);
   const { data, error } = await qb.order('submitted_at', { ascending: false });
   if (error) throw httpError(500, error.message);
@@ -22,8 +111,31 @@ export const list: RequestHandler = async (req, res) => {
  * a new one. Returns 409 with the offending row if found.
  */
 export const checkDuplicate: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
   const { consultant_id, job_id, vendor_id } = req.query as Record<string, string | undefined>;
   if (!consultant_id || !job_id) throw httpError(400, 'consultant_id and job_id required');
+
+  // Scope: non-managers may only check against their own consultant rows.
+  if (!isManagerTier(req.user.role)) {
+    if (req.user.role === 'RECRUITER') {
+      const myRecId = await getCallerRecruiterRowId(req.user.id);
+      if (!myRecId) throw httpError(403, 'Forbidden');
+      // Recruiter must own the consultant.
+      const { data: cons } = await db
+        .from('consultants')
+        .select('id')
+        .eq('id', consultant_id)
+        .eq('recruiter_id', myRecId)
+        .maybeSingle();
+      if (!cons) throw httpError(403, 'Forbidden');
+    } else if (req.user.role === 'CONSULTANT') {
+      const myConsId = await getCallerConsultantRowId(req.user.id);
+      if (myConsId !== consultant_id) throw httpError(403, 'Forbidden');
+    } else {
+      throw httpError(403, 'Forbidden');
+    }
+  }
+
   let qb = db
     .from('applications')
     .select('*')
@@ -40,6 +152,27 @@ export const create: RequestHandler = async (req, res) => {
   const body = req.body ?? {};
   if (!body.consultant_id || !body.job_id)
     throw httpError(400, 'consultant_id and job_id required');
+
+  // Scope: the caller must legitimately represent that consultant. Without
+  // this, any signed-in user could pin an application to any consultant.
+  if (!isManagerTier(req.user.role)) {
+    if (req.user.role === 'RECRUITER') {
+      const myRecId = await getCallerRecruiterRowId(req.user.id);
+      if (!myRecId) throw httpError(403, 'Forbidden');
+      const { data: cons } = await db
+        .from('consultants')
+        .select('id')
+        .eq('id', body.consultant_id)
+        .eq('recruiter_id', myRecId)
+        .maybeSingle();
+      if (!cons) throw httpError(403, 'Forbidden');
+    } else if (req.user.role === 'CONSULTANT') {
+      const myConsId = await getCallerConsultantRowId(req.user.id);
+      if (myConsId !== body.consultant_id) throw httpError(403, 'Forbidden');
+    } else {
+      throw httpError(403, 'Forbidden');
+    }
+  }
 
   // Duplicate guard.
   let dupQ = db
@@ -62,17 +195,34 @@ export const create: RequestHandler = async (req, res) => {
   res.status(201).json(data);
 };
 
+// Editable fields via PATCH. Anything not in this allowlist is silently
+// dropped — protects against mass-assignment of recruiter_id / consultant_id /
+// arbitrary AI fields by callers who pass the ownership check.
+const updateSchema = z
+  .object({
+    status: z.string().optional(),
+    notes: z.string().optional().nullable(),
+    vendor_id: z.string().uuid().optional().nullable(),
+    submitted_at: z.string().datetime().optional().nullable(),
+    follow_up_at: z.string().datetime().optional().nullable(),
+    rejection_reason: z.string().optional().nullable(),
+    source_url: z.string().optional().nullable(),
+  })
+  .strict();
+
 export const update: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  await loadAndAuthorize(req.user, req.params.id);
+  const parsed = updateSchema.safeParse(req.body);
+  if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
+
   const { data, error } = await db
     .from('applications')
-    .update(req.body)
+    .update(parsed.data)
     .eq('id', req.params.id)
     .select()
     .single();
   if (error) {
-    // Most likely cause when ARCHIVED PATCH fails: the migration that adds
-    // the enum value hasn't been applied yet. Surface a clear hint instead
-    // of a raw Postgres message.
     if (/invalid input value for enum application_status.*ARCHIVED/i.test(error.message)) {
       throw httpError(
         400,
@@ -87,18 +237,6 @@ export const update: RequestHandler = async (req, res) => {
 // ---------------------------------------------------------------------------
 // POST /applications/from-job — record that the recruiter (or consultant)
 // actually applied. Called from the "Did you apply? Yes" confirmation modal.
-//
-// Body:
-//   {
-//     job_id: uuid,
-//     consultant_id: uuid,
-//     resume_id?: uuid,             // resume that was sent (tailored OR original)
-//     tailored_resume_id?: uuid,    // the tailored variant if any
-//     method: 'CUSTOMIZED' | 'ORIGINAL',
-//     match_score?: number,
-//     ats_score?: number,
-//     source_url?: string,
-//   }
 // ---------------------------------------------------------------------------
 export const fromJob: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
@@ -116,6 +254,27 @@ export const fromJob: RequestHandler = async (req, res) => {
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
 
+  // Scope the consultant id to the caller. Without this, any user could log
+  // an application "from" another consultant.
+  if (!isManagerTier(req.user.role)) {
+    if (req.user.role === 'RECRUITER') {
+      const myRecId = await getCallerRecruiterRowId(req.user.id);
+      if (!myRecId) throw httpError(403, 'Forbidden');
+      const { data: cons } = await db
+        .from('consultants')
+        .select('id')
+        .eq('id', parsed.data.consultant_id)
+        .eq('recruiter_id', myRecId)
+        .maybeSingle();
+      if (!cons) throw httpError(403, 'Forbidden');
+    } else if (req.user.role === 'CONSULTANT') {
+      const myConsId = await getCallerConsultantRowId(req.user.id);
+      if (myConsId !== parsed.data.consultant_id) throw httpError(403, 'Forbidden');
+    } else {
+      throw httpError(403, 'Forbidden');
+    }
+  }
+
   // Identify the caller's recruiter row, if any — populates applications.recruiter_id.
   const { data: rec } = await db
     .from('recruiters')
@@ -128,7 +287,7 @@ export const fromJob: RequestHandler = async (req, res) => {
     job_id: parsed.data.job_id,
     resume_id: parsed.data.resume_id ?? null,
     tailored_resume_id: parsed.data.tailored_resume_id ?? null,
-    recruiter_id: rec?.id ?? null,
+    recruiter_id: (rec as { id?: string } | null)?.id ?? null,
     applied_method: parsed.data.method,
     match_score: parsed.data.match_score ?? null,
     ats_score: parsed.data.ats_score ?? null,
@@ -168,8 +327,6 @@ export const fromJob: RequestHandler = async (req, res) => {
   }
 
   if (error) {
-    // Log the raw database error so we can diagnose if the toast is still vague.
-
     console.error(
       '[applications.fromJob] database error:',
       error,
@@ -192,12 +349,11 @@ export const fromJob: RequestHandler = async (req, res) => {
         `Enum value rejected: ${error.message}. The application_method or status value isn't in the database enum yet — apply database/ai-job-search-and-apply.sql.`,
       );
     }
-    // Surface the exact Postgres message + code so we can fix it.
     throw httpError(500, `Database error: ${error.message} (code ${code || '?'})`);
   }
   // Audit trail: every successful application gets an apply_confirmed event.
   logEvent({
-    application_id: data?.id,
+    application_id: (data as { id?: string } | null)?.id ?? null,
     job_id: parsed.data.job_id,
     consultant_id: parsed.data.consultant_id,
     kind: 'apply_confirmed',
@@ -227,11 +383,7 @@ const EVENT_KINDS = [
   'note',
 ] as const;
 
-/** POST /applications/:id/events  body: { kind, job_id?, consultant_id?, payload? }
- *  Append an event to an existing application's log.
- *
- *  Also reusable via /applications/events for events that aren't tied to an
- *  application yet (see logEvent below). */
+/** POST /applications/:id/events — append an event to an existing application's log. */
 export const appendEvent: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   const schema = z.object({
@@ -243,15 +395,46 @@ export const appendEvent: RequestHandler = async (req, res) => {
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
 
+  // Two modes: attached to an existing application (must be owned by caller),
+  // or "free-floating" pre-application events (POST /applications/none/events).
+  // The free-floating mode lets recruiters log "viewed" / "apply_declined" /
+  // "apply_clicked" before any application row exists.
+  let applicationId: string | null = null;
+  if (req.params.id !== 'none') {
+    await loadAndAuthorize(req.user, req.params.id);
+    applicationId = req.params.id;
+  } else if (parsed.data.consultant_id) {
+    // For pre-application events, the caller must still own the referenced
+    // consultant — otherwise this is an audit-log forgery primitive.
+    if (!isManagerTier(req.user.role)) {
+      if (req.user.role === 'RECRUITER') {
+        const myRecId = await getCallerRecruiterRowId(req.user.id);
+        if (!myRecId) throw httpError(403, 'Forbidden');
+        const { data: cons } = await db
+          .from('consultants')
+          .select('id')
+          .eq('id', parsed.data.consultant_id)
+          .eq('recruiter_id', myRecId)
+          .maybeSingle();
+        if (!cons) throw httpError(403, 'Forbidden');
+      } else if (req.user.role === 'CONSULTANT') {
+        const myConsId = await getCallerConsultantRowId(req.user.id);
+        if (myConsId !== parsed.data.consultant_id) throw httpError(403, 'Forbidden');
+      } else {
+        throw httpError(403, 'Forbidden');
+      }
+    }
+  }
+
   const insertBody: any = {
-    application_id: req.params.id === 'none' ? null : req.params.id,
+    application_id: applicationId,
     job_id: parsed.data.job_id ?? null,
     consultant_id: parsed.data.consultant_id ?? null,
     kind: parsed.data.kind,
     payload: parsed.data.payload ?? null,
     created_by: req.user.id,
   };
-  let { data, error } = await db.from('application_events').insert(insertBody).select().single();
+  const { data, error } = await db.from('application_events').insert(insertBody).select().single();
   if (error && /application_events|relation .* does not exist/i.test(error.message)) {
     throw httpError(
       400,
@@ -265,6 +448,7 @@ export const appendEvent: RequestHandler = async (req, res) => {
 /** GET /applications/:id/events — full event timeline for one application. */
 export const listEvents: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
+  await loadAndAuthorize(req.user, req.params.id);
   const { data, error } = await db
     .from('application_events')
     .select('*')
@@ -310,6 +494,9 @@ export async function logEvent(opts: {
 
 /** Run ATS scoring against an application's job description + resume text. */
 export const runAtsScore: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  await loadAndAuthorize(req.user, req.params.id);
+
   const resumeText = String(req.body?.resume_text ?? '');
   const jobDescription = String(req.body?.job_description ?? '');
   if (!resumeText || !jobDescription)

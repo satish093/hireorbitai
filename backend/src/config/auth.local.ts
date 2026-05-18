@@ -156,8 +156,17 @@ export async function signInWithPassword(args: {
   email: string;
   password: string;
 }): Promise<AuthResp<{ user: AuthUser | null; session: Session | null }>> {
+  // Case-insensitive equality, not ILIKE. ILIKE would honour the SQL `%` and
+  // `_` wildcards which RFC 5321 permits in the local-part of an email — an
+  // attacker submitting `admin%@example.com` would otherwise match (and
+  // brute-force / lock out via failed_login_attempts) the seeded SUPER_ADMIN
+  // account. lower(email) keeps the case-insensitive intent without
+  // wildcards. A functional index `(lower(email))` keeps the lookup O(log n).
   const r = await pool.query<UserRow>(
-    `SELECT id, email, full_name, password_hash, session_version FROM public.users WHERE email ILIKE $1 LIMIT 1`,
+    `SELECT id, email, full_name, password_hash, session_version
+       FROM public.users
+       WHERE lower(email) = lower($1)
+       LIMIT 1`,
     [args.email],
   );
   const row = r.rows[0];

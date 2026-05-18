@@ -41,10 +41,18 @@ const USER_ROW_COLS =
   'id,email,full_name,role,is_active,status,must_change_password,temporary_password_sent_at,failed_login_attempts,locked_until';
 
 async function loadUserByEmail(email: string): Promise<UserRow | null> {
+  // .eq() instead of .ilike() — wildcards (`%`, `_`) are RFC-legal in the
+  // local part of an email and Zod's email() validator permits them, so the
+  // previous ILIKE lookup would match `admin%@example.com` against the seed
+  // SUPER_ADMIN and let an unauthenticated attacker target lockout / brute-
+  // force their account. Callers always normalize to lowercase upstream
+  // (`email.trim().toLowerCase()`), and we additionally lowercase here as
+  // defense in depth so a future caller can't bypass by mixed-case.
+  const norm = email.trim().toLowerCase();
   const { data, error } = await db
     .from('users')
     .select(USER_ROW_COLS)
-    .ilike('email', email)
+    .eq('email', norm)
     .maybeSingle();
   if (error) throw httpError(500, error.message);
   return data as UserRow | null;
