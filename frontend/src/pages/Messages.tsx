@@ -280,8 +280,17 @@ export function Messages() {
     setDraft('');
     stickToBottomRef.current = true;
     try {
-      await api.post('/messages', { recipient_id: activePeerId, body });
-      await loadThread(activePeerId);
+      // Replace the optimistic tmp-id row with the real server message
+      // BEFORE the realtime push can arrive. The SSE handler dedupes by
+      // message id, so if the real id is already in the array by the time
+      // the push lands, it short-circuits and we don't render a duplicate.
+      const res = await api.post('/messages', { recipient_id: activePeerId, body });
+      const saved = res.data as Message;
+      setMessages((m) => m.map((x) => (x.id === optimistic.id ? saved : x)));
+      // Refresh the conversation list (reorder, unread counts) but skip
+      // loadThread — the optimistic row is now the canonical row, and any
+      // peer message that arrived in the same window already came in via
+      // SSE.
       refresh();
     } catch (e: any) {
       // Roll back optimistic message regardless of the failure reason.
