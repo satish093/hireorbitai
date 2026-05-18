@@ -6,90 +6,166 @@
   <title>HireOrbit AI — Changelog</title>
   <style>
     :root {
-      --bg: #f8fafc;
+      --bg: #f6f7fb;
       --card: #ffffff;
-      --border: #e2e8f0;
-      --text: #0f172a;
-      --muted: #64748b;
+      --border: #e6e9f1;
+      --border-strong: #d4d9e4;
+      --text: #0b1220;
+      --text-soft: #29324a;
+      --muted: #5d6781;
       --brand: #4f46e5;
+      --brand-deep: #3730a3;
       --brand-soft: #eef2ff;
-      --emerald: #059669;
-      --rose: #e11d48;
+      --emerald: #047857;
+      --emerald-soft: #ecfdf5;
+      --rose: #be123c;
+      --rose-soft: #fff1f2;
       --amber: #b45309;
+      --amber-soft: #fffbeb;
       --sky: #0369a1;
+      --sky-soft: #f0f9ff;
+      --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
+      --shadow-md: 0 4px 16px -8px rgba(15, 23, 42, 0.08), 0 2px 4px -2px rgba(15, 23, 42, 0.04);
     }
     * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
     body {
       margin: 0;
-      padding: 32px 16px;
-      background: var(--bg);
+      padding: 40px 16px 16px;
+      background:
+        radial-gradient(1200px 600px at 50% -120px, rgba(79, 70, 229, 0.10), transparent 60%),
+        var(--bg);
       color: var(--text);
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      line-height: 1.55;
+      line-height: 1.6;
       font-size: 14.5px;
       -webkit-font-smoothing: antialiased;
+      letter-spacing: -0.005em;
     }
-    .container { max-width: 820px; margin: 0 auto; }
+    .container { max-width: 840px; margin: 0 auto; }
+
+    /* ---- Header ----------------------------------------------------------- */
     header {
-      padding: 28px 32px;
-      background: var(--card);
+      position: relative;
+      padding: 32px 36px;
+      background: linear-gradient(180deg, #ffffff 0%, #fbfbfe 100%);
       border: 1px solid var(--border);
-      border-radius: 16px;
-      margin-bottom: 24px;
+      border-radius: 20px;
+      margin-bottom: 28px;
+      box-shadow: var(--shadow-md);
+      overflow: hidden;
+    }
+    header::before {
+      content: '';
+      position: absolute;
+      inset: 0 0 auto 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--brand) 0%, #7c3aed 50%, #0ea5e9 100%);
     }
     header h1 {
-      margin: 0 0 8px 0;
-      font-size: 24px;
-      letter-spacing: -0.02em;
+      margin: 0 0 10px 0;
+      font-size: 26px;
+      letter-spacing: -0.025em;
       font-weight: 700;
+      color: var(--text);
     }
-    header p {
+    header > p:first-of-type {
       margin: 0;
       color: var(--muted);
-      font-size: 14px;
+      font-size: 14.5px;
     }
+
+    /* ---- Release card ----------------------------------------------------- */
     .release {
+      position: relative;
       background: var(--card);
       border: 1px solid var(--border);
       border-radius: 16px;
       padding: 24px 32px;
-      margin-bottom: 16px;
+      margin-bottom: 14px;
+      box-shadow: var(--shadow-sm);
+      transition:
+        transform 180ms cubic-bezier(0.22, 1, 0.36, 1),
+        box-shadow 180ms cubic-bezier(0.22, 1, 0.36, 1),
+        border-color 180ms ease;
+      overflow: hidden;
     }
+    .release::before {
+      /* Accent stripe along the left edge. The colour is set per pill class
+         below so the colour matches the category. */
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 14px;
+      bottom: 14px;
+      width: 3px;
+      border-radius: 0 3px 3px 0;
+      background: var(--brand);
+      opacity: 0.75;
+    }
+    .release:hover {
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-md);
+      border-color: var(--border-strong);
+    }
+    .release:has(.pill.new)::before  { background: var(--emerald); }
+    .release:has(.pill.fix)::before  { background: var(--brand); }
+    .release:has(.pill.sec)::before  { background: var(--rose); }
+    .release:has(.pill.perf)::before { background: var(--amber); }
+    .release:has(.pill.devx)::before { background: var(--sky); }
+
     .release-head {
       display: flex;
       align-items: baseline;
       justify-content: space-between;
       gap: 16px;
       flex-wrap: wrap;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
     }
     .release-head h2 {
       margin: 0;
       font-size: 17px;
-      font-weight: 600;
-      letter-spacing: -0.01em;
+      font-weight: 650;
+      letter-spacing: -0.012em;
+      color: var(--text);
     }
     .release-head .date {
       color: var(--muted);
-      font-size: 12.5px;
+      font-size: 12px;
       font-variant-numeric: tabular-nums;
+      font-weight: 500;
+      padding: 3px 9px;
+      border-radius: 999px;
+      background: var(--bg);
+      border: 1px solid var(--border);
     }
     .release-summary {
-      color: var(--muted);
-      font-size: 13.5px;
-      margin: 4px 0 16px 0;
+      color: var(--text-soft);
+      font-size: 14px;
+      margin: 6px 0 18px 0;
+      max-width: 68ch;
     }
+
+    /* ---- Sub-groups ------------------------------------------------------- */
     .group {
-      margin-top: 14px;
+      margin-top: 16px;
+      padding-top: 14px;
+      border-top: 1px dashed var(--border);
+    }
+    .group:first-of-type {
+      border-top: none;
+      padding-top: 0;
     }
     .group h3 {
-      font-size: 11px;
-      font-weight: 600;
+      font-size: 10.5px;
+      font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.08em;
+      letter-spacing: 0.1em;
       color: var(--muted);
-      margin: 0 0 8px 0;
+      margin: 0 0 10px 0;
     }
+
+    /* ---- Bullets ---------------------------------------------------------- */
     ul.bullets {
       list-style: none;
       padding: 0;
@@ -97,47 +173,90 @@
     }
     ul.bullets li {
       position: relative;
-      padding-left: 18px;
-      margin-bottom: 6px;
+      padding-left: 20px;
+      margin-bottom: 8px;
       font-size: 14px;
-      color: var(--text);
+      line-height: 1.6;
+      color: var(--text-soft);
     }
     ul.bullets li::before {
-      content: '•';
+      content: '';
       position: absolute;
-      left: 4px;
-      color: var(--brand);
-      font-weight: 700;
+      left: 6px;
+      top: 0.66em;
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--brand);
+      opacity: 0.7;
     }
+    ul.bullets li strong { color: var(--text); font-weight: 600; }
+
+    /* ---- Pills ------------------------------------------------------------ */
     .pill {
-      display: inline-block;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
       font-size: 10px;
       font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.06em;
-      padding: 2px 7px;
+      letter-spacing: 0.07em;
+      padding: 3px 8px;
       border-radius: 999px;
       vertical-align: middle;
-      margin-left: 6px;
+      margin-left: 8px;
+      border: 1px solid transparent;
+      line-height: 1;
     }
-    .pill.new { background: #ecfdf5; color: var(--emerald); }
-    .pill.fix { background: #eef2ff; color: var(--brand); }
-    .pill.sec { background: #fef2f2; color: var(--rose); }
-    .pill.perf { background: #fffbeb; color: var(--amber); }
-    .pill.devx { background: #f0f9ff; color: var(--sky); }
+    .pill::before {
+      content: '';
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: currentColor;
+      opacity: 0.7;
+    }
+    .pill.new  { background: var(--emerald-soft); color: var(--emerald); border-color: rgba(4, 120, 87, 0.15); }
+    .pill.fix  { background: var(--brand-soft);   color: var(--brand);   border-color: rgba(79, 70, 229, 0.15); }
+    .pill.sec  { background: var(--rose-soft);    color: var(--rose);    border-color: rgba(190, 18, 60, 0.15); }
+    .pill.perf { background: var(--amber-soft);   color: var(--amber);   border-color: rgba(180, 83, 9, 0.15); }
+    .pill.devx { background: var(--sky-soft);     color: var(--sky);     border-color: rgba(3, 105, 161, 0.15); }
+
+    /* ---- Footer ----------------------------------------------------------- */
     footer {
       color: var(--muted);
-      font-size: 12px;
+      font-size: 12.5px;
       text-align: center;
-      padding: 24px 8px;
+      padding: 32px 8px 16px;
     }
-    footer a { color: var(--brand); text-decoration: none; }
+    footer a { color: var(--brand); text-decoration: none; font-weight: 500; }
+    footer a:hover { text-decoration: underline; }
+
+    /* ---- Inline code ------------------------------------------------------ */
     code {
-      background: #f1f5f9;
-      padding: 1px 5px;
-      border-radius: 4px;
+      background: #eef2f9;
+      color: var(--brand-deep);
+      padding: 1.5px 6px;
+      border-radius: 5px;
       font-family: 'SF Mono', Menlo, Consolas, monospace;
       font-size: 12.5px;
+      border: 1px solid rgba(79, 70, 229, 0.08);
+    }
+
+    /* ---- Mobile ----------------------------------------------------------- */
+    @media (max-width: 640px) {
+      body { padding: 20px 12px 8px; }
+      header { padding: 24px 22px; border-radius: 16px; }
+      header h1 { font-size: 22px; }
+      .release { padding: 20px 22px; border-radius: 14px; }
+      .release-head h2 { font-size: 16px; }
+    }
+
+    /* ---- Reduced motion --------------------------------------------------- */
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      .release { transition: none; }
+      .release:hover { transform: none; }
     }
   </style>
 </head>
