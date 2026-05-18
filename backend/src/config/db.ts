@@ -159,13 +159,28 @@ function renderFilter(f: Filter, a: Args): string {
 }
 
 // Parse a single PostgREST condition like "name.ilike.*foo*" or "id.eq.123"
-// or "is_active.is.null". Returns a SQL fragment.
+// or "is_active.is.null". Also supports nested PostgREST groups:
+//   - and(<a.eq.1>,<b.eq.2>)  → SQL AND
+//   - or(<a.eq.1>,<b.eq.2>)   → SQL OR
+// Used by messages.controller / permission.service for the
+// (sender=me AND recipient=you) OR (sender=you AND recipient=me) thread
+// lookup pattern.
 function renderPostgrestCondition(cond: string, a: Args): string {
   const trimmed = cond.trim();
   // not.<op>.<value> wrapper
   if (trimmed.startsWith('not.')) {
     const rest = trimmed.slice(4);
     return `NOT (${renderPostgrestCondition(rest, a)})`;
+  }
+  // and(...) / or(...) groups — recurse on the inner comma-separated list.
+  // We reuse the same comma splitter as renderOr so commas inside any
+  // further-nested groups (or in `in.(…)`) are preserved.
+  const groupMatch = trimmed.match(/^(and|or)\((.*)\)$/s);
+  if (groupMatch) {
+    const joiner = groupMatch[1] === 'and' ? ' AND ' : ' OR ';
+    const inner = groupMatch[2]!;
+    const parts = splitTopLevelCommas(inner);
+    return '(' + parts.map((p) => renderPostgrestCondition(p, a)).join(joiner) + ')';
   }
   const m = trimmed.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\.([a-z]+)\.(.*)$/s);
   if (!m) {
@@ -193,21 +208,10 @@ function renderPostgrestCondition(cond: string, a: Args): string {
 }
 
 function renderOr(orString: string, a: Args): string {
-  // PostgREST OR: comma-separated list, but commas inside parens (for in.()) must be preserved.
-  const parts: string[] = [];
-  let depth = 0;
-  let buf = '';
-  for (const ch of orString) {
-    if (ch === '(') depth++;
-    if (ch === ')') depth--;
-    if (ch === ',' && depth === 0) {
-      parts.push(buf);
-      buf = '';
-    } else {
-      buf += ch;
-    }
-  }
-  if (buf.length) parts.push(buf);
+  // PostgREST OR: comma-separated list. Commas inside parens (for in.()
+  // and and(...)/or(...) groups) must be preserved — splitTopLevelCommas
+  // handles that.
+  const parts = splitTopLevelCommas(orString);
   return parts.map((p) => renderPostgrestCondition(p, a)).join(' OR ');
 }
 
