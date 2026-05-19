@@ -1089,7 +1089,22 @@ function JobCard({
   const enriched = !!job.requirements;
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl flex overflow-hidden hover:border-slate-300 hover:shadow-sm transition">
+    // Entire card is clickable — opens the slide-in detail panel via
+    // onOpenInsight. Interactive child elements (Apply, Like, expand, status
+    // dropdown) stop propagation so they don't double-trigger the panel.
+    // role="button" + tabIndex makes the card keyboard-accessible.
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onOpenInsight}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onOpenInsight();
+        }
+      }}
+      className="bg-white border border-slate-200 rounded-xl flex overflow-hidden hover:border-slate-300 hover:shadow-md transition cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"
+    >
       {/* Left: job content */}
       <div className="flex-1 p-5 min-w-0">
         <div className="flex items-start gap-3">
@@ -1138,7 +1153,10 @@ function JobCard({
             </div>
           </div>
           <button
-            onClick={onToggleLike}
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleLike();
+            }}
             title={job.liked ? 'Unlike' : 'Like'}
             className={clsx(
               'shrink-0 w-9 h-9 rounded-full border flex items-center justify-center',
@@ -1301,13 +1319,19 @@ function JobCard({
           </div>
         )}
 
-        {/* Footer: Apply / Status + expand */}
+        {/* Footer: Apply / Status + expand. Each interactive control stops
+            propagation so it doesn't double-trigger the card's onOpenInsight. */}
         <div className="mt-4 flex items-center justify-between flex-wrap gap-2">
           {onChangeStatus ? (
-            <StatusDropdown current={job.application_status} onChange={onChangeStatus} />
+            <div onClick={(e) => e.stopPropagation()}>
+              <StatusDropdown current={job.application_status} onChange={onChangeStatus} />
+            </div>
           ) : (
             <button
-              onClick={onApply}
+              onClick={(e) => {
+                e.stopPropagation();
+                onApply();
+              }}
               className="inline-flex items-center gap-1.5 bg-slate-900 text-white text-sm px-4 py-2 rounded-lg hover:bg-slate-800"
             >
               Apply on company site <span>↗</span>
@@ -1316,7 +1340,10 @@ function JobCard({
           <div className="flex items-center gap-3">
             {isConsultant && (
               <button
-                onClick={onOpenInsight}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenInsight();
+                }}
                 className="text-xs font-medium text-brand-700 bg-brand-50 border border-brand-200 px-3 py-1.5 rounded-full hover:bg-brand-100"
                 title="Score your resume against this job's requirements"
               >
@@ -1330,7 +1357,10 @@ function JobCard({
             )}
             {enriched && (responsibilities.length > 0 || skillSummaries.length > 0) && (
               <button
-                onClick={() => setExpanded((v) => !v)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setExpanded((v) => !v);
+                }}
                 className="text-xs text-slate-600 hover:text-slate-900"
               >
                 {expanded ? 'Show less ▴' : 'Show details ▾'}
