@@ -3,6 +3,7 @@ import { db } from '../config/db';
 import { logger } from '../config/logger';
 import { matchJobsForConsultant } from './ai.service';
 import { loadFlags } from '../controllers/featureFlags.controller';
+import { mockEnabled, mockAdzuna, mockJSearch, mockLinkedIn } from './jobIngestionMocks';
 
 // ---------------------------------------------------------------------------
 // Driver self-healing — auto-deactivate misbehaving source_companies rows.
@@ -385,7 +386,13 @@ function prettyJobType(t: string): string {
 // ---------------------------------------------------------------------------
 // Adzuna (requires API key — covers ~15M aggregated listings across boards)
 // ---------------------------------------------------------------------------
-async function fetchAdzuna(_slug: string | null): Promise<NormalizedJob[]> {
+async function fetchAdzuna(slug: string | null): Promise<NormalizedJob[]> {
+  // Test mode — synthetic data, no HTTP call, no API quota burn.
+  // Flip JOB_SOURCES_MOCK=true in backend/.env to enable.
+  if (mockEnabled()) {
+    logger.info({ source: 'adzuna', slug }, 'jobIngestion: mock mode — returning synthetic jobs');
+    return mockAdzuna(slug);
+  }
   const appId = process.env.ADZUNA_APP_ID;
   const appKey = process.env.ADZUNA_APP_KEY;
   const country = process.env.ADZUNA_COUNTRY ?? 'us';
@@ -438,6 +445,11 @@ async function fetchAdzuna(_slug: string | null): Promise<NormalizedJob[]> {
 // Each query gets one paginated fetch (50 jobs/page max on Basic plan).
 // ---------------------------------------------------------------------------
 async function fetchJSearch(slug: string | null): Promise<NormalizedJob[]> {
+  // Test mode — see jobIngestionMocks.ts for the short-circuit rationale.
+  if (mockEnabled()) {
+    logger.info({ source: 'jsearch', slug }, 'jobIngestion: mock mode — returning synthetic jobs');
+    return mockJSearch(slug);
+  }
   const apiKey = process.env.JSEARCH_API_KEY;
   if (!apiKey) {
     throw new Error('JSEARCH_API_KEY not set in backend/.env');
@@ -775,6 +787,11 @@ async function fetchSearchApi(slug: string | null): Promise<NormalizedJob[]> {
 // Env: LINKEDIN_TITLES (pipe-separated), LINKEDIN_LOCATIONS, LINKEDIN_WINDOW.
 // ---------------------------------------------------------------------------
 async function fetchLinkedIn(slug: string | null): Promise<NormalizedJob[]> {
+  // Test mode — see jobIngestionMocks.ts for the short-circuit rationale.
+  if (mockEnabled()) {
+    logger.info({ source: 'linkedin', slug }, 'jobIngestion: mock mode — returning synthetic jobs');
+    return mockLinkedIn(slug);
+  }
   const apiKey = process.env.RAPIDAPI_KEY ?? process.env.JSEARCH_API_KEY;
   if (!apiKey) throw new Error('RAPIDAPI_KEY (or JSEARCH_API_KEY) not set in backend/.env');
 
