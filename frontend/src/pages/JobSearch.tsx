@@ -1889,6 +1889,21 @@ function MatchInsightModal({ job, onClose }: { job: JobRow; onClose: () => void 
   const [resumePaste, setResumePaste] = useState('');
   const [needsResume, setNeedsResume] = useState(false);
 
+  // ESC key closes the panel. Lock body scroll while the panel is open so
+  // the underlying list doesn't drift on iOS Safari.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [onClose]);
+
   async function run(extraResumeText?: string) {
     setLoading(true);
     setError(null);
@@ -1931,15 +1946,21 @@ function MatchInsightModal({ job, onClose }: { job: JobRow; onClose: () => void 
   const atsScore = ats?.score != null ? Math.round(ats.score) : null;
 
   return (
+    // Jobright-style slide-in side panel. The backdrop is a softer slate-900/30
+    // (vs the old slate-900/50 modal) so the underlying job list stays visible
+    // alongside the detail view.
     <div
-      className="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 bg-slate-900/30 backdrop-blur-[2px] animate-fade-in"
       onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Job match insight"
     >
       <div
-        className="bg-white w-full max-w-3xl max-h-[90vh] rounded-2xl shadow-xl overflow-hidden flex flex-col"
+        className="absolute right-0 top-0 bottom-0 w-full sm:max-w-2xl bg-white shadow-2xl flex flex-col animate-slide-in-panel"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-6 py-4 border-b border-slate-200 flex items-start justify-between gap-4">
+        <div className="px-5 sm:px-6 py-4 border-b border-slate-200 flex items-start justify-between gap-4 shrink-0">
           <div>
             <div className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase mb-0.5">
               Match Insight
@@ -1957,7 +1978,7 @@ function MatchInsightModal({ job, onClose }: { job: JobRow; onClose: () => void 
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+        <div className="flex-1 overflow-y-auto px-5 sm:px-6 py-5 space-y-5">
           {/* Quick-facts meta strip — mirrors what the card shows so the modal
               functions as a full job-detail view, not just a score breakdown. */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
