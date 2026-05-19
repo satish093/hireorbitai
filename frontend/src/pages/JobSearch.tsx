@@ -1957,7 +1957,7 @@ function MatchInsightModal({ job, onClose }: { job: JobRow; onClose: () => void 
       aria-label="Job match insight"
     >
       <div
-        className="absolute right-0 top-0 bottom-0 w-full sm:max-w-2xl bg-white shadow-2xl flex flex-col animate-slide-in-panel"
+        className="absolute right-0 top-0 bottom-0 w-full sm:max-w-3xl md:max-w-4xl bg-white shadow-2xl flex flex-col animate-slide-in-panel"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-5 sm:px-6 py-4 border-b border-slate-200 flex items-start justify-between gap-4 shrink-0">
