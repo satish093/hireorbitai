@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "_comment": "Personal overrides. COPY this file to .claude/settings.local.json (which is gitignored) and edit to taste. Anything you allow here is allowed only for you; teammates aren't affected. Useful for trusting commands you personally run all the time without prompting (e.g. your local psql, your VPS ssh).",
+  "permissions": {
+    "allow": [
+      "Bash(git push hireorbitai:*)",
+      "Bash(git push origin:*)"
+    ]
+  },
+  "env": {}
+}

@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "_comment": "Project-scoped settings, committed to the repo. Personal overrides go in .claude/settings.local.json (gitignored). Permissions here are conservative — read-only / verification commands only; anything that mutates the working tree, network state, or the VPS should require a per-invocation prompt.",
+  "permissions": {
+    "allow": [
+      "Bash(git status)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git branch:*)",
+      "Bash(git show:*)",
+      "Bash(npm run typecheck)",
+      "Bash(npm run lint)",
+      "Bash(npm run build)",
+      "Bash(npm --prefix backend run typecheck)",
+      "Bash(npm --prefix backend run lint)",
+      "Bash(npm --prefix backend run build)",
+      "Bash(npm --prefix backend test)",
+      "Bash(npm --prefix backend test:*)",
+      "Bash(npm --prefix frontend run typecheck)",
+      "Bash(npm --prefix frontend run lint)",
+      "Bash(npm --prefix frontend run build)",
+      "Bash(npm run shared:build)",
+      "Bash(npm run format:check)"
+    ],
+    "deny": [
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(git clean -fd:*)",
+      "Bash(git branch -D:*)",
+      "Bash(rm -rf:*)",
+      "Bash(psql:*)",
+      "Bash(ssh:*)",
+      "Bash(scp:*)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "_comment": "If shared/src/** changed, remind that @hireorbitai/shared needs a rebuild before typecheck reflects it.",
+            "command": "node -e \"const f=process.env.CLAUDE_HOOK_FILE||''; if(f.includes('shared/src/'))console.error('[hint] shared/src/** changed — run: npm run shared:build');\""
+          }
+        ]
+      }
+    ]
+  },
+  "env": {
+    "HIREORBITAI_STRICT_COMMITS": "0"
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "$schema": "https://json.schemastore.org/claude-mcp.json",
+  "_comment": "Team-shared MCP servers. Anything declared here is auto-available to every teammate who opens Claude Code in this repo. Personal MCP servers live in ~/.claude.json instead. Keep this file conservative — every entry here runs on every teammate's machine the moment they pull.",
+  "mcpServers": {}
+}

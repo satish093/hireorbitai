@@ -12,7 +12,12 @@ dist/
 .DS_Store
 *.log
 .vite/
-.claude/
+
+# Claude Code config — commit team-shared files under .claude/ but exclude
+# personal overrides and per-agent memory the team doesn't share.
+.claude/settings.local.json
+.claude/projects/
+.claude/cache/
 
 # PM2 + Node 22 build artifacts
 .pm2/

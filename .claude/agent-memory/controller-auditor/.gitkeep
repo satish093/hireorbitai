@@ -1,0 +1,6 @@
+# Persistent notes for the controller-auditor agent.
+# Files placed here survive across invocations — useful for tracking
+# previously-flagged-and-ignored false positives, or controllers that
+# have been audited recently and don't need a re-pass.
+#
+# Format is up to the agent. Keep entries small and dated.
