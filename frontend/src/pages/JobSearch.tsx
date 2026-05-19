@@ -9,6 +9,7 @@ import { DuplicateSubmissionModal } from '../components/DuplicateSubmissionModal
 import { invalidate } from '../hooks/useInvalidate';
 import { useFeatureFlag } from '../hooks/useFeatureFlags';
 import { SkillGap } from '../components/SkillGap';
+import { SkeletonCard } from '../components/Skeleton';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
 
@@ -713,24 +714,12 @@ export function JobSearch() {
         </div>
       )}
 
-      {/* Match-mode banner — explains missing scores. */}
-      {!loading && tab === 'recommended' && matchMode === 'skills-only' && (
-        <div className="bg-amber-50 border border-amber-100 rounded-xl px-4 py-2.5 mb-3 text-xs text-amber-900 flex items-center gap-2">
-          <span>⚠️</span>
-          <span>
-            <strong>No resume on file</strong> — match scores below are based on the curated skill
-            list only. Upload a resume on{' '}
-            <a className="underline" href="/resumes">
-              Resumes
-            </a>{' '}
-            so we can rank against your actual experience.
-          </span>
-        </div>
-      )}
-      {!loading && tab === 'recommended' && matchMode === 'no-consultant' && isRecruiterMode && (
-        <div className="bg-sky-50 border border-sky-100 rounded-xl px-4 py-2.5 mb-3 text-xs text-sky-900 flex items-center gap-2">
-          <span>ℹ️</span>
-          <span>Pick a consultant in the targeting bar to see resume-aware match scores.</span>
+      {/* Match-mode chip — single-line, replaces the two verbose banners
+          we used to render. The match-mode header set by /jobs/recommended
+          tells us why scores are partial / missing. */}
+      {!loading && tab === 'recommended' && matchMode && matchMode !== 'resume+skills' && (
+        <div className="mb-3">
+          <MatchModeChip mode={matchMode} isRecruiterMode={isRecruiterMode} />
         </div>
       )}
 
@@ -751,7 +740,17 @@ export function JobSearch() {
       {/* Results — apply source filter (Recommended/Liked) and sub-tab filter (Applied). */}
       {(() => {
         const filtered = filteredRows(rows, tab, sourceFilter, appliedSub);
-        if (loading) return <div className="text-sm text-slate-500">Loading…</div>;
+        if (loading) {
+          // Skeleton cards mimic the job-card layout so the loading state feels
+          // intentional rather than a blank screen with a stray "Loading…".
+          return (
+            <div className="space-y-3" aria-label="Loading jobs">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <SkeletonCard key={i} lines={4} />
+              ))}
+            </div>
+          );
+        }
         if (filtered.length === 0)
           return <EmptyState tab={tab} onSync={isManager ? syncNow : undefined} />;
         return (
@@ -1108,20 +1107,7 @@ function JobCard({
               {job.source && <SourceBadge source={job.source} />}
               {job.publisher && <PublisherBadge publisher={job.publisher} />}
               {aiMatchEnabled && typeof job.match_score === 'number' && (
-                <span
-                  className={clsx(
-                    'text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded border',
-                    job.match_score >= 85
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
-                      : job.match_score >= 70
-                        ? 'bg-sky-50 text-sky-700 border-sky-100'
-                        : job.match_score >= 50
-                          ? 'bg-amber-50 text-amber-700 border-amber-100'
-                          : 'bg-rose-50 text-rose-700 border-rose-100',
-                  )}
-                >
-                  Match {Math.round(job.match_score)}%
-                </span>
+                <MatchScoreChip score={Math.round(job.match_score)} />
               )}
               {job.application_status && !onChangeStatus && (
                 <span className="text-[10px] font-semibold uppercase tracking-wide bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded">
@@ -1170,13 +1156,27 @@ function JobCard({
           <MetaItem icon="◎" label={job.location ?? 'Unknown location'} />
           <MetaItem icon="⌂" label={workModel} />
           <MetaItem icon="◷" label={prettyType(job.job_type)} />
-          <MetaItem icon="$" label={prettyRate(job.rate_min, job.rate_max)} />
+          {(job.rate_min != null || job.rate_max != null) && (
+            <MetaItem icon="$" label={prettyRate(job.rate_min, job.rate_max)} />
+          )}
           <MetaItem icon="◯" label={seniority ?? 'Level not specified'} />
           <MetaItem
             icon="⌛"
             label={minYears != null ? `${minYears}+ years exp` : 'Experience not specified'}
           />
         </div>
+
+        {/* Salary + high-signal flags — colored pills that read at a glance.
+            Hidden entirely when there's no rate AND no recommendation tags
+            so the card stays compact for un-enriched jobs. */}
+        {(job.rate_min != null || job.rate_max != null || recTags.length > 0) && (
+          <div className="mt-3 flex flex-wrap items-center gap-1.5">
+            <SalaryPill min={job.rate_min} max={job.rate_max} />
+            {recTags.slice(0, 4).map((t) => (
+              <HighlightTagChip key={t} tag={t} />
+            ))}
+          </div>
+        )}
 
         {/* Description excerpt — visible even when AI enrichment hasn't run yet.
             Strips HTML tags, caps at 200 chars. Hidden when expanded so the
@@ -1192,19 +1192,15 @@ function JobCard({
           </p>
         )}
 
-        {/* Recommendation tags (Jobright-style "H1B Sponsor Likely" etc.) */}
-        {recTags.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mt-3">
-            {recTags.slice(0, 6).map((t) => (
-              <RecommendationTag key={t} tag={t} />
-            ))}
-          </div>
-        )}
+        {/* The recommendation-tag chip row used to live here; the highest-
+            signal flags (Sponsor / Remote / Hybrid / Clearance / Relocation)
+            now appear in the meta-pill row directly under the title. */}
 
-        {/* Required skills tags */}
+        {/* Required skills tags — capped to 6 visible with a "+N more" chip
+            when the job has more, so the card height stays predictable. */}
         {requiredSkills.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mt-3">
-            {requiredSkills.slice(0, 8).map((s) => (
+            {requiredSkills.slice(0, 6).map((s) => (
               <span
                 key={s}
                 className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-700"
@@ -1212,6 +1208,11 @@ function JobCard({
                 {s}
               </span>
             ))}
+            {requiredSkills.length > 6 && (
+              <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-slate-50 text-slate-500 border border-slate-200">
+                +{requiredSkills.length - 6} more
+              </span>
+            )}
           </div>
         )}
 
@@ -1415,6 +1416,143 @@ function MetaItem({ icon, label }: { icon: string; label: string }) {
       <span className="text-slate-400">{icon}</span>
       <span className="truncate">{label}</span>
     </div>
+  );
+}
+
+/**
+ * Prominent colored match-score chip on every job card. Replaces the
+ * easy-to-miss tiny "Match X%" badge. Color band:
+ *   ≥ 85  → emerald   (strong)
+ *   ≥ 70  → sky       (good)
+ *   ≥ 50  → amber     (fair)
+ *   < 50  → rose      (weak)
+ */
+function MatchScoreChip({ score }: { score: number }) {
+  const tone =
+    score >= 85
+      ? 'bg-emerald-50 text-emerald-700 border-emerald-200 ring-emerald-100'
+      : score >= 70
+        ? 'bg-sky-50 text-sky-700 border-sky-200 ring-sky-100'
+        : score >= 50
+          ? 'bg-amber-50 text-amber-700 border-amber-200 ring-amber-100'
+          : 'bg-rose-50 text-rose-700 border-rose-200 ring-rose-100';
+  const dot =
+    score >= 85
+      ? 'bg-emerald-500'
+      : score >= 70
+        ? 'bg-sky-500'
+        : score >= 50
+          ? 'bg-amber-500'
+          : 'bg-rose-500';
+  return (
+    <span
+      className={clsx(
+        'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border ring-2 font-semibold text-xs tabular-nums',
+        tone,
+      )}
+      title={`AI match score: ${score}%`}
+    >
+      <span className={clsx('w-1.5 h-1.5 rounded-full', dot)} aria-hidden="true" />
+      <span>{score}% match</span>
+    </span>
+  );
+}
+
+/**
+ * Single-line chip explaining a non-default match mode. Replaces the two
+ * verbose banners we used to render when /jobs/recommended set the
+ * x-match-mode header to "skills-only" or "no-consultant".
+ */
+function MatchModeChip({ mode, isRecruiterMode }: { mode: string; isRecruiterMode: boolean }) {
+  if (mode === 'skills-only') {
+    return (
+      <span className="inline-flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-800 rounded-full px-3 py-1 text-xs font-medium">
+        <span aria-hidden="true">⚡</span>
+        <span>
+          Scored against your skills only —{' '}
+          <a className="underline hover:text-amber-900" href="/resumes">
+            upload a resume
+          </a>{' '}
+          for sharper matches.
+        </span>
+      </span>
+    );
+  }
+  if (mode === 'no-consultant' && isRecruiterMode) {
+    return (
+      <span className="inline-flex items-center gap-2 bg-sky-50 border border-sky-200 text-sky-800 rounded-full px-3 py-1 text-xs font-medium">
+        <span aria-hidden="true">ℹ️</span>
+        <span>Pick a consultant in the targeting bar to see resume-aware match scores.</span>
+      </span>
+    );
+  }
+  if (mode === 'no-signal') {
+    return (
+      <span className="inline-flex items-center gap-2 bg-slate-100 border border-slate-200 text-slate-700 rounded-full px-3 py-1 text-xs font-medium">
+        <span aria-hidden="true">ℹ️</span>
+        <span>Add skills to your profile for personalised matches.</span>
+      </span>
+    );
+  }
+  return null;
+}
+
+/**
+ * Salary range pill — rendered next to the meta row when the job has any rate
+ * data. Hidden completely when both rate fields are null (jobright-style:
+ * skip rather than show "undisclosed" noise).
+ */
+function SalaryPill({ min, max }: { min?: number | null; max?: number | null }) {
+  if (min == null && max == null) return null;
+  const label =
+    min != null && max != null
+      ? `$${min}–$${max}/hr`
+      : min != null
+        ? `$${min}+/hr`
+        : `Up to $${max}/hr`;
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 text-[11px] font-medium">
+      <span aria-hidden="true">$</span>
+      {label}
+    </span>
+  );
+}
+
+/**
+ * Surface high-signal recommendation tags (H1B Sponsor / Remote / Hybrid /
+ * Clearance / Relocation) as prominent colored chips. Falls back to a neutral
+ * slate tone for tags we don't recognize.
+ */
+function HighlightTagChip({ tag }: { tag: string }) {
+  const t = tag.toLowerCase();
+  let tone = 'bg-slate-50 text-slate-700 border-slate-200';
+  let label = tag;
+  if (/(no sponsor|no h1b)/.test(t)) {
+    tone = 'bg-rose-50 text-rose-700 border-rose-200';
+  } else if (/(sponsor|h1b)/.test(t)) {
+    tone = 'bg-indigo-50 text-indigo-700 border-indigo-200';
+    label = 'H1B Sponsor';
+  } else if (/clearance|secret/.test(t)) {
+    tone = 'bg-amber-50 text-amber-800 border-amber-200';
+  } else if (/remote/.test(t)) {
+    tone = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+    label = 'Remote';
+  } else if (/hybrid/.test(t)) {
+    tone = 'bg-sky-50 text-sky-700 border-sky-200';
+    label = 'Hybrid';
+  } else if (/relocat/.test(t)) {
+    tone = 'bg-amber-50 text-amber-700 border-amber-200';
+    label = 'Relocation';
+  }
+  return (
+    <span
+      className={clsx(
+        'inline-flex items-center px-2 py-0.5 rounded-full border text-[11px] font-medium',
+        tone,
+      )}
+    >
+      {label}
+    </span>
   );
 }
 
