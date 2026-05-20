@@ -1597,11 +1597,15 @@ function HighlightTagChip({ tag }: { tag: string }) {
 // card-based layout instead of a flat run of text blocks.
 function FactTile({ label, value }: { label: string; value: string }) {
   return (
-    <div className="bg-white border border-slate-200 rounded-xl px-3 py-2.5 shadow-sm">
+    // min-w-0 lets the tile shrink inside the grid so a long value wraps
+    // instead of forcing the whole row past the panel's (and screen's) edge.
+    <div className="min-w-0 bg-white border border-slate-200 rounded-xl px-3 py-2.5 shadow-sm">
       <div className="text-[10px] font-semibold tracking-widest text-slate-400 uppercase">
         {label}
       </div>
-      <div className="text-sm font-medium text-slate-800 truncate mt-0.5">{value}</div>
+      <div className="text-sm font-medium text-slate-800 mt-0.5 break-words" title={value}>
+        {value}
+      </div>
     </div>
   );
 }
@@ -2188,8 +2192,10 @@ function MatchInsightModal({
                 {job.source && <SourceBadge source={job.source} />}
                 {job.publisher && <PublisherBadge publisher={job.publisher} />}
               </div>
-              <h2 className="text-xl font-semibold text-slate-900 leading-tight">{job.title}</h2>
-              <div className="text-sm text-slate-600 mt-0.5">
+              <h2 className="text-xl font-semibold text-slate-900 leading-tight break-words">
+                {job.title}
+              </h2>
+              <div className="text-sm text-slate-600 mt-0.5 break-words">
                 <span className="font-medium text-slate-800">{company}</span>
                 <span className="text-slate-400"> · {job.location ?? 'Location N/A'}</span>
               </div>
@@ -2212,7 +2218,7 @@ function MatchInsightModal({
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-5 sm:px-6 py-5 space-y-4">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden px-5 sm:px-6 py-5 space-y-4">
           {/* Key facts as labelled stat tiles. */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
             <FactTile label="Location" value={job.location ?? '—'} />

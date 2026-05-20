@@ -163,6 +163,10 @@ body {
    document instead of a flat wall of text. */
 .jd-prose {
   line-height: 1.6;
+  /* Break long unbroken strings (URLs, run-on tokens) so the description can
+     never push the panel past the screen edge. */
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 .jd-prose > *:first-child {
   margin-top: 0;
