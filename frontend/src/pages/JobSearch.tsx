@@ -1788,6 +1788,27 @@ function prettyType(t?: string | null): string {
   return map[t] ?? t;
 }
 
+/** Convert a raw job description (which may contain HTML from LinkedIn /
+ *  JSearch / Greenhouse) into clean readable text. Block tags become line
+ *  breaks; inline tags are stripped; common entities are decoded. Without
+ *  this the detail panel rendered literal `<p>`, `<ul>`, `&amp;` etc. —
+ *  the "messy details" bug. */
+function jdToText(raw: string): string {
+  return raw
+    .replace(/<\s*(br|\/p|\/li|\/div|\/h[1-6])\s*\/?>/gi, '\n')
+    .replace(/<\s*li[^>]*>/gi, '• ')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&#39;|&rsquo;|&lsquo;/gi, "'")
+    .replace(/&quot;|&ldquo;|&rdquo;/gi, '"')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim();
+}
+
 function prettyRate(min?: number | null, max?: number | null): string {
   if (min == null && max == null) return 'Rate undisclosed';
   if (min != null && max != null) return `$${min}/hr – $${max}/hr`;
@@ -2075,17 +2096,38 @@ function MatchInsightModal({
             ) : null;
           })()}
 
-          {/* Full JD body */}
-          {job.description && (
+          {/* Full JD body — HTML stripped to readable text. */}
+          {job.description && jdToText(job.description).length > 0 && (
             <div>
               <div className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase mb-1.5">
                 Job description
               </div>
               <div className="text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-xl p-4 max-h-72 overflow-y-auto whitespace-pre-wrap leading-relaxed">
-                {job.description}
+                {jdToText(job.description)}
               </div>
             </div>
           )}
+
+          {/* Empty-state for un-enriched jobs with no usable detail. Without
+              this, an admin opening a bare LinkedIn listing saw a near-empty
+              panel. */}
+          {(() => {
+            const hasJd = !!job.description && jdToText(job.description).length > 0;
+            const hasSkills =
+              (
+                (job.requirements?.required_skills?.length
+                  ? job.requirements.required_skills
+                  : job.required_skills) ?? []
+              ).length > 0;
+            const hasTags = (job.requirements?.recommendation_tags ?? []).length > 0;
+            if (hasJd || hasSkills || hasTags) return null;
+            return (
+              <div className="text-sm text-slate-500 bg-slate-50 border border-slate-200 rounded-xl p-4 text-center">
+                This listing hasn't been enriched yet — only the basic facts above are available.
+                Open the original posting for the full description.
+              </div>
+            );
+          })()}
 
           {/* For non-consultants the scoring section is skipped — this is a
               plain job-detail view. */}
@@ -2245,15 +2287,17 @@ function MatchInsightModal({
           )}
         </div>
 
-        <div className="px-6 py-3 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
+        <div className="px-5 sm:px-6 py-3 border-t border-slate-200 bg-slate-50 flex items-center justify-between gap-3">
           <span className="text-[11px] text-slate-500">
-            Resume scored against this job's extracted requirements.
+            {isConsultant
+              ? "Resume scored against this job's extracted requirements."
+              : 'Job detail view.'}
           </span>
           <a
             href={resolveApplyUrl(job)}
             target="_blank"
             rel="noopener noreferrer"
-            className="bg-slate-900 text-white text-sm px-4 py-1.5 rounded-lg hover:bg-slate-800 inline-flex items-center gap-1.5"
+            className="shrink-0 bg-slate-900 text-white text-sm px-4 py-1.5 rounded-lg hover:bg-slate-800 inline-flex items-center gap-1.5"
           >
             Apply on company site <span>↗</span>
           </a>
