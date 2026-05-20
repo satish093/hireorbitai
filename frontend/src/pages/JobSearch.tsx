@@ -1120,7 +1120,14 @@ function JobCard({
                 </span>
               )}
               {job.source && <SourceBadge source={job.source} />}
-              {job.publisher && <PublisherBadge publisher={job.publisher} />}
+              {/* Skip the publisher badge when it just repeats the source
+                  (e.g. source 'linkedin' + publisher 'LinkedIn' → "LinkedIn
+                  LinkedIn"). */}
+              {job.publisher &&
+                job.publisher.trim().toLowerCase() !==
+                  (SOURCE_LABEL[job.source ?? ''] ?? job.source ?? '').toLowerCase() && (
+                  <PublisherBadge publisher={job.publisher} />
+                )}
               {aiMatchEnabled && typeof job.match_score === 'number' && (
                 <MatchScoreChip score={Math.round(job.match_score)} />
               )}
