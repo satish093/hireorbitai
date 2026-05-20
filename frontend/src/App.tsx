@@ -39,6 +39,7 @@ const Recruiters = lazy(() =>
   import('./pages/Recruiters').then((m) => ({ default: m.Recruiters })),
 );
 const JobSearch = lazy(() => import('./pages/JobSearch').then((m) => ({ default: m.JobSearch })));
+const JobDetail = lazy(() => import('./pages/JobDetail').then((m) => ({ default: m.JobDetail })));
 const Applications = lazy(() =>
   import('./pages/Applications').then((m) => ({ default: m.Applications })),
 );
@@ -214,6 +215,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <JobSearch />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/jobs/:id"
+          element={
+            <ProtectedRoute>
+              <JobDetail />
             </ProtectedRoute>
           }
         />
