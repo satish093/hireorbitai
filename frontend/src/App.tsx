@@ -28,6 +28,7 @@ import { ConsultantOnboarding } from './pages/ConsultantOnboarding';
 import { RecruiterOnboarding } from './pages/RecruiterOnboarding';
 import { ManagerDashboard } from './pages/ManagerDashboard';
 import { RecruiterDashboard } from './pages/RecruiterDashboard';
+import { ConsultantDashboard } from './pages/ConsultantDashboard';
 import { ResetPassword } from './pages/ResetPassword';
 
 // Talent + network pages.
@@ -135,9 +136,7 @@ function RouteFallback() {
 function DashboardRouter() {
   const { profile } = useAuth();
   if (!profile) return null;
-  // Jobs is the product's home for job-seekers — consultants land straight on
-  // the jobs app instead of an admin-style dashboard.
-  if (profile.role === 'CONSULTANT') return <Navigate to="/jobs" replace />;
+  if (profile.role === 'CONSULTANT') return <ConsultantDashboard />;
   if (profile.role === 'RECRUITER') return <RecruiterDashboard />;
   // Everyone manager-and-above lands on the manager dashboard.
   return <ManagerDashboard />;

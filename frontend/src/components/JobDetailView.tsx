@@ -316,6 +316,10 @@ export function JobDetailView({ job, isConsultant }: { job: Job; isConsultant: b
   const workModel = reqs?.work_model ?? (job.remote ? 'Remote' : 'Onsite');
   const skills = (reqs?.required_skills?.length ? reqs.required_skills : job.required_skills) ?? [];
 
+  // Many aggregated listings expire — the stored apply link can 404. Offer a
+  // Google-for-jobs search as a always-valid fallback under the Apply button.
+  const googleUrl =
+    'https://www.google.com/search?ibp=htl;jobs&q=' + encodeURIComponent(`${job.title} ${company}`);
   const applyBtn = (extra?: string) => (
     <a
       href={resolveApplyUrl(job)}
@@ -327,6 +331,16 @@ export function JobDetailView({ job, isConsultant }: { job: Job; isConsultant: b
       )}
     >
       Apply on company site <span>↗</span>
+    </a>
+  );
+  const googleFallback = (
+    <a
+      href={googleUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="block text-xs text-slate-500 hover:text-slate-800 mt-1.5"
+    >
+      Link not working? Search on Google ↗
     </a>
   );
 
@@ -354,11 +368,17 @@ export function JobDetailView({ job, isConsultant }: { job: Job; isConsultant: b
             <div className="text-sm text-slate-500 mt-1 break-words">
               {job.location ?? 'Location N/A'} · {workModel}
             </div>
-            <div className="mt-3 hidden sm:block">{applyBtn()}</div>
+            <div className="mt-3 hidden sm:block">
+              {applyBtn()}
+              {googleFallback}
+            </div>
           </div>
         </div>
         {/* Apply is full-width under the header on mobile. */}
-        <div className="mt-3 sm:hidden">{applyBtn('w-full')}</div>
+        <div className="mt-3 sm:hidden">
+          {applyBtn('w-full')}
+          {googleFallback}
+        </div>
       </div>
 
       {enriching && (

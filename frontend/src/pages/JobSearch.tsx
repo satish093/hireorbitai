@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { JobsLayout } from '../components/JobsLayout';
+import { Layout } from '../components/Layout';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { Avatar } from '../components/TaskBits';
@@ -528,7 +528,7 @@ export function JobSearch() {
   }
 
   return (
-    <JobsLayout>
+    <Layout title="Jobs" crumbs={[{ label: 'Workspace', to: '/dashboard' }, { label: 'Jobs' }]}>
       {/* Consumer hero — search-forward, shown on the main feed */}
       {tab === 'recommended' && (
         <div className="rounded-2xl bg-gradient-to-br from-brand-600 to-indigo-600 text-white p-6 sm:p-8 mb-6 shadow-sm">
@@ -559,6 +559,11 @@ export function JobSearch() {
               Search
             </button>
           </div>
+          {isConsultant && (
+            <div className="mt-3">
+              <AlertsToggle />
+            </div>
+          )}
         </div>
       )}
 
@@ -958,7 +963,7 @@ export function JobSearch() {
           }}
         />
       )}
-    </JobsLayout>
+    </Layout>
   );
 }
 
@@ -1763,6 +1768,52 @@ function resolveApplyUrl(job: JobRow): string {
 // Skills picker — "Add skill" chip input. Saves to consultants.skills via the
 // onboard endpoint; the next /jobs/recommended call uses it for ranking.
 // ---------------------------------------------------------------------------
+// Daily job-alert opt-in toggle, shown in the hero for consultants.
+function AlertsToggle() {
+  const { profile } = useAuth();
+  const [on, setOn] = useState(profile?.job_alerts !== false);
+  const [busy, setBusy] = useState(false);
+  async function toggle() {
+    if (busy) return;
+    const next = !on;
+    setOn(next);
+    setBusy(true);
+    try {
+      await api.post('/auth/job-alerts', { enabled: next });
+      toast.success(next ? 'Daily job alerts on' : 'Daily job alerts off');
+    } catch {
+      setOn(!next);
+      toast.error('Could not update alerts');
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <button
+      onClick={toggle}
+      disabled={busy}
+      aria-pressed={on}
+      className="inline-flex items-center gap-2 text-sm text-white/90 hover:text-white disabled:opacity-60"
+      title="Email me new matching jobs daily"
+    >
+      <span
+        className={clsx(
+          'w-9 h-5 rounded-full p-0.5 transition-colors',
+          on ? 'bg-white/90' : 'bg-white/25',
+        )}
+      >
+        <span
+          className={clsx(
+            'block w-4 h-4 rounded-full bg-slate-900 transition-transform',
+            on ? 'translate-x-4' : '',
+          )}
+        />
+      </span>
+      {on ? '🔔 Daily job alerts on' : '🔕 Daily job alerts off'}
+    </button>
+  );
+}
+
 function SkillsPicker({
   skills,
   onChange,
