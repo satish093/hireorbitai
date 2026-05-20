@@ -112,7 +112,7 @@ interface JobRow {
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: 'recommended', label: 'Recommended' },
-  { key: 'liked', label: 'Liked' },
+  { key: 'liked', label: 'Saved' },
   { key: 'applied', label: 'Applied' },
 ];
 
@@ -1183,15 +1183,16 @@ function JobCard({
               e.stopPropagation();
               onToggleLike();
             }}
-            title={job.liked ? 'Unlike' : 'Like'}
+            title={job.liked ? 'Saved — click to remove' : 'Save job'}
+            aria-label={job.liked ? 'Remove from saved' : 'Save job'}
             className={clsx(
               'shrink-0 w-9 h-9 rounded-full border flex items-center justify-center',
               job.liked
-                ? 'bg-red-50 border-red-200 text-red-500'
-                : 'bg-white border-slate-200 text-slate-400 hover:text-red-500 hover:border-red-200',
+                ? 'bg-brand-50 border-brand-200 text-brand-600'
+                : 'bg-white border-slate-200 text-slate-400 hover:text-brand-600 hover:border-brand-200',
             )}
           >
-            {job.liked ? '♥' : '♡'}
+            {job.liked ? '🔖' : '🔖'}
           </button>
         </div>
 
