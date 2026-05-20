@@ -1,11 +1,7 @@
 import { RequestHandler } from 'express';
 import { db } from '../config/db';
-import {
-  matchJobsForConsultant,
-  extractJobRequirements,
-  atsScore,
-  scoreResumeAgainstJob,
-} from '../services/ai.service';
+import { matchJobsForConsultant, atsScore, scoreResumeAgainstJob } from '../services/ai.service';
+import { parseJobRequirements } from '../services/jobParser.service';
 import { tailorForJob as resumeTailorForJob } from './resumes.controller';
 import { fromJob as applicationsFromJob } from './applications.controller';
 import { httpError } from '../types';
@@ -540,7 +536,7 @@ export const matchForMe: RequestHandler = async (req, res) => {
 };
 
 // ---------------------------------------------------------------------------
-// Extracted requirements (uses AI; caches result on the job row)
+// Extracted requirements (free local heuristic parser; caches on the job row)
 // ---------------------------------------------------------------------------
 
 export const requirementsFor: RequestHandler = async (req, res) => {
@@ -552,11 +548,12 @@ export const requirementsFor: RequestHandler = async (req, res) => {
     return;
   }
 
-  const extracted = await extractJobRequirements({
+  const extracted = parseJobRequirements({
     title: job.title,
     description: job.description,
     required_skills: job.required_skills,
     location: job.location,
+    remote: job.remote,
   });
   await db.from('jobs').update({ requirements: extracted }).eq('id', job.id);
   res.json(extracted);
@@ -594,11 +591,12 @@ export const enrichPending: RequestHandler = async (req, res) => {
         const job = queue.shift();
         if (!job) break;
         try {
-          const reqs = await extractJobRequirements({
+          const reqs = parseJobRequirements({
             title: job.title,
             description: job.description,
             required_skills: job.required_skills,
             location: job.location,
+            remote: job.remote,
           });
           const patch: any = { requirements: reqs };
           // Mirror Jobright: surface seniority/work model at the column level too.
@@ -620,11 +618,12 @@ export const enrichPending: RequestHandler = async (req, res) => {
 export const enrichOne: RequestHandler = async (req, res) => {
   const { data: job, error } = await db.from('jobs').select('*').eq('id', req.params.id).single();
   if (error || !job) throw httpError(404, 'Job not found');
-  const reqs = await extractJobRequirements({
+  const reqs = parseJobRequirements({
     title: job.title,
     description: job.description,
     required_skills: job.required_skills,
     location: job.location,
+    remote: job.remote,
   });
   const patch: any = { requirements: reqs };
   if (reqs.job_seniority) patch.level = reqs.job_seniority;
@@ -661,11 +660,12 @@ export const skillMatchForMe: RequestHandler = async (req, res) => {
   // Make sure we have extracted requirements so we know which skills to match.
   let reqs = job.requirements;
   if (!reqs) {
-    reqs = await extractJobRequirements({
+    reqs = parseJobRequirements({
       title: job.title,
       description: job.description,
       required_skills: job.required_skills,
       location: job.location,
+      remote: job.remote,
     });
     await db.from('jobs').update({ requirements: reqs }).eq('id', job.id);
   }

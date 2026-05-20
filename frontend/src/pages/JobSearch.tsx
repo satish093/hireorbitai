@@ -2100,6 +2100,12 @@ function MatchInsightModal({
   const [ats, setAts] = useState<AtsResp | null>(null);
   const [resumePaste, setResumePaste] = useState('');
   const [needsResume, setNeedsResume] = useState(false);
+  // Structured requirements shown in the panel. Starts from whatever the job
+  // already has; if it's missing we lazily enrich (free, local parser on the
+  // backend) for EVERY role so admins see clean sections too, not just the
+  // raw description.
+  const [reqs, setReqs] = useState(job.requirements);
+  const [enriching, setEnriching] = useState(false);
 
   // ESC key closes the panel. Lock body scroll while the panel is open so
   // the underlying list doesn't drift on iOS Safari.
@@ -2156,12 +2162,37 @@ function MatchInsightModal({
     if (isConsultant) run(); /* eslint-disable-next-line */
   }, [job.id, isConsultant]);
 
+  useEffect(() => {
+    // Enrich on open for ALL roles so the panel renders structured sections,
+    // not just a raw description. Free local parser — no AI cost. Best-effort:
+    // a failure just leaves the basic facts + description.
+    if (job.requirements) {
+      setReqs(job.requirements);
+      return;
+    }
+    let cancelled = false;
+    setEnriching(true);
+    api
+      .post(`/jobs/${job.id}/enrich`)
+      .then((r) => {
+        if (!cancelled) setReqs(r.data?.requirements ?? null);
+      })
+      .catch(() => {
+        /* keep basic facts only */
+      })
+      .finally(() => {
+        if (!cancelled) setEnriching(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [job.id, job.requirements]);
+
   const company = job.company_name ?? job.client?.company_name ?? 'Unknown';
   const overall = skillMatch?.overall_score != null ? Math.round(skillMatch.overall_score) : null;
   const atsScore = ats?.score != null ? Math.round(ats.score) : null;
-  const reqs = job.requirements ?? {};
-  const seniority = reqs.job_seniority ?? reqs.level ?? job.level ?? null;
-  const minYears = reqs.min_years_of_experience ?? reqs.years_required ?? null;
+  const seniority = reqs?.job_seniority ?? job.level ?? null;
+  const minYears = reqs?.min_years_of_experience ?? null;
   const hasRate = job.rate_min != null || job.rate_max != null;
 
   return (
@@ -2222,30 +2253,80 @@ function MatchInsightModal({
           {/* Key facts as labelled stat tiles. */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
             <FactTile label="Location" value={job.location ?? '—'} />
-            <FactTile label="Work model" value={job.remote ? 'Remote' : 'Onsite'} />
+            <FactTile
+              label="Work model"
+              value={reqs?.work_model ?? (job.remote ? 'Remote' : 'Onsite')}
+            />
             <FactTile label="Type" value={prettyType(job.job_type)} />
             {hasRate && <FactTile label="Salary" value={prettyRate(job.rate_min, job.rate_max)} />}
             {seniority && <FactTile label="Level" value={seniority} />}
             {minYears != null && <FactTile label="Experience" value={`${minYears}+ years`} />}
           </div>
 
-          {/* Highlights — recommendation tags (visa, clearance, remote, etc.) */}
-          {(job.requirements?.recommendation_tags ?? []).length > 0 && (
-            <PanelSection title="Highlights">
+          {enriching && (
+            <div className="text-xs text-slate-500 flex items-center gap-2">
+              <span className="inline-block w-3 h-3 border-2 border-slate-300 border-t-slate-500 rounded-full animate-spin" />
+              Analyzing job…
+            </div>
+          )}
+
+          {/* Flags — recommendation tags (visa, clearance, remote, etc.) */}
+          {(reqs?.recommendation_tags ?? []).length > 0 && (
+            <PanelSection title="Flags">
               <div className="flex flex-wrap gap-1.5">
-                {(job.requirements?.recommendation_tags ?? []).slice(0, 8).map((t) => (
+                {(reqs?.recommendation_tags ?? []).slice(0, 8).map((t) => (
                   <RecommendationTag key={t} tag={t} />
                 ))}
               </div>
             </PanelSection>
           )}
 
+          {/* Highlights — candidate-facing positives. */}
+          {(reqs?.highlights ?? []).length > 0 && (
+            <PanelSection title="Highlights">
+              <ul className="space-y-1 text-sm text-slate-700">
+                {(reqs?.highlights ?? []).slice(0, 5).map((h, i) => (
+                  <li key={i} className="flex items-start gap-1.5">
+                    <span className="text-sky-500">★</span>
+                    <span>{h}</span>
+                  </li>
+                ))}
+              </ul>
+            </PanelSection>
+          )}
+
+          {/* Core responsibilities */}
+          {(reqs?.core_responsibilities ?? []).length > 0 && (
+            <PanelSection title="Core responsibilities">
+              <ul className="space-y-1 text-sm text-slate-700">
+                {(reqs?.core_responsibilities ?? []).slice(0, 8).map((b, i) => (
+                  <li key={i} className="flex items-start gap-1.5">
+                    <span className="text-slate-400">•</span>
+                    <span>{b}</span>
+                  </li>
+                ))}
+              </ul>
+            </PanelSection>
+          )}
+
+          {/* Skill requirements (paraphrased bullets) */}
+          {(reqs?.skill_summaries ?? []).length > 0 && (
+            <PanelSection title="Skill requirements">
+              <ul className="space-y-1 text-sm text-slate-700">
+                {(reqs?.skill_summaries ?? []).slice(0, 8).map((b, i) => (
+                  <li key={i} className="flex items-start gap-1.5">
+                    <span className="text-slate-400">•</span>
+                    <span>{b}</span>
+                  </li>
+                ))}
+              </ul>
+            </PanelSection>
+          )}
+
           {/* Required skills chips */}
           {(() => {
             const skills =
-              (job.requirements?.required_skills?.length
-                ? job.requirements.required_skills
-                : job.required_skills) ?? [];
+              (reqs?.required_skills?.length ? reqs.required_skills : job.required_skills) ?? [];
             return skills.length > 0 ? (
               <PanelSection title="Required skills">
                 <div className="flex flex-wrap gap-1.5">
@@ -2261,6 +2342,34 @@ function MatchInsightModal({
               </PanelSection>
             ) : null;
           })()}
+
+          {/* Benefits */}
+          {(reqs?.benefits_summaries ?? []).length > 0 && (
+            <PanelSection title="Benefits">
+              <ul className="space-y-1 text-sm text-slate-700">
+                {(reqs?.benefits_summaries ?? []).slice(0, 6).map((b, i) => (
+                  <li key={i} className="flex items-start gap-1.5">
+                    <span className="text-emerald-500">+</span>
+                    <span>{b}</span>
+                  </li>
+                ))}
+              </ul>
+            </PanelSection>
+          )}
+
+          {/* Work authorization */}
+          {(reqs?.work_authorization ?? []).length > 0 && (
+            <PanelSection title="Work authorization">
+              <ul className="space-y-1 text-sm text-slate-700">
+                {(reqs?.work_authorization ?? []).map((w, i) => (
+                  <li key={i} className="flex items-start gap-1.5">
+                    <span className="text-amber-500">•</span>
+                    <span>{w}</span>
+                  </li>
+                ))}
+              </ul>
+            </PanelSection>
+          )}
 
           {/* Full JD body. When the source has real markup we sanitize it to a
               safe subset and render it as prose (headings, bullet lists, bold)
@@ -2291,15 +2400,16 @@ function MatchInsightModal({
               this, an admin opening a bare LinkedIn listing saw a near-empty
               panel. */}
           {(() => {
+            if (enriching) return null;
             const hasJd = !!job.description && jdToText(job.description).length > 0;
             const hasSkills =
-              (
-                (job.requirements?.required_skills?.length
-                  ? job.requirements.required_skills
-                  : job.required_skills) ?? []
-              ).length > 0;
-            const hasTags = (job.requirements?.recommendation_tags ?? []).length > 0;
-            if (hasJd || hasSkills || hasTags) return null;
+              ((reqs?.required_skills?.length ? reqs.required_skills : job.required_skills) ?? [])
+                .length > 0;
+            const hasTags = (reqs?.recommendation_tags ?? []).length > 0;
+            const hasBullets =
+              (reqs?.core_responsibilities ?? []).length > 0 ||
+              (reqs?.skill_summaries ?? []).length > 0;
+            if (hasJd || hasSkills || hasTags || hasBullets) return null;
             return (
               <PanelSection>
                 <p className="text-sm text-slate-500 text-center">
