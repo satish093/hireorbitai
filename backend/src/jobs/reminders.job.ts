@@ -18,6 +18,7 @@
 import { db } from '../config/db';
 import { logger } from '../config/logger';
 import { sendReminderNotice } from '../services/brevo.service';
+import { publishToUser } from '../services/realtime.service';
 
 interface ReminderRow {
   id: string;
@@ -27,6 +28,8 @@ interface ReminderRow {
   due_at: string;
   status: 'PENDING' | 'SENT' | 'DONE' | 'SNOOZED';
   delivery_attempts?: number | null;
+  related_type?: string | null;
+  related_id?: string | null;
 }
 
 interface OwnerRow {
@@ -51,7 +54,9 @@ export const remindersJob = {
     // tolerates rows where the column is null (first attempt) or already due.
     const { data, error } = await db
       .from('reminders')
-      .select('id, owner_id, title, description, due_at, status, delivery_attempts')
+      .select(
+        'id, owner_id, title, description, due_at, status, delivery_attempts, related_type, related_id',
+      )
       .eq('status', 'PENDING')
       .lte('due_at', nowIso)
       .or(`delivery_next_attempt_at.is.null,delivery_next_attempt_at.lte.${nowIso}`)
@@ -128,6 +133,16 @@ export const remindersJob = {
           })
           .eq('id', r.id)
           .eq('status', 'PENDING');
+        // Best-effort in-app push so an open browser shows a toast without
+        // waiting for the email. Never throws (publishToUser swallows).
+        await publishToUser(owner.id, 'reminder:due', {
+          id: r.id,
+          title: r.title,
+          description: r.description,
+          due_at: r.due_at,
+          related_type: r.related_type ?? null,
+          related_id: r.related_id ?? null,
+        });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         const attempts = (r.delivery_attempts ?? 0) + 1;

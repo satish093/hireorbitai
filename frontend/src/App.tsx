@@ -2,6 +2,8 @@ import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { FeatureGuard } from './hooks/useFeatureFlags';
+import { RealtimeNotifications } from './components/RealtimeNotifications';
+import { ProductTour } from './components/ProductTour';
 import { useAuth } from './context/AuthContext';
 import { ADMIN_TIER, MANAGER_TIER, OPERATOR_TIER, OWNER_TIER } from './types';
 
@@ -140,8 +142,14 @@ function DashboardRouter() {
 }
 
 export default function App() {
+  // Keep a single realtime subscription alive for the signed-in user across
+  // route changes. Keyed by user id so it remounts (reconnects) on a switch
+  // of identity and unmounts on sign-out.
+  const { profile } = useAuth();
   return (
     <Suspense fallback={<RouteFallback />}>
+      {profile?.id && <RealtimeNotifications key={profile.id} />}
+      {profile?.id && <ProductTour />}
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />

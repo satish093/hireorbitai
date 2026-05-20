@@ -9,6 +9,7 @@ import { api } from '../services/api';
 import { invalidate } from '../hooks/useInvalidate';
 import { ADMIN_TIER, MANAGER_TIER, ROLE_LABEL, Role } from '../types';
 import { GroupBadge } from '../components/GroupBadge';
+import { replayTour } from '../components/ProductTour';
 
 interface UserProfile {
   id: string;
@@ -290,6 +291,15 @@ export function UserProfile() {
                     Delete
                   </button>
                 </>
+              )}
+              {isSelf && (
+                <button
+                  onClick={replayTour}
+                  className="border border-slate-200 text-slate-700 text-sm px-3 py-1.5 rounded-lg hover:bg-slate-50 press transition-colors"
+                  title="Replay the product tour"
+                >
+                  Replay tour
+                </button>
               )}
               <button
                 onClick={() => setEditing(true)}

@@ -69,6 +69,8 @@ export interface UserProfile {
   /** Set when the user has completed the role-specific onboarding. */
   consultant_id?: string | null;
   recruiter_id?: string | null;
+  /** Set once the user has seen (or skipped) the first-run product tour. */
+  tour_completed_at?: string | null;
 }
 
 export type MarketingStatus = 'ACTIVE' | 'PAUSED' | 'PLACED';

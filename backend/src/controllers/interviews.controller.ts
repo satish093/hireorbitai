@@ -2,6 +2,7 @@ import { RequestHandler } from 'express';
 import { z } from 'zod';
 import { db } from '../config/db';
 import { httpError, MANAGER_TIER } from '../types';
+import { syncInterviewReminders } from '../services/interviewReminders.service';
 
 // ---------------------------------------------------------------------------
 // Authorization helpers — every signed-in user reaches these handlers, so
@@ -203,6 +204,7 @@ export const schedule: RequestHandler = async (req, res) => {
     .select()
     .single();
   if (error) throw httpError(500, error.message);
+  await syncInterviewReminders(data as Parameters<typeof syncInterviewReminders>[0]);
   res.status(201).json(data);
 };
 
@@ -218,6 +220,7 @@ export const scheduleMock: RequestHandler = async (req, res) => {
     .select()
     .single();
   if (error) throw httpError(500, error.message);
+  await syncInterviewReminders(data as Parameters<typeof syncInterviewReminders>[0]);
   res.status(201).json(data);
 };
 
@@ -234,6 +237,9 @@ export const update: RequestHandler = async (req, res) => {
     .select()
     .single();
   if (error) throw httpError(500, error.message);
+  // Reschedule / cancel: regenerate the lead-time reminders for the new
+  // date (or clear them if the interview is no longer SCHEDULED).
+  await syncInterviewReminders(data as Parameters<typeof syncInterviewReminders>[0]);
   res.json(data);
 };
 

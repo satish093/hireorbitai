@@ -363,6 +363,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps = {}
                       <NavLink
                         key={i.to}
                         to={i.to}
+                        data-tour={`nav-${i.to}`}
                         className={({ isActive }) =>
                           clsx(
                             'group relative flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-sm transition-all duration-200 ease-out',
@@ -423,6 +424,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps = {}
           <div className="flex items-center gap-2.5 px-1.5 py-1.5 rounded-md hover:bg-slate-50">
             <NavLink
               to={profile?.id ? `/users/${profile.id}` : '#'}
+              data-tour="nav-profile"
               className="flex items-center gap-2.5 flex-1 min-w-0 hover:bg-slate-50 rounded-md -mx-1 px-1 py-0.5"
               title="View your profile"
             >

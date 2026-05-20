@@ -73,6 +73,34 @@ export const syncProfile: RequestHandler = async (req, res) => {
 };
 
 // ---------------------------------------------------------------------------
+// /complete-tour — marks the first-run product tour as seen for this user.
+// `completed` defaults to true; pass false to reset (the "Replay tour" link
+// clears it so the tour shows again on the next dashboard visit).
+// ---------------------------------------------------------------------------
+const tourSchema = z.object({ completed: z.boolean().optional() }).strict();
+
+export const completeTour: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const parsed = tourSchema.safeParse(req.body ?? {});
+  if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
+  const completed = parsed.data.completed ?? true;
+  const { error } = await db
+    .from('users')
+    .update({ tour_completed_at: completed ? new Date().toISOString() : null })
+    .eq('id', req.user.id);
+  if (error) {
+    // Tolerate the column not existing yet (migration not applied) so the
+    // frontend's fire-and-forget call never surfaces a 500.
+    if (/schema cache|column .* does not exist/i.test(error.message)) {
+      res.json({ ok: true, persisted: false });
+      return;
+    }
+    throw httpError(500, error.message);
+  }
+  res.json({ ok: true, persisted: true });
+};
+
+// ---------------------------------------------------------------------------
 // /login
 // ---------------------------------------------------------------------------
 const loginSchema = z.object({
