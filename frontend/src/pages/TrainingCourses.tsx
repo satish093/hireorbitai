@@ -5,7 +5,7 @@ import { Layout } from '../components/Layout';
 import { api } from '../services/api';
 import { TrainingCourseCard, CourseCardData } from '../components/Training';
 import { useAuth } from '../context/AuthContext';
-import { MANAGER_TIER } from '../types';
+import { MANAGER_TIER, ADMIN_TIER } from '../types';
 
 const CATEGORIES = [
   '',
@@ -34,9 +34,31 @@ const CATEGORIES = [
 export function TrainingCourses() {
   const { profile } = useAuth();
   const isManager = !!profile && (MANAGER_TIER as string[]).includes(profile.role);
+  const isAdmin = !!profile && (ADMIN_TIER as string[]).includes(profile.role);
   const [rows, setRows] = useState<CourseCardData[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState({ status: '', category: '' });
+  const [backfilling, setBackfilling] = useState(false);
+
+  async function backfillAll() {
+    if (
+      !confirm(
+        'AI-enrich all courses missing overview/roadmap/resources/capstone? Lessons are left untouched.',
+      )
+    )
+      return;
+    setBackfilling(true);
+    try {
+      const r = await api.post('/training/courses/backfill');
+      const enriched = (r.data?.results ?? []).filter((x: any) => x.result === 'enriched').length;
+      toast.success(`Backfill done · ${enriched} enriched`);
+      await load();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error ?? 'Backfill failed');
+    } finally {
+      setBackfilling(false);
+    }
+  }
 
   async function load() {
     setLoading(true);
@@ -89,6 +111,16 @@ export function TrainingCourses() {
               </option>
             ))}
           </select>
+          {isAdmin && (
+            <button
+              onClick={backfillAll}
+              disabled={backfilling}
+              title="AI-enrich every course missing structured content (lessons untouched)"
+              className="border border-brand-200 text-brand-700 bg-brand-50 text-sm px-3 py-2 rounded-lg hover:bg-brand-100 disabled:opacity-50"
+            >
+              {backfilling ? 'Backfilling…' : '✦ Backfill all'}
+            </button>
+          )}
           {isManager && (
             <Link
               to="/training/courses/new"

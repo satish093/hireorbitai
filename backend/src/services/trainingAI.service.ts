@@ -1,13 +1,135 @@
+import { spawn } from 'node:child_process';
 import { z } from 'zod';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
-import { anthropic, ANTHROPIC_MODEL } from '../config/anthropic';
+import {
+  anthropic,
+  ANTHROPIC_MODEL,
+  TRAINING_CONTENT_MODEL,
+  AI_PROVIDER,
+  AI_AVAILABLE,
+  CLAUDE_CLI_PATH,
+  CLAUDE_OAUTH_TOKEN,
+} from '../config/anthropic';
+import { logger } from '../config/logger';
+import { httpError } from '../types';
 
 /**
- * Anthropic-backed AI helpers for the Training module.
+ * AI helpers for the Training module.
  *
- * All four endpoints use messages.parse() + Zod so the controller receives a
- * typed object — no JSON.parse / try/catch needed at the call site.
+ * Every call goes through `generateStructured`, which dispatches on
+ * TRAINING_AI_PROVIDER:
+ *   - 'api'          → Anthropic Messages API + messages.parse() (per-token billing).
+ *   - 'subscription' → shells out to the `claude` CLI, authenticated by the
+ *                      operator's Claude Max login / CLAUDE_CODE_OAUTH_TOKEN.
+ *                      The model is asked for raw JSON, which we parse + validate
+ *                      against the same Zod schema. No API key required.
+ *   - 'stub'         → throws, so callers fall back to editable stubs.
+ *
+ * The full-course generators (outline / lesson / capstone) additionally run
+ * through `safeGenerate`, which returns a deterministic fallback when the
+ * provider is unavailable or the call fails — so the authoring pipeline never
+ * 500s and the generated stub stays fully editable by hand.
  */
+
+const CLI_TIMEOUT_MS = 120_000;
+
+/** Run a prompt through the Claude Code CLI using the Max subscription. */
+async function runClaudeCli(prompt: string, model: string): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
+    const child = spawn(CLAUDE_CLI_PATH, ['-p', '--output-format', 'json', '--model', model], {
+      env: {
+        ...process.env,
+        ...(CLAUDE_OAUTH_TOKEN ? { CLAUDE_CODE_OAUTH_TOKEN: CLAUDE_OAUTH_TOKEN } : {}),
+      },
+    });
+    let out = '';
+    let err = '';
+    const timer = setTimeout(() => {
+      child.kill('SIGKILL');
+      reject(new Error('claude CLI timed out'));
+    }, CLI_TIMEOUT_MS);
+    child.stdout.on('data', (d) => (out += d));
+    child.stderr.on('data', (d) => (err += d));
+    child.on('error', (e) => {
+      clearTimeout(timer);
+      reject(e);
+    });
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      if (code !== 0) {
+        reject(new Error(`claude CLI exited ${code}: ${err.slice(0, 500)}`));
+        return;
+      }
+      // --output-format json wraps the reply: { type:'result', result:'<text>' }.
+      try {
+        const env = JSON.parse(out);
+        resolve(typeof env?.result === 'string' ? env.result : out);
+      } catch {
+        resolve(out);
+      }
+    });
+    child.stdin.write(prompt);
+    child.stdin.end();
+  });
+}
+
+/** Pull the first balanced JSON object/array out of a model reply. */
+function extractJson(text: string): string {
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const body = fenced ? fenced[1] : text;
+  const start = body.search(/[{[]/);
+  if (start === -1) return body.trim();
+  const open = body[start];
+  const close = open === '{' ? '}' : ']';
+  let depth = 0;
+  for (let i = start; i < body.length; i++) {
+    if (body[i] === open) depth++;
+    else if (body[i] === close) {
+      depth--;
+      if (depth === 0) return body.slice(start, i + 1);
+    }
+  }
+  return body.slice(start).trim();
+}
+
+/**
+ * Single entry point for every structured generation. Returns a value already
+ * validated against `schema`, regardless of provider.
+ */
+async function generateStructured<S extends z.ZodTypeAny>(
+  schema: S,
+  prompt: string,
+  opts: { model: string; maxTokens: number },
+): Promise<z.infer<S>> {
+  if (AI_PROVIDER === 'stub') throw new Error('TRAINING_AI_PROVIDER=stub');
+
+  if (AI_PROVIDER === 'api') {
+    const r = await anthropic.messages.parse({
+      model: opts.model,
+      max_tokens: opts.maxTokens,
+      messages: [{ role: 'user', content: prompt }],
+      output_config: { format: zodOutputFormat(schema) },
+    });
+    return r.parsed_output!;
+  }
+
+  // subscription → CLI. Ask for raw JSON, then parse + validate ourselves.
+  // The model occasionally wraps or malforms the JSON; retry once before
+  // surfacing a clear 502 (instead of a raw SyntaxError 500) so callers that
+  // aren't wrapped in safeGenerate fail legibly.
+  const jsonPrompt = `${prompt}\n\nRespond with ONLY a single valid JSON object matching the structure described above. No prose, no explanation, no markdown code fences.`;
+  let lastErr: unknown;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const text = await runClaudeCli(jsonPrompt, opts.model);
+      return schema.parse(JSON.parse(extractJson(text)));
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  logger.error({ err: lastErr }, 'training AI returned unparseable output');
+  throw httpError(502, 'AI generation returned malformed output — please retry.');
+}
 
 // ---------------------------------------------------------------------------
 // 1) generateTrainingPlan
@@ -51,13 +173,10 @@ Produce:
 - learning_roadmap: 2–4 phases, each with a duration and 2–4 focus areas. Order by what unblocks the most JD requirements first.
 - summary: 2–3 sentences for the consultant on what to focus on and in what order.`;
 
-  const r = await anthropic.messages.parse({
+  return generateStructured(TrainingPlanSchema, prompt, {
     model: ANTHROPIC_MODEL,
-    max_tokens: 3072,
-    messages: [{ role: 'user', content: prompt }],
-    output_config: { format: zodOutputFormat(TrainingPlanSchema) },
+    maxTokens: 3072,
   });
-  return r.parsed_output!;
 }
 
 // ---------------------------------------------------------------------------
@@ -88,13 +207,10 @@ Produce:
 
 Avoid generic "tell me about yourself"-style filler. Every item should map back to a JD requirement.`;
 
-  const r = await anthropic.messages.parse({
+  return generateStructured(InterviewQuestionsSchema, prompt, {
     model: ANTHROPIC_MODEL,
-    max_tokens: 3072,
-    messages: [{ role: 'user', content: prompt }],
-    output_config: { format: zodOutputFormat(InterviewQuestionsSchema) },
+    maxTokens: 3072,
   });
-  return r.parsed_output!;
 }
 
 // ---------------------------------------------------------------------------
@@ -132,13 +248,7 @@ Produce ${count} questions. Each:
 
 Mix difficulty: ~60% recall, ~30% applied, ~10% scenario.`;
 
-  const r = await anthropic.messages.parse({
-    model: ANTHROPIC_MODEL,
-    max_tokens: 3072,
-    messages: [{ role: 'user', content: prompt }],
-    output_config: { format: zodOutputFormat(QuizSchema) },
-  });
-  return r.parsed_output!;
+  return generateStructured(QuizSchema, prompt, { model: ANTHROPIC_MODEL, maxTokens: 3072 });
 }
 
 // ---------------------------------------------------------------------------
@@ -181,11 +291,361 @@ Produce:
 - overall_score: 0–100 readiness score
 - readiness_summary: 2–3 sentences a recruiter would forward to the consultant.`;
 
-  const r = await anthropic.messages.parse({
-    model: ANTHROPIC_MODEL,
-    max_tokens: 2048,
-    messages: [{ role: 'user', content: prompt }],
-    output_config: { format: zodOutputFormat(SkillGapSchema) },
-  });
-  return r.parsed_output!;
+  return generateStructured(SkillGapSchema, prompt, { model: ANTHROPIC_MODEL, maxTokens: 2048 });
+}
+
+// ===========================================================================
+// FULL-COURSE GENERATION (LMS)
+// ===========================================================================
+// These power the "type a title → get a teachable course" flow. Each call is
+// bounded (one outline call, one call per lesson, one capstone call) so no
+// single request blows the token/HTTP budget. Every call is wrapped in
+// `safeGenerate` so a missing key or a transient model error degrades to an
+// editable stub instead of a 500.
+
+/**
+ * Run an AI generator, falling back to a deterministic stub when the API key
+ * is absent or the call throws. The `degraded` flag lets the caller mark the
+ * persisted row FAILED so the UI can offer a Retry.
+ */
+async function safeGenerate<T>(
+  label: string,
+  fn: () => Promise<T>,
+  fallback: () => T,
+): Promise<{ data: T; degraded: boolean }> {
+  if (!AI_AVAILABLE) {
+    return { data: fallback(), degraded: true };
+  }
+  try {
+    return { data: await fn(), degraded: false };
+  } catch (err) {
+    logger.error({ err, label }, 'training AI generation failed — using fallback');
+    return { data: fallback(), degraded: true };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Course outline — overview + objectives + roadmap + resources + criteria +
+// lesson stubs. Cheap model; bodies are filled in per-lesson later.
+// ---------------------------------------------------------------------------
+const ResourceSchema = z.object({
+  title: z.string(),
+  url: z.string(),
+  type: z.enum(['DOC', 'VIDEO', 'ARTICLE', 'TOOL']),
+});
+const CourseOutlineSchema = z.object({
+  overview: z.string(),
+  learning_objectives: z.array(z.string()),
+  skills_taught: z.array(z.string()),
+  expected_outcomes: z.array(z.string()),
+  roadmap: z.array(
+    z.object({
+      phase: z.string(),
+      duration_label: z.string(),
+      focus_areas: z.array(z.string()),
+    }),
+  ),
+  resources: z.array(ResourceSchema),
+  completion_criteria: z.object({
+    minimum_time_minutes: z.number().int().min(0),
+    quiz_passing_score: z.number().min(0).max(100),
+    quiz_max_attempts: z.number().int().min(1),
+    requires_manager_approval: z.boolean(),
+  }),
+  estimated_duration_hours: z.number().min(0),
+  lessons: z.array(
+    z.object({
+      title: z.string(),
+      summary: z.string(),
+      objective: z.string(),
+      estimated_minutes: z.number().int().min(1),
+      lesson_order: z.number().int().min(0),
+    }),
+  ),
+});
+export type CourseOutline = z.infer<typeof CourseOutlineSchema>;
+
+export interface CourseOutlineInput {
+  title: string;
+  category: string;
+  difficulty: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED';
+  estimated_duration_hours?: number | null;
+  tags?: string[];
+  lesson_count?: number | null;
+  target_audience?: string | null;
+}
+
+/** ≈1 lesson per hour, clamped 4–12, unless the caller pins lesson_count. */
+function deriveLessonCount(input: CourseOutlineInput): number {
+  if (input.lesson_count && input.lesson_count > 0) {
+    return Math.max(3, Math.min(20, Math.round(input.lesson_count)));
+  }
+  const hours = input.estimated_duration_hours ?? 6;
+  return Math.max(4, Math.min(12, Math.round(hours)));
+}
+
+export async function generateCourseOutline(
+  input: CourseOutlineInput,
+): Promise<{ data: CourseOutline; degraded: boolean }> {
+  const count = deriveLessonCount(input);
+  const prompt = `You are an instructional designer building a complete, teachable online course from a title and metadata.
+
+Course title: ${input.title}
+Category: ${input.category}
+Difficulty: ${input.difficulty}
+${input.target_audience ? `Target audience: ${input.target_audience}\n` : ''}${input.estimated_duration_hours ? `Target length: ~${input.estimated_duration_hours} hours\n` : ''}${input.tags?.length ? `Tags: ${input.tags.join(', ')}\n` : ''}
+Produce a course OUTLINE only (lesson bodies are written separately later):
+- overview: 2–4 short paragraphs (markdown) introducing the course, who it's for, and what they'll be able to do at the end.
+- learning_objectives: 4–8 concrete, measurable objectives.
+- skills_taught: the discrete skills/tools a learner walks away with.
+- expected_outcomes: what the learner can DO after finishing (outcome statements).
+- roadmap: 2–4 phases, each with a duration_label (e.g. "Week 1") and 2–4 focus_areas.
+- resources: 3–6 genuinely useful external references (official docs, well-known articles/videos). Use real, plausible URLs; set type to DOC/VIDEO/ARTICLE/TOOL.
+- completion_criteria: sensible gates for this course — minimum_time_minutes (total expected study minutes), quiz_passing_score (0–100, default 70), quiz_max_attempts (default 3), requires_manager_approval (true only if the topic warrants sign-off).
+- estimated_duration_hours: your best estimate.
+- lessons: exactly ${count} lessons in teaching order. Each lesson: title, a one-sentence summary, a single measurable objective, estimated_minutes, and lesson_order (0-based, sequential). Sequence from fundamentals → application. Do NOT write lesson bodies here.`;
+
+  return safeGenerate(
+    'course-outline',
+    () =>
+      generateStructured(CourseOutlineSchema, prompt, { model: ANTHROPIC_MODEL, maxTokens: 3072 }),
+    () => fallbackOutline(input, count),
+  );
+}
+
+function fallbackOutline(input: CourseOutlineInput, count: number): CourseOutline {
+  const lessons = Array.from({ length: Math.max(4, Math.min(count, 5)) }, (_, i) => ({
+    title: `Module ${i + 1}: ${input.title}`,
+    summary: `Auto-stub for "${input.title}". Edit this lesson's title and content.`,
+    objective: `Understand a core part of ${input.title}.`,
+    estimated_minutes: 30,
+    lesson_order: i,
+  }));
+  return {
+    overview: `# ${input.title}\n\n_AI generation was unavailable — this is an editable stub. Replace this overview and the lesson content below._`,
+    learning_objectives: [`Understand the fundamentals of ${input.title}.`],
+    skills_taught: input.tags?.length ? input.tags : [input.category],
+    expected_outcomes: [`Apply ${input.title} concepts in practice.`],
+    roadmap: [{ phase: 'Phase 1', duration_label: 'Week 1', focus_areas: [input.category] }],
+    resources: [],
+    completion_criteria: {
+      minimum_time_minutes: 0,
+      quiz_passing_score: 70,
+      quiz_max_attempts: 3,
+      requires_manager_approval: false,
+    },
+    estimated_duration_hours: input.estimated_duration_hours ?? 4,
+    lessons,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Lesson content — full markdown body + practical example + exercises +
+// takeaways + a per-lesson knowledge-check quiz. Heavier model.
+// ---------------------------------------------------------------------------
+const LessonContentSchema = z.object({
+  content: z.string(),
+  practical_example: z.string(),
+  exercises: z.array(
+    z.object({
+      prompt: z.string(),
+      expected_outcome: z.string(),
+      hints: z.array(z.string()),
+    }),
+  ),
+  key_takeaways: z.array(z.string()),
+  quiz: z.array(
+    z.object({
+      question: z.string(),
+      options: z.array(z.string()).min(3).max(5),
+      correct_answer: z.string(),
+      explanation: z.string(),
+      points: z.number().default(1),
+    }),
+  ),
+});
+export type LessonContent = z.infer<typeof LessonContentSchema>;
+
+export interface LessonContentInput {
+  course_title: string;
+  category: string;
+  difficulty: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED';
+  lesson_title: string;
+  lesson_summary?: string | null;
+  lesson_objective?: string | null;
+}
+
+export async function generateLessonContent(
+  input: LessonContentInput,
+): Promise<{ data: LessonContent; degraded: boolean }> {
+  const prompt = `You are writing one full lesson inside an online course.
+
+Course: ${input.course_title} (category: ${input.category}, difficulty: ${input.difficulty})
+Lesson title: ${input.lesson_title}
+${input.lesson_summary ? `Lesson summary: ${input.lesson_summary}\n` : ''}${input.lesson_objective ? `Lesson objective: ${input.lesson_objective}\n` : ''}
+Produce:
+- content: the full lesson body in MARKDOWN. Use ## / ### headings, bullet/numbered lists, and fenced code blocks where the topic is technical. Teach the objective thoroughly but stay focused on THIS lesson (aim ~500–900 words). No front-matter, no "Lesson N:" prefix.
+- practical_example: one concrete worked example (markdown) the learner can follow along with.
+- exercises: 1–3 hands-on exercises. Each: prompt, expected_outcome (what a correct result looks like), and 1–3 hints.
+- key_takeaways: 3–5 one-line takeaways.
+- quiz: 3–5 multiple-choice knowledge-check questions answerable from this lesson alone. Each: question, 3–5 options, correct_answer (must match one option exactly), a 1–2 sentence explanation, and points (1, or 2 for harder).`;
+
+  return safeGenerate(
+    'lesson-content',
+    () =>
+      generateStructured(LessonContentSchema, prompt, {
+        model: TRAINING_CONTENT_MODEL,
+        maxTokens: 5000,
+      }),
+    () => ({
+      content: `## ${input.lesson_title}\n\n> ⚠️ Content generation failed — edit this lesson manually.\n\n${
+        input.lesson_objective ? `**Objective:** ${input.lesson_objective}\n` : ''
+      }`,
+      practical_example: '',
+      exercises: [],
+      key_takeaways: [],
+      quiz: [],
+    }),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Capstone — course-level final-assessment template. Heavier model.
+// ---------------------------------------------------------------------------
+const CapstoneSchema = z.object({
+  assessment_type: z.enum(['PRACTICAL_ASSIGNMENT', 'SHORT_ANSWER', 'MULTIPLE_CHOICE']),
+  instructions: z.string(),
+  questions: z.array(
+    z.object({
+      prompt: z.string(),
+      guidance: z.string().default(''),
+    }),
+  ),
+  rubric: z.array(z.object({ criterion: z.string(), weight: z.number() })),
+});
+export type Capstone = z.infer<typeof CapstoneSchema>;
+
+export interface CapstoneInput {
+  course_title: string;
+  category: string;
+  difficulty: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED';
+  learning_objectives?: string[];
+}
+
+export async function generateCapstone(
+  input: CapstoneInput,
+): Promise<{ data: Capstone; degraded: boolean }> {
+  const prompt = `Design a capstone final assessment for this course.
+
+Course: ${input.course_title} (category: ${input.category}, difficulty: ${input.difficulty})
+${input.learning_objectives?.length ? `Objectives:\n- ${input.learning_objectives.join('\n- ')}\n` : ''}
+Produce:
+- assessment_type: PRACTICAL_ASSIGNMENT (preferred for hands-on topics), SHORT_ANSWER, or MULTIPLE_CHOICE.
+- instructions: markdown instructions framing the capstone and how it ties the objectives together.
+- questions: 1–5 prompts. For PRACTICAL_ASSIGNMENT, each prompt is a deliverable; include short guidance per prompt.
+- rubric: 3–6 grading criteria, each with a weight (weights should sum to ~100).`;
+
+  return safeGenerate(
+    'capstone',
+    () =>
+      generateStructured(CapstoneSchema, prompt, {
+        model: TRAINING_CONTENT_MODEL,
+        maxTokens: 3072,
+      }),
+    () => ({
+      assessment_type: 'SHORT_ANSWER' as const,
+      instructions: `Reflect on what you learned in "${input.course_title}" and how you will apply it. (AI generation was unavailable — edit this capstone.)`,
+      questions: [
+        {
+          prompt: `Summarize the most important concept from ${input.course_title} and describe a concrete way you would apply it.`,
+          guidance: '',
+        },
+      ],
+      rubric: [{ criterion: 'Demonstrates understanding', weight: 100 }],
+    }),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Enrich-only — generate the structured META for an existing course (overview,
+// objectives, roadmap, resources, completion criteria, capstone) WITHOUT
+// touching its lessons/quizzes. Used to backfill hand-seeded courses.
+// ---------------------------------------------------------------------------
+const EnrichSchema = z.object({
+  overview: z.string(),
+  learning_objectives: z.array(z.string()),
+  skills_taught: z.array(z.string()),
+  expected_outcomes: z.array(z.string()),
+  roadmap: z.array(
+    z.object({
+      phase: z.string(),
+      duration_label: z.string(),
+      focus_areas: z.array(z.string()),
+    }),
+  ),
+  resources: z.array(ResourceSchema),
+  completion_criteria: z.object({
+    minimum_time_minutes: z.number().int().min(0),
+    quiz_passing_score: z.number().min(0).max(100),
+    quiz_max_attempts: z.number().int().min(1),
+    requires_manager_approval: z.boolean(),
+  }),
+  capstone: CapstoneSchema,
+});
+export type CourseEnrichment = z.infer<typeof EnrichSchema>;
+
+export interface EnrichInput {
+  title: string;
+  category: string;
+  difficulty: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED';
+  target_audience?: string | null;
+  existing_lesson_titles?: string[];
+}
+
+export async function enrichCourseMeta(
+  input: EnrichInput,
+): Promise<{ data: CourseEnrichment; degraded: boolean }> {
+  const prompt = `An existing course already has its lessons written. Generate the surrounding STRUCTURE for it — do NOT rewrite or invent lessons.
+
+Course title: ${input.title}
+Category: ${input.category}
+Difficulty: ${input.difficulty}
+${input.target_audience ? `Target audience: ${input.target_audience}\n` : ''}${
+    input.existing_lesson_titles?.length
+      ? `Existing lessons (for context only):\n- ${input.existing_lesson_titles.join('\n- ')}\n`
+      : ''
+  }
+Produce:
+- overview: 2–4 markdown paragraphs introducing the course and who it's for.
+- learning_objectives, skills_taught, expected_outcomes: concrete lists derived from the lessons above.
+- roadmap: 2–4 phases (phase, duration_label, focus_areas[]).
+- resources: 3–6 genuinely useful references (DOC/VIDEO/ARTICLE/TOOL with plausible URLs).
+- completion_criteria: minimum_time_minutes, quiz_passing_score (default 70), quiz_max_attempts (default 3), requires_manager_approval.
+- capstone: a final assessment tying the lessons together (assessment_type, instructions, questions[], rubric[]).`;
+
+  return safeGenerate(
+    'enrich-course',
+    () =>
+      generateStructured(EnrichSchema, prompt, { model: TRAINING_CONTENT_MODEL, maxTokens: 3072 }),
+    () => ({
+      overview: `# ${input.title}\n\n_Enrichment was unavailable — edit this overview._`,
+      learning_objectives: [],
+      skills_taught: input.category ? [input.category] : [],
+      expected_outcomes: [],
+      roadmap: [],
+      resources: [],
+      completion_criteria: {
+        minimum_time_minutes: 0,
+        quiz_passing_score: 70,
+        quiz_max_attempts: 3,
+        requires_manager_approval: false,
+      },
+      capstone: {
+        assessment_type: 'SHORT_ANSWER' as const,
+        instructions: `Reflect on "${input.title}".`,
+        questions: [{ prompt: `What was the most important thing you learned?`, guidance: '' }],
+        rubric: [{ criterion: 'Demonstrates understanding', weight: 100 }],
+      },
+    }),
+  );
 }

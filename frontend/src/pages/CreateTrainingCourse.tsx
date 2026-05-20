@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Layout } from '../components/Layout';
 import { api } from '../services/api';
+import { useAuth } from '../context/AuthContext';
+import { ADMIN_TIER } from '../types';
 
 const CATEGORIES = [
   'Java',
@@ -36,6 +38,55 @@ const CATEGORIES = [
 
 export function CreateTrainingCourse() {
   const nav = useNavigate();
+  const { profile } = useAuth();
+  // AI generation is admin-only; regular managers author courses by hand.
+  const isAdmin = !!profile && (ADMIN_TIER as string[]).includes(profile.role);
+  const [mode, setMode] = useState<'ai' | 'manual'>(isAdmin ? 'ai' : 'manual');
+  const [genBusy, setGenBusy] = useState(false);
+  const [gen, setGen] = useState({
+    title: '',
+    category: 'Java',
+    difficulty: 'BEGINNER',
+    estimated_duration_hours: '6',
+    tags: '',
+    target_audience: '',
+  });
+
+  async function generateWithAI() {
+    if (!gen.title.trim()) {
+      toast.error('Title required');
+      return;
+    }
+    setGenBusy(true);
+    try {
+      const r = await api.post('/training/courses/generate', {
+        title: gen.title.trim(),
+        category: gen.category,
+        difficulty: gen.difficulty,
+        estimated_duration_hours: gen.estimated_duration_hours
+          ? Number(gen.estimated_duration_hours)
+          : null,
+        tags: gen.tags
+          ? gen.tags
+              .split(',')
+              .map((s) => s.trim())
+              .filter(Boolean)
+          : [],
+        target_audience: gen.target_audience.trim() || null,
+      });
+      if (r.data?.degraded) {
+        toast('Outline stub created — AI was unavailable. Edit lessons manually.');
+      } else {
+        toast.success(`Course outline ready · ${r.data.lessons?.length ?? 0} lessons`);
+      }
+      nav(`/training/courses/${r.data.course_id}`);
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error ?? 'Generation failed');
+    } finally {
+      setGenBusy(false);
+    }
+  }
+
   const [form, setForm] = useState<any>({
     title: '',
     description: '',
@@ -105,6 +156,105 @@ export function CreateTrainingCourse() {
     >
       <div className="max-w-2xl">
         <h1 className="text-2xl font-semibold tracking-tight mb-5">New training course</h1>
+
+        {/* Mode toggle: AI-generate a full course from a title, or author
+            manually. AI generation is admin-only — managers see manual only. */}
+        {isAdmin && (
+          <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 mb-5">
+            <button
+              onClick={() => setMode('ai')}
+              className={`text-sm px-4 py-1.5 rounded-md ${
+                mode === 'ai' ? 'bg-brand-600 text-white' : 'text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              ✦ Generate with AI
+            </button>
+            <button
+              onClick={() => setMode('manual')}
+              className={`text-sm px-4 py-1.5 rounded-md ${
+                mode === 'manual' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              Manual
+            </button>
+          </div>
+        )}
+
+        {mode === 'ai' && isAdmin ? (
+          <>
+            <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4">
+              <p className="text-sm text-slate-500">
+                Enter a title and a few details. We'll generate an overview, lesson outline,
+                per-lesson content, quizzes, exercises, and completion criteria. You can review and
+                edit everything before publishing.
+              </p>
+              <Field
+                label="Course title"
+                value={gen.title}
+                onChange={(v) => setGen({ ...gen, title: v })}
+                hint="e.g. React Interview Preparation, AWS for Beginners"
+                required
+              />
+              <div className="grid grid-cols-2 gap-3">
+                <Selector
+                  label="Category"
+                  value={gen.category}
+                  onChange={(v) => setGen({ ...gen, category: v })}
+                  options={CATEGORIES}
+                />
+                <Selector
+                  label="Difficulty"
+                  value={gen.difficulty}
+                  onChange={(v) => setGen({ ...gen, difficulty: v })}
+                  options={['BEGINNER', 'INTERMEDIATE', 'ADVANCED']}
+                />
+                <Field
+                  type="number"
+                  label="Target length (hours)"
+                  value={gen.estimated_duration_hours}
+                  onChange={(v) => setGen({ ...gen, estimated_duration_hours: v })}
+                  hint="≈ one lesson per hour (4–12)"
+                />
+                <Field
+                  label="Tags (comma separated)"
+                  value={gen.tags}
+                  onChange={(v) => setGen({ ...gen, tags: v })}
+                />
+              </div>
+              <Field
+                label="Target audience"
+                value={gen.target_audience}
+                onChange={(v) => setGen({ ...gen, target_audience: v })}
+                hint="e.g. junior consultants new to React; STEM-OPT trainees"
+              />
+            </div>
+            <div className="flex justify-end gap-2 mt-4">
+              <button
+                onClick={() => nav(-1)}
+                className="border border-slate-200 text-slate-700 text-sm px-4 py-2 rounded-lg hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={generateWithAI}
+                disabled={genBusy}
+                className="bg-brand-600 text-white text-sm font-semibold px-5 py-2 rounded-lg hover:bg-brand-700 disabled:opacity-50"
+              >
+                {genBusy ? 'Generating outline…' : '✦ Generate course'}
+              </button>
+            </div>
+          </>
+        ) : (
+          <ManualForm />
+        )}
+      </div>
+    </Layout>
+  );
+
+  // ----- manual authoring form (original flow) -----
+  function ManualForm() {
+    return (
+      <>
         <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4">
           <Field
             label="Title"
@@ -225,9 +375,9 @@ export function CreateTrainingCourse() {
             {saving ? 'Saving…' : 'Create'}
           </button>
         </div>
-      </div>
-    </Layout>
-  );
+      </>
+    );
+  }
 }
 
 function Field({

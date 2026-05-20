@@ -1,0 +1,44 @@
+-- =============================================================================
+-- Training: course versioning + editorial lifecycle
+-- =============================================================================
+-- Adds immutable published snapshots so assignments reference a stable course
+-- version (later edits don't break in-flight student records), plus a formal
+-- review lifecycle and a target_audience input. Apply AFTER
+-- training-generated-content.sql.
+--
+-- Idempotent. Manual-baseline mirror of
+-- backend/migrations/1700000000009_training_versioning.sql.
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS public.training_course_versions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  course_id uuid NOT NULL REFERENCES public.training_courses(id) ON DELETE CASCADE,
+  version_number int NOT NULL,
+  snapshot jsonb NOT NULL,
+  published_by uuid REFERENCES public.users(id) ON DELETE SET NULL,
+  published_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (course_id, version_number)
+);
+CREATE INDEX IF NOT EXISTS training_course_versions_course_id_idx
+  ON public.training_course_versions(course_id);
+
+ALTER TABLE public.training_courses
+  ADD COLUMN IF NOT EXISTS review_status text NOT NULL DEFAULT 'DRAFT',
+  ADD COLUMN IF NOT EXISTS current_version_id uuid REFERENCES public.training_course_versions(id),
+  ADD COLUMN IF NOT EXISTS target_audience text;
+
+ALTER TABLE public.training_courses
+  DROP CONSTRAINT IF EXISTS training_courses_review_status_chk;
+ALTER TABLE public.training_courses
+  ADD CONSTRAINT training_courses_review_status_chk
+  CHECK (review_status IN ('DRAFT', 'GENERATED', 'REVIEWED', 'PUBLISHED', 'ARCHIVED'));
+
+ALTER TABLE public.training_assignments
+  ADD COLUMN IF NOT EXISTS course_version_id uuid
+    REFERENCES public.training_course_versions(id),
+  ADD COLUMN IF NOT EXISTS last_viewed_lesson_id uuid;
+
+CREATE INDEX IF NOT EXISTS training_assignments_course_version_id_idx
+  ON public.training_assignments(course_version_id);
+
+NOTIFY pgrst, 'reload schema';

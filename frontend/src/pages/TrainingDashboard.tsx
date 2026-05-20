@@ -6,8 +6,12 @@ import { api } from '../services/api';
 import { TrainingProgressBar } from '../components/Training';
 import { DashboardCard } from '../components/DashboardCard';
 import { StemOptDisclaimer } from '../components/StemOptDisclaimer';
+import { useAuth } from '../context/AuthContext';
+import { ADMIN_TIER } from '../types';
 
 export function TrainingDashboard() {
+  const { profile } = useAuth();
+  const isAdmin = !!profile && (ADMIN_TIER as string[]).includes(profile.role);
   const [data, setData] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -55,7 +59,7 @@ export function TrainingDashboard() {
       {loading && <p className="text-sm text-slate-500">Loading…</p>}
       {!loading && data && (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
             <DashboardCard label="Active courses" value={data.active_courses} accent="blue" />
             <DashboardCard
               label="Total assignments"
@@ -64,6 +68,26 @@ export function TrainingDashboard() {
             />
             <DashboardCard label="Completed" value={data.completed_assignments} accent="green" />
             <DashboardCard label="Overdue" value={data.overdue_assignments} accent="amber" />
+          </div>
+
+          {/* Engagement analytics */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+            <DashboardCard
+              label="In progress"
+              value={data.in_progress_assignments ?? 0}
+              accent="blue"
+            />
+            <DashboardCard
+              label="Quiz pass rate"
+              value={`${data.quiz_pass_rate ?? 0}%`}
+              accent="green"
+            />
+            <DashboardCard
+              label="Avg time / assignment"
+              value={`${data.avg_time_spent_minutes ?? 0}m`}
+              accent="slate"
+            />
+            <DashboardCard label="Failed" value={data.failed_assignments ?? 0} accent="amber" />
           </div>
 
           <div className="bg-white border border-slate-200 rounded-xl p-4 mb-5">
@@ -109,6 +133,36 @@ export function TrainingDashboard() {
               </ul>
             </Section>
           </div>
+
+          {/* Admin-only: compliance-category breakdown + cumulative study time. */}
+          {isAdmin && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+              <Section title="Courses by compliance category (admin)">
+                {(data.by_compliance_category ?? []).length === 0 ? (
+                  <p className="text-xs italic text-slate-400">No compliance categories set.</p>
+                ) : (
+                  <ul className="space-y-1.5 text-sm">
+                    {data.by_compliance_category.map((c: any) => (
+                      <li key={c.compliance_category} className="flex justify-between">
+                        <span className="text-slate-700">{c.compliance_category}</span>
+                        <span className="text-slate-900 font-semibold tabular-nums">
+                          {c.courses}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </Section>
+              <Section title="Cumulative study time (admin)">
+                <div className="text-3xl font-bold text-slate-900">
+                  {Math.round((data.total_time_spent_minutes ?? 0) / 60)}h
+                </div>
+                <div className="text-xs text-slate-500 mt-1">
+                  {data.total_time_spent_minutes ?? 0} minutes logged across all assignments
+                </div>
+              </Section>
+            </div>
+          )}
         </>
       )}
       <StemOptDisclaimer />

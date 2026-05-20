@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { requireRole } from '../middleware/auth';
-import { MANAGER_TIER } from '../types';
+import { MANAGER_TIER, ADMIN_TIER } from '../types';
 import * as c from '../controllers/training.controller';
 
 export const trainingRouter = Router();
@@ -8,17 +8,43 @@ export const trainingRouter = Router();
 // ---- Courses (manager-tier writes; everyone authed can read) ----
 trainingRouter.get('/courses', c.listCourses);
 trainingRouter.post('/courses', requireRole(...MANAGER_TIER), c.createCourse);
+// Full-course AI generation is ADMIN-tier only (SUPER_ADMIN/CEO/CTO/DIRECTOR).
+// Regular managers can still author courses + lessons by hand, but not invoke
+// the AI generators.
+trainingRouter.post('/courses/generate', requireRole(...ADMIN_TIER), c.generateCourse);
+// Non-destructive enrich/backfill (structure only) — admin-tier.
+trainingRouter.post('/courses/backfill', requireRole(...ADMIN_TIER), c.backfillCourses);
 trainingRouter.get('/courses/:id', c.getCourse);
 trainingRouter.put('/courses/:id', requireRole(...MANAGER_TIER), c.updateCourse);
 trainingRouter.delete('/courses/:id', requireRole(...MANAGER_TIER), c.deleteCourse);
+trainingRouter.post('/courses/:id/generate-outline', requireRole(...ADMIN_TIER), c.generateOutline);
+trainingRouter.post(
+  '/courses/:id/generate-capstone',
+  requireRole(...ADMIN_TIER),
+  c.generateCapstone,
+);
+trainingRouter.post('/courses/:id/enrich', requireRole(...ADMIN_TIER), c.enrichCourse);
+trainingRouter.post('/courses/:id/review', requireRole(...MANAGER_TIER), c.reviewCourse);
+trainingRouter.post('/courses/:id/publish', requireRole(...MANAGER_TIER), c.publishCourse);
 
 // ---- Lessons (manager-tier only) ----
 trainingRouter.post('/courses/:id/lessons', requireRole(...MANAGER_TIER), c.createLesson);
 trainingRouter.put('/lessons/:id', requireRole(...MANAGER_TIER), c.updateLesson);
 trainingRouter.delete('/lessons/:id', requireRole(...MANAGER_TIER), c.deleteLesson);
+// AI lesson-content generation is ADMIN-tier only.
+trainingRouter.post(
+  '/lessons/:id/generate-content',
+  requireRole(...ADMIN_TIER),
+  c.generateLessonContent,
+);
 
 // ---- Quizzes ----
 trainingRouter.get('/courses/:id/quiz', c.listQuiz);
+trainingRouter.get('/lessons/:id/quiz', c.listLessonQuiz); // any authed user, answer-stripped
+// Manual quiz-question CRUD for the inline editor (manager-tier).
+trainingRouter.post('/lessons/:id/quiz', requireRole(...MANAGER_TIER), c.createLessonQuizQuestion);
+trainingRouter.put('/quizzes/:id', requireRole(...MANAGER_TIER), c.updateQuizQuestion);
+trainingRouter.delete('/quizzes/:id', requireRole(...MANAGER_TIER), c.deleteQuizQuestion);
 
 // ---- Assignments ----
 trainingRouter.post('/assign', requireRole(...MANAGER_TIER), c.assign);
@@ -27,6 +53,7 @@ trainingRouter.get('/my-training', c.myTraining); // any authed user
 trainingRouter.get('/assignments/:id', c.getAssignment);
 trainingRouter.put('/assignments/:id', requireRole(...MANAGER_TIER), c.updateAssignment); // I-983 attestation block
 trainingRouter.put('/assignments/:id/progress', c.updateProgress);
+trainingRouter.put('/assignments/:id/viewed', c.markLessonViewed);
 trainingRouter.post('/assignments/:id/upload', c.recordUpload);
 trainingRouter.post('/assignments/:id/feedback', requireRole(...MANAGER_TIER), c.addFeedback);
 trainingRouter.post('/assignments/:id/quiz-attempt', c.submitQuizAttempt);

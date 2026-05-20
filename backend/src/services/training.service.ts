@@ -1,5 +1,7 @@
 import { db } from '../config/db';
 import * as repo from '../repositories/training.repository';
+import * as ai from './trainingAI.service';
+import { httpError } from '../types';
 
 /**
  * Business rules + cross-table orchestration for the Training module.
@@ -40,6 +42,261 @@ export interface CompletionEvaluation {
   gates: GateState;
 }
 
+// ===========================================================================
+// VERSIONING — snapshot-on-publish so assignments pin a stable course version.
+// ===========================================================================
+
+/**
+ * Assemble the immutable course payload that gets frozen at publish time.
+ * Lesson + quiz ids are the live ids so existing progress / quiz-attempt rows
+ * (keyed by lesson_id / quiz_id) stay valid across the version.
+ */
+export async function buildCourseSnapshot(courseId: string): Promise<any> {
+  const [courseRes, lessonsRes, quizzesRes] = await Promise.all([
+    repo.courses.get(courseId),
+    repo.lessons.listByCourse(courseId),
+    repo.quizzes.listByCourse(courseId, { includeAnswers: true }),
+  ]);
+  const c: any = (courseRes as any)?.data ?? {};
+  const lessons = (lessonsRes.data ?? []) as any[];
+  const quizzes = (quizzesRes.data ?? []) as any[];
+
+  const byLesson = new Map<string, any[]>();
+  for (const q of quizzes) {
+    if (!q.lesson_id) continue;
+    const arr = byLesson.get(q.lesson_id) ?? [];
+    arr.push(q);
+    byLesson.set(q.lesson_id, arr);
+  }
+
+  return {
+    course: {
+      title: c.title,
+      description: c.description,
+      overview: c.overview,
+      category: c.category,
+      difficulty: c.difficulty,
+      estimated_duration_hours: c.estimated_duration_hours,
+      learning_objectives: c.learning_objectives,
+      skills_taught: c.skills_taught,
+      expected_outcomes: c.expected_outcomes,
+      roadmap: c.roadmap,
+      resources: c.resources,
+      completion_criteria: {
+        minimum_time_minutes: c.minimum_time_minutes,
+        quiz_passing_score: c.quiz_passing_score,
+        quiz_max_attempts: c.quiz_max_attempts,
+        requires_manager_approval: c.requires_manager_approval,
+      },
+      stem_relevance: c.stem_relevance,
+      weekly_hours: c.weekly_hours,
+      assessment_methods: c.assessment_methods,
+      target_audience: c.target_audience,
+      thumbnail_url: c.thumbnail_url,
+      tags: c.tags,
+    },
+    lessons: lessons.map((l) => ({
+      id: l.id,
+      title: l.title,
+      summary: l.summary,
+      description: l.description,
+      content: l.content,
+      content_format: l.content_format,
+      practical_example: l.practical_example,
+      exercises: l.exercises,
+      key_takeaways: l.key_takeaways,
+      video_url: l.video_url,
+      document_url: l.document_url,
+      lesson_order: l.lesson_order,
+      estimated_minutes: l.estimated_minutes,
+      knowledge_check_required: l.knowledge_check_required,
+      quiz: byLesson.get(l.id) ?? [],
+    })),
+    quizzes,
+    capstone: c.capstone ?? null,
+  };
+}
+
+/**
+ * Publish: freeze a snapshot as the next version, then flip the course to
+ * PUBLISHED/ACTIVE pointing at it. The guard (≥1 lesson, all READY) runs in the
+ * controller before this is called.
+ */
+export async function publishCourse(
+  courseId: string,
+  userId: string,
+): Promise<{ course: any; version: { id: string; version_number: number } }> {
+  const version = await snapshotCourse(courseId, userId);
+  const { data: updated } = await repo.courses.update(courseId, {
+    status: 'ACTIVE',
+    content_status: 'READY',
+    review_status: 'PUBLISHED',
+    current_version_id: version.id,
+  });
+  return { course: updated, version };
+}
+
+/** Freeze the next immutable version of a course and return it. Does NOT touch
+ *  the course's lifecycle columns — callers decide what to flip. */
+async function snapshotCourse(
+  courseId: string,
+  userId: string,
+): Promise<{ id: string; version_number: number }> {
+  const snapshot = await buildCourseSnapshot(courseId);
+  const version_number = (await repo.courseVersions.maxNumber(courseId)) + 1;
+  const { data: ver, error } = await repo.courseVersions.create({
+    course_id: courseId,
+    version_number,
+    snapshot,
+    published_by: userId,
+  });
+  if (error || !ver) throw httpError(500, error?.message ?? 'Failed to snapshot course');
+  return { id: (ver as any).id as string, version_number };
+}
+
+/**
+ * Resolve the version an assignment should pin. Uses the course's current
+ * published version; if a legacy ACTIVE course was never published through the
+ * new flow (e.g. the seeded courses), it self-heals by snapshotting one now so
+ * assignments are always version-pinned. Only DRAFT/unpublished courses are
+ * rejected.
+ */
+async function ensureCurrentVersion(course: any, userId: string): Promise<string> {
+  if (course.current_version_id) return course.current_version_id;
+  if (course.status === 'ACTIVE') {
+    const version = await snapshotCourse(course.id, userId);
+    await repo.courses.update(course.id, {
+      current_version_id: version.id,
+      review_status: 'PUBLISHED',
+    });
+    return version.id;
+  }
+  throw httpError(409, 'Publish the course before assigning it.');
+}
+
+/**
+ * The single source of course content for an assignment. Returns the pinned
+ * version snapshot when the assignment was created against a published version,
+ * else the live tables (legacy assignments). Includes quiz answer keys — strip
+ * them before sending to a student (see stripQuizAnswers).
+ */
+export async function resolveAssignmentContent(
+  a: any,
+): Promise<{ course: any; lessons: any[]; quizzes: any[]; versioned: boolean }> {
+  if (a?.course_version_id) {
+    const { data: ver } = await repo.courseVersions.get(a.course_version_id);
+    const snap = (ver as any)?.snapshot;
+    if (snap) {
+      return {
+        course: snap.course ?? {},
+        lessons: (snap.lessons ?? []) as any[],
+        quizzes: (snap.quizzes ?? []) as any[],
+        versioned: true,
+      };
+    }
+  }
+  const courseId = a.course_id as string;
+  const [c, ls, qz] = await Promise.all([
+    repo.courses.get(courseId),
+    repo.lessons.listByCourse(courseId),
+    repo.quizzes.listByCourse(courseId, { includeAnswers: true }),
+  ]);
+  return {
+    course: (c as any)?.data ?? {},
+    lessons: (ls.data ?? []) as any[],
+    quizzes: (qz.data ?? []) as any[],
+    versioned: false,
+  };
+}
+
+/** Remove answer-key fields so resolved content is safe to send to a student. */
+export function stripQuizAnswers(content: { course: any; lessons: any[]; quizzes: any[] }): {
+  course: any;
+  lessons: any[];
+  quizzes: any[];
+} {
+  const strip = (q: any) => {
+    const { correct_answer: _c, explanation: _e, ...rest } = q ?? {};
+    return rest;
+  };
+  return {
+    course: content.course,
+    lessons: (content.lessons ?? []).map((l) => ({ ...l, quiz: (l.quiz ?? []).map(strip) })),
+    quizzes: (content.quizzes ?? []).map(strip),
+  };
+}
+
+/**
+ * Enrich-only: generate the surrounding structure (overview, objectives,
+ * roadmap, resources, completion criteria, capstone) for an existing course
+ * WITHOUT touching its lessons or quizzes. Used to backfill hand-seeded courses.
+ */
+export async function enrichCourse(courseId: string): Promise<{ degraded: boolean }> {
+  const { data: course } = await repo.courses.get(courseId);
+  if (!course) throw httpError(404, 'Course not found');
+  const c: any = course;
+  const lessonTitles = ((c.lessons ?? []) as any[]).map((l) => l.title).filter(Boolean);
+
+  const { data: meta, degraded } = await ai.enrichCourseMeta({
+    title: c.title,
+    category: c.category,
+    difficulty: c.difficulty,
+    target_audience: c.target_audience,
+    existing_lesson_titles: lessonTitles,
+  });
+
+  const cc = meta.completion_criteria;
+  await repo.courses.update(courseId, {
+    overview: meta.overview,
+    learning_objectives: meta.learning_objectives,
+    skills_taught: meta.skills_taught,
+    expected_outcomes: meta.expected_outcomes,
+    roadmap: meta.roadmap,
+    resources: meta.resources,
+    capstone: meta.capstone,
+    minimum_time_minutes: cc.minimum_time_minutes,
+    quiz_passing_score: cc.quiz_passing_score,
+    quiz_max_attempts: cc.quiz_max_attempts,
+    requires_manager_approval: cc.requires_manager_approval,
+  });
+  return { degraded };
+}
+
+/**
+ * Backfill: enrich every course that's missing structured content (no
+ * overview). Non-destructive — lessons/quizzes are never touched.
+ */
+export async function backfillCourses(): Promise<
+  Array<{ id: string; title: string; result: 'enriched' | 'skipped' | 'failed' }>
+> {
+  const { data: courses } = await repo.courses.list({});
+  const out: Array<{ id: string; title: string; result: 'enriched' | 'skipped' | 'failed' }> = [];
+  for (const c of (courses ?? []) as any[]) {
+    if (c.overview) {
+      out.push({ id: c.id, title: c.title, result: 'skipped' });
+      continue;
+    }
+    try {
+      const { degraded } = await enrichCourse(c.id);
+      out.push({ id: c.id, title: c.title, result: degraded ? 'failed' : 'enriched' });
+    } catch {
+      out.push({ id: c.id, title: c.title, result: 'failed' });
+    }
+  }
+  return out;
+}
+
+/** Resolve a single quiz (with its answer key) for grading, version-aware. */
+export async function getAssignmentQuiz(a: any, quizId: string): Promise<any | null> {
+  if (a?.course_version_id) {
+    const { data: ver } = await repo.courseVersions.get(a.course_version_id);
+    const quizzes = ((ver as any)?.snapshot?.quizzes ?? []) as any[];
+    return quizzes.find((q) => q.id === quizId) ?? null;
+  }
+  const { data } = await repo.quizzes.get(quizId);
+  return (data as any) ?? null;
+}
+
 /**
  * Evaluate every completion gate for an assignment. Returns the derived
  * status + a human-readable list of what's still blocking completion. This
@@ -56,25 +313,25 @@ export async function evaluateCompletion(assignmentId: string): Promise<Completi
     };
   }
   const a: any = aRow;
-  const courseId = a.course_id as string;
 
-  // Course row carries gate thresholds (passing_score, min_time, etc.).
-  const { data: cRow } = await repo.courses.get(courseId);
-  const course: any = cRow ?? {};
+  // Course content comes from the pinned version (or live tables for legacy
+  // assignments) so gates evaluate against the version the student was assigned.
+  const content = await resolveAssignmentContent(a);
+  const course: any = content.course ?? {};
+  // Snapshot stores completion_criteria nested; live course has flat columns.
+  const cc = course.completion_criteria ?? course;
 
-  const [lessons, progressRows, quizQuestions, attempts, uploads, ack, fa] = await Promise.all([
-    repo.lessons.listByCourse(courseId),
+  const [progressRows, attempts, uploads, ack, fa] = await Promise.all([
     repo.progress.listForAssignment(assignmentId),
-    repo.quizzes.listByCourse(courseId),
     repo.quizAttempts.listForAssignment(assignmentId),
     repo.uploads.listForAssignment(assignmentId),
     repo.acknowledgements.getForAssignment(assignmentId),
     repo.finalAssessments.getForAssignment(assignmentId),
   ]);
 
-  const lessonRows = (lessons.data ?? []) as any[];
+  const lessonRows = content.lessons;
   const progress = (progressRows.data ?? []) as any[];
-  const quizRows = (quizQuestions.data ?? []) as any[];
+  const quizRows = content.quizzes;
   const attemptRows = (attempts.data ?? []) as any[];
   const uploadRows = (uploads.data ?? []) as any[];
   const ackRow = (ack as any)?.data ?? null;
@@ -82,12 +339,12 @@ export async function evaluateCompletion(assignmentId: string): Promise<Completi
 
   const gates: GateState = {
     lessons: lessonGate(lessonRows, progress),
-    time: timeGate(progress, course.minimum_time_minutes),
-    quiz: quizGate(quizRows, attemptRows, course),
+    time: timeGate(progress, cc.minimum_time_minutes),
+    quiz: quizGate(quizRows, attemptRows, cc),
     uploads: uploadGate(lessonRows, uploadRows),
     acknowledgement: acknowledgementGate(ackRow),
     final_assessment: finalAssessmentGate(faRow),
-    manager_approval: managerApprovalGate(course, faRow),
+    manager_approval: managerApprovalGate(cc, faRow),
   };
 
   const { status, blockers } = deriveStatus(gates);
@@ -374,9 +631,19 @@ export async function bulkAssignCourse(input: {
 }): Promise<{ created: any[]; skipped: string[] }> {
   const created: any[] = [];
   const skipped: string[] = [];
+
+  // Assignments pin the course's current published version so later edits +
+  // re-publishes (which create a new version) never mutate in-flight records.
+  // Legacy ACTIVE courses with no version self-heal (see ensureCurrentVersion).
+  const { data: courseRow } = await repo.courses.get(input.course_id);
+  const course: any = courseRow ?? {};
+  const versionId = await ensureCurrentVersion(course, input.assigned_by_user_id);
+  const capstone: any = course.capstone ?? null;
+
   for (const uid of input.user_ids) {
     const { data, error } = await repo.assignments.create({
       course_id: input.course_id,
+      course_version_id: versionId,
       assigned_to_user_id: uid,
       assigned_by_user_id: input.assigned_by_user_id,
       due_date: input.due_date ?? null,
@@ -388,20 +655,37 @@ export async function bulkAssignCourse(input: {
       else throw new Error(error.message);
     } else if (data) {
       created.push(data);
+      if (capstone?.assessment_type) {
+        // Idempotent on (assignment_id); ignore failures so a capstone hiccup
+        // never blocks the assignment itself.
+        await repo.finalAssessments
+          .upsert({
+            assignment_id: (data as any).id,
+            assessment_type: capstone.assessment_type,
+            questions: capstone,
+            approval_status: 'PENDING',
+          })
+          .catch(() => undefined);
+      }
     }
   }
   return { created, skipped };
 }
 
-/** Manager reports: completion rate, overdue count, top consultants. */
+/** Manager reports: completion rate, overdue count, top consultants, plus
+ *  quiz pass rate + time-spent analytics. */
 export async function reports(): Promise<{
   total_courses: number;
   active_courses: number;
   total_assignments: number;
   completed_assignments: number;
+  in_progress_assignments: number;
   overdue_assignments: number;
   failed_assignments: number;
   completion_rate: number;
+  quiz_pass_rate: number;
+  avg_time_spent_minutes: number;
+  total_time_spent_minutes: number;
   top_consultants: Array<{ user_id: string; completed: number }>;
   by_category: Array<{ category: string; courses: number }>;
   by_compliance_category: Array<{ compliance_category: string; courses: number }>;
@@ -409,12 +693,33 @@ export async function reports(): Promise<{
   const { data: courses } = await repo.courses.list({});
   const { data: assignments } = await repo.assignments.list({});
 
+  // Aggregate raw quiz attempts + lesson time directly (not exposed on the repo).
+  const [{ data: attempts }, { data: progress }] = await Promise.all([
+    db.from('training_quiz_attempts').select('passed, is_correct'),
+    db.from('training_lesson_progress').select('time_spent_minutes'),
+  ]);
+
   const allCourses = (courses ?? []) as any[];
   const allAssignments = (assignments ?? []) as any[];
 
   const completed = allAssignments.filter((a) => a.status === 'COMPLETED');
   const overdue = allAssignments.filter((a) => a.status === 'OVERDUE');
   const failed = allAssignments.filter((a) => a.status === 'FAILED');
+  const inProgress = allAssignments.filter(
+    (a) => !['NOT_STARTED', 'COMPLETED', 'FAILED'].includes(a.status),
+  );
+
+  const allAttempts = (attempts ?? []) as any[];
+  const passedAttempts = allAttempts.filter((x) => x.passed ?? x.is_correct).length;
+  const quizPassRate =
+    allAttempts.length > 0 ? Math.round((passedAttempts / allAttempts.length) * 100) : 0;
+
+  const totalMinutes = ((progress ?? []) as any[]).reduce(
+    (sum, p) => sum + Number(p.time_spent_minutes ?? 0),
+    0,
+  );
+  const avgMinutes =
+    allAssignments.length > 0 ? Math.round(totalMinutes / allAssignments.length) : 0;
 
   // Top consultants (completed assignments).
   const byUser = new Map<string, number>();
@@ -446,10 +751,14 @@ export async function reports(): Promise<{
     active_courses: allCourses.filter((c) => c.status === 'ACTIVE').length,
     total_assignments: allAssignments.length,
     completed_assignments: completed.length,
+    in_progress_assignments: inProgress.length,
     overdue_assignments: overdue.length,
     failed_assignments: failed.length,
     completion_rate:
       allAssignments.length > 0 ? Math.round((completed.length / allAssignments.length) * 100) : 0,
+    quiz_pass_rate: quizPassRate,
+    avg_time_spent_minutes: avgMinutes,
+    total_time_spent_minutes: totalMinutes,
     top_consultants: top,
     by_category: byCategory,
     by_compliance_category: byComplianceCategory,

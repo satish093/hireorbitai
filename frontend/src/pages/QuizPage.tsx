@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Layout } from '../components/Layout';
 import { api } from '../services/api';
@@ -16,6 +16,8 @@ interface AttemptResult {
 
 export function QuizPage() {
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
+  const lessonId = searchParams.get('lesson');
   const nav = useNavigate();
   const [assignment, setAssignment] = useState<any | null>(null);
   const [quiz, setQuiz] = useState<QuizQuestion[]>([]);
@@ -32,13 +34,31 @@ export function QuizPage() {
       try {
         const a = await api.get(`/training/assignments/${id}`);
         setAssignment(a.data);
-        const q = await api.get(`/training/courses/${a.data.course_id}/quiz`);
-        setQuiz(q.data ?? []);
+        // Pull questions from the assignment's pinned-version content (answer-
+        // stripped). Per-lesson when ?lesson= is present, else the whole course.
+        const cc = a.data.course_content;
+        let questions: QuizQuestion[] = [];
+        if (cc) {
+          if (lessonId) {
+            const lesson = (cc.lessons ?? []).find((l: any) => l.id === lessonId);
+            questions =
+              lesson?.quiz ?? (cc.quizzes ?? []).filter((q: any) => q.lesson_id === lessonId);
+          } else {
+            questions = cc.quizzes ?? [];
+          }
+        } else {
+          // Legacy fallback (assignment without pinned content).
+          const q = lessonId
+            ? await api.get(`/training/lessons/${lessonId}/quiz`)
+            : await api.get(`/training/courses/${a.data.course_id}/quiz`);
+          questions = q.data ?? [];
+        }
+        setQuiz(questions);
       } catch (e: any) {
         toast.error(e?.response?.data?.error ?? 'Failed to load quiz');
       }
     })();
-  }, [id]);
+  }, [id, lessonId]);
 
   async function submit() {
     if (Object.keys(picks).length < quiz.length) {

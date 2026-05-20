@@ -43,6 +43,34 @@ export const courses = {
   },
 };
 
+// ===== COURSE VERSIONS — immutable published snapshots =====
+export const courseVersions = {
+  async create(row: any) {
+    return db.from('training_course_versions').insert(row).select().single();
+  },
+  async get(id: string) {
+    return db.from('training_course_versions').select('*').eq('id', id).maybeSingle();
+  },
+  async listForCourse(courseId: string) {
+    return db
+      .from('training_course_versions')
+      .select('id, version_number, published_at, published_by')
+      .eq('course_id', courseId)
+      .order('version_number', { ascending: false });
+  },
+  /** Highest version_number for a course, or 0 when none exist yet. */
+  async maxNumber(courseId: string): Promise<number> {
+    const { data } = await db
+      .from('training_course_versions')
+      .select('version_number')
+      .eq('course_id', courseId)
+      .order('version_number', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    return Number((data as any)?.version_number ?? 0);
+  },
+};
+
 // ===== LESSONS =====
 export const lessons = {
   async listByCourse(courseId: string) {
@@ -52,8 +80,14 @@ export const lessons = {
       .eq('course_id', courseId)
       .order('lesson_order');
   },
+  async get(id: string) {
+    return db.from('training_lessons').select(LESSON_SELECT).eq('id', id).single();
+  },
   async create(row: any) {
     return db.from('training_lessons').insert(row).select(LESSON_SELECT).single();
+  },
+  async createMany(rows: any[]) {
+    return db.from('training_lessons').insert(rows).select(LESSON_SELECT);
   },
   async update(id: string, patch: any) {
     return db.from('training_lessons').update(patch).eq('id', id).select(LESSON_SELECT).single();
@@ -127,12 +161,25 @@ export const progress = {
 };
 
 // ===== QUIZZES =====
+// `correct_answer` + `explanation` are answer-key columns — they must NOT be
+// sent to a student before they submit. STUDENT_QUIZ_SELECT omits them; the
+// full select is reserved for the manager-only course-detail embed and for
+// server-side grading (quizzes.get).
+const STUDENT_QUIZ_SELECT = 'id, lesson_id, question, options, points, question_order';
 export const quizzes = {
-  async listByCourse(courseId: string) {
+  /** includeAnswers defaults FALSE — callers must opt in to the answer key. */
+  async listByCourse(courseId: string, opts: { includeAnswers?: boolean } = {}) {
     return db
       .from('training_quizzes')
-      .select('*')
+      .select(opts.includeAnswers ? '*' : STUDENT_QUIZ_SELECT)
       .eq('course_id', courseId)
+      .order('question_order');
+  },
+  async listByLesson(lessonId: string, opts: { includeAnswers?: boolean } = {}) {
+    return db
+      .from('training_quizzes')
+      .select(opts.includeAnswers ? '*' : STUDENT_QUIZ_SELECT)
+      .eq('lesson_id', lessonId)
       .order('question_order');
   },
   async create(row: any) {
@@ -141,8 +188,18 @@ export const quizzes = {
   async createMany(rows: any[]) {
     return db.from('training_quizzes').insert(rows).select();
   },
+  /** Drop a lesson's generated questions before re-generating its content. */
+  async removeForLesson(lessonId: string) {
+    return db.from('training_quizzes').delete().eq('lesson_id', lessonId);
+  },
   async get(id: string) {
     return db.from('training_quizzes').select('*').eq('id', id).single();
+  },
+  async update(id: string, patch: any) {
+    return db.from('training_quizzes').update(patch).eq('id', id).select().single();
+  },
+  async remove(id: string) {
+    return db.from('training_quizzes').delete().eq('id', id);
   },
 };
 

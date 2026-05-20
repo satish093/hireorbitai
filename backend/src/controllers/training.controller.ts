@@ -61,6 +61,12 @@ const courseSchema = z.object({
   trainer_user_id: z.string().uuid().nullable().optional(),
   expected_outcomes: z.array(z.string()).nullable().optional(),
   related_job_duties: z.array(z.string()).nullable().optional(),
+  // Generated-content fields (editable after AI generation).
+  overview: z.string().nullable().optional(),
+  roadmap: z.any().optional(),
+  resources: z.any().optional(),
+  capstone: z.any().optional(),
+  target_audience: z.string().max(500).nullable().optional(),
 });
 
 export const createCourse: RequestHandler = async (req, res) => {
@@ -75,7 +81,19 @@ export const createCourse: RequestHandler = async (req, res) => {
 export const updateCourse: RequestHandler = async (req, res) => {
   const parsed = courseSchema.partial().safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
-  const { data, error } = await repo.courses.update(req.params.id, parsed.data);
+  // Keep the editorial lifecycle in sync with a direct status edit (the manual
+  // flow flips status via this endpoint) so review_status can't drift — e.g.
+  // archiving must not leave a course marked PUBLISHED.
+  const patch: Record<string, unknown> = { ...parsed.data };
+  if (parsed.data.status) {
+    patch.review_status =
+      parsed.data.status === 'ACTIVE'
+        ? 'PUBLISHED'
+        : parsed.data.status === 'ARCHIVED'
+          ? 'ARCHIVED'
+          : 'DRAFT';
+  }
+  const { data, error } = await repo.courses.update(req.params.id, patch);
   if (error) throw httpError(500, error.message);
   res.json(data);
 };
@@ -102,6 +120,11 @@ const lessonSchema = z.object({
   practical_example: z.string().nullable().optional(),
   knowledge_check_required: z.boolean().optional(),
   minimum_time_minutes: z.number().int().min(0).nullable().optional(),
+  // Generated-content fields (editable after AI generation).
+  summary: z.string().nullable().optional(),
+  exercises: z.any().optional(),
+  key_takeaways: z.any().optional(),
+  content_status: z.enum(['PENDING', 'GENERATING', 'READY', 'FAILED']).optional(),
 });
 
 export const createLesson: RequestHandler = async (req, res) => {
@@ -175,15 +198,16 @@ export const getAssignment: RequestHandler = async (req, res) => {
   const a: any = row;
   // Auth: consultants/recruiters can only see their own; manager-tier sees all.
   if (!isManagerTier(req.user.role) && a.assigned_to_user_id !== req.user.id) {
-    throw httpError(403, 'Forbidden');
+    throw httpError(404, 'Not found');
   }
   // Hydrate lesson progress + uploads + feedback + quiz attempts for the
   // assignment-detail view in one round-trip.
-  const [pr, up, fb, qa] = await Promise.all([
+  const [pr, up, fb, qa, content] = await Promise.all([
     repo.progress.listForAssignment(a.id),
     repo.uploads.listForAssignment(a.id),
     repo.feedback.listForAssignment(a.id),
     repo.quizAttempts.listForAssignment(a.id),
+    svc.resolveAssignmentContent(a),
   ]);
   res.json({
     ...a,
@@ -191,6 +215,9 @@ export const getAssignment: RequestHandler = async (req, res) => {
     uploads: up.data ?? [],
     feedback: fb.data ?? [],
     quiz_attempts: qa.data ?? [],
+    // Pinned-version (or live, for legacy) course content the player should
+    // render — answer keys stripped so quizzes stay un-cheatable until submit.
+    course_content: svc.stripQuizAnswers(content),
   });
 };
 
@@ -243,7 +270,7 @@ export const updateProgress: RequestHandler = async (req, res) => {
   const { data: a } = await repo.assignments.get(req.params.id);
   if (!a) throw httpError(404, 'Assignment not found');
   if ((a as any).assigned_to_user_id !== req.user.id && !isManagerTier(req.user.role)) {
-    throw httpError(403, 'Forbidden');
+    throw httpError(404, 'Not found');
   }
 
   await svc.markLessonProgress({
@@ -307,10 +334,87 @@ export const addFeedback: RequestHandler = async (req, res) => {
 // ---------------------------------------------------------------------------
 // QUIZ — list + record attempt
 // ---------------------------------------------------------------------------
+// Answer-stripped by default — never ship correct_answer/explanation to a
+// student before they submit. Managers read the answer key via the course
+// detail embed (manager-only route).
 export const listQuiz: RequestHandler = async (req, res) => {
   const { data, error } = await repo.quizzes.listByCourse(req.params.id);
   if (error) throw httpError(500, error.message);
   res.json(data ?? []);
+};
+
+// GET /lessons/:id/quiz — per-lesson knowledge check, answer-stripped.
+export const listLessonQuiz: RequestHandler = async (req, res) => {
+  const { data, error } = await repo.quizzes.listByLesson(req.params.id);
+  if (error) throw httpError(500, error.message);
+  res.json(data ?? []);
+};
+
+// ---- Manual quiz-question CRUD (manager-tier) for the inline editor ----
+const quizQuestionSchema = z
+  .object({
+    question: z.string().min(1).max(2000),
+    options: z.array(z.string().min(1)).min(2).max(6),
+    correct_answer: z.string().min(1),
+    explanation: z.string().max(2000).nullable().optional(),
+    points: z.number().int().min(1).max(10).default(1),
+    question_order: z.number().int().min(0).optional(),
+  })
+  .strict();
+
+export const createLessonQuizQuestion: RequestHandler = async (req, res) => {
+  const parsed = quizQuestionSchema.safeParse(req.body);
+  if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
+  const { data: lesson, error: lErr } = await repo.lessons.get(req.params.id);
+  if (lErr || !lesson) throw httpError(404, 'Lesson not found');
+  // correct_answer must be one of the options.
+  if (!parsed.data.options.includes(parsed.data.correct_answer)) {
+    throw httpError(400, 'correct_answer must match one of the options');
+  }
+  const { data, error } = await repo.quizzes.create({
+    ...parsed.data,
+    lesson_id: req.params.id,
+    course_id: (lesson as any).course_id,
+  });
+  if (error) throw httpError(500, error.message);
+  res.status(201).json(data);
+};
+
+export const updateQuizQuestion: RequestHandler = async (req, res) => {
+  const parsed = quizQuestionSchema.partial().safeParse(req.body);
+  if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
+  if (
+    parsed.data.options &&
+    parsed.data.correct_answer &&
+    !parsed.data.options.includes(parsed.data.correct_answer)
+  ) {
+    throw httpError(400, 'correct_answer must match one of the options');
+  }
+  const { data, error } = await repo.quizzes.update(req.params.id, parsed.data);
+  if (error) throw httpError(500, error.message);
+  res.json(data);
+};
+
+export const deleteQuizQuestion: RequestHandler = async (req, res) => {
+  const { error } = await repo.quizzes.remove(req.params.id);
+  if (error) throw httpError(500, error.message);
+  res.json({ ok: true });
+};
+
+// PUT /assignments/:id/viewed — record the student's current lesson (resume +
+// "current lesson" analytics). Owner-or-manager only.
+const viewedSchema = z.object({ lesson_id: z.string().uuid() }).strict();
+export const markLessonViewed: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const parsed = viewedSchema.safeParse(req.body);
+  if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
+  const { data: a } = await repo.assignments.get(req.params.id);
+  if (!a) throw httpError(404, 'Not found');
+  if ((a as any).assigned_to_user_id !== req.user.id && !isManagerTier(req.user.role)) {
+    throw httpError(404, 'Not found');
+  }
+  await repo.assignments.update(req.params.id, { last_viewed_lesson_id: parsed.data.lesson_id });
+  res.json({ ok: true });
 };
 
 const quizAttemptSchema = z.object({
@@ -329,11 +433,13 @@ export const submitQuizAttempt: RequestHandler = async (req, res) => {
   const { data: a } = await repo.assignments.get(req.params.id);
   if (!a) throw httpError(404, 'Assignment not found');
   if ((a as any).assigned_to_user_id !== req.user.id && !isManagerTier(req.user.role)) {
-    throw httpError(403, 'Forbidden');
+    throw httpError(404, 'Not found');
   }
 
-  const { data: quiz, error: qErr } = await repo.quizzes.get(parsed.data.quiz_id);
-  if (qErr || !quiz) throw httpError(404, 'Quiz not found');
+  // Grade against the pinned version's answer key (the live quiz may have
+  // changed or been deleted since this student was assigned).
+  const quiz = await svc.getAssignmentQuiz(a, parsed.data.quiz_id);
+  if (!quiz) throw httpError(404, 'Quiz not found');
 
   const isCorrect = parsed.data.selected_answer === (quiz as any).correct_answer;
   const score = isCorrect ? Number((quiz as any).points ?? 1) : 0;
@@ -411,6 +517,262 @@ export const aiGenerateQuiz: RequestHandler = async (req, res) => {
 };
 
 // ---------------------------------------------------------------------------
+// FULL-COURSE GENERATION (LMS authoring)
+//   1. generateCourse        — title+metadata → DRAFT course + lesson stubs
+//   2. generateOutline       — (re)generate outline for an existing course
+//   3. generateLessonContent — fill one lesson body + exercises + quiz
+//   4. generateCapstone      — course-level final-assessment template
+//   5. publishCourse         — guarded DRAFT → ACTIVE (all lessons READY)
+// All manager-tier. Generation is progressive: the client drives the
+// per-lesson loop so each AI call stays bounded.
+// ---------------------------------------------------------------------------
+const DIFFICULTY = z.enum(['BEGINNER', 'INTERMEDIATE', 'ADVANCED']);
+
+const generateCourseSchema = z
+  .object({
+    title: z.string().min(1).max(200),
+    category: z.string().min(1).max(80),
+    difficulty: DIFFICULTY.default('BEGINNER'),
+    estimated_duration_hours: z.number().min(0).nullable().optional(),
+    tags: z.array(z.string()).default([]),
+    lesson_count: z.number().int().min(3).max(20).nullable().optional(),
+    target_audience: z.string().max(500).nullable().optional(),
+  })
+  .strict();
+
+/** Persist an outline onto a course row + (re)create its lesson stubs. */
+async function applyOutline(
+  courseId: string,
+  outline: import('../services/trainingAI.service').CourseOutline,
+  degraded: boolean,
+) {
+  const cc = outline.completion_criteria;
+  await repo.courses.update(courseId, {
+    overview: outline.overview,
+    description: outline.overview.slice(0, 500),
+    learning_objectives: outline.learning_objectives,
+    skills_taught: outline.skills_taught,
+    expected_outcomes: outline.expected_outcomes,
+    roadmap: outline.roadmap,
+    resources: outline.resources,
+    estimated_duration_hours: outline.estimated_duration_hours,
+    minimum_time_minutes: cc.minimum_time_minutes,
+    quiz_passing_score: cc.quiz_passing_score,
+    quiz_max_attempts: cc.quiz_max_attempts,
+    requires_manager_approval: cc.requires_manager_approval,
+    content_status: degraded ? 'FAILED' : 'OUTLINE_READY',
+    review_status: degraded ? 'DRAFT' : 'GENERATED',
+  });
+  const lessonRows = outline.lessons.map((l) => ({
+    course_id: courseId,
+    title: l.title,
+    summary: l.summary,
+    lesson_objective: l.objective,
+    estimated_minutes: l.estimated_minutes,
+    lesson_order: l.lesson_order,
+    content_status: 'PENDING',
+  }));
+  const { data: lessons, error } = await repo.lessons.createMany(lessonRows);
+  if (error) throw httpError(500, error.message);
+  return lessons ?? [];
+}
+
+export const generateCourse: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const parsed = generateCourseSchema.safeParse(req.body);
+  if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
+
+  // Create the shell first so a slow/failed generation still leaves an
+  // editable DRAFT behind.
+  const { data: course, error } = await repo.courses.create({
+    title: parsed.data.title,
+    category: parsed.data.category,
+    difficulty: parsed.data.difficulty,
+    estimated_duration_hours: parsed.data.estimated_duration_hours ?? null,
+    tags: parsed.data.tags,
+    target_audience: parsed.data.target_audience ?? null,
+    status: 'DRAFT',
+    content_status: 'GENERATING',
+    created_by: req.user.id,
+    generation_input: parsed.data,
+  });
+  if (error || !course) throw httpError(500, error?.message ?? 'Failed to create course');
+  const courseId = (course as any).id as string;
+
+  const { data: outline, degraded } = await ai.generateCourseOutline({
+    title: parsed.data.title,
+    category: parsed.data.category,
+    difficulty: parsed.data.difficulty,
+    estimated_duration_hours: parsed.data.estimated_duration_hours ?? undefined,
+    tags: parsed.data.tags,
+    lesson_count: parsed.data.lesson_count ?? undefined,
+    target_audience: parsed.data.target_audience ?? undefined,
+  });
+  const lessons = await applyOutline(courseId, outline, degraded);
+
+  res.status(201).json({
+    course_id: courseId,
+    content_status: degraded ? 'FAILED' : 'OUTLINE_READY',
+    degraded,
+    lessons: (lessons as any[]).map((l) => ({
+      id: l.id,
+      title: l.title,
+      content_status: l.content_status,
+    })),
+  });
+};
+
+const generateOutlineSchema = z
+  .object({
+    lesson_count: z.number().int().min(3).max(20).nullable().optional(),
+    replace: z.boolean().optional(),
+  })
+  .strict();
+
+export const generateOutline: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const parsed = generateOutlineSchema.safeParse(req.body ?? {});
+  if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
+
+  const { data: course, error } = await repo.courses.get(req.params.id);
+  if (error || !course) throw httpError(404, 'Course not found');
+  const c: any = course;
+  const existingLessons = (c.lessons ?? []) as any[];
+  if (existingLessons.length > 0 && !parsed.data.replace) {
+    throw httpError(409, 'Course already has lessons; pass replace=true to regenerate');
+  }
+  // Replacing: drop existing lessons (cascades their progress/quizzes).
+  for (const l of existingLessons) await repo.lessons.remove(l.id);
+
+  await repo.courses.update(req.params.id, { content_status: 'GENERATING' });
+  const { data: outline, degraded } = await ai.generateCourseOutline({
+    title: c.title,
+    category: c.category,
+    difficulty: c.difficulty,
+    estimated_duration_hours: c.estimated_duration_hours ?? undefined,
+    tags: c.tags ?? [],
+    lesson_count: parsed.data.lesson_count ?? undefined,
+  });
+  const lessons = await applyOutline(req.params.id, outline, degraded);
+  res.json({
+    course_id: req.params.id,
+    content_status: degraded ? 'FAILED' : 'OUTLINE_READY',
+    degraded,
+    lessons: (lessons as any[]).map((l) => ({
+      id: l.id,
+      title: l.title,
+      content_status: l.content_status,
+    })),
+  });
+};
+
+export const generateLessonContent: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const { data: lesson, error } = await repo.lessons.get(req.params.id);
+  if (error || !lesson) throw httpError(404, 'Lesson not found');
+  const l: any = lesson;
+  const { data: course } = await repo.courses.get(l.course_id);
+  const c: any = course ?? {};
+
+  await repo.lessons.update(l.id, { content_status: 'GENERATING' });
+  const { data: content, degraded } = await ai.generateLessonContent({
+    course_title: c.title ?? l.title,
+    category: c.category ?? 'General',
+    difficulty: c.difficulty ?? 'BEGINNER',
+    lesson_title: l.title,
+    lesson_summary: l.summary,
+    lesson_objective: l.lesson_objective,
+  });
+
+  const { data: updated, error: upErr } = await repo.lessons.update(l.id, {
+    content: content.content,
+    content_format: 'markdown',
+    practical_example: content.practical_example,
+    exercises: content.exercises,
+    key_takeaways: content.key_takeaways,
+    content_status: degraded ? 'FAILED' : 'READY',
+  });
+  if (upErr) throw httpError(500, upErr.message);
+
+  // Replace this lesson's generated quiz questions.
+  await repo.quizzes.removeForLesson(l.id);
+  if (content.quiz.length > 0) {
+    await repo.quizzes.createMany(
+      content.quiz.map((q, i) => ({
+        course_id: l.course_id,
+        lesson_id: l.id,
+        question: q.question,
+        options: q.options,
+        correct_answer: q.correct_answer,
+        explanation: q.explanation,
+        points: q.points ?? 1,
+        question_order: i,
+      })),
+    );
+  }
+  res.json({ ...(updated as any), degraded });
+};
+
+// Non-destructive AI enrich: structure only, lessons untouched (admin-tier).
+export const enrichCourse: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const { degraded } = await svc.enrichCourse(req.params.id);
+  const { data } = await repo.courses.get(req.params.id);
+  res.json({ degraded, course: data });
+};
+
+// Backfill every course missing structured content (admin-tier).
+export const backfillCourses: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const results = await svc.backfillCourses();
+  res.json({ results });
+};
+
+export const generateCapstone: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const { data: course, error } = await repo.courses.get(req.params.id);
+  if (error || !course) throw httpError(404, 'Course not found');
+  const c: any = course;
+  const { data: capstone, degraded } = await ai.generateCapstone({
+    course_title: c.title,
+    category: c.category,
+    difficulty: c.difficulty,
+    learning_objectives: c.learning_objectives ?? [],
+  });
+  const { data, error: upErr } = await repo.courses.update(req.params.id, { capstone });
+  if (upErr) throw httpError(500, upErr.message);
+  res.json({ capstone, degraded, course: data });
+};
+
+export const publishCourse: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const { data: course, error } = await repo.courses.get(req.params.id);
+  if (error || !course) throw httpError(404, 'Course not found');
+  const lessons = ((course as any).lessons ?? []) as any[];
+  if (lessons.length === 0) throw httpError(409, 'Cannot publish a course with no lessons');
+  const notReady = lessons.filter((l) => (l.content_status ?? 'READY') !== 'READY');
+  if (notReady.length > 0) {
+    throw httpError(409, `${notReady.length} lesson(s) still need content before publishing`);
+  }
+  // Freeze an immutable version + flip to PUBLISHED/ACTIVE pointing at it.
+  const result = await svc.publishCourse(req.params.id, req.user.id);
+  res.json(result);
+};
+
+// Set the editorial review state (manager-tier). Lets a human sign off on
+// generated content before publishing.
+export const reviewCourse: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const { data: course, error } = await repo.courses.get(req.params.id);
+  if (error || !course) throw httpError(404, 'Course not found');
+  const { data, error: upErr } = await repo.courses.update(req.params.id, {
+    review_status: 'REVIEWED',
+  });
+  if (upErr) throw httpError(500, upErr.message);
+  res.json(data);
+};
+
+// ---------------------------------------------------------------------------
 // I-983 EVALUATIONS — 12-month self + final, plus optional supervisor interim.
 // Authorization:
 //   - Manager-tier can create/update any evaluation on any assignment.
@@ -438,9 +800,11 @@ async function assertCanWriteEval(req: any, assignmentId: string, kind?: string)
   const isOwner = (a as any).assigned_to_user_id === req.user.id;
   const isMgr = isManagerTier(req.user.role);
   if (isMgr) return;
-  // Consultants can only write their own student-facing evals.
-  if (isOwner && (kind === 'SELF_12_MONTH' || kind === 'FINAL')) return;
-  throw httpError(403, 'Forbidden');
+  // Non-owners can't even know the assignment exists — 404, not an oracle.
+  if (!isOwner) throw httpError(404, 'Not found');
+  // Owner, but consultants may only write their own student-facing evals.
+  if (kind === 'SELF_12_MONTH' || kind === 'FINAL') return;
+  throw httpError(403, 'Only the assigned consultant can submit this evaluation type');
 }
 
 export const listEvaluations: RequestHandler = async (req, res) => {
@@ -448,7 +812,7 @@ export const listEvaluations: RequestHandler = async (req, res) => {
   const { data: a } = await repo.assignments.get(req.params.id);
   if (!a) throw httpError(404, 'Assignment not found');
   if (!isManagerTier(req.user.role) && (a as any).assigned_to_user_id !== req.user.id) {
-    throw httpError(403, 'Forbidden');
+    throw httpError(404, 'Not found');
   }
   const { data, error } = await repo.evaluations.listForAssignment(req.params.id);
   if (error) throw httpError(500, error.message);
@@ -508,7 +872,7 @@ async function assertCanReadAssignment(req: any, assignmentId: string) {
   const { data: a } = await repo.assignments.get(assignmentId);
   if (!a) throw httpError(404, 'Assignment not found');
   if (!isManagerTier(req.user.role) && (a as any).assigned_to_user_id !== req.user.id) {
-    throw httpError(403, 'Forbidden');
+    throw httpError(404, 'Not found');
   }
   return a as any;
 }

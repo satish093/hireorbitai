@@ -71,6 +71,21 @@ const envSchema = z.object({
   // --- Anthropic ---
   ANTHROPIC_API_KEY: optionalKey,
   ANTHROPIC_MODEL: z.string().default('claude-haiku-4-5-20251001'),
+  // Heavier model for long-form training content generation (lesson bodies,
+  // capstone). Outline + quiz calls stay on the cheaper ANTHROPIC_MODEL.
+  TRAINING_CONTENT_MODEL: z.string().default('claude-sonnet-4-6'),
+  // How training AI generation reaches a model:
+  //   subscription — shell out to the `claude` CLI, authenticated by the
+  //                   operator's Claude Max login (or CLAUDE_CODE_OAUTH_TOKEN).
+  //                   No per-token API billing. (default)
+  //   api          — use the Anthropic Messages API with ANTHROPIC_API_KEY.
+  //   stub         — never call a model; always return editable stubs.
+  TRAINING_AI_PROVIDER: z.enum(['subscription', 'api', 'stub']).default('subscription'),
+  // OAuth token from `claude setup-token` (Max plan). Lets the CLI auth on a
+  // headless VPS where there's no interactive login. Optional locally.
+  CLAUDE_CODE_OAUTH_TOKEN: optionalKey,
+  // Path to the Claude Code CLI binary (override if not on PATH).
+  CLAUDE_CLI_PATH: z.string().default('claude'),
 
   // --- Email (Brevo only) ---
   // Per the auth spec, ALL transactional email goes through Brevo. The
@@ -158,6 +173,10 @@ export const env = {
   anthropic: {
     apiKey: e.ANTHROPIC_API_KEY,
     model: e.ANTHROPIC_MODEL,
+    contentModel: e.TRAINING_CONTENT_MODEL,
+    provider: e.TRAINING_AI_PROVIDER,
+    oauthToken: e.CLAUDE_CODE_OAUTH_TOKEN,
+    cliPath: e.CLAUDE_CLI_PATH,
   },
   email: {
     // Single provider — Brevo. Kept under env.email.* so callers in

@@ -7,11 +7,17 @@ import { api } from '../services/api';
 import {
   CourseCategoryBadge,
   TrainingStatusBadge,
-  LessonCard,
   AssignTrainingModal,
 } from '../components/Training';
+import {
+  ContentStatusChip,
+  GenerationProgress,
+  generateAllLessons,
+  CapstoneEditor,
+  LessonEditorModal,
+} from '../components/TrainingAuthoring';
 import { useAuth } from '../context/AuthContext';
-import { MANAGER_TIER } from '../types';
+import { MANAGER_TIER, ADMIN_TIER } from '../types';
 
 interface Lesson {
   id: string;
@@ -19,6 +25,10 @@ interface Lesson {
   title: string;
   description: string | null;
   content: string | null;
+  summary: string | null;
+  content_status: 'PENDING' | 'GENERATING' | 'READY' | 'FAILED' | null;
+  exercises: any[] | null;
+  key_takeaways: any[] | null;
   video_url: string | null;
   document_url: string | null;
   lesson_order: number;
@@ -33,6 +43,13 @@ interface Course {
   estimated_duration_hours: number | null;
   tags: string[];
   status: string;
+  content_status: string | null;
+  review_status: string | null;
+  target_audience: string | null;
+  overview: string | null;
+  roadmap: any[] | null;
+  resources: any[] | null;
+  capstone: any | null;
   thumbnail_url: string | null;
   lessons: Lesson[];
   quizzes: any[];
@@ -48,6 +65,8 @@ export function TrainingCourseDetails() {
   const { id } = useParams<{ id: string }>();
   const { profile } = useAuth();
   const isManager = !!profile && (MANAGER_TIER as string[]).includes(profile.role);
+  // AI generation (course/lesson/capstone) is admin-only.
+  const isAdmin = !!profile && (ADMIN_TIER as string[]).includes(profile.role);
   const [course, setCourse] = useState<Course | null>(null);
   const [loading, setLoading] = useState(true);
   const [lessonOpen, setLessonOpen] = useState(false);
@@ -55,6 +74,14 @@ export function TrainingCourseDetails() {
   const [aiOpen, setAiOpen] = useState(false);
   const [aiContent, setAiContent] = useState('');
   const [aiBusy, setAiBusy] = useState(false);
+  const [gen, setGen] = useState<{ running: boolean; done: number; total: number }>({
+    running: false,
+    done: 0,
+    total: 0,
+  });
+  const [publishing, setPublishing] = useState(false);
+  const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
+  const [lifecycleBusy, setLifecycleBusy] = useState(false);
   const [lessonForm, setLessonForm] = useState<any>({
     title: '',
     description: '',
@@ -132,12 +159,88 @@ export function TrainingCourseDetails() {
     }
   }
 
+  // Generate (or regenerate) content for the given lessons, one call at a time.
+  async function runGeneration(lessonIds: string[]) {
+    if (lessonIds.length === 0) {
+      toast('All lessons already have content.');
+      return;
+    }
+    setGen({ running: true, done: 0, total: lessonIds.length });
+    const { ok, failed } = await generateAllLessons(lessonIds, (done, total) =>
+      setGen({ running: true, done, total }),
+    );
+    setGen({ running: false, done: 0, total: 0 });
+    if (failed > 0) toast(`${ok} lesson(s) generated · ${failed} failed — retry the failed ones.`);
+    else toast.success(`${ok} lesson(s) generated`);
+    await load();
+  }
+
+  async function generateOneLesson(lessonId: string) {
+    setGen({ running: true, done: 0, total: 1 });
+    try {
+      const r = await api.post(`/training/lessons/${lessonId}/generate-content`);
+      if (r.data?.degraded) toast('Generation failed for this lesson — try again.');
+      else toast.success('Lesson generated');
+      await load();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error ?? 'Failed');
+    } finally {
+      setGen({ running: false, done: 0, total: 0 });
+    }
+  }
+
+  async function publish() {
+    setPublishing(true);
+    try {
+      const r = await api.post(`/training/courses/${id}/publish`);
+      toast.success(`Published v${r.data?.version?.version_number ?? ''}`);
+      await load();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error ?? 'Failed to publish');
+    } finally {
+      setPublishing(false);
+    }
+  }
+
+  async function markReviewed() {
+    setLifecycleBusy(true);
+    try {
+      await api.post(`/training/courses/${id}/review`);
+      toast.success('Marked reviewed');
+      await load();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error ?? 'Failed');
+    } finally {
+      setLifecycleBusy(false);
+    }
+  }
+
+  async function enrich() {
+    setLifecycleBusy(true);
+    try {
+      const r = await api.post(`/training/courses/${id}/enrich`);
+      if (r.data?.degraded) toast('Enrich stub written — AI unavailable, edit manually.');
+      else toast.success('Course enriched');
+      await load();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error ?? 'Failed');
+    } finally {
+      setLifecycleBusy(false);
+    }
+  }
+
   if (loading || !course)
     return (
       <Layout title="Course">
         <div className="text-sm text-slate-500">{loading ? 'Loading…' : 'Not found.'}</div>
       </Layout>
     );
+
+  const sortedLessons = course.lessons.slice().sort((a, b) => a.lesson_order - b.lesson_order);
+  const pendingLessonIds = sortedLessons
+    .filter((l) => (l.content_status ?? 'READY') !== 'READY')
+    .map((l) => l.id);
+  const allReady = sortedLessons.length > 0 && pendingLessonIds.length === 0;
 
   return (
     <Layout
@@ -159,6 +262,16 @@ export function TrainingCourseDetails() {
               <div className="flex items-center gap-2 flex-wrap mb-2">
                 <CourseCategoryBadge category={course.category} />
                 <TrainingStatusBadge status={course.status} />
+                {course.review_status && (
+                  <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600">
+                    {course.review_status}
+                  </span>
+                )}
+                {course.content_status &&
+                  course.content_status !== 'NONE' &&
+                  course.content_status !== 'READY' && (
+                    <ContentStatusChip status={course.content_status} />
+                  )}
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
                   {course.difficulty}
                 </span>
@@ -191,6 +304,37 @@ export function TrainingCourseDetails() {
                 >
                   Edit
                 </Link>
+                {isAdmin && (
+                  <button
+                    onClick={enrich}
+                    disabled={lifecycleBusy}
+                    title="AI-generate overview, roadmap, resources, capstone (lessons untouched)"
+                    className="border border-brand-200 text-brand-700 bg-brand-50 text-sm px-3 py-1.5 rounded-lg hover:bg-brand-100 disabled:opacity-50"
+                  >
+                    ✦ Enrich
+                  </button>
+                )}
+                {course.review_status !== 'REVIEWED' && course.review_status !== 'PUBLISHED' && (
+                  <button
+                    onClick={markReviewed}
+                    disabled={lifecycleBusy}
+                    className="border border-slate-200 text-slate-700 text-sm px-3 py-1.5 rounded-lg hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    Mark reviewed
+                  </button>
+                )}
+                {course.status !== 'ACTIVE' && (
+                  <button
+                    onClick={publish}
+                    disabled={publishing || !allReady}
+                    title={
+                      allReady ? 'Publish course' : 'All lessons need content before publishing'
+                    }
+                    className="border border-emerald-200 bg-emerald-50 text-emerald-800 text-sm px-3 py-1.5 rounded-lg hover:bg-emerald-100 disabled:opacity-50"
+                  >
+                    {publishing ? 'Publishing…' : 'Publish'}
+                  </button>
+                )}
                 <button
                   onClick={() => setAssignOpen(true)}
                   className="bg-slate-900 text-white text-sm px-4 py-1.5 rounded-lg hover:bg-slate-800"
@@ -278,27 +422,162 @@ export function TrainingCourseDetails() {
         </div>
       ) : null}
 
+      {/* Course overview (AI-generated, editable). */}
+      {(course.overview || course.roadmap?.length || course.resources?.length) && (
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 mb-6 space-y-5">
+          {course.overview && (
+            <div>
+              <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-1">
+                Overview
+              </div>
+              <p className="text-sm text-slate-700 whitespace-pre-wrap">{course.overview}</p>
+            </div>
+          )}
+          {course.roadmap?.length ? (
+            <div>
+              <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-2">
+                Roadmap
+              </div>
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                {course.roadmap.map((p: any, i: number) => (
+                  <div key={i} className="border border-slate-100 rounded-lg p-3 bg-slate-50">
+                    <div className="text-sm font-medium text-slate-900">{p.phase}</div>
+                    <div className="text-[11px] text-slate-500">{p.duration_label}</div>
+                    {Array.isArray(p.focus_areas) && (
+                      <ul className="mt-1 text-xs text-slate-600 list-disc list-inside">
+                        {p.focus_areas.map((f: string) => (
+                          <li key={f}>{f}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+          {course.resources?.length ? (
+            <div>
+              <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-2">
+                Recommended resources
+              </div>
+              <ul className="space-y-1 text-sm">
+                {course.resources.map((r: any, i: number) => (
+                  <li key={i}>
+                    <a
+                      href={r.url}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      className="text-brand-700 hover:underline"
+                    >
+                      {r.title}
+                    </a>
+                    {r.type && (
+                      <span className="text-[11px] text-slate-400 ml-1.5">· {r.type}</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </div>
+      )}
+
       {/* Lessons */}
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
         <h2 className="text-lg font-semibold tracking-tight">Lessons ({course.lessons.length})</h2>
         {isManager && (
-          <button
-            onClick={() => setLessonOpen(true)}
-            className="bg-slate-900 text-white text-sm px-3 py-1.5 rounded-lg hover:bg-slate-800"
-          >
-            + Add lesson
-          </button>
+          <div className="flex items-center gap-2">
+            {isAdmin && pendingLessonIds.length > 0 && (
+              <button
+                onClick={() => runGeneration(pendingLessonIds)}
+                disabled={gen.running}
+                className="border border-brand-200 text-brand-700 bg-brand-50 text-sm px-3 py-1.5 rounded-lg hover:bg-brand-100 disabled:opacity-50"
+              >
+                {gen.running
+                  ? 'Generating…'
+                  : `✦ Generate ${pendingLessonIds.length} pending lesson(s)`}
+              </button>
+            )}
+            <button
+              onClick={() => setLessonOpen(true)}
+              className="bg-slate-900 text-white text-sm px-3 py-1.5 rounded-lg hover:bg-slate-800"
+            >
+              + Add lesson
+            </button>
+          </div>
         )}
       </div>
+      {gen.running && (
+        <div className="mb-3">
+          <GenerationProgress done={gen.done} total={gen.total} />
+        </div>
+      )}
       <div className="space-y-2 mb-8">
-        {course.lessons.length === 0 ? (
+        {sortedLessons.length === 0 ? (
           <p className="text-sm text-slate-400 italic">No lessons yet.</p>
         ) : (
-          course.lessons
-            .sort((a, b) => a.lesson_order - b.lesson_order)
-            .map((l) => <LessonCard key={l.id} lesson={l} />)
+          sortedLessons.map((l) => {
+            const status = l.content_status ?? 'READY';
+            return (
+              <div
+                key={l.id}
+                className="bg-white border border-slate-200 rounded-lg p-3 flex items-center justify-between gap-3"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-medium text-slate-900 truncate">{l.title}</span>
+                    {isManager && <ContentStatusChip status={status} />}
+                  </div>
+                  {(l.summary || l.description) && (
+                    <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">
+                      {l.summary || l.description}
+                    </p>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {isManager && (
+                    <button
+                      onClick={() => setEditingLesson(l)}
+                      className="text-xs border border-slate-200 text-slate-700 px-2.5 py-1 rounded-lg hover:bg-slate-50"
+                    >
+                      Edit
+                    </button>
+                  )}
+                  {isAdmin && (
+                    <button
+                      onClick={() => generateOneLesson(l.id)}
+                      disabled={gen.running}
+                      className="text-xs border border-slate-200 text-slate-700 px-2.5 py-1 rounded-lg hover:bg-slate-50 disabled:opacity-50"
+                    >
+                      {status === 'READY'
+                        ? '✦ Regenerate'
+                        : status === 'FAILED'
+                          ? 'Retry'
+                          : '✦ Generate'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })
         )}
       </div>
+
+      {editingLesson && (
+        <LessonEditorModal
+          lesson={editingLesson}
+          quizzes={(course.quizzes ?? []).filter((q: any) => q.lesson_id === editingLesson.id)}
+          onClose={() => setEditingLesson(null)}
+          onSaved={load}
+        />
+      )}
+
+      {/* Capstone — AI generation is admin-only. */}
+      {isAdmin && (
+        <div className="mb-8">
+          <CapstoneEditor courseId={course.id} capstone={course.capstone} onChanged={load} />
+        </div>
+      )}
 
       {/* Quizzes */}
       <div className="flex items-center justify-between mb-3">

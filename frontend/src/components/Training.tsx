@@ -122,6 +122,7 @@ export interface CourseCardData {
   thumbnail_url?: string | null;
   tags?: string[];
   status: 'DRAFT' | 'ACTIVE' | 'ARCHIVED';
+  content_status?: string | null;
   lessons?: { count: number }[];
   assignments?: { count: number }[];
 }
@@ -153,6 +154,15 @@ export function TrainingCourseCard({
         <div className="flex items-center gap-2 flex-wrap mb-1.5">
           <CourseCategoryBadge category={course.category} />
           <TrainingStatusBadge status={course.status} />
+          {course.content_status &&
+            course.content_status !== 'NONE' &&
+            course.content_status !== 'READY' && (
+              <span className="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-full border border-amber-200 bg-amber-50 text-amber-700">
+                {course.content_status === 'OUTLINE_READY'
+                  ? 'needs content'
+                  : course.content_status}
+              </span>
+            )}
           <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
             {course.difficulty}
           </span>
