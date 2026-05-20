@@ -323,29 +323,35 @@ export function UserProfile() {
 
         {/* Sections */}
         <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6 stagger-children">
+          {/* Editable fields bind `value` to the `form` draft, not the
+              immutable `user` object. Binding to `user` meant keystrokes
+              updated `form` but the input kept showing the old `user` value —
+              so typing appeared to do nothing. `form` is seeded from the
+              loaded profile on mount / save / cancel, so the non-editing
+              display reads correctly too. */}
           <Card title="Contact">
             <Field
               label="First name"
-              value={user.first_name}
+              value={editing ? (form.first_name ?? '') : user.first_name}
               editing={editing}
               onChange={(v) => setForm((f) => ({ ...f, first_name: v }))}
             />
             <Field
               label="Last name"
-              value={user.last_name}
+              value={editing ? (form.last_name ?? '') : user.last_name}
               editing={editing}
               onChange={(v) => setForm((f) => ({ ...f, last_name: v }))}
             />
             <Field label="Email" value={user.email} readonly />
             <Field
               label="Phone"
-              value={user.phone ?? ''}
+              value={editing ? (form.phone ?? '') : (user.phone ?? '')}
               editing={editing}
               onChange={(v) => setForm((f) => ({ ...f, phone: v }))}
             />
             <Field
               label="LinkedIn"
-              value={user.linkedin_url ?? ''}
+              value={editing ? (form.linkedin_url ?? '') : (user.linkedin_url ?? '')}
               editing={editing}
               onChange={(v) => setForm((f) => ({ ...f, linkedin_url: v }))}
               type="url"
@@ -355,26 +361,26 @@ export function UserProfile() {
           <Card title="Address">
             <Field
               label="Street"
-              value={user.address_line1 ?? ''}
+              value={editing ? (form.address_line1 ?? '') : (user.address_line1 ?? '')}
               editing={editing}
               onChange={(v) => setForm((f) => ({ ...f, address_line1: v }))}
             />
             <Field
               label="Apt / Suite"
-              value={user.address_line2 ?? ''}
+              value={editing ? (form.address_line2 ?? '') : (user.address_line2 ?? '')}
               editing={editing}
               onChange={(v) => setForm((f) => ({ ...f, address_line2: v }))}
             />
             <div className="grid grid-cols-2 gap-3">
               <Field
                 label="City"
-                value={user.city ?? ''}
+                value={editing ? (form.city ?? '') : (user.city ?? '')}
                 editing={editing}
                 onChange={(v) => setForm((f) => ({ ...f, city: v }))}
               />
               <Field
                 label="State"
-                value={user.state ?? ''}
+                value={editing ? (form.state ?? '') : (user.state ?? '')}
                 editing={editing}
                 onChange={(v) => setForm((f) => ({ ...f, state: v }))}
               />
@@ -382,20 +388,20 @@ export function UserProfile() {
             <div className="grid grid-cols-2 gap-3">
               <Field
                 label="Postal code"
-                value={user.postal_code ?? ''}
+                value={editing ? (form.postal_code ?? '') : (user.postal_code ?? '')}
                 editing={editing}
                 onChange={(v) => setForm((f) => ({ ...f, postal_code: v }))}
               />
               <Field
                 label="Country"
-                value={user.country ?? ''}
+                value={editing ? (form.country ?? '') : (user.country ?? '')}
                 editing={editing}
                 onChange={(v) => setForm((f) => ({ ...f, country: v }))}
               />
             </div>
             <Field
               label="Timezone"
-              value={user.timezone ?? ''}
+              value={editing ? (form.timezone ?? '') : (user.timezone ?? '')}
               editing={editing}
               onChange={(v) => setForm((f) => ({ ...f, timezone: v }))}
               placeholder="America/New_York"

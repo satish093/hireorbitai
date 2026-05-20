@@ -254,6 +254,12 @@ export const admin = {
   }): Promise<AuthResp<{ user: AuthUser | null }>> {
     const hash = await bcrypt.hash(args.password, 10);
     const id = randomUUID();
+    // Normalize email to lowercase before storing. The login lookup
+    // (loadUserByEmail) compares against a lowercased input via `.eq`, so a
+    // mixed-case stored email would never match → "email not found" on
+    // sign-in. Every other create path already lowercases; this one was the
+    // gap.
+    const email = args.email.trim().toLowerCase();
     // Insert into the canonical public.users row. The temp-password admin
     // flow in services/auth.service.ts upserts the same row with role +
     // metadata immediately after this call.
@@ -262,12 +268,12 @@ export const admin = {
         `INSERT INTO public.users (id, email, password_hash, full_name, created_at, updated_at, session_version)
          VALUES ($1, $2, $3, $4, now(), now(), 0)
          ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash`,
-        [id, args.email, hash, (args.user_metadata?.full_name as string) ?? null],
+        [id, email, hash, (args.user_metadata?.full_name as string) ?? null],
       );
       // Re-read the row to capture the actual id (handles the ON CONFLICT path).
       const r = await pool.query<{ id: string; email: string; full_name: string | null }>(
         `SELECT id, email, full_name FROM public.users WHERE email = $1`,
-        [args.email],
+        [email],
       );
       const row = r.rows[0]!;
       return {

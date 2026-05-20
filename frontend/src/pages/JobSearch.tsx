@@ -810,7 +810,13 @@ export function JobSearch() {
       {sourcesOpen && (
         <SourcesDrawer onClose={() => setSourcesOpen(false)} onAfterSync={() => load(tab)} />
       )}
-      {insightFor && <MatchInsightModal job={insightFor} onClose={() => setInsightFor(null)} />}
+      {insightFor && (
+        <MatchInsightModal
+          job={insightFor}
+          isConsultant={isConsultant}
+          onClose={() => setInsightFor(null)}
+        />
+      )}
       {interceptFor && (
         <ApplyInterceptModal
           job={interceptFor}
@@ -1911,8 +1917,22 @@ interface AtsResp {
   summary: string;
 }
 
-function MatchInsightModal({ job, onClose }: { job: JobRow; onClose: () => void }) {
-  const [loading, setLoading] = useState(true);
+function MatchInsightModal({
+  job,
+  isConsultant,
+  onClose,
+}: {
+  job: JobRow;
+  /** Match scoring only applies to consultants (it scores their resume). For
+   *  admins/recruiters with no consultant profile the scoring endpoint 400s,
+   *  so we skip it and show the job details as a plain detail view. */
+  isConsultant: boolean;
+  onClose: () => void;
+}) {
+  // Only consultants auto-run the scoring fetch. Others land straight on the
+  // job-details view (loading=false) so the panel is never a stuck spinner
+  // or a blank page.
+  const [loading, setLoading] = useState(isConsultant);
   const [error, setError] = useState<string | null>(null);
   const [skillMatch, setSkillMatch] = useState<SkillMatchResp | null>(null);
   const [ats, setAts] = useState<AtsResp | null>(null);
@@ -1968,8 +1988,11 @@ function MatchInsightModal({ job, onClose }: { job: JobRow; onClose: () => void 
   }
 
   useEffect(() => {
-    run(); /* eslint-disable-next-line */
-  }, [job.id]);
+    // Skip the scoring call for non-consultants — they have no resume to
+    // score and the endpoint returns 400, which previously left the panel
+    // looking broken/empty.
+    if (isConsultant) run(); /* eslint-disable-next-line */
+  }, [job.id, isConsultant]);
 
   const company = job.company_name ?? job.client?.company_name ?? 'Unknown';
   const overall = skillMatch?.overall_score != null ? Math.round(skillMatch.overall_score) : null;
@@ -2064,6 +2087,15 @@ function MatchInsightModal({ job, onClose }: { job: JobRow; onClose: () => void 
             </div>
           )}
 
+          {/* For non-consultants the scoring section is skipped — this is a
+              plain job-detail view. */}
+          {!isConsultant && (
+            <div className="text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-lg p-3">
+              ℹ️ Resume match scoring is available when viewing as a consultant. This is the job
+              detail view.
+            </div>
+          )}
+
           {loading && <div className="text-sm text-slate-500">Scoring against your resume…</div>}
 
           {error && !loading && (
@@ -2111,7 +2143,7 @@ function MatchInsightModal({ job, onClose }: { job: JobRow; onClose: () => void 
                   value={Math.round((skillMatch.feature_scores?.skill_match ?? 0) * 100)}
                   suffix="%"
                   tone="info"
-                  sub={`${skillMatch.per_skill.length} skills evaluated`}
+                  sub={`${skillMatch.per_skill?.length ?? 0} skills evaluated`}
                 />
                 <ScoreCard
                   label="Seniority fit"
@@ -2174,13 +2206,13 @@ function MatchInsightModal({ job, onClose }: { job: JobRow; onClose: () => void 
               )}
 
               {/* Per-skill table */}
-              {skillMatch.per_skill.length > 0 && (
+              {(skillMatch.per_skill?.length ?? 0) > 0 && (
                 <div>
                   <div className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase mb-1.5">
                     Skill-by-skill
                   </div>
                   <div className="border border-slate-200 rounded-xl divide-y divide-slate-100">
-                    {skillMatch.per_skill.map((s) => {
+                    {(skillMatch.per_skill ?? []).map((s) => {
                       const pct = Math.round((s.score ?? 0) * 100);
                       const tone =
                         pct >= 80 ? 'bg-emerald-500' : pct >= 50 ? 'bg-amber-400' : 'bg-red-400';

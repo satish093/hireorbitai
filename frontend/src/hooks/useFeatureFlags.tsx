@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState, ReactNode } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useInvalidationListener } from './useInvalidate';
@@ -111,16 +111,20 @@ export function useFeatureFlags() {
 //     </ProtectedRoute>
 //   } />
 //
-// Defaults to redirecting to /dashboard. Override with `redirectTo` if a
-// different fallback makes sense for the feature.
+// When a feature flag is OFF, we now render an inline "feature disabled"
+// panel instead of silently redirecting to /dashboard. The old redirect made
+// it look like clicking a nav item or dashboard button "did nothing" or
+// "bounced home" — confusing because the user got no explanation. Pass
+// `redirectTo` only if a hard redirect is genuinely wanted somewhere.
 // ---------------------------------------------------------------------------
 export function FeatureGuard({
   feature,
   children,
-  redirectTo = '/dashboard',
+  redirectTo,
 }: {
   feature: string;
   children: ReactNode;
+  /** If set, hard-redirect instead of showing the disabled panel. */
   redirectTo?: string;
 }) {
   const ctx = useContext(FeatureFlagsContext);
@@ -134,7 +138,49 @@ export function FeatureGuard({
     );
   }
   if (ctx.flags[feature] === false) {
-    return <Navigate to={redirectTo} replace />;
+    if (redirectTo) return <Navigate to={redirectTo} replace />;
+    return <FeatureDisabledPanel feature={feature} />;
   }
   return <>{children}</>;
+}
+
+/** Friendly inline panel shown when a feature flag is turned off, instead of
+ *  a silent redirect. Tells the user what happened and (for admins) where to
+ *  flip the flag back on. */
+function FeatureDisabledPanel({ feature }: { feature: string }) {
+  const { profile } = useAuth();
+  const isOwner = profile?.role === 'SUPER_ADMIN' || profile?.role === 'CEO';
+  const label = feature.replace(/_/g, ' ');
+  return (
+    <div className="min-h-[60vh] flex items-center justify-center p-6">
+      <div className="max-w-md w-full text-center bg-white border border-slate-200 rounded-2xl p-8 shadow-sm">
+        <div className="w-12 h-12 rounded-full bg-slate-100 text-slate-500 text-2xl mx-auto mb-3 flex items-center justify-center">
+          ⌀
+        </div>
+        <h2 className="text-lg font-semibold text-slate-900 capitalize">{label} is turned off</h2>
+        <p className="text-sm text-slate-500 mt-2">
+          This feature is disabled for your workspace.
+          {isOwner
+            ? ' You can re-enable it from Feature flags.'
+            : ' Ask a workspace owner to enable it.'}
+        </p>
+        <div className="mt-5 flex items-center justify-center gap-2">
+          <Link
+            to="/dashboard"
+            className="text-sm px-4 py-2 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50"
+          >
+            Back to dashboard
+          </Link>
+          {isOwner && (
+            <Link
+              to="/admin/features"
+              className="text-sm px-4 py-2 rounded-lg bg-slate-900 text-white hover:bg-slate-800"
+            >
+              Open Feature flags
+            </Link>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }

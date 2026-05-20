@@ -5,6 +5,7 @@ import { DashboardCard } from '../components/DashboardCard';
 import { SkeletonMetricGrid } from '../components/Skeleton';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useFeatureFlag } from '../hooks/useFeatureFlags';
 import {
   TASK_STATUSES,
   TASK_STATUS_LABEL,
@@ -355,6 +356,10 @@ export function ManagerDashboard() {
 }
 
 function QuickActions({ hasJobs, hasTasks }: { hasJobs: boolean; hasTasks: boolean }) {
+  // Don't surface the "Create your first task" card when the tasks feature is
+  // turned off for the workspace — clicking it would land on the
+  // feature-disabled panel, which is confusing as a "first step".
+  const tasksEnabled = useFeatureFlag('tasks');
   return (
     <div className="mb-6 bg-gradient-to-br from-brand-50 to-violet-50 border border-brand-100 rounded-xl p-5">
       <div className="text-[10px] font-semibold tracking-widest text-brand-700 uppercase mb-1">
@@ -372,13 +377,15 @@ function QuickActions({ hasJobs, hasTasks }: { hasJobs: boolean; hasTasks: boole
           to="/jobs"
           cta={hasJobs ? 'Manage sources →' : 'Open Jobs →'}
         />
-        <QuickActionCard
-          done={hasTasks}
-          title="Create your first task"
-          desc="Assign work to a recruiter or consultant on the ADO-style board."
-          to="/tasks"
-          cta={hasTasks ? 'Open board →' : 'New task →'}
-        />
+        {tasksEnabled && (
+          <QuickActionCard
+            done={hasTasks}
+            title="Create your first task"
+            desc="Assign work to a recruiter or consultant on the ADO-style board."
+            to="/tasks"
+            cta={hasTasks ? 'Open board →' : 'New task →'}
+          />
+        )}
         <QuickActionCard
           done={false}
           title="Invite your team"

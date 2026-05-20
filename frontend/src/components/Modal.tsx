@@ -26,6 +26,15 @@ export function Modal({ open, onClose, title, description, children, footer, siz
   const dialogRef = useRef<HTMLDivElement>(null);
   const previouslyFocused = useRef<HTMLElement | null>(null);
 
+  // Hold onClose in a ref so the focus/keydown effect below can depend ONLY
+  // on `open`. Parents almost always pass onClose as an inline lambda (a new
+  // reference every render); if the effect depended on onClose it would
+  // re-run on every keystroke, re-focus the first field, and steal focus from
+  // whatever input the user is typing in — which manifested as "I have to
+  // type each letter 2-3 times". Keep this ref current every render.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
   useEffect(() => {
     if (!open) return;
 
@@ -43,7 +52,7 @@ export function Modal({ open, onClose, title, description, children, footer, siz
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (e.key !== 'Tab') return;
@@ -81,7 +90,10 @@ export function Modal({ open, onClose, title, description, children, footer, siz
       // Restore focus to the trigger when the modal closes.
       previouslyFocused.current?.focus?.();
     };
-  }, [open, onClose]);
+    // Depends ONLY on `open` — onClose is read via onCloseRef so re-running on
+    // every onClose change (which would steal focus from inputs mid-typing)
+    // is avoided.
+  }, [open]);
 
   if (!open) return null;
   return (
