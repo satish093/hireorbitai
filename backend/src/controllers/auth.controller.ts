@@ -101,6 +101,29 @@ export const completeTour: RequestHandler = async (req, res) => {
 };
 
 // ---------------------------------------------------------------------------
+// /job-alerts — per-user opt-in for the daily job-match email digest.
+// ---------------------------------------------------------------------------
+const jobAlertsSchema = z.object({ enabled: z.boolean() }).strict();
+
+export const setJobAlerts: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const parsed = jobAlertsSchema.safeParse(req.body);
+  if (!parsed.success) throw httpError(400, 'enabled (boolean) is required');
+  const { error } = await db
+    .from('users')
+    .update({ job_alerts: parsed.data.enabled })
+    .eq('id', req.user.id);
+  if (error) {
+    if (/schema cache|column .* does not exist/i.test(error.message)) {
+      res.json({ ok: true, persisted: false });
+      return;
+    }
+    throw httpError(500, error.message);
+  }
+  res.json({ ok: true, persisted: true });
+};
+
+// ---------------------------------------------------------------------------
 // /login
 // ---------------------------------------------------------------------------
 const loginSchema = z.object({

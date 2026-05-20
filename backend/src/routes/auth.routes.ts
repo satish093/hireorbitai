@@ -40,4 +40,5 @@ authRouter.post('/sync', requireAuth, auth.syncProfile);
 // /change-password is the ONE protected route a "must_change" user can hit.
 authRouter.post('/change-password', requireAuth, auth.changePassword);
 authRouter.post('/complete-tour', requireAuth, auth.completeTour);
+authRouter.post('/job-alerts', requireAuth, auth.setJobAlerts);
 authRouter.post('/logout', requireAuth, auth.logout);

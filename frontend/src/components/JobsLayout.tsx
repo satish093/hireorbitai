@@ -1,7 +1,9 @@
-import { ReactNode } from 'react';
+import { ReactNode, useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import clsx from 'clsx';
 import { Brand } from './Brand';
+import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { MANAGER_TIER } from '../types';
 
@@ -19,9 +21,46 @@ function initials(name?: string | null, email?: string | null): string {
   return (parts[0]![0]! + parts[1]![0]!).toUpperCase();
 }
 
+/** Bell toggle — opt in/out of the daily job-match email digest. */
+function AlertsToggle() {
+  const { profile } = useAuth();
+  const [on, setOn] = useState(profile?.job_alerts !== false);
+  const [busy, setBusy] = useState(false);
+  async function toggle() {
+    if (busy) return;
+    const next = !on;
+    setOn(next);
+    setBusy(true);
+    try {
+      await api.post('/auth/job-alerts', { enabled: next });
+      toast.success(next ? 'Job alerts on' : 'Job alerts off');
+    } catch {
+      setOn(!next);
+      toast.error('Could not update alerts');
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <button
+      onClick={toggle}
+      disabled={busy}
+      title={on ? 'Daily job alerts: on' : 'Daily job alerts: off'}
+      aria-pressed={on}
+      className={clsx(
+        'text-sm px-2 py-1 rounded-md transition-colors disabled:opacity-50',
+        on ? 'text-brand-600 hover:bg-brand-50' : 'text-slate-400 hover:bg-slate-100',
+      )}
+    >
+      {on ? '🔔' : '🔕'}
+    </button>
+  );
+}
+
 export function JobsLayout({ children }: { children: ReactNode }) {
   const { profile, signOut } = useAuth();
   const isStaff = !!profile && (MANAGER_TIER as string[]).includes(profile.role);
+  const isConsultant = profile?.role === 'CONSULTANT';
 
   return (
     <div className="min-h-dvh bg-slate-50 text-slate-900 flex flex-col">
@@ -48,6 +87,7 @@ export function JobsLayout({ children }: { children: ReactNode }) {
           </nav>
 
           <div className="flex items-center gap-2 shrink-0">
+            {isConsultant && <AlertsToggle />}
             {isStaff && (
               <Link
                 to="/dashboard"

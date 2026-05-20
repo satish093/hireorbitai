@@ -71,6 +71,8 @@ export interface UserProfile {
   recruiter_id?: string | null;
   /** Set once the user has seen (or skipped) the first-run product tour. */
   tour_completed_at?: string | null;
+  /** Per-user opt-in for the daily job-match email digest. Default true. */
+  job_alerts?: boolean;
 }
 
 export type MarketingStatus = 'ACTIVE' | 'PAUSED' | 'PLACED';

@@ -132,15 +132,27 @@ export async function runDailyDigest(): Promise<DigestReport> {
 
   // 3. Fetch emails + names in one round-trip.
   const userIds = consultantRows.map((c) => c.user_id).filter(Boolean) as string[];
-  const usersById = new Map<string, { email: string; full_name: string | null }>();
+  const usersById = new Map<
+    string,
+    { email: string; full_name: string | null; job_alerts: boolean }
+  >();
   if (userIds.length > 0) {
-    const { data: users } = await db.from('users').select('id, email, full_name').in('id', userIds);
+    const { data: users } = await db
+      .from('users')
+      .select('id, email, full_name, job_alerts')
+      .in('id', userIds);
     for (const u of (users ?? []) as Array<{
       id: string;
       email: string;
       full_name: string | null;
+      job_alerts: boolean | null;
     }>) {
-      usersById.set(u.id, { email: u.email, full_name: u.full_name });
+      usersById.set(u.id, {
+        email: u.email,
+        full_name: u.full_name,
+        // Default-on: only an explicit opt-out (false) suppresses the digest.
+        job_alerts: u.job_alerts !== false,
+      });
     }
   }
 
@@ -150,6 +162,8 @@ export async function runDailyDigest(): Promise<DigestReport> {
     report.consultants_scanned++;
     if (!c.user_id) continue;
     const u = usersById.get(c.user_id);
+    // Respect the per-user job-alert opt-out.
+    if (u && u.job_alerts === false) continue;
     if (!u?.email) {
       report.digests_skipped_no_email++;
       continue;
