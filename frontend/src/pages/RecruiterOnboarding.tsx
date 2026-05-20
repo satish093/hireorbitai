@@ -16,7 +16,11 @@ interface FormData {
 
 export function RecruiterOnboarding() {
   const { profile, refreshProfile } = useAuth();
-  const { register, handleSubmit, formState: { isSubmitting, errors } } = useForm<FormData>({
+  const {
+    register,
+    handleSubmit,
+    formState: { isSubmitting, errors },
+  } = useForm<FormData>({
     defaultValues: {
       full_name: profile?.full_name ?? '',
       phone: profile?.phone ?? '',
@@ -44,16 +48,23 @@ export function RecruiterOnboarding() {
 
   return (
     <Layout title="Recruiter onboarding">
-      <form onSubmit={handleSubmit(submit)} className="bg-white rounded-xl border border-slate-200 p-6 max-w-2xl mx-auto space-y-5">
+      <form
+        onSubmit={handleSubmit(submit)}
+        className="bg-white rounded-xl border border-slate-200 p-6 max-w-2xl mx-auto space-y-5"
+      >
         <div>
-          <h2 className="text-lg font-semibold text-slate-900">Welcome — let's finish your profile</h2>
+          <h2 className="text-lg font-semibold text-slate-900">
+            Welcome — let's finish your profile
+          </h2>
           <p className="text-sm text-slate-500 mt-1">
             Tell us who you are and a few details about your recruiting setup.
           </p>
         </div>
 
         <section>
-          <h3 className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-2">Personal details</h3>
+          <h3 className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-2">
+            Personal details
+          </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormInput
               label="Full name"
@@ -66,19 +77,21 @@ export function RecruiterOnboarding() {
               disabled
               hint="Set when you accepted the invite — can't change here."
             />
-            <FormInput
-              label="Phone"
-              placeholder="+1 555 123 4567"
-              {...register('phone')}
-            />
+            <FormInput label="Phone" placeholder="+1 555 123 4567" {...register('phone')} />
           </div>
         </section>
 
         <section>
-          <h3 className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-2">Recruiting setup</h3>
+          <h3 className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-2">
+            Recruiting setup
+          </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormInput label="Team / Pod" placeholder="e.g. Pod Alpha" {...register('team')} />
-            <FormInput label="Weekly submission target" type="number" {...register('target_submissions_per_week')} />
+            <FormInput
+              label="Weekly submission target"
+              type="number"
+              {...register('target_submissions_per_week')}
+            />
           </div>
           <div className="mt-4">
             <label className="block text-xs font-medium text-slate-700 mb-1.5">Notes</label>

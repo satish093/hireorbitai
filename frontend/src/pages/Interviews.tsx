@@ -11,7 +11,14 @@ import { Button } from '../components/Button';
 import { api } from '../services/api';
 import toast from 'react-hot-toast';
 
-const EMPTY_FORM = { consultant_id: '', type: 'PHONE', scheduled_at: '', scheduled_at_local: '', interviewer: '', meeting_url: '' };
+const EMPTY_FORM = {
+  consultant_id: '',
+  type: 'PHONE',
+  scheduled_at: '',
+  scheduled_at_local: '',
+  interviewer: '',
+  meeting_url: '',
+};
 const EMPTY_FEEDBACK = { rating: 3, strengths: '', weaknesses: '', notes: '' };
 
 export function Interviews() {
@@ -28,7 +35,8 @@ export function Interviews() {
 
   function load() {
     setLoading(true);
-    api.get('/interviews')
+    api
+      .get('/interviews')
       .then((r) => setRows(r.data ?? []))
       .catch((e) => toast.error(e?.response?.data?.error ?? 'Failed to load interviews'))
       .finally(() => setLoading(false));
@@ -36,10 +44,15 @@ export function Interviews() {
   useEffect(() => {
     let cancelled = false;
     load();
-    api.get('/consultants')
-      .then((r) => { if (!cancelled) setConsultants(r.data ?? []); })
+    api
+      .get('/consultants')
+      .then((r) => {
+        if (!cancelled) setConsultants(r.data ?? []);
+      })
       .catch(() => {});
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   async function schedule(mock = false) {
@@ -94,7 +107,9 @@ export function Interviews() {
         description="Real and mock interview rounds — feedback rolls up into the consultant pipeline report."
         action={
           <>
-            <Button variant="secondary" onClick={() => setOpenMock(true)}>+ Mock</Button>
+            <Button variant="secondary" onClick={() => setOpenMock(true)}>
+              + Mock
+            </Button>
             <Button onClick={() => setOpenSchedule(true)}>+ Schedule interview</Button>
           </>
         }
@@ -103,42 +118,94 @@ export function Interviews() {
         loading={loading}
         empty="No interviews yet."
         columns={[
-          { key: 'consultant', header: 'Consultant', render: (i: any) => i.consultant?.user?.full_name ?? i.consultant?.user?.email ?? '—' },
-          { key: 'type', header: 'Type' },
-          { key: 'when', header: 'When', render: (i: any) => i.scheduled_at ? new Date(i.scheduled_at).toLocaleString() : '—' },
-          { key: 'interviewer', header: 'Interviewer' },
-          { key: 'mock', header: 'Mock?', render: (i: any) => i.is_mock
-            ? <span className="text-[11px] font-medium bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded">Mock</span>
-            : <span className="text-slate-300 text-xs">—</span>
+          {
+            key: 'consultant',
+            header: 'Consultant',
+            render: (i: any) => i.consultant?.user?.full_name ?? i.consultant?.user?.email ?? '—',
           },
-          { key: 'status', header: 'Status', render: (i: any) => <StatusBadge status={i.status} /> },
-          { key: 'fb', header: '', align: 'right', render: (i: any) => (
-            <Button size="sm" variant="ghost" onClick={() => setOpenFeedback(i)}>Feedback</Button>
-          )},
+          { key: 'type', header: 'Type' },
+          {
+            key: 'when',
+            header: 'When',
+            render: (i: any) => (i.scheduled_at ? new Date(i.scheduled_at).toLocaleString() : '—'),
+          },
+          { key: 'interviewer', header: 'Interviewer' },
+          {
+            key: 'mock',
+            header: 'Mock?',
+            render: (i: any) =>
+              i.is_mock ? (
+                <span className="text-[11px] font-medium bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded">
+                  Mock
+                </span>
+              ) : (
+                <span className="text-slate-300 text-xs">—</span>
+              ),
+          },
+          {
+            key: 'status',
+            header: 'Status',
+            render: (i: any) => <StatusBadge status={i.status} />,
+          },
+          {
+            key: 'fb',
+            header: '',
+            align: 'right',
+            render: (i: any) => (
+              <Button size="sm" variant="ghost" onClick={() => setOpenFeedback(i)}>
+                Feedback
+              </Button>
+            ),
+          },
         ]}
         rows={rows}
       />
 
       <Modal
         open={openSchedule || openMock}
-        onClose={() => { setOpenSchedule(false); setOpenMock(false); setForm(EMPTY_FORM); }}
+        onClose={() => {
+          setOpenSchedule(false);
+          setOpenMock(false);
+          setForm(EMPTY_FORM);
+        }}
         title={openMock ? 'Schedule mock interview' : 'Schedule interview'}
-        description={openMock ? 'Internal practice run — feedback only.' : 'Records on the consultant timeline and calendar.'}
+        description={
+          openMock
+            ? 'Internal practice run — feedback only.'
+            : 'Records on the consultant timeline and calendar.'
+        }
         footer={
           <>
-            <Button variant="secondary" onClick={() => { setOpenSchedule(false); setOpenMock(false); setForm(EMPTY_FORM); }}>Cancel</Button>
-            <Button onClick={() => schedule(openMock)} loading={saving}>{saving ? 'Saving' : 'Save'}</Button>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setOpenSchedule(false);
+                setOpenMock(false);
+                setForm(EMPTY_FORM);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button onClick={() => schedule(openMock)} loading={saving}>
+              {saving ? 'Saving' : 'Save'}
+            </Button>
           </>
         }
       >
         <div className="space-y-3">
-          <SelectInput label="Consultant *" placeholder="Select a consultant…"
+          <SelectInput
+            label="Consultant *"
+            placeholder="Select a consultant…"
             value={form.consultant_id}
-            options={consultants.map((c) => ({ value: c.id, label: c.user?.full_name ?? c.user?.email }))}
+            options={consultants.map((c) => ({
+              value: c.id,
+              label: c.user?.full_name ?? c.user?.email,
+            }))}
             onChange={(e) => setForm({ ...form, consultant_id: e.target.value })}
           />
           {!openMock && (
-            <SelectInput label="Type"
+            <SelectInput
+              label="Type"
               value={form.type}
               options={[
                 { value: 'PHONE', label: 'Phone' },
@@ -153,40 +220,77 @@ export function Interviews() {
           <DateTimePicker
             label="When *"
             value={form.scheduled_at_local ?? ''}
-            onChange={(v) => setForm({
-              ...form,
-              scheduled_at_local: v,
-              scheduled_at: localToIso(v),
-            })}
+            onChange={(v) =>
+              setForm({
+                ...form,
+                scheduled_at_local: v,
+                scheduled_at: localToIso(v),
+              })
+            }
           />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <FormInput label="Interviewer" value={form.interviewer} onChange={(e) => setForm({ ...form, interviewer: e.target.value })} />
-            <FormInput label="Meeting URL" placeholder="https://meet.google.com/…" value={form.meeting_url} onChange={(e) => setForm({ ...form, meeting_url: e.target.value })} />
+            <FormInput
+              label="Interviewer"
+              value={form.interviewer}
+              onChange={(e) => setForm({ ...form, interviewer: e.target.value })}
+            />
+            <FormInput
+              label="Meeting URL"
+              placeholder="https://meet.google.com/…"
+              value={form.meeting_url}
+              onChange={(e) => setForm({ ...form, meeting_url: e.target.value })}
+            />
           </div>
         </div>
       </Modal>
 
       <Modal
         open={!!openFeedback}
-        onClose={() => { setOpenFeedback(null); setFeedback(EMPTY_FEEDBACK); }}
+        onClose={() => {
+          setOpenFeedback(null);
+          setFeedback(EMPTY_FEEDBACK);
+        }}
         title="Interview feedback"
         description="Captured against the interview record. Rolls into pipeline reports."
         footer={
           <>
-            <Button variant="secondary" onClick={() => { setOpenFeedback(null); setFeedback(EMPTY_FEEDBACK); }}>Cancel</Button>
-            <Button onClick={submitFeedback} loading={savingFeedback}>{savingFeedback ? 'Saving' : 'Save feedback'}</Button>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setOpenFeedback(null);
+                setFeedback(EMPTY_FEEDBACK);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button onClick={submitFeedback} loading={savingFeedback}>
+              {savingFeedback ? 'Saving' : 'Save feedback'}
+            </Button>
           </>
         }
       >
         <div className="space-y-3">
-          <FormInput label="Rating (1–5)" type="number" min={1} max={5} value={feedback.rating}
+          <FormInput
+            label="Rating (1–5)"
+            type="number"
+            min={1}
+            max={5}
+            value={feedback.rating}
             onChange={(e) => {
               const v = e.target.value;
               setFeedback({ ...feedback, rating: v === '' ? 0 : Number(v) });
             }}
           />
-          <FormInput label="Strengths" value={feedback.strengths} onChange={(e) => setFeedback({ ...feedback, strengths: e.target.value })} />
-          <FormInput label="Weaknesses" value={feedback.weaknesses} onChange={(e) => setFeedback({ ...feedback, weaknesses: e.target.value })} />
+          <FormInput
+            label="Strengths"
+            value={feedback.strengths}
+            onChange={(e) => setFeedback({ ...feedback, strengths: e.target.value })}
+          />
+          <FormInput
+            label="Weaknesses"
+            value={feedback.weaknesses}
+            onChange={(e) => setFeedback({ ...feedback, weaknesses: e.target.value })}
+          />
           <label className="block">
             <span className="block text-xs font-medium text-slate-700 mb-1.5">Notes</span>
             <textarea

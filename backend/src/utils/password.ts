@@ -11,9 +11,9 @@ import crypto from 'node:crypto';
  * are responsible for not storing or echoing the value beyond the one-time
  * email send.
  */
-const UPPER = 'ABCDEFGHJKLMNPQRSTUVWXYZ';    // omit O/I for legibility
-const LOWER = 'abcdefghijkmnopqrstuvwxyz';   // omit l
-const DIGIT = '23456789';                    // omit 0/1
+const UPPER = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; // omit O/I for legibility
+const LOWER = 'abcdefghijkmnopqrstuvwxyz'; // omit l
+const DIGIT = '23456789'; // omit 0/1
 const SPECIAL = '!@#$%^&*?-_=+';
 const ALPHABET = UPPER + LOWER + DIGIT + SPECIAL;
 
@@ -53,10 +53,23 @@ export interface PasswordStrengthResult {
  *     real prod, plug in have-i-been-pwned k-anonymity or zxcvbn)
  */
 const COMMON_BANLIST = new Set([
-  'password', 'password1', 'password123',
-  'qwerty', 'qwerty123', 'letmein', 'admin', 'admin123',
-  'welcome', 'welcome1', 'iloveyou', 'changeme',
-  'abc12345', '12345678', '123456789', 'p@ssword', 'p@ssw0rd',
+  'password',
+  'password1',
+  'password123',
+  'qwerty',
+  'qwerty123',
+  'letmein',
+  'admin',
+  'admin123',
+  'welcome',
+  'welcome1',
+  'iloveyou',
+  'changeme',
+  'abc12345',
+  '12345678',
+  '123456789',
+  'p@ssword',
+  'p@ssw0rd',
 ]);
 
 export function validatePasswordStrength(

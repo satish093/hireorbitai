@@ -29,7 +29,11 @@ export function FileUpload({ label = 'Upload file', accept, onFile }: Props) {
         <span aria-hidden="true">📎</span> {label}
       </button>
       <input ref={inputRef} type="file" accept={accept} className="hidden" onChange={handle} />
-      {name && <span className="text-xs text-slate-600 truncate max-w-[180px]" title={name}>{name}</span>}
+      {name && (
+        <span className="text-xs text-slate-600 truncate max-w-[180px]" title={name}>
+          {name}
+        </span>
+      )}
     </div>
   );
 }

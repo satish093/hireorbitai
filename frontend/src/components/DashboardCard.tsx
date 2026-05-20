@@ -24,7 +24,9 @@ export function DashboardCard({ label, value, hint, accent = 'slate', selected }
         selected ? 'border-slate-900 shadow-sm' : 'border-slate-200'
       } p-5 overflow-hidden hover-lift before:absolute before:left-0 before:top-0 before:bottom-0 before:w-1 ${accents[accent]} before:scale-y-0 before:origin-top before:transition-transform before:duration-300 before:ease-out hover:before:scale-y-100`}
     >
-      <div className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase">{label}</div>
+      <div className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase">
+        {label}
+      </div>
       <div className="text-3xl font-semibold mt-2 tabular-nums tracking-tight text-slate-900">
         {typeof value === 'number' ? <CountUp value={value} /> : value}
       </div>
@@ -42,7 +44,10 @@ function CountUp({ value }: { value: number }) {
   useEffect(() => {
     if (value === display) return;
     // Respect reduced-motion: skip the tween entirely.
-    if (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    if (
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    ) {
       setDisplay(value);
       return;
     }

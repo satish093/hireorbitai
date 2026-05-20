@@ -25,7 +25,8 @@ export function Applications() {
 
   function load() {
     setLoading(true);
-    api.get('/applications')
+    api
+      .get('/applications')
       .then((r) => setRows(r.data ?? []))
       .catch((e) => toast.error(e?.response?.data?.error ?? 'Failed to load applications'))
       .finally(() => setLoading(false));
@@ -33,10 +34,27 @@ export function Applications() {
   useEffect(() => {
     let cancelled = false;
     load();
-    api.get('/consultants').then((r) => { if (!cancelled) setConsultants(r.data ?? []); }).catch(() => {});
-    api.get('/jobs').then((r) => { if (!cancelled) setJobs(r.data ?? []); }).catch(() => {});
-    api.get('/vendors').then((r) => { if (!cancelled) setVendors(r.data ?? []); }).catch(() => {});
-    return () => { cancelled = true; };
+    api
+      .get('/consultants')
+      .then((r) => {
+        if (!cancelled) setConsultants(r.data ?? []);
+      })
+      .catch(() => {});
+    api
+      .get('/jobs')
+      .then((r) => {
+        if (!cancelled) setJobs(r.data ?? []);
+      })
+      .catch(() => {});
+    api
+      .get('/vendors')
+      .then((r) => {
+        if (!cancelled) setVendors(r.data ?? []);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Refetch when a sibling page (JobSearch's "I applied" flow, etc.)
@@ -84,45 +102,85 @@ export function Applications() {
         loading={loading}
         empty="No submissions yet."
         columns={[
-          { key: 'consultant', header: 'Consultant', render: (a: any) => a.consultant?.user?.full_name ?? a.consultant?.user?.email ?? '—' },
+          {
+            key: 'consultant',
+            header: 'Consultant',
+            render: (a: any) => a.consultant?.user?.full_name ?? a.consultant?.user?.email ?? '—',
+          },
           { key: 'job', header: 'Job', render: (a: any) => a.job?.title ?? '—' },
           { key: 'vendor', header: 'Vendor', render: (a: any) => a.vendor?.company_name ?? '—' },
           { key: 'ats', header: 'ATS', align: 'right', render: (a: any) => a.ats_score ?? '—' },
-          { key: 'date', header: 'Submitted', render: (a: any) => a.submitted_at ? new Date(a.submitted_at).toLocaleDateString() : '—' },
-          { key: 'status', header: 'Status', render: (a: any) => <StatusBadge status={a.status} /> },
+          {
+            key: 'date',
+            header: 'Submitted',
+            render: (a: any) =>
+              a.submitted_at ? new Date(a.submitted_at).toLocaleDateString() : '—',
+          },
+          {
+            key: 'status',
+            header: 'Status',
+            render: (a: any) => <StatusBadge status={a.status} />,
+          },
         ]}
         rows={rows}
       />
 
       <Modal
         open={open}
-        onClose={() => { setOpen(false); setForm(EMPTY); }}
+        onClose={() => {
+          setOpen(false);
+          setForm(EMPTY);
+        }}
         title="New submission"
         description="Pick a consultant, a job, and a vendor. The system pre-checks for duplicates."
         footer={
           <>
-            <Button variant="secondary" onClick={() => { setOpen(false); setForm(EMPTY); }}>Cancel</Button>
-            <Button onClick={submit} loading={submitting}>{submitting ? 'Submitting' : 'Submit'}</Button>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setOpen(false);
+                setForm(EMPTY);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button onClick={submit} loading={submitting}>
+              {submitting ? 'Submitting' : 'Submit'}
+            </Button>
           </>
         }
       >
         <div className="space-y-3">
-          <SelectInput label="Consultant *" placeholder="Select a consultant…"
+          <SelectInput
+            label="Consultant *"
+            placeholder="Select a consultant…"
             value={form.consultant_id}
-            options={consultants.map((c) => ({ value: c.id, label: c.user?.full_name ?? c.user?.email }))}
+            options={consultants.map((c) => ({
+              value: c.id,
+              label: c.user?.full_name ?? c.user?.email,
+            }))}
             onChange={(e) => setForm({ ...form, consultant_id: e.target.value })}
           />
-          <SelectInput label="Job *" placeholder="Select a job…"
+          <SelectInput
+            label="Job *"
+            placeholder="Select a job…"
             value={form.job_id}
             options={jobs.map((j) => ({ value: j.id, label: j.title }))}
             onChange={(e) => setForm({ ...form, job_id: e.target.value })}
           />
-          <SelectInput label="Vendor" placeholder="Select a vendor…"
+          <SelectInput
+            label="Vendor"
+            placeholder="Select a vendor…"
             value={form.vendor_id}
             options={vendors.map((v) => ({ value: v.id, label: v.company_name }))}
             onChange={(e) => setForm({ ...form, vendor_id: e.target.value })}
           />
-          <FormInput label="Notes" placeholder="Anything the team should know" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+          <FormInput
+            label="Notes"
+            placeholder="Anything the team should know"
+            value={form.notes}
+            onChange={(e) => setForm({ ...form, notes: e.target.value })}
+          />
         </div>
       </Modal>
     </Layout>

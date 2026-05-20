@@ -19,23 +19,34 @@ export function Clients() {
 
   function load() {
     setLoading(true);
-    api.get('/clients')
+    api
+      .get('/clients')
       .then((r) => setRows(r.data ?? []))
       .catch((e) => toast.error(e?.response?.data?.error ?? 'Failed to load clients'))
       .finally(() => setLoading(false));
   }
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+  }, []);
 
   async function save() {
     if (saving) return;
-    if (!form.company_name) { toast.error('Company is required'); return; }
+    if (!form.company_name) {
+      toast.error('Company is required');
+      return;
+    }
     setSaving(true);
     try {
       await api.post('/clients', form);
       toast.success('Client added');
-      setOpen(false); setForm(EMPTY); load();
-    } catch (e: any) { toast.error(e?.response?.data?.error ?? 'Failed'); }
-    finally { setSaving(false); }
+      setOpen(false);
+      setForm(EMPTY);
+      load();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error ?? 'Failed');
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -58,23 +69,58 @@ export function Clients() {
       />
       <Modal
         open={open}
-        onClose={() => { setOpen(false); setForm(EMPTY); }}
+        onClose={() => {
+          setOpen(false);
+          setForm(EMPTY);
+        }}
         title="New client"
         footer={
           <>
-            <Button variant="secondary" onClick={() => { setOpen(false); setForm(EMPTY); }}>Cancel</Button>
-            <Button onClick={save} loading={saving}>{saving ? 'Saving' : 'Save client'}</Button>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setOpen(false);
+                setForm(EMPTY);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button onClick={save} loading={saving}>
+              {saving ? 'Saving' : 'Save client'}
+            </Button>
           </>
-        }>
+        }
+      >
         <div className="space-y-3">
-          <FormInput label="Company *" value={form.company_name} onChange={(e) => setForm({ ...form, company_name: e.target.value })} />
+          <FormInput
+            label="Company *"
+            value={form.company_name}
+            onChange={(e) => setForm({ ...form, company_name: e.target.value })}
+          />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <FormInput label="Industry" value={form.industry} onChange={(e) => setForm({ ...form, industry: e.target.value })} />
-            <FormInput label="Location" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
+            <FormInput
+              label="Industry"
+              value={form.industry}
+              onChange={(e) => setForm({ ...form, industry: e.target.value })}
+            />
+            <FormInput
+              label="Location"
+              value={form.location}
+              onChange={(e) => setForm({ ...form, location: e.target.value })}
+            />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <FormInput label="Contact name" value={form.contact_name} onChange={(e) => setForm({ ...form, contact_name: e.target.value })} />
-            <FormInput label="Contact email" type="email" value={form.contact_email} onChange={(e) => setForm({ ...form, contact_email: e.target.value })} />
+            <FormInput
+              label="Contact name"
+              value={form.contact_name}
+              onChange={(e) => setForm({ ...form, contact_name: e.target.value })}
+            />
+            <FormInput
+              label="Contact email"
+              type="email"
+              value={form.contact_email}
+              onChange={(e) => setForm({ ...form, contact_email: e.target.value })}
+            />
           </div>
         </div>
       </Modal>

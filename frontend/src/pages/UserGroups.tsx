@@ -68,18 +68,29 @@ export function UserGroups() {
       } else {
         toast.error(msg);
       }
-    } finally { setLoading(false); }
+    } finally {
+      setLoading(false);
+    }
   }
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+  }, []);
 
   async function create() {
-    if (!name.trim() || !slug.trim()) { toast.error('Name and slug required'); return; }
+    if (!name.trim() || !slug.trim()) {
+      toast.error('Name and slug required');
+      return;
+    }
     try {
       await api.post('/user-groups', {
-        name: name.trim(), slug: slug.trim().toLowerCase().replace(/\s+/g, '-'),
+        name: name.trim(),
+        slug: slug.trim().toLowerCase().replace(/\s+/g, '-'),
       });
-      setName(''); setSlug(''); setSlugEdited(false);
-      toast.success('Group created'); load();
+      setName('');
+      setSlug('');
+      setSlugEdited(false);
+      toast.success('Group created');
+      load();
     } catch (e: any) {
       toast.error(e?.response?.data?.error ?? 'Failed to create');
     }
@@ -98,7 +109,8 @@ export function UserGroups() {
     if (!confirm(`Delete "${g.name}"? Members will fall back to no group.`)) return;
     try {
       await api.delete(`/user-groups/${g.id}`);
-      toast.success('Removed'); load();
+      toast.success('Removed');
+      load();
     } catch (e: any) {
       toast.error(e?.response?.data?.error ?? 'Failed');
     }
@@ -134,21 +146,28 @@ export function UserGroups() {
         />
         <input
           value={slug}
-          onChange={(e) => { setSlug(e.target.value); setSlugEdited(true); }}
+          onChange={(e) => {
+            setSlug(e.target.value);
+            setSlugEdited(true);
+          }}
           placeholder="slug"
           className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm font-mono"
         />
         <button
           onClick={create}
           className="bg-slate-900 text-white text-sm px-4 py-1.5 rounded-lg hover:bg-slate-800"
-        >+ Create group</button>
+        >
+          + Create group
+        </button>
       </div>
 
       {loading ? (
         <p className="text-sm text-slate-500">Loading…</p>
       ) : groups.length === 0 ? (
         <div className="bg-white border border-slate-200 rounded-xl p-10 text-center text-slate-500">
-          No groups yet. Apply <span className="font-mono text-xs">database/user-groups-and-presence.sql</span> to seed Cloudfen / Zangle IT / Xeronix / Okta Solutions.
+          No groups yet. Apply{' '}
+          <span className="font-mono text-xs">database/user-groups-and-presence.sql</span> to seed
+          Cloudfen / Zangle IT / Xeronix / Okta Solutions.
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -156,20 +175,39 @@ export function UserGroups() {
             const members = users.filter((u) => u.group_id === g.id);
             const candidates = users.filter((u) => u.group_id !== g.id);
             return (
-              <div key={g.id} className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+              <div
+                key={g.id}
+                className="bg-white border border-slate-200 rounded-xl overflow-hidden"
+              >
                 <div className="px-5 py-3 border-b border-slate-100 flex items-center gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <h3 className="text-sm font-semibold text-slate-900">{g.name}</h3>
-                      <span className="text-[10px] font-mono text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">{g.slug}</span>
-                      {!g.is_active && <span className="text-[10px] uppercase tracking-widest text-amber-600">paused</span>}
+                      <span className="text-[10px] font-mono text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                        {g.slug}
+                      </span>
+                      {!g.is_active && (
+                        <span className="text-[10px] uppercase tracking-widest text-amber-600">
+                          paused
+                        </span>
+                      )}
                     </div>
-                    <p className="text-xs text-slate-500">{g.member_count} member{g.member_count === 1 ? '' : 's'}</p>
+                    <p className="text-xs text-slate-500">
+                      {g.member_count} member{g.member_count === 1 ? '' : 's'}
+                    </p>
                   </div>
-                  <button onClick={() => toggle(g)} className="text-xs text-slate-500 hover:text-slate-900 px-2">
+                  <button
+                    onClick={() => toggle(g)}
+                    className="text-xs text-slate-500 hover:text-slate-900 px-2"
+                  >
                     {g.is_active ? 'Pause' : 'Resume'}
                   </button>
-                  <button onClick={() => remove(g)} className="text-xs text-red-600 hover:underline px-2">Delete</button>
+                  <button
+                    onClick={() => remove(g)}
+                    className="text-xs text-red-600 hover:underline px-2"
+                  >
+                    Delete
+                  </button>
                 </div>
 
                 <div className="px-5 py-3 max-h-64 overflow-y-auto">
@@ -183,26 +221,34 @@ export function UserGroups() {
                           <button
                             onClick={() => assign(u.id, null)}
                             className="text-[11px] text-red-500 hover:underline"
-                          >Remove</button>
+                          >
+                            Remove
+                          </button>
                         </li>
                       ))}
                     </ul>
                   )}
                   <details>
-                    <summary className="text-xs text-slate-500 cursor-pointer hover:text-slate-900">+ Add member</summary>
+                    <summary className="text-xs text-slate-500 cursor-pointer hover:text-slate-900">
+                      + Add member
+                    </summary>
                     <div className="mt-2 max-h-44 overflow-y-auto border border-slate-100 rounded">
                       {candidates.length === 0 ? (
                         <p className="text-xs italic text-slate-400 p-2">No more users to add.</p>
-                      ) : candidates.map((u) => (
-                        <button
-                          key={u.id}
-                          onClick={() => assign(u.id, g.id)}
-                          className="w-full text-left text-sm px-2 py-1.5 hover:bg-slate-50 flex items-center justify-between"
-                        >
-                          <span className="truncate">{u.full_name ?? u.email}</span>
-                          <span className="text-[10px] uppercase tracking-wider text-slate-400">{u.role}</span>
-                        </button>
-                      ))}
+                      ) : (
+                        candidates.map((u) => (
+                          <button
+                            key={u.id}
+                            onClick={() => assign(u.id, g.id)}
+                            className="w-full text-left text-sm px-2 py-1.5 hover:bg-slate-50 flex items-center justify-between"
+                          >
+                            <span className="truncate">{u.full_name ?? u.email}</span>
+                            <span className="text-[10px] uppercase tracking-wider text-slate-400">
+                              {u.role}
+                            </span>
+                          </button>
+                        ))
+                      )}
                     </div>
                   </details>
                 </div>
@@ -216,5 +262,9 @@ export function UserGroups() {
 }
 
 function toSlug(s: string): string {
-  return s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+  return s
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
 }

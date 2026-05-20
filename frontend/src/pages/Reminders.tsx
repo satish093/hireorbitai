@@ -19,16 +19,22 @@ export function Reminders() {
 
   function load() {
     setLoading(true);
-    api.get('/reminders')
+    api
+      .get('/reminders')
       .then((r) => setRows(r.data ?? []))
       .catch((e) => toast.error(e?.response?.data?.error ?? 'Failed to load reminders'))
       .finally(() => setLoading(false));
   }
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+  }, []);
 
   async function save() {
     if (saving) return;
-    if (!form.title || !form.due_at) { toast.error('Title and due date are required'); return; }
+    if (!form.title || !form.due_at) {
+      toast.error('Title and due date are required');
+      return;
+    }
     setSaving(true);
     try {
       // Strip the local-only mirror field before POST. `due_at_local` is the
@@ -70,33 +76,70 @@ export function Reminders() {
         empty="No reminders. Add one to track an upcoming follow-up."
         columns={[
           { key: 'title', header: 'Title' },
-          { key: 'due_at', header: 'Due', render: (r: any) => r.due_at ? new Date(r.due_at).toLocaleString() : '—' },
-          { key: 'status', header: 'Status', render: (r: any) => <StatusBadge status={r.status} /> },
-          { key: 'actions', header: '', align: 'right', render: (r: any) => (
-            r.status !== 'DONE'
-              ? <Button size="sm" variant="ghost" onClick={() => complete(r.id)}>Mark done</Button>
-              : null
-          )},
+          {
+            key: 'due_at',
+            header: 'Due',
+            render: (r: any) => (r.due_at ? new Date(r.due_at).toLocaleString() : '—'),
+          },
+          {
+            key: 'status',
+            header: 'Status',
+            render: (r: any) => <StatusBadge status={r.status} />,
+          },
+          {
+            key: 'actions',
+            header: '',
+            align: 'right',
+            render: (r: any) =>
+              r.status !== 'DONE' ? (
+                <Button size="sm" variant="ghost" onClick={() => complete(r.id)}>
+                  Mark done
+                </Button>
+              ) : null,
+          },
         ]}
         rows={rows}
       />
-      <Modal open={open} onClose={() => { setOpen(false); setForm({}); }} title="New reminder"
+      <Modal
+        open={open}
+        onClose={() => {
+          setOpen(false);
+          setForm({});
+        }}
+        title="New reminder"
         footer={
           <>
-            <Button variant="secondary" onClick={() => { setOpen(false); setForm({}); }}>Cancel</Button>
-            <Button onClick={save} loading={saving}>{saving ? 'Saving' : 'Save reminder'}</Button>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setOpen(false);
+                setForm({});
+              }}
+            >
+              Cancel
+            </Button>
+            <Button onClick={save} loading={saving}>
+              {saving ? 'Saving' : 'Save reminder'}
+            </Button>
           </>
-        }>
+        }
+      >
         <div className="space-y-3">
-          <FormInput label="Title *" value={form.title ?? ''} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+          <FormInput
+            label="Title *"
+            value={form.title ?? ''}
+            onChange={(e) => setForm({ ...form, title: e.target.value })}
+          />
           <DateTimePicker
             label="Due at *"
             value={form.due_at_local ?? ''}
-            onChange={(v) => setForm({
-              ...form,
-              due_at_local: v,
-              due_at: localToIso(v),
-            })}
+            onChange={(v) =>
+              setForm({
+                ...form,
+                due_at_local: v,
+                due_at: localToIso(v),
+              })
+            }
           />
           <label className="block">
             <span className="block text-xs font-medium text-slate-700 mb-1.5">Description</span>

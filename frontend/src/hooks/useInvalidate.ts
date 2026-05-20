@@ -50,7 +50,11 @@ export function invalidate(channel: Channel): void {
   // Clone so a listener that synchronously re-subscribes (rare but
   // possible during rerenders) doesn't mutate the iteration target.
   for (const fn of Array.from(c.listeners)) {
-    try { fn(c.version); } catch { /* listener errors don't block siblings */ }
+    try {
+      fn(c.version);
+    } catch {
+      /* listener errors don't block siblings */
+    }
   }
 }
 
@@ -61,19 +65,20 @@ export function invalidate(channel: Channel): void {
  * Note: the callback is captured at mount time. If you need to read fresh
  * state from inside it, use a ref or pull the data via the function args.
  */
-export function useInvalidationListener(
-  channel: Channel,
-  onInvalidate: () => void,
-): void {
+export function useInvalidationListener(channel: Channel, onInvalidate: () => void): void {
   // Latest-callback ref so consumers don't need to memoize, but the
   // subscription itself only needs to mount/unmount once.
   const fnRef = useRef(onInvalidate);
-  useEffect(() => { fnRef.current = onInvalidate; });
+  useEffect(() => {
+    fnRef.current = onInvalidate;
+  });
 
   useEffect(() => {
     const c = ensureChannel(channel);
     const handler = () => fnRef.current();
     c.listeners.add(handler);
-    return () => { c.listeners.delete(handler); };
+    return () => {
+      c.listeners.delete(handler);
+    };
   }, [channel]);
 }

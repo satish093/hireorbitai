@@ -12,10 +12,18 @@ interface Props {
  * an ugly OS-native dialog.
  */
 export function DuplicateSubmissionModal({
-  consultantName, jobTitle, status, submittedAt, onConfirm, onCancel,
+  consultantName,
+  jobTitle,
+  status,
+  submittedAt,
+  onConfirm,
+  onCancel,
 }: Props) {
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/55 flex items-center justify-center p-4" onClick={onCancel}>
+    <div
+      className="fixed inset-0 z-50 bg-slate-900/55 flex items-center justify-center p-4"
+      onClick={onCancel}
+    >
       <div
         className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden"
         onClick={(e) => e.stopPropagation()}
@@ -36,15 +44,20 @@ export function DuplicateSubmissionModal({
               </span>
               {submittedAt && (
                 <span className="text-xs text-slate-500">
-                  on {new Date(submittedAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
+                  on{' '}
+                  {new Date(submittedAt).toLocaleDateString(undefined, {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                  })}
                 </span>
               )}
             </div>
           </div>
         </div>
         <p className="px-6 pb-5 text-xs text-slate-500 leading-relaxed">
-          Submitting again will create a second application record. Most vendors only consider the first
-          submission. Continue only if the vendor has explicitly asked for a re-submit.
+          Submitting again will create a second application record. Most vendors only consider the
+          first submission. Continue only if the vendor has explicitly asked for a re-submit.
         </p>
         <div className="px-6 py-3 border-t border-slate-100 bg-slate-50 flex items-center justify-end gap-2">
           <button

@@ -27,7 +27,9 @@ export const PasswordField = forwardRef<HTMLInputElement, Props>(function Passwo
             'w-full rounded-lg border bg-white pl-3 pr-10 py-2 text-sm shadow-sm transition',
             'placeholder:text-slate-400',
             'focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500',
-            error ? 'border-red-300 focus:ring-red-200 focus:border-red-500' : 'border-slate-300 hover:border-slate-400',
+            error
+              ? 'border-red-300 focus:ring-red-200 focus:border-red-500'
+              : 'border-slate-300 hover:border-slate-400',
             className,
           )}
         />
@@ -50,13 +52,16 @@ export const PasswordField = forwardRef<HTMLInputElement, Props>(function Passwo
 // Strength hints — live indicator next to the new-password field. Matches the
 // backend rules in backend/src/utils/password.ts.
 // ---------------------------------------------------------------------------
-interface Rule { label: string; check: (pw: string) => boolean }
+interface Rule {
+  label: string;
+  check: (pw: string) => boolean;
+}
 const RULES: Rule[] = [
   { label: 'At least 12 characters', check: (p) => p.length >= 12 },
-  { label: 'Uppercase letter',       check: (p) => /[A-Z]/.test(p) },
-  { label: 'Lowercase letter',       check: (p) => /[a-z]/.test(p) },
-  { label: 'Number',                 check: (p) => /[0-9]/.test(p) },
-  { label: 'Special character',      check: (p) => /[^A-Za-z0-9]/.test(p) },
+  { label: 'Uppercase letter', check: (p) => /[A-Z]/.test(p) },
+  { label: 'Lowercase letter', check: (p) => /[a-z]/.test(p) },
+  { label: 'Number', check: (p) => /[0-9]/.test(p) },
+  { label: 'Special character', check: (p) => /[^A-Za-z0-9]/.test(p) },
 ];
 
 export function PasswordStrengthHints({ password }: { password: string }) {
@@ -66,8 +71,19 @@ export function PasswordStrengthHints({ password }: { password: string }) {
       {RULES.map((r) => {
         const ok = r.check(pw);
         return (
-          <li key={r.label} className={clsx('flex items-center gap-1.5', ok ? 'text-emerald-700' : 'text-slate-500')}>
-            <span className={clsx('w-3 inline-flex justify-center', ok ? 'text-emerald-600' : 'text-slate-300')}>
+          <li
+            key={r.label}
+            className={clsx(
+              'flex items-center gap-1.5',
+              ok ? 'text-emerald-700' : 'text-slate-500',
+            )}
+          >
+            <span
+              className={clsx(
+                'w-3 inline-flex justify-center',
+                ok ? 'text-emerald-600' : 'text-slate-300',
+              )}
+            >
               {ok ? '✓' : '○'}
             </span>
             {r.label}

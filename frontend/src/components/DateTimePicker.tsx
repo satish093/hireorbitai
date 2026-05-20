@@ -17,7 +17,7 @@ import { IconCalendar, IconReminder } from './Icons';
 
 interface Props {
   label?: string;
-  value: string;                // 'YYYY-MM-DDTHH:mm' (datetime-local format)
+  value: string; // 'YYYY-MM-DDTHH:mm' (datetime-local format)
   onChange: (next: string) => void;
   required?: boolean;
   /** Optional helper text below the inputs. */
@@ -55,7 +55,7 @@ function combine(date: string, time: string): string {
 function pretty12hr(time: string): string {
   const [h, m] = time.split(':').map(Number);
   const period = (h ?? 0) >= 12 ? 'PM' : 'AM';
-  const hour12 = ((h ?? 0) % 12) || 12;
+  const hour12 = (h ?? 0) % 12 || 12;
   return `${hour12}:${String(m ?? 0).padStart(2, '0')} ${period}`;
 }
 
@@ -73,9 +73,7 @@ function isoLocalToday(hour: number, minute: number = 0, daysAhead: number = 0):
   return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
 }
 
-export function DateTimePicker({
-  label, value, onChange, required, hint, hidePresets,
-}: Props) {
+export function DateTimePicker({ label, value, onChange, required, hint, hidePresets }: Props) {
   const { date, time } = useMemo(() => splitISO(value), [value]);
   const [timeOpen, setTimeOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -95,14 +93,18 @@ export function DateTimePicker({
     <div className="space-y-1.5" ref={wrapRef}>
       {label && (
         <label className="text-sm font-medium text-slate-700">
-          {label}{required && <span className="text-rose-500 ml-0.5">*</span>}
+          {label}
+          {required && <span className="text-rose-500 ml-0.5">*</span>}
         </label>
       )}
 
       <div className="flex items-stretch gap-2">
         {/* Date field */}
         <div className="relative flex-1 min-w-0">
-          <IconCalendar size={15} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          <IconCalendar
+            size={15}
+            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+          />
           <input
             type="date"
             value={date}
@@ -119,7 +121,10 @@ export function DateTimePicker({
             onClick={() => setTimeOpen((v) => !v)}
             className="text-sm bg-white border border-slate-200 rounded-lg pl-8 pr-3 py-2 min-w-[120px] text-left hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-brand-500/40 relative"
           >
-            <IconReminder size={15} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <IconReminder
+              size={15}
+              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400"
+            />
             <span className="tabular-nums">{pretty12hr(time)}</span>
           </button>
           {timeOpen && (
@@ -128,7 +133,10 @@ export function DateTimePicker({
                 <button
                   key={t}
                   type="button"
-                  onClick={() => { onChange(combine(date, t)); setTimeOpen(false); }}
+                  onClick={() => {
+                    onChange(combine(date, t));
+                    setTimeOpen(false);
+                  }}
                   className={clsx(
                     'w-full px-3 py-1.5 text-sm text-left hover:bg-brand-50 hover:text-brand-700 tabular-nums',
                     t === time && 'bg-brand-50 text-brand-700 font-semibold',
@@ -144,11 +152,15 @@ export function DateTimePicker({
 
       {!hidePresets && (
         <div className="flex flex-wrap gap-1.5 pt-0.5">
-          <Preset label="In 1 hour" onClick={() => {
-            const d = new Date(); d.setHours(d.getHours() + 1, 0, 0, 0);
-            onChange(isoLocalFromDate(d));
-          }} />
-          <Preset label="Today 5 PM"   onClick={() => onChange(isoLocalToday(17, 0))} />
+          <Preset
+            label="In 1 hour"
+            onClick={() => {
+              const d = new Date();
+              d.setHours(d.getHours() + 1, 0, 0, 0);
+              onChange(isoLocalFromDate(d));
+            }}
+          />
+          <Preset label="Today 5 PM" onClick={() => onChange(isoLocalToday(17, 0))} />
           <Preset label="Tomorrow 9 AM" onClick={() => onChange(isoLocalToday(9, 0, 1))} />
           <Preset label="Next week 9 AM" onClick={() => onChange(isoLocalToday(9, 0, 7))} />
         </div>

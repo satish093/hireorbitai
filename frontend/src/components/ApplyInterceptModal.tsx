@@ -14,11 +14,18 @@ import { Avatar } from './TaskBits';
 
 const REMIND_KEY = 'tb_apply_no_intercept';
 export function shouldShowApplyIntercept(): boolean {
-  try { return localStorage.getItem(REMIND_KEY) !== '1'; }
-  catch { return true; }
+  try {
+    return localStorage.getItem(REMIND_KEY) !== '1';
+  } catch {
+    return true;
+  }
 }
 export function suppressApplyIntercept() {
-  try { localStorage.setItem(REMIND_KEY, '1'); } catch { /* ignore */ }
+  try {
+    localStorage.setItem(REMIND_KEY, '1');
+  } catch {
+    /* ignore */
+  }
 }
 
 interface JobLite {
@@ -31,7 +38,12 @@ interface JobLite {
 }
 
 export function ApplyInterceptModal({
-  job, mySkills, applyUrl, onClose, onCustomize, onApplyAnyway,
+  job,
+  mySkills,
+  applyUrl,
+  onClose,
+  onCustomize,
+  onApplyAnyway,
 }: {
   job: JobLite;
   mySkills: string[];
@@ -46,7 +58,9 @@ export function ApplyInterceptModal({
 
   const company = job.company_name ?? 'Confidential';
   const requiredSkills =
-    (job.requirements?.required_skills?.length ? job.requirements.required_skills : job.required_skills) ?? [];
+    (job.requirements?.required_skills?.length
+      ? job.requirements.required_skills
+      : job.required_skills) ?? [];
   const mineLower = new Set(mySkills.map((s) => s.toLowerCase()));
   const missing = requiredSkills.filter((s) => !mineLower.has(s.toLowerCase())).slice(0, 16);
 
@@ -84,13 +98,20 @@ export function ApplyInterceptModal({
           <h2 className="text-base font-semibold text-slate-900">
             Customize Your Resume in 10 seconds
           </h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-900 text-xl leading-none">×</button>
+          <button
+            onClick={onClose}
+            className="text-slate-400 hover:text-slate-900 text-xl leading-none"
+          >
+            ×
+          </button>
         </div>
 
         <div className="p-5 space-y-4">
           {/* Status banner */}
           <div className="flex items-start gap-2 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2.5">
-            <span className="text-lg leading-none">{score10 >= 7 ? '🙂' : score10 >= 5 ? '😐' : '😕'}</span>
+            <span className="text-lg leading-none">
+              {score10 >= 7 ? '🙂' : score10 >= 5 ? '😐' : '😕'}
+            </span>
             <p className="text-sm font-semibold text-slate-900 leading-snug">
               {score10 >= 7
                 ? 'Your resume is on the right track, but a few keywords are still missing'
@@ -105,7 +126,9 @@ export function ApplyInterceptModal({
             <Avatar name={company} size={40} />
             <div className="flex-1 min-w-0">
               <div className="text-xs text-slate-500 truncate">{company}</div>
-              <div className="text-sm font-semibold text-slate-900 leading-snug truncate">{job.title}</div>
+              <div className="text-sm font-semibold text-slate-900 leading-snug truncate">
+                {job.title}
+              </div>
             </div>
             <ScoreGauge value={score10} tone={tone} />
           </div>
@@ -114,12 +137,16 @@ export function ApplyInterceptModal({
           {missing.length > 0 ? (
             <div>
               <p className="text-sm text-slate-700 mb-2">
-                Missing <span className="font-semibold">{missing.length}</span> key skill{missing.length === 1 ? '' : 's'}
+                Missing <span className="font-semibold">{missing.length}</span> key skill
+                {missing.length === 1 ? '' : 's'}
                 {missing.length >= 5 ? ' & bullet point alignment' : ''}
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {missing.slice(0, 8).map((s) => (
-                  <span key={s} className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-rose-100 text-rose-800">
+                  <span
+                    key={s}
+                    className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-rose-100 text-rose-800"
+                  >
                     {s}
                   </span>
                 ))}
@@ -132,7 +159,8 @@ export function ApplyInterceptModal({
             </div>
           ) : (
             <p className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2">
-              ✓ Your skills cover the job's required keywords. You can still review the per-skill match.
+              ✓ Your skills cover the job's required keywords. You can still review the per-skill
+              match.
             </p>
           )}
 
@@ -172,11 +200,7 @@ export function ApplyInterceptModal({
 
 /** Map the AI match_score (0..100) onto Jobright's 0..10 gauge. Falls back to
  *  a coverage ratio when we don't have a precomputed score yet. */
-function scoreOnTen(
-  job: JobLite,
-  required: string[],
-  mineLower: Set<string>,
-): number {
+function scoreOnTen(job: JobLite, required: string[], mineLower: Set<string>): number {
   if (typeof job.match_score === 'number') {
     return Math.round((job.match_score / 10) * 10) / 10;
   }
@@ -196,28 +220,31 @@ function ScoreGauge({ value, tone }: { value: number; tone: 'good' | 'fair' | 'w
   const r = 32;
   const c = Math.PI * r; // semicircle length
   const offset = c - (pct / 100) * c;
-  const stroke =
-    tone === 'good' ? 'url(#g-good)'
-    : tone === 'fair' ? 'url(#g-fair)'
-    : '#ef4444';
+  const stroke = tone === 'good' ? 'url(#g-good)' : tone === 'fair' ? 'url(#g-fair)' : '#ef4444';
   const label = tone === 'good' ? 'Strong' : tone === 'fair' ? 'Fair' : 'Weak';
   return (
     <div className="text-center">
       <svg viewBox="0 0 80 50" className="w-20 h-12">
         <defs>
           <linearGradient id="g-good" x1="0" x2="1">
-            <stop offset="0%" stopColor="#fb923c"/>
-            <stop offset="50%" stopColor="#facc15"/>
-            <stop offset="100%" stopColor="#22d3ee"/>
+            <stop offset="0%" stopColor="#fb923c" />
+            <stop offset="50%" stopColor="#facc15" />
+            <stop offset="100%" stopColor="#22d3ee" />
           </linearGradient>
           <linearGradient id="g-fair" x1="0" x2="1">
-            <stop offset="0%" stopColor="#fb923c"/>
-            <stop offset="60%" stopColor="#facc15"/>
-            <stop offset="100%" stopColor="#22d3ee"/>
+            <stop offset="0%" stopColor="#fb923c" />
+            <stop offset="60%" stopColor="#facc15" />
+            <stop offset="100%" stopColor="#22d3ee" />
           </linearGradient>
         </defs>
         {/* Background arc */}
-        <path d="M 8 42 A 32 32 0 0 1 72 42" stroke="#e2e8f0" strokeWidth="6" fill="none" strokeLinecap="round" />
+        <path
+          d="M 8 42 A 32 32 0 0 1 72 42"
+          stroke="#e2e8f0"
+          strokeWidth="6"
+          fill="none"
+          strokeLinecap="round"
+        />
         {/* Value arc */}
         <path
           d="M 8 42 A 32 32 0 0 1 72 42"
@@ -232,7 +259,9 @@ function ScoreGauge({ value, tone }: { value: number; tone: 'good' | 'fair' | 'w
           {value.toFixed(1)}
         </text>
       </svg>
-      <div className="text-[10px] font-semibold tracking-wider uppercase text-slate-600">{label}</div>
+      <div className="text-[10px] font-semibold tracking-wider uppercase text-slate-600">
+        {label}
+      </div>
     </div>
   );
 }

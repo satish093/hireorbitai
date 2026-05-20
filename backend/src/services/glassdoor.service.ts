@@ -24,19 +24,16 @@ function getKey(): string {
  * questions asked, plus interviewee notes.
  */
 export async function fetchGlassdoorInterview(interviewId: string): Promise<unknown> {
-  const { data, status } = await axios.get(
-    `https://${HOST}/companies/interview-details`,
-    {
-      params: { interviewId },
-      headers: {
-        'x-rapidapi-host': HOST,
-        'x-rapidapi-key': getKey(),
-        'Content-Type': 'application/json',
-      },
-      timeout: 20000,
-      validateStatus: () => true,
+  const { data, status } = await axios.get(`https://${HOST}/companies/interview-details`, {
+    params: { interviewId },
+    headers: {
+      'x-rapidapi-host': HOST,
+      'x-rapidapi-key': getKey(),
+      'Content-Type': 'application/json',
     },
-  );
+    timeout: 20000,
+    validateStatus: () => true,
+  });
   if (status >= 400) {
     const msg = (data as any)?.message ?? `HTTP ${status}`;
     throw new Error(`Glassdoor: ${msg}`);

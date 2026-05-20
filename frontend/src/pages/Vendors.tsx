@@ -8,7 +8,14 @@ import { Button } from '../components/Button';
 import { api } from '../services/api';
 import toast from 'react-hot-toast';
 
-const EMPTY = { company_name: '', contact_name: '', contact_email: '', contact_phone: '', website: '', tier: '' };
+const EMPTY = {
+  company_name: '',
+  contact_name: '',
+  contact_email: '',
+  contact_phone: '',
+  website: '',
+  tier: '',
+};
 
 export function Vendors() {
   const [rows, setRows] = useState<any[]>([]);
@@ -19,23 +26,34 @@ export function Vendors() {
 
   function load() {
     setLoading(true);
-    api.get('/vendors')
+    api
+      .get('/vendors')
       .then((r) => setRows(r.data ?? []))
       .catch((e) => toast.error(e?.response?.data?.error ?? 'Failed to load vendors'))
       .finally(() => setLoading(false));
   }
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+  }, []);
 
   async function save() {
     if (saving) return;
-    if (!form.company_name) { toast.error('Company name is required'); return; }
+    if (!form.company_name) {
+      toast.error('Company name is required');
+      return;
+    }
     setSaving(true);
     try {
       await api.post('/vendors', form);
       toast.success('Vendor added');
-      setOpen(false); setForm(EMPTY); load();
-    } catch (e: any) { toast.error(e?.response?.data?.error ?? 'Failed'); }
-    finally { setSaving(false); }
+      setOpen(false);
+      setForm(EMPTY);
+      load();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error ?? 'Failed');
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -58,27 +76,67 @@ export function Vendors() {
       />
       <Modal
         open={open}
-        onClose={() => { setOpen(false); setForm(EMPTY); }}
+        onClose={() => {
+          setOpen(false);
+          setForm(EMPTY);
+        }}
         title="New vendor"
         description="Create a vendor record so submissions can reference them."
         footer={
           <>
-            <Button variant="secondary" onClick={() => { setOpen(false); setForm(EMPTY); }}>Cancel</Button>
-            <Button onClick={save} loading={saving}>{saving ? 'Saving' : 'Save vendor'}</Button>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setOpen(false);
+                setForm(EMPTY);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button onClick={save} loading={saving}>
+              {saving ? 'Saving' : 'Save vendor'}
+            </Button>
           </>
         }
       >
         <div className="space-y-3">
-          <FormInput label="Company name *" value={form.company_name} onChange={(e) => setForm({ ...form, company_name: e.target.value })} />
+          <FormInput
+            label="Company name *"
+            value={form.company_name}
+            onChange={(e) => setForm({ ...form, company_name: e.target.value })}
+          />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <FormInput label="Contact name" value={form.contact_name} onChange={(e) => setForm({ ...form, contact_name: e.target.value })} />
-            <FormInput label="Contact email" type="email" value={form.contact_email} onChange={(e) => setForm({ ...form, contact_email: e.target.value })} />
+            <FormInput
+              label="Contact name"
+              value={form.contact_name}
+              onChange={(e) => setForm({ ...form, contact_name: e.target.value })}
+            />
+            <FormInput
+              label="Contact email"
+              type="email"
+              value={form.contact_email}
+              onChange={(e) => setForm({ ...form, contact_email: e.target.value })}
+            />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <FormInput label="Contact phone" value={form.contact_phone} onChange={(e) => setForm({ ...form, contact_phone: e.target.value })} />
-            <FormInput label="Tier" placeholder="T1 / T2 / Prime" value={form.tier} onChange={(e) => setForm({ ...form, tier: e.target.value })} />
+            <FormInput
+              label="Contact phone"
+              value={form.contact_phone}
+              onChange={(e) => setForm({ ...form, contact_phone: e.target.value })}
+            />
+            <FormInput
+              label="Tier"
+              placeholder="T1 / T2 / Prime"
+              value={form.tier}
+              onChange={(e) => setForm({ ...form, tier: e.target.value })}
+            />
           </div>
-          <FormInput label="Website" placeholder="https://…" value={form.website} onChange={(e) => setForm({ ...form, website: e.target.value })} />
+          <FormInput
+            label="Website"
+            placeholder="https://…"
+            value={form.website}
+            onChange={(e) => setForm({ ...form, website: e.target.value })}
+          />
         </div>
       </Modal>
     </Layout>

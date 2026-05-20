@@ -10,4 +10,8 @@ consultantsRouter.get('/:id', c.get);
 consultantsRouter.post('/onboard', c.onboard);
 consultantsRouter.patch('/:id', requireRole(...ALL_ROLES), c.update);
 consultantsRouter.post('/:id/assign-recruiter', requireRole(...MANAGER_TIER), c.assignRecruiter);
-consultantsRouter.post('/:id/marketing-status', requireRole(...OPERATOR_TIER), c.setMarketingStatus);
+consultantsRouter.post(
+  '/:id/marketing-status',
+  requireRole(...OPERATOR_TIER),
+  c.setMarketingStatus,
+);

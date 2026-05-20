@@ -12,10 +12,14 @@ interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const VARIANT: Record<Variant, string> = {
-  primary:   'bg-slate-900 text-white hover:bg-slate-800 focus-visible:ring-slate-900/40 disabled:bg-slate-300',
-  secondary: 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 hover:border-slate-300 focus-visible:ring-slate-300/60 disabled:opacity-60',
-  ghost:     'bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus-visible:ring-slate-300/60 disabled:opacity-60',
-  danger:    'bg-red-600 text-white hover:bg-red-700 focus-visible:ring-red-500/40 disabled:bg-red-300',
+  primary:
+    'bg-slate-900 text-white hover:bg-slate-800 focus-visible:ring-slate-900/40 disabled:bg-slate-300',
+  secondary:
+    'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 hover:border-slate-300 focus-visible:ring-slate-300/60 disabled:opacity-60',
+  ghost:
+    'bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus-visible:ring-slate-300/60 disabled:opacity-60',
+  danger:
+    'bg-red-600 text-white hover:bg-red-700 focus-visible:ring-red-500/40 disabled:bg-red-300',
 };
 
 const SIZE: Record<Size, string> = {
@@ -49,10 +53,19 @@ export const Button = forwardRef<HTMLButtonElement, Props>(function Button(
     >
       {loading ? (
         <svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
-          <circle cx="12" cy="12" r="10" stroke="currentColor" strokeOpacity="0.25" strokeWidth="4" />
+          <circle
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            strokeOpacity="0.25"
+            strokeWidth="4"
+          />
           <path d="M4 12a8 8 0 018-8" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
         </svg>
-      ) : icon}
+      ) : (
+        icon
+      )}
       {children}
     </button>
   );
