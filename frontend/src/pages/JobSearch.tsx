@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { JobsLayout } from '../components/JobsLayout';
 import { api } from '../services/api';
@@ -181,6 +181,9 @@ export function JobSearch() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalRows, setTotalRows] = useState(0);
+  // Sentinel for infinite scroll — when it enters the viewport we load the
+  // next page (which the reload effect appends).
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
   // Load the consultant's profile (skills + consultant row id) and their
   // current resume id. Used by the recommended ranker AND the apply flow so
@@ -331,7 +334,14 @@ export function JobSearch() {
         typeof r.data === 'object' &&
         Array.isArray(r.data.rows)
       ) {
-        setRows(r.data.rows);
+        // Infinite scroll: append when fetching a later page, replace on page 1
+        // (a fresh filter/tab load). Dedupe by id so a shifting feed can't
+        // double-list a job.
+        setRows((prev) => {
+          if (page <= 1) return r.data.rows;
+          const seen = new Set(prev.map((x) => x.id));
+          return [...prev, ...r.data.rows.filter((x: JobRow) => !seen.has(x.id))];
+        });
         setTotalPages(Math.max(1, Number(r.data.total_pages) || 1));
         setTotalRows(Number(r.data.total) || r.data.rows.length);
       } else {
@@ -361,6 +371,23 @@ export function JobSearch() {
     return () => controller.abort();
     // eslint-disable-next-line
   }, [tab, target?.consultantId, postedAfter, publisherFilter, jobFunction, page]);
+
+  // Infinite scroll — bump the page when the sentinel scrolls into view (only
+  // on the recommended feed, when there's more to load and we're idle).
+  useEffect(() => {
+    const el = loadMoreRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && !loading && tab === 'recommended' && page < totalPages) {
+          setPage((p) => p + 1);
+        }
+      },
+      { rootMargin: '600px' },
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [loading, tab, page, totalPages]);
 
   // Whenever a filter changes (NOT page), snap back to page 1 so the user
   // sees the top of the freshly-filtered feed instead of an empty page-50.
@@ -777,8 +804,7 @@ export function JobSearch() {
           <div className="space-y-3">
             {tab === 'recommended' && totalRows > 0 && (
               <div className="text-xs text-slate-500 px-1">
-                Page {page} of {totalPages} · showing {filtered.length} of{' '}
-                {totalRows.toLocaleString()} jobs
+                Showing {filtered.length} of {totalRows.toLocaleString()} jobs
               </div>
             )}
             {filtered.map((j) => (
@@ -813,15 +839,11 @@ export function JobSearch() {
                 }
               />
             ))}
-            {tab === 'recommended' && totalPages > 1 && (
-              <Pagination
-                page={page}
-                totalPages={totalPages}
-                onChange={(p) => {
-                  setPage(p);
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }}
-              />
+            {/* Infinite scroll sentinel — entering view loads the next page. */}
+            {tab === 'recommended' && page < totalPages && (
+              <div ref={loadMoreRef} className="py-6 text-center text-xs text-slate-400">
+                {loading ? 'Loading more…' : 'Scroll for more'}
+              </div>
             )}
           </div>
         );
@@ -974,77 +996,10 @@ function PillSelect({
   );
 }
 
-// ---------------------------------------------------------------------------
-// Pagination — numbered pages with prev/next. Compact window around the
-// current page so the bar stays one line even with 100+ pages.
-// ---------------------------------------------------------------------------
-function Pagination({
-  page,
-  totalPages,
-  onChange,
-}: {
-  page: number;
-  totalPages: number;
-  onChange: (p: number) => void;
-}) {
-  // Build the page-number window: always include first and last, plus a
-  // 2-step radius around the current page. Gaps render as "…".
-  const window = new Set<number>([1, totalPages, page, page - 1, page + 1, page - 2, page + 2]);
-  const visible = [...window].filter((p) => p >= 1 && p <= totalPages).sort((a, b) => a - b);
-  const items: (number | 'gap')[] = [];
-  let prev = 0;
-  for (const p of visible) {
-    if (prev && p - prev > 1) items.push('gap');
-    items.push(p);
-    prev = p;
-  }
-  return (
-    <div className="mt-4 flex items-center justify-center gap-1 text-sm">
-      <button
-        type="button"
-        disabled={page <= 1}
-        onClick={() => onChange(Math.max(1, page - 1))}
-        className="px-2.5 py-1 rounded-md border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
-      >
-        ‹ Prev
-      </button>
-      {items.map((it, i) =>
-        it === 'gap' ? (
-          <span key={`g${i}`} className="px-1 text-slate-400">
-            …
-          </span>
-        ) : (
-          <button
-            key={it}
-            type="button"
-            onClick={() => onChange(it)}
-            aria-current={it === page ? 'page' : undefined}
-            className={
-              it === page
-                ? 'px-2.5 py-1 rounded-md bg-brand-600 text-white font-semibold tabular-nums'
-                : 'px-2.5 py-1 rounded-md border border-slate-200 text-slate-700 hover:bg-slate-50 tabular-nums'
-            }
-          >
-            {it}
-          </button>
-        ),
-      )}
-      <button
-        type="button"
-        disabled={page >= totalPages}
-        onClick={() => onChange(Math.min(totalPages, page + 1))}
-        className="px-2.5 py-1 rounded-md border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
-      >
-        Next ›
-      </button>
-    </div>
-  );
-}
-
 function EmptyState({ tab, onSync }: { tab: TabKey; onSync?: () => void }) {
   const map: Record<TabKey, string> = {
     recommended: 'No jobs found yet. Pull fresh listings from your live sources to get started.',
-    liked: "You haven't liked any jobs yet — tap the heart on a card to save it.",
+    liked: "You haven't saved any jobs yet — tap the bookmark on a card to save it.",
     applied: "You haven't submitted to any jobs yet.",
   };
   return (
