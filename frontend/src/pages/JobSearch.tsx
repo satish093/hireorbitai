@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, ReactNode } from 'react';
 import { Layout } from '../components/Layout';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -1592,11 +1592,37 @@ function HighlightTagChip({ tag }: { tag: string }) {
   );
 }
 
-function MetaPill({ icon, label }: { icon: string; label: string }) {
+// Detail-panel building blocks (shadcn / 21st.dev-style): a labelled stat tile
+// and a white "section" card. Used to give the slide-in job detail a clean,
+// card-based layout instead of a flat run of text blocks.
+function FactTile({ label, value }: { label: string; value: string }) {
   return (
-    <div className="inline-flex items-center gap-2 text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5">
-      <span className="text-slate-400">{icon}</span>
-      <span className="truncate text-xs">{label}</span>
+    <div className="bg-white border border-slate-200 rounded-xl px-3 py-2.5 shadow-sm">
+      <div className="text-[10px] font-semibold tracking-widest text-slate-400 uppercase">
+        {label}
+      </div>
+      <div className="text-sm font-medium text-slate-800 truncate mt-0.5">{value}</div>
+    </div>
+  );
+}
+
+function PanelSection({
+  title,
+  children,
+  className,
+}: {
+  title?: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={clsx('bg-white border border-slate-200 rounded-xl p-4 shadow-sm', className)}>
+      {title && (
+        <div className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase mb-2">
+          {title}
+        </div>
+      )}
+      {children}
     </div>
   );
 }
@@ -2129,6 +2155,10 @@ function MatchInsightModal({
   const company = job.company_name ?? job.client?.company_name ?? 'Unknown';
   const overall = skillMatch?.overall_score != null ? Math.round(skillMatch.overall_score) : null;
   const atsScore = ats?.score != null ? Math.round(ats.score) : null;
+  const reqs = job.requirements ?? {};
+  const seniority = reqs.job_seniority ?? reqs.level ?? job.level ?? null;
+  const minYears = reqs.min_years_of_experience ?? reqs.years_required ?? null;
+  const hasRate = job.rate_min != null || job.rate_max != null;
 
   return (
     // Jobright-style slide-in side panel. The backdrop is a softer slate-900/30
@@ -2142,44 +2172,66 @@ function MatchInsightModal({
       aria-label="Job match insight"
     >
       <div
-        className="absolute right-0 top-0 bottom-0 w-full sm:max-w-2xl bg-white shadow-2xl flex flex-col animate-slide-in-panel"
+        className="absolute right-0 top-0 bottom-0 w-full sm:max-w-2xl bg-slate-50 shadow-2xl flex flex-col animate-slide-in-panel"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-5 sm:px-6 py-4 border-b border-slate-200 flex items-start justify-between gap-4 shrink-0">
-          <div>
-            <div className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase mb-0.5">
-              Match Insight
+        {/* Hero header — logo, title, company·location, source badges, and the
+            primary Apply CTA. White on a slate-50 body, shadcn dashboard feel. */}
+        <div className="px-5 sm:px-6 py-5 border-b border-slate-200 bg-white shrink-0">
+          <div className="flex items-start gap-4">
+            <Avatar name={company} size={52} />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center flex-wrap gap-2 mb-1">
+                <span className="text-xs text-slate-500">
+                  {relative(job.posted_at ?? job.created_at)}
+                </span>
+                {job.source && <SourceBadge source={job.source} />}
+                {job.publisher && <PublisherBadge publisher={job.publisher} />}
+              </div>
+              <h2 className="text-xl font-semibold text-slate-900 leading-tight">{job.title}</h2>
+              <div className="text-sm text-slate-600 mt-0.5">
+                <span className="font-medium text-slate-800">{company}</span>
+                <span className="text-slate-400"> · {job.location ?? 'Location N/A'}</span>
+              </div>
+              <a
+                href={resolveApplyUrl(job)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-3 inline-flex items-center gap-1.5 bg-slate-900 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-slate-800 press"
+              >
+                Apply on company site <span>↗</span>
+              </a>
             </div>
-            <h2 className="text-lg font-semibold text-slate-900 leading-tight">{job.title}</h2>
-            <div className="text-sm text-slate-600">
-              {company} · {job.location ?? 'Unknown'}
-            </div>
+            <button
+              onClick={onClose}
+              aria-label="Close"
+              className="shrink-0 -mr-1 -mt-1 w-9 h-9 inline-flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 text-xl leading-none"
+            >
+              ×
+            </button>
           </div>
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-slate-900 text-2xl leading-none"
-          >
-            ×
-          </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-5 sm:px-6 py-5 space-y-5">
-          {/* Quick-facts meta strip — mirrors what the card shows so the modal
-              functions as a full job-detail view, not just a score breakdown. */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-            <MetaPill icon="◎" label={job.location ?? 'Unknown location'} />
-            <MetaPill icon="⌂" label={job.remote ? 'Remote' : 'Onsite'} />
-            <MetaPill icon="◷" label={prettyType(job.job_type)} />
-            <MetaPill icon="$" label={prettyRate(job.rate_min, job.rate_max)} />
+        <div className="flex-1 overflow-y-auto px-5 sm:px-6 py-5 space-y-4">
+          {/* Key facts as labelled stat tiles. */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+            <FactTile label="Location" value={job.location ?? '—'} />
+            <FactTile label="Work model" value={job.remote ? 'Remote' : 'Onsite'} />
+            <FactTile label="Type" value={prettyType(job.job_type)} />
+            {hasRate && <FactTile label="Salary" value={prettyRate(job.rate_min, job.rate_max)} />}
+            {seniority && <FactTile label="Level" value={seniority} />}
+            {minYears != null && <FactTile label="Experience" value={`${minYears}+ years`} />}
           </div>
 
-          {/* Recommendation tags (visa, clearance, etc.) */}
+          {/* Highlights — recommendation tags (visa, clearance, remote, etc.) */}
           {(job.requirements?.recommendation_tags ?? []).length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {(job.requirements?.recommendation_tags ?? []).slice(0, 8).map((t) => (
-                <RecommendationTag key={t} tag={t} />
-              ))}
-            </div>
+            <PanelSection title="Highlights">
+              <div className="flex flex-wrap gap-1.5">
+                {(job.requirements?.recommendation_tags ?? []).slice(0, 8).map((t) => (
+                  <RecommendationTag key={t} tag={t} />
+                ))}
+              </div>
+            </PanelSection>
           )}
 
           {/* Required skills chips */}
@@ -2189,10 +2241,7 @@ function MatchInsightModal({
                 ? job.requirements.required_skills
                 : job.required_skills) ?? [];
             return skills.length > 0 ? (
-              <div>
-                <div className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase mb-1.5">
-                  Required skills
-                </div>
+              <PanelSection title="Required skills">
                 <div className="flex flex-wrap gap-1.5">
                   {skills.map((s) => (
                     <span
@@ -2203,7 +2252,7 @@ function MatchInsightModal({
                     </span>
                   ))}
                 </div>
-              </div>
+              </PanelSection>
             ) : null;
           })()}
 
@@ -2217,21 +2266,18 @@ function MatchInsightModal({
               const useHtml = looksLikeHtml(job.description!);
               const html = useHtml ? jdToSafeHtml(job.description!) : '';
               return (
-                <div>
-                  <div className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase mb-1.5">
-                    Job description
-                  </div>
+                <PanelSection title="Job description">
                   {useHtml && html ? (
                     <div
-                      className="jd-prose text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-xl p-4"
+                      className="jd-prose text-sm text-slate-700"
                       dangerouslySetInnerHTML={{ __html: html }}
                     />
                   ) : (
-                    <div className="text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-xl p-4 whitespace-pre-wrap leading-relaxed">
+                    <div className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">
                       {jdToText(job.description!)}
                     </div>
                   )}
-                </div>
+                </PanelSection>
               );
             })()}
 
@@ -2249,20 +2295,21 @@ function MatchInsightModal({
             const hasTags = (job.requirements?.recommendation_tags ?? []).length > 0;
             if (hasJd || hasSkills || hasTags) return null;
             return (
-              <div className="text-sm text-slate-500 bg-slate-50 border border-slate-200 rounded-xl p-4 text-center">
-                This listing hasn't been enriched yet — only the basic facts above are available.
-                Open the original posting for the full description.
-              </div>
+              <PanelSection>
+                <p className="text-sm text-slate-500 text-center">
+                  This listing hasn't been enriched yet — only the basic facts above are available.
+                  Open the original posting for the full description.
+                </p>
+              </PanelSection>
             );
           })()}
 
           {/* For non-consultants the scoring section is skipped — this is a
               plain job-detail view. */}
           {!isConsultant && (
-            <div className="text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-lg p-3">
-              ℹ️ Resume match scoring is available when viewing as a consultant. This is the job
-              detail view.
-            </div>
+            <p className="text-xs text-slate-400 text-center px-2">
+              ℹ️ Resume match scoring is available when viewing as a consultant.
+            </p>
           )}
 
           {loading && <div className="text-sm text-slate-500">Scoring against your resume…</div>}
@@ -2324,7 +2371,7 @@ function MatchInsightModal({
               </div>
 
               {atsScore != null && (
-                <div className="border border-slate-200 rounded-xl p-4 bg-slate-50">
+                <div className="border border-slate-200 rounded-xl p-4 bg-white shadow-sm">
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase">
                       ATS score
@@ -2359,10 +2406,7 @@ function MatchInsightModal({
 
               {/* Rationale */}
               {skillMatch.rationale?.length > 0 && (
-                <div>
-                  <div className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase mb-1.5">
-                    Why this score
-                  </div>
+                <PanelSection title="Why this score">
                   <ul className="space-y-1 text-sm text-slate-700">
                     {skillMatch.rationale.map((r, i) => (
                       <li key={i} className="flex items-start gap-1.5">
@@ -2371,7 +2415,7 @@ function MatchInsightModal({
                       </li>
                     ))}
                   </ul>
-                </div>
+                </PanelSection>
               )}
 
               {/* Per-skill table */}
@@ -2380,7 +2424,7 @@ function MatchInsightModal({
                   <div className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase mb-1.5">
                     Skill-by-skill
                   </div>
-                  <div className="border border-slate-200 rounded-xl divide-y divide-slate-100">
+                  <div className="border border-slate-200 rounded-xl divide-y divide-slate-100 bg-white shadow-sm">
                     {(skillMatch.per_skill ?? []).map((s) => {
                       const pct = Math.round((s.score ?? 0) * 100);
                       const tone =
@@ -2414,17 +2458,17 @@ function MatchInsightModal({
           )}
         </div>
 
-        <div className="px-5 sm:px-6 py-3 border-t border-slate-200 bg-slate-50 flex items-center justify-between gap-3">
-          <span className="text-[11px] text-slate-500">
+        <div className="px-5 sm:px-6 py-3 border-t border-slate-200 bg-white flex items-center justify-between gap-3 shrink-0">
+          <span className="text-[11px] text-slate-500 min-w-0 truncate">
             {isConsultant
-              ? "Resume scored against this job's extracted requirements."
+              ? "Scored against this job's extracted requirements."
               : 'Job detail view.'}
           </span>
           <a
             href={resolveApplyUrl(job)}
             target="_blank"
             rel="noopener noreferrer"
-            className="shrink-0 bg-slate-900 text-white text-sm px-4 py-1.5 rounded-lg hover:bg-slate-800 inline-flex items-center gap-1.5"
+            className="shrink-0 bg-slate-900 text-white text-sm px-4 py-1.5 rounded-lg hover:bg-slate-800 inline-flex items-center gap-1.5 press"
           >
             Apply on company site <span>↗</span>
           </a>
