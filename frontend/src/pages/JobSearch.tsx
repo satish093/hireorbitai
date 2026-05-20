@@ -1851,6 +1851,10 @@ function SkillsPicker({
   onRecompute: () => void;
 }) {
   const [input, setInput] = useState('');
+  // Index of the chip currently being edited in place, plus its draft text.
+  // Click a chip's label to edit it without having to delete + re-add.
+  const [editIdx, setEditIdx] = useState<number | null>(null);
+  const [editText, setEditText] = useState('');
 
   function add() {
     const v = input.trim();
@@ -1865,6 +1869,29 @@ function SkillsPicker({
   function remove(s: string) {
     onChange(skills.filter((x) => x !== s));
   }
+  function startEdit(i: number) {
+    setEditIdx(i);
+    setEditText(skills[i] ?? '');
+  }
+  function commitEdit() {
+    if (editIdx === null) return;
+    const v = editText.trim();
+    // Empty draft removes the skill; a duplicate of another chip collapses
+    // (drop the edited one). Otherwise replace in place.
+    if (!v) {
+      onChange(skills.filter((_, i) => i !== editIdx));
+    } else if (skills.some((s, i) => i !== editIdx && s.toLowerCase() === v.toLowerCase())) {
+      onChange(skills.filter((_, i) => i !== editIdx));
+    } else {
+      onChange(skills.map((s, i) => (i === editIdx ? v : s)));
+    }
+    setEditIdx(null);
+    setEditText('');
+  }
+  function cancelEdit() {
+    setEditIdx(null);
+    setEditText('');
+  }
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl px-4 py-3 mb-3 flex items-center gap-2 flex-wrap">
@@ -1876,21 +1903,42 @@ function SkillsPicker({
           Add skills (React, Java, AWS, Python…) to tune recommendations.
         </span>
       )}
-      {skills.map((s) => (
-        <span
-          key={s}
-          className="inline-flex items-center gap-1 bg-slate-100 text-slate-800 text-xs font-medium px-2 py-0.5 rounded-full"
-        >
-          {s}
-          <button
-            onClick={() => remove(s)}
-            className="text-slate-400 hover:text-red-500 text-sm leading-none"
-            title="Remove"
+      {skills.map((s, i) =>
+        editIdx === i ? (
+          <input
+            key={`edit-${i}`}
+            autoFocus
+            value={editText}
+            onChange={(e) => setEditText(e.target.value)}
+            onBlur={commitEdit}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commitEdit();
+              else if (e.key === 'Escape') cancelEdit();
+            }}
+            className="text-xs bg-white border border-brand-400 text-slate-800 font-medium rounded-full px-2.5 py-0.5 focus:outline-none focus:ring-2 focus:ring-brand-500/40 w-28"
+          />
+        ) : (
+          <span
+            key={s}
+            className="inline-flex items-center gap-1 bg-slate-100 text-slate-800 text-xs font-medium px-2 py-0.5 rounded-full"
           >
-            ×
-          </button>
-        </span>
-      ))}
+            <button
+              onClick={() => startEdit(i)}
+              className="hover:text-brand-600"
+              title="Click to edit"
+            >
+              {s}
+            </button>
+            <button
+              onClick={() => remove(s)}
+              className="text-slate-400 hover:text-red-500 text-sm leading-none"
+              title="Remove"
+            >
+              ×
+            </button>
+          </span>
+        ),
+      )}
       <div className="flex items-center gap-1.5 ml-1">
         <input
           value={input}
