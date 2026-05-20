@@ -502,9 +502,41 @@ export function JobSearch() {
 
   return (
     <JobsLayout>
-      {/* Tabs + search */}
+      {/* Consumer hero — search-forward, shown on the main feed */}
+      {tab === 'recommended' && (
+        <div className="rounded-2xl bg-gradient-to-br from-brand-600 to-indigo-600 text-white p-6 sm:p-8 mb-6 shadow-sm">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Find your next role</h1>
+          <p className="text-white/85 text-sm mt-1">
+            {totalRows > 0
+              ? `${totalRows.toLocaleString()} live openings`
+              : 'Search thousands of live openings'}
+          </p>
+          <div className="mt-4 flex flex-col sm:flex-row gap-2 bg-white rounded-xl p-2 shadow-lg max-w-2xl">
+            <div className="relative flex-1 min-w-0">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">⌕</span>
+              <input
+                type="text"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') load();
+                }}
+                placeholder="Job title, company, or skill"
+                className="w-full h-10 pl-9 pr-3 rounded-lg text-sm text-slate-900 placeholder-slate-400 focus:outline-none"
+              />
+            </div>
+            <button
+              onClick={() => load()}
+              className="h-10 px-6 rounded-lg bg-slate-900 text-white text-sm font-medium hover:bg-slate-800 press shrink-0"
+            >
+              Search
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Tabs + (staff) actions */}
       <div className="flex items-center gap-4 mb-5">
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Jobs</h1>
         <nav className="flex items-end gap-5">
           {TABS.map((t) => (
             <button
@@ -521,51 +553,34 @@ export function JobSearch() {
             </button>
           ))}
         </nav>
-        <div className="ml-auto flex items-center gap-2">
-          <div className="relative w-72">
-            <input
-              type="text"
-              placeholder="Search by title or company"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') load();
-              }}
-              className="w-full bg-slate-50 border border-slate-200 rounded-full pl-9 pr-3 py-1.5 text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
-            />
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
-              ⌕
-            </span>
+        {isManager && (
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              onClick={() => setSourcesOpen(true)}
+              className="border border-slate-200 bg-white rounded-full px-3 py-1.5 text-sm hover:bg-slate-50"
+              title="Manage live job sources"
+            >
+              Sources
+            </button>
+            <button
+              onClick={enrichNow}
+              disabled={syncing}
+              className="border border-brand-200 bg-brand-50 text-brand-700 rounded-full px-3 py-1.5 text-sm hover:bg-brand-100 disabled:opacity-50 inline-flex items-center gap-1.5"
+              title="Run AI to extract requirements, seniority, work model, etc."
+            >
+              ✦ Enrich
+            </button>
+            <button
+              onClick={syncNow}
+              disabled={syncing}
+              className="bg-slate-900 text-white rounded-full px-3 py-1.5 text-sm hover:bg-slate-800 disabled:opacity-50 inline-flex items-center gap-1.5"
+              title="Pull fresh jobs from all sources"
+            >
+              <span className={syncing ? 'inline-block animate-spin' : ''}>↻</span>
+              {syncing ? 'Working…' : 'Sync now'}
+            </button>
           </div>
-          {isManager && (
-            <>
-              <button
-                onClick={() => setSourcesOpen(true)}
-                className="border border-slate-200 bg-white rounded-full px-3 py-1.5 text-sm hover:bg-slate-50"
-                title="Manage live job sources"
-              >
-                Sources
-              </button>
-              <button
-                onClick={enrichNow}
-                disabled={syncing}
-                className="border border-brand-200 bg-brand-50 text-brand-700 rounded-full px-3 py-1.5 text-sm hover:bg-brand-100 disabled:opacity-50 inline-flex items-center gap-1.5"
-                title="Run AI to extract requirements, seniority, work model, etc."
-              >
-                ✦ Enrich
-              </button>
-              <button
-                onClick={syncNow}
-                disabled={syncing}
-                className="bg-slate-900 text-white rounded-full px-3 py-1.5 text-sm hover:bg-slate-800 disabled:opacity-50 inline-flex items-center gap-1.5"
-                title="Pull fresh jobs from all sources"
-              >
-                <span className={syncing ? 'inline-block animate-spin' : ''}>↻</span>
-                {syncing ? 'Working…' : 'Sync now'}
-              </button>
-            </>
-          )}
-        </div>
+        )}
       </div>
 
       {/* Recruiter targeting — pick a consultant + resume to apply on behalf of. */}
