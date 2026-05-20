@@ -4,6 +4,7 @@ import { logger } from '../config/logger';
 import { matchJobsForConsultant } from './ai.service';
 import { loadFlags } from '../controllers/featureFlags.controller';
 import { mockEnabled, mockAdzuna, mockJSearch, mockLinkedIn } from './jobIngestionMocks';
+import { parseJobsFromHtml, parseLinkedInGuestCards } from './jobScrape';
 
 // ---------------------------------------------------------------------------
 // Driver self-healing — auto-deactivate misbehaving source_companies rows.
@@ -122,6 +123,7 @@ export type Source =
   | 'searchapi'
   | 'linkedin'
   | 'monster'
+  | 'scraper'
   | 'manual';
 
 export interface NormalizedJob {
@@ -792,6 +794,11 @@ async function fetchLinkedIn(slug: string | null): Promise<NormalizedJob[]> {
     logger.info({ source: 'linkedin', slug }, 'jobIngestion: mock mode — returning synthetic jobs');
     return mockLinkedIn(slug);
   }
+  // Free, no-API path: scrape LinkedIn's unauthenticated guest job-search
+  // endpoint instead of the paid RapidAPI driver. Opt-in via LINKEDIN_FREE=true.
+  if (String(process.env.LINKEDIN_FREE ?? '').toLowerCase() === 'true') {
+    return fetchLinkedInGuest(slug);
+  }
   const apiKey = process.env.RAPIDAPI_KEY ?? process.env.JSEARCH_API_KEY;
   if (!apiKey) throw new Error('RAPIDAPI_KEY (or JSEARCH_API_KEY) not set in backend/.env');
 
@@ -885,6 +892,87 @@ function mapLinkedInEmployment(t: unknown): string {
   if (u.includes('part')) return 'Part-time';
   if (u.includes('intern')) return 'Internship';
   return 'FTE';
+}
+
+// ---------------------------------------------------------------------------
+// Free, no-API scraping config (shared by the LinkedIn guest driver and the
+// generic JSON-LD scraper). HTTP-only, sequential, byte-capped, polite delays.
+// A browser-like User-Agent is required for the guest endpoints to respond.
+// ---------------------------------------------------------------------------
+const SCRAPER_UA =
+  process.env.SCRAPER_USER_AGENT?.trim() ||
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36';
+const SCRAPER_TIMEOUT_MS = Math.max(1000, Number(process.env.SCRAPER_TIMEOUT_MS ?? 15000));
+const SCRAPER_DELAY_MS = Math.max(0, Number(process.env.SCRAPER_DELAY_MS ?? 2500));
+const SCRAPER_MAX_JOBS = Math.max(1, Number(process.env.SCRAPER_MAX_JOBS ?? 60));
+const SCRAPER_MAX_BYTES = Math.max(100_000, Number(process.env.SCRAPER_MAX_BYTES ?? 3_000_000));
+const LINKEDIN_MAX_JOBS = Math.max(1, Number(process.env.LINKEDIN_MAX_JOBS ?? 75));
+
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+// ---------------------------------------------------------------------------
+// LinkedIn — FREE guest job-search endpoint (no login, no API key).
+//   GET /jobs-guest/jobs/api/seeMoreJobPostings/search
+// Returns an HTML fragment of ~25 <li> job cards per `start` page. We page
+// through (start += 25) up to LINKEDIN_MAX_JOBS with a polite delay, stop on
+// 429 / empty, and parse listing-level fields with regex (low RAM). Full
+// descriptions are intentionally NOT fetched (would multiply requests and
+// blocking) — the free local parser fills structure later.
+// Slug / LINKEDIN_TITLES are pipe-delimited search keywords.
+// ---------------------------------------------------------------------------
+async function fetchLinkedInGuest(slug: string | null): Promise<NormalizedJob[]> {
+  const titlesRaw =
+    slug ?? process.env.LINKEDIN_TITLES ?? 'Software Engineer|Data Engineer|Full Stack Developer';
+  const titles = titlesRaw
+    .split('|')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const location = process.env.LINKEDIN_LOCATIONS ?? 'United States';
+  const window = (process.env.LINKEDIN_WINDOW ?? '24h').toLowerCase();
+  const fTPR = window === '1h' ? 'r3600' : window === '7d' ? 'r604800' : 'r86400';
+
+  const out: NormalizedJob[] = [];
+  const base = 'https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search';
+
+  for (const title of titles) {
+    let start = 0;
+    // Each page returns up to ~25 cards. Cap total per title slice of the budget.
+    while (out.length < LINKEDIN_MAX_JOBS && start < 200) {
+      let html = '';
+      try {
+        const res = await axios.get(base, {
+          params: { keywords: title, location, f_TPR: fTPR, start },
+          headers: { 'User-Agent': SCRAPER_UA, Accept: 'text/html' },
+          timeout: SCRAPER_TIMEOUT_MS,
+          responseType: 'text',
+          maxContentLength: SCRAPER_MAX_BYTES,
+          transformResponse: (d) => d,
+          validateStatus: (s) => s === 200 || s === 429 || s === 404,
+        });
+        if (res.status === 429) {
+          logger.warn(
+            { source: 'linkedin', title, start },
+            'linkedin guest: 429 rate-limited — stopping this title',
+          );
+          break;
+        }
+        html = typeof res.data === 'string' ? res.data : '';
+      } catch (e) {
+        logger.warn(
+          { source: 'linkedin', title, start, err: e instanceof Error ? e.message : String(e) },
+          'linkedin guest: fetch failed',
+        );
+        break;
+      }
+
+      const cards = parseLinkedInGuestCards(html);
+      if (cards.length === 0) break; // no parseable cards → done
+      out.push(...cards.slice(0, LINKEDIN_MAX_JOBS - out.length));
+      start += 25;
+      if (SCRAPER_DELAY_MS > 0) await sleep(SCRAPER_DELAY_MS);
+    }
+  }
+  return dedupe(out);
 }
 
 // ---------------------------------------------------------------------------
@@ -1004,6 +1092,56 @@ function dedupe(jobs: NormalizedJob[]): NormalizedJob[] {
 }
 
 // ---------------------------------------------------------------------------
+// Generic JSON-LD scraper (Dice / Monster / CareerBuilder / any JobPosting page)
+//
+// Fetches public search/job pages and extracts schema.org JobPosting JSON-LD
+// (then OpenGraph/meta as fallback). HTTP-only, sequential, byte-capped, no
+// browser, no API key. A 'scraper' source-row's `slug` is one or more page
+// URLs (pipe-delimited). Best-effort: blocked/empty pages are logged, not
+// thrown. No login/CAPTCHA bypass.
+// ---------------------------------------------------------------------------
+
+async function scrapeOnePage(url: string): Promise<NormalizedJob[]> {
+  if (!/^https?:\/\//i.test(url)) return [];
+  try {
+    const res = await axios.get(url, {
+      headers: { 'User-Agent': SCRAPER_UA, Accept: 'text/html' },
+      timeout: SCRAPER_TIMEOUT_MS,
+      responseType: 'text',
+      maxContentLength: SCRAPER_MAX_BYTES,
+      maxBodyLength: SCRAPER_MAX_BYTES,
+      transformResponse: (d) => d,
+      validateStatus: (s) => s >= 200 && s < 400,
+    });
+    const jobs = parseJobsFromHtml(typeof res.data === 'string' ? res.data : '', url);
+    if (jobs.length === 0) logger.warn({ url }, 'scraper: no JobPosting JSON-LD found');
+    return jobs;
+  } catch (e) {
+    logger.warn(
+      { url, err: e instanceof Error ? e.message : String(e) },
+      'scraper: fetch/parse failed (likely blocked)',
+    );
+    return [];
+  }
+}
+
+async function scrapeJsonLd(slug: string | null): Promise<NormalizedJob[]> {
+  if (!slug) return [];
+  const urls = slug
+    .split('|')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const out: NormalizedJob[] = [];
+  for (const url of urls) {
+    if (out.length >= SCRAPER_MAX_JOBS) break;
+    const jobs = await scrapeOnePage(url);
+    out.push(...jobs.slice(0, SCRAPER_MAX_JOBS - out.length));
+    if (SCRAPER_DELAY_MS > 0) await sleep(SCRAPER_DELAY_MS);
+  }
+  return dedupe(out);
+}
+
+// ---------------------------------------------------------------------------
 // Orchestrator
 // ---------------------------------------------------------------------------
 
@@ -1022,6 +1160,7 @@ const DRIVERS: Record<Source, (ctx: DriverCtx) => Promise<NormalizedJob[]>> = {
   searchapi: ({ slug }) => fetchSearchApi(slug),
   linkedin: ({ slug }) => fetchLinkedIn(slug),
   monster: ({ slug }) => fetchMonster(slug),
+  scraper: ({ slug }) => scrapeJsonLd(slug),
   // 'manual' isn't crawled — rows arrive via POST /api/jobs/import-url.
   manual: () => Promise.resolve([]),
 };
