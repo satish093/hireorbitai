@@ -306,8 +306,12 @@ export function JobSearch() {
         if (yearsMin) params.years_min = yearsMin;
         if (publisherFilter) params.publisher = publisherFilter;
         if (jobFunction) params.job_function = jobFunction;
-        // Recruiter mode: rank/score against the targeted consultant.
-        if (target?.consultantId) params.consultant_id = target.consultantId;
+        // Recruiter mode: rank/score against the targeted consultant AND filter
+        // the feed down to jobs that actually match them (Fair match and up).
+        if (target?.consultantId) {
+          params.consultant_id = target.consultantId;
+          params.min_match = '50';
+        }
         // Pagination — recommended is the only paginated tab.
         params.page = String(page);
         params.per_page = String(PER_PAGE);

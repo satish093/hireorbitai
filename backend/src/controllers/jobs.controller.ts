@@ -395,6 +395,17 @@ export const recommended: RequestHandler = async (req, res) => {
   }
   ranked = ranked.sort((a: any, b: any) => (b.match_score ?? -1) - (a.match_score ?? -1));
 
+  // When scoring for a specific consultant, optionally filter the feed down to
+  // jobs that actually match them (drop low/zero-match rows) — used when a
+  // recruiter selects a consultant. Never return an empty screen: if the
+  // threshold filters everything out, fall back to the top 10 by score.
+  const minMatch = Math.max(0, Math.min(100, Number(req.query.min_match) || 0));
+  if (consultant?.id && minMatch > 0) {
+    const filtered = ranked.filter((j: any) => (j.match_score ?? 0) >= minMatch);
+    ranked = filtered.length > 0 ? filtered : ranked.slice(0, 10);
+    res.setHeader('x-match-min', String(minMatch));
+  }
+
   // Page-slice. Always sort BEFORE slicing — top-of-feed is the most useful
   // page regardless of pagination params. annotateLiked is cheap enough to
   // run on the page subset only (an extra row lookup per page is fine).
