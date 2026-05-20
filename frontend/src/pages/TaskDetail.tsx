@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { ReactNode, useEffect, useRef, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import {
@@ -386,10 +386,12 @@ export function TaskDetail() {
 
         {/* Sidebar / properties */}
         <div className="space-y-4">
-          <div className="bg-white rounded-xl border border-slate-200 p-4">
-            <div className="grid grid-cols-[7rem_1fr] gap-x-3 gap-y-3.5 items-center text-sm">
-              <span className="text-slate-500">Status</span>
-              <div>
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="px-4 py-2.5 border-b border-slate-100 text-[10px] font-semibold tracking-widest text-slate-400 uppercase">
+              Details
+            </div>
+            <div className="p-4 space-y-4 text-sm">
+              <Field label="Status">
                 {canChangeStatus ? (
                   <SelectInput
                     value={task.status}
@@ -399,10 +401,9 @@ export function TaskDetail() {
                 ) : (
                   <TaskStatusBadge status={task.status} />
                 )}
-              </div>
+              </Field>
 
-              <span className="text-slate-500">Priority</span>
-              <div>
+              <Field label="Priority">
                 {canEdit ? (
                   <SelectInput
                     value={task.priority}
@@ -412,36 +413,37 @@ export function TaskDetail() {
                 ) : (
                   <PriorityBadge priority={task.priority} />
                 )}
-              </div>
+              </Field>
 
-              <span className="text-slate-500">Assignee</span>
-              <div>
+              <Field label="Assignee">
                 {task.assignee ? (
                   <span className="inline-flex items-center gap-1.5 text-slate-900">
                     <Avatar name={task.assignee.full_name} email={task.assignee.email} size={22} />
-                    {task.assignee.full_name ?? task.assignee.email}
+                    <span className="truncate">
+                      {task.assignee.full_name ?? task.assignee.email}
+                    </span>
                   </span>
                 ) : (
                   <span className="text-slate-400 italic text-xs">Unassigned</span>
                 )}
-              </div>
+              </Field>
 
               {task.consultant && (
-                <>
-                  <span className="text-slate-500">Consultant</span>
+                <Field label="Consultant">
                   <span className="inline-flex items-center gap-1.5 text-slate-900">
                     <Avatar
                       name={task.consultant.user?.full_name}
                       email={task.consultant.user?.email}
                       size={22}
                     />
-                    {task.consultant.user?.full_name ?? task.consultant.user?.email}
+                    <span className="truncate">
+                      {task.consultant.user?.full_name ?? task.consultant.user?.email}
+                    </span>
                   </span>
-                </>
+                </Field>
               )}
 
-              <span className="text-slate-500">Due date</span>
-              <div>
+              <Field label="Due date" align="start">
                 {canEdit ? (
                   <DateTimePicker
                     value={task.due_at ? isoToLocalInput(task.due_at) : ''}
@@ -451,50 +453,56 @@ export function TaskDetail() {
                 ) : (
                   <DuePill task={task} />
                 )}
-              </div>
+              </Field>
 
-              <span className="text-slate-500">Created</span>
-              <span className="text-slate-700">
-                {new Date(task.created_at).toLocaleDateString(undefined, {
-                  month: 'short',
-                  day: 'numeric',
-                  year: 'numeric',
-                })}
-              </span>
+              <Field label="Created">
+                <span className="text-slate-700">
+                  {new Date(task.created_at).toLocaleDateString(undefined, {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                  })}
+                </span>
+              </Field>
 
-              <span className="text-slate-500 self-start mt-0.5">Tags</span>
-              <div className="flex flex-wrap items-center gap-1">
-                {(task.tags ?? []).map((t) => (
-                  <span
-                    key={t}
-                    className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-700"
-                  >
-                    {t}
-                    {canEdit && (
-                      <button
-                        onClick={() => removeTag(t)}
-                        className="text-slate-400 hover:text-slate-700"
-                      >
-                        ×
-                      </button>
-                    )}
-                  </span>
-                ))}
-                {canEdit && (
-                  <input
-                    value={tagInput}
-                    onChange={(e) => setTagInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        addTag();
-                      }
-                    }}
-                    placeholder="+ Add"
-                    className="text-[11px] border border-slate-200 rounded-full px-2 py-0.5 outline-none w-20 focus:ring-2 focus:ring-brand-500/30"
-                  />
-                )}
-              </div>
+              <Field label="Tags" align="start">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {(task.tags ?? []).map((t) => (
+                    <span
+                      key={t}
+                      className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-brand-50 text-brand-700 border border-brand-100"
+                    >
+                      {t}
+                      {canEdit && (
+                        <button
+                          onClick={() => removeTag(t)}
+                          className="text-brand-400 hover:text-brand-700"
+                          aria-label={`Remove ${t}`}
+                        >
+                          ×
+                        </button>
+                      )}
+                    </span>
+                  ))}
+                  {canEdit && (
+                    <input
+                      value={tagInput}
+                      onChange={(e) => setTagInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          addTag();
+                        }
+                      }}
+                      placeholder="+ Add"
+                      className="text-[11px] border border-slate-200 rounded-full px-2 py-0.5 outline-none w-20 focus:ring-2 focus:ring-brand-500/30"
+                    />
+                  )}
+                  {(task.tags ?? []).length === 0 && !canEdit && (
+                    <span className="text-xs text-slate-400 italic">None</span>
+                  )}
+                </div>
+              </Field>
             </div>
           </div>
 
@@ -544,6 +552,29 @@ export function TaskDetail() {
         </div>
       </div>
     </Layout>
+  );
+}
+
+/** A labelled property row in the Details panel — muted uppercase label in a
+ *  fixed column, value beside it, consistent vertical rhythm. */
+function Field({
+  label,
+  children,
+  align = 'center',
+}: {
+  label: string;
+  children: ReactNode;
+  align?: 'center' | 'start';
+}) {
+  return (
+    <div
+      className={`grid grid-cols-[5.5rem_1fr] gap-3 ${align === 'start' ? 'items-start' : 'items-center'}`}
+    >
+      <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+        {label}
+      </span>
+      <div className="min-w-0">{children}</div>
+    </div>
   );
 }
 
