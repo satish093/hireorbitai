@@ -1,5 +1,19 @@
-import { z } from 'zod';
-import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
+// NOTE: must be zod v4 — the Anthropic SDK's zodOutputFormat calls
+// z.toJSONSchema(), a v4 API that reads schema._zod.def. v3 schemas (._def)
+// throw "Cannot read properties of undefined (reading 'def')" and every
+// messages.parse() call silently fails (match scoring → baseline fallback).
+// zod 3.25.x ships the v4 build under the 'zod/v4' subpath.
+import { z } from 'zod/v4';
+import { zodOutputFormat as zodOutputFormatRaw } from '@anthropic-ai/sdk/helpers/zod';
+
+// The SDK helper's RUNTIME uses v4's z.toJSONSchema (verified), but its
+// published TYPES still target zod v3, so it rejects our v4 schemas at
+// compile time. Bridge the type gap here — safe because v4 is the
+// runtime-correct shape.
+const zodOutputFormat = zodOutputFormatRaw as unknown as (
+  schema: z.ZodType,
+  name?: string,
+) => ReturnType<typeof zodOutputFormatRaw>;
 import { anthropic, ANTHROPIC_MODEL } from '../config/anthropic';
 
 const ResumeScoreSchema = z.object({
