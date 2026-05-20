@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Layout } from '../components/Layout';
+import { JobsLayout } from '../components/JobsLayout';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { Avatar } from '../components/TaskBits';
@@ -501,7 +501,7 @@ export function JobSearch() {
   }
 
   return (
-    <Layout title="Jobs" crumbs={[{ label: 'Workspace', to: '/dashboard' }, { label: 'Jobs' }]}>
+    <JobsLayout>
       {/* Tabs + search */}
       <div className="flex items-center gap-4 mb-5">
         <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Jobs</h1>
@@ -921,7 +921,7 @@ export function JobSearch() {
           }}
         />
       )}
-    </Layout>
+    </JobsLayout>
   );
 }
 

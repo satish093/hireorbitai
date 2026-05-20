@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Layout } from '../components/Layout';
+import { JobsLayout } from '../components/JobsLayout';
 import { SkeletonCard } from '../components/Skeleton';
 import { EmptyState } from '../components/EmptyState';
 import { JobDetailView } from '../components/JobDetailView';
@@ -44,7 +44,7 @@ export function JobDetail() {
   }, [id]);
 
   return (
-    <Layout title="Job detail" crumbs={[{ label: 'Jobs', to: '/jobs' }, { label: 'Detail' }]}>
+    <JobsLayout>
       <div className="mb-4">
         <Link to="/jobs" className="text-sm text-slate-500 hover:text-slate-800">
           ← Back to jobs
@@ -74,6 +74,6 @@ export function JobDetail() {
       ) : (
         <JobDetailView job={job} isConsultant={isConsultant} />
       )}
-    </Layout>
+    </JobsLayout>
   );
 }
