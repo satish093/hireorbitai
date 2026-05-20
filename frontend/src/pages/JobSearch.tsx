@@ -1809,6 +1809,69 @@ function jdToText(raw: string): string {
     .trim();
 }
 
+// Structural tags we keep when rendering a description as HTML. Everything
+// else (div, span, font, a, img, table, …) is unwrapped to its text content,
+// and ALL attributes are dropped — so there's no surface for onclick /
+// javascript: / style-based injection. script & style nodes are removed whole.
+const JD_KEEP_TAGS = new Set([
+  'P',
+  'BR',
+  'UL',
+  'OL',
+  'LI',
+  'STRONG',
+  'B',
+  'EM',
+  'I',
+  'H1',
+  'H2',
+  'H3',
+  'H4',
+  'H5',
+  'H6',
+]);
+
+/** True when the raw description carries HTML markup worth preserving. */
+function looksLikeHtml(raw: string): boolean {
+  return /<(p|br|ul|ol|li|strong|b|em|i|h[1-6]|div|span)\b/i.test(raw);
+}
+
+/**
+ * Sanitize a description's HTML down to a safe structural subset and return
+ * the cleaned innerHTML. Walks the parsed DOM keeping only whitelisted tags
+ * with no attributes, so headings / lists / bold survive (for the prose
+ * styling) while any executable or styling vector is stripped. Falls back to
+ * '' when there's no DOM (the caller then renders plain text).
+ */
+function jdToSafeHtml(raw: string): string {
+  if (typeof window === 'undefined' || typeof window.DOMParser === 'undefined') return '';
+  const doc = new DOMParser().parseFromString(raw, 'text/html');
+  const out = doc.createElement('div');
+
+  const walk = (src: Node, dest: Node) => {
+    src.childNodes.forEach((node) => {
+      if (node.nodeType === Node.TEXT_NODE) {
+        dest.appendChild(doc.createTextNode(node.textContent ?? ''));
+        return;
+      }
+      if (node.nodeType !== Node.ELEMENT_NODE) return;
+      const el = node as Element;
+      const tag = el.tagName.toUpperCase();
+      if (tag === 'SCRIPT' || tag === 'STYLE') return; // drop whole subtree
+      if (JD_KEEP_TAGS.has(tag)) {
+        const clean = doc.createElement(tag.toLowerCase()); // no attributes copied
+        walk(el, clean);
+        dest.appendChild(clean);
+      } else {
+        // Unknown/unsafe wrapper: keep its text, drop the tag itself.
+        walk(el, dest);
+      }
+    });
+  };
+  walk(doc.body, out);
+  return out.innerHTML.replace(/(\s*<br\s*\/?>\s*){3,}/gi, '<br><br>').trim();
+}
+
 function prettyRate(min?: number | null, max?: number | null): string {
   if (min == null && max == null) return 'Rate undisclosed';
   if (min != null && max != null) return `$${min}/hr – $${max}/hr`;
@@ -2144,17 +2207,33 @@ function MatchInsightModal({
             ) : null;
           })()}
 
-          {/* Full JD body — HTML stripped to readable text. */}
-          {job.description && jdToText(job.description).length > 0 && (
-            <div>
-              <div className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase mb-1.5">
-                Job description
-              </div>
-              <div className="text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-xl p-4 whitespace-pre-wrap leading-relaxed">
-                {jdToText(job.description)}
-              </div>
-            </div>
-          )}
+          {/* Full JD body. When the source has real markup we sanitize it to a
+              safe subset and render it as prose (headings, bullet lists, bold)
+              so it reads like a posting instead of a flat wall of text. Plain
+              text falls back to pre-wrap. */}
+          {job.description &&
+            jdToText(job.description).length > 0 &&
+            (() => {
+              const useHtml = looksLikeHtml(job.description!);
+              const html = useHtml ? jdToSafeHtml(job.description!) : '';
+              return (
+                <div>
+                  <div className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase mb-1.5">
+                    Job description
+                  </div>
+                  {useHtml && html ? (
+                    <div
+                      className="jd-prose text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-xl p-4"
+                      dangerouslySetInnerHTML={{ __html: html }}
+                    />
+                  ) : (
+                    <div className="text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-xl p-4 whitespace-pre-wrap leading-relaxed">
+                      {jdToText(job.description!)}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
           {/* Empty-state for un-enriched jobs with no usable detail. Without
               this, an admin opening a bare LinkedIn listing saw a near-empty

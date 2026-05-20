@@ -157,6 +157,50 @@ body {
   border: 2px solid transparent;
 }
 
+/* Job-description prose. Sanitized JD HTML (see jdToSafeHtml in JobSearch.tsx)
+   renders inside `.jd-prose` — give it real reading rhythm: paragraph spacing,
+   bullet/number lists, and emphasized headings, so a posting reads like a
+   document instead of a flat wall of text. */
+.jd-prose {
+  line-height: 1.6;
+}
+.jd-prose > *:first-child {
+  margin-top: 0;
+}
+.jd-prose p {
+  margin: 0 0 0.7rem;
+}
+.jd-prose ul,
+.jd-prose ol {
+  margin: 0 0 0.7rem;
+  padding-left: 1.25rem;
+}
+.jd-prose ul {
+  list-style: disc;
+}
+.jd-prose ol {
+  list-style: decimal;
+}
+.jd-prose li {
+  margin: 0.15rem 0;
+}
+.jd-prose h1,
+.jd-prose h2,
+.jd-prose h3,
+.jd-prose h4,
+.jd-prose h5,
+.jd-prose h6 {
+  font-weight: 600;
+  color: #0f172a;
+  font-size: 0.95rem;
+  margin: 1rem 0 0.35rem;
+}
+.jd-prose strong,
+.jd-prose b {
+  font-weight: 600;
+  color: #0f172a;
+}
+
 /* Respect OS-level reduced-motion preference: kill all animation + transitions. */
 @media (prefers-reduced-motion: reduce) {
   *,
