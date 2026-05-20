@@ -178,13 +178,20 @@ export function ManagerDashboard() {
         </div>
       )}
 
-      {/* First-run quick actions for admin */}
+      {/* First-run quick actions for admin.
+          Gating rules (fixes the "card never disappears" + "CTA flickers
+          between Manage sources / Open Jobs" bug):
+          - Wait until jobsCount has loaded (!== null) before rendering, so the
+            "Pull live jobs" CTA doesn't flash "Open Jobs" then snap to
+            "Manage sources" on every reload.
+          - Only count tasks as a pending setup step when the metrics actually
+            loaded AND came back 0. When the tasks feature is disabled,
+            /tasks/metrics 403s and `tasks` stays null forever — treating null
+            as "needs setup" kept this card pinned open permanently. */}
       {(profile?.role === 'SUPER_ADMIN' || profile?.role === 'MANAGER') &&
-        (!jobsCount || jobsCount === 0 || !tasks || tasks.total === 0) && (
-          <QuickActions
-            hasJobs={!!jobsCount && jobsCount > 0}
-            hasTasks={!!tasks && tasks.total > 0}
-          />
+        jobsCount !== null &&
+        (jobsCount === 0 || (tasks !== null && tasks.total === 0)) && (
+          <QuickActions hasJobs={jobsCount > 0} hasTasks={!!tasks && tasks.total > 0} />
         )}
 
       {/* Top metric cards — render skeletons on the very first paint so the
