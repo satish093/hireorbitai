@@ -21,6 +21,16 @@ function isManagerLike(role?: string): boolean {
   return !!role && (MANAGER_TIER as string[]).includes(role);
 }
 
+// The db shim only resolves embedded FK selects (assignee:users!…) on a plain
+// SELECT — not inside a write's RETURNING (it would inline the embed syntax and
+// Postgres errors with "syntax error at or near :"). So writes return `*` and
+// we re-fetch the row with joins here for the response.
+async function taskWithJoins(id: string) {
+  const { data, error } = await db.from('tasks').select(SELECT_WITH_JOINS).eq('id', id).single();
+  if (error) throw httpError(500, error.message);
+  return data;
+}
+
 function applyFilters(qb: any, q: Record<string, any>) {
   if (q.status) qb = qb.eq('status', q.status);
   if (q.priority) qb = qb.eq('priority', q.priority);
@@ -90,13 +100,13 @@ export const create: RequestHandler = async (req, res) => {
   // creation working even before database/tasks-tags.sql has been applied.
   if (Array.isArray(b.tags) && b.tags.length > 0) payload.tags = b.tags;
 
-  let { data, error } = await db.from('tasks').insert(payload).select(SELECT_WITH_JOINS).single();
+  let { data, error } = await db.from('tasks').insert(payload).select('*').single();
   if (error && /tags/i.test(error.message) && /schema cache|column/i.test(error.message)) {
     delete payload.tags;
-    ({ data, error } = await db.from('tasks').insert(payload).select(SELECT_WITH_JOINS).single());
+    ({ data, error } = await db.from('tasks').insert(payload).select('*').single());
   }
   if (error) throw httpError(500, error.message);
-  res.status(201).json(data);
+  res.status(201).json(await taskWithJoins((data as { id: string }).id));
 };
 
 /** Update task. Managers can update any field; assignee can only update status. */
@@ -143,12 +153,7 @@ export const update: RequestHandler = async (req, res) => {
     throw httpError(400, 'Invalid status');
   }
 
-  let { data, error } = await db
-    .from('tasks')
-    .update(allowed)
-    .eq('id', id)
-    .select(SELECT_WITH_JOINS)
-    .single();
+  let { error } = await db.from('tasks').update(allowed).eq('id', id).select('*').single();
   // Retry without `tags` if the column hasn't been migrated in yet, so other
   // edits still apply. Surface a 422 explaining how to enable tags.
   if (
@@ -164,15 +169,10 @@ export const update: RequestHandler = async (req, res) => {
         'Tags column missing — run database/tasks-tags.sql against the database to enable task tags.',
       );
     }
-    ({ data, error } = await db
-      .from('tasks')
-      .update(allowed)
-      .eq('id', id)
-      .select(SELECT_WITH_JOINS)
-      .single());
+    ({ error } = await db.from('tasks').update(allowed).eq('id', id).select('*').single());
   }
   if (error) throw httpError(500, error.message);
-  res.json(data);
+  res.json(await taskWithJoins(id));
 };
 
 /** Status-only update (board drag-and-drop). Assignee or manager can call. */
@@ -193,14 +193,14 @@ export const updateStatus: RequestHandler = async (req, res) => {
 
   const patch: Record<string, unknown> = { status };
   patch.completed_at = status === 'COMPLETED' ? new Date().toISOString() : null;
-  const { data, error } = await db
+  const { error } = await db
     .from('tasks')
     .update(patch)
     .eq('id', req.params.id)
-    .select(SELECT_WITH_JOINS)
+    .select('*')
     .single();
   if (error) throw httpError(500, error.message);
-  res.json(data);
+  res.json(await taskWithJoins(req.params.id));
 };
 
 /** Delete. Manager / Super admin only. */
