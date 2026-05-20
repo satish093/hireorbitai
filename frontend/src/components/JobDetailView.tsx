@@ -138,6 +138,110 @@ function Bullets({
   );
 }
 
+interface ChatMsg {
+  role: 'user' | 'assistant';
+  text: string;
+}
+
+// AI job copilot — Jobright "Orion"-style chat about this specific job.
+function JobCopilot({ jobId, isConsultant }: { jobId: string; isConsultant: boolean }) {
+  const [messages, setMessages] = useState<ChatMsg[]>([]);
+  const [input, setInput] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const suggestions = isConsultant
+    ? [
+        'Am I a good fit for this role?',
+        "What's missing on my resume for this job?",
+        'Draft a short intro message to the recruiter.',
+      ]
+    : [
+        'Summarize this role in 3 bullets.',
+        'What skills matter most here?',
+        'What questions should a candidate ask?',
+      ];
+
+  async function ask(question: string) {
+    const q = question.trim();
+    if (!q || busy) return;
+    setInput('');
+    setMessages((m) => [...m, { role: 'user', text: q }]);
+    setBusy(true);
+    try {
+      const { data } = await api.post(`/jobs/${jobId}/copilot`, { question: q });
+      setMessages((m) => [...m, { role: 'assistant', text: data?.answer ?? 'No answer.' }]);
+    } catch (e) {
+      const msg =
+        (e as { response?: { data?: { error?: string } } })?.response?.data?.error ??
+        'Copilot is unavailable right now.';
+      setMessages((m) => [...m, { role: 'assistant', text: `⚠ ${msg}` }]);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Section title="AI Copilot">
+      {messages.length === 0 ? (
+        <p className="text-sm text-slate-500 mb-3">
+          Ask anything about this job — fit, requirements, or outreach.
+        </p>
+      ) : (
+        <div className="space-y-2.5 mb-3">
+          {messages.map((m, i) => (
+            <div
+              key={i}
+              className={clsx(
+                'text-sm rounded-xl px-3 py-2 max-w-[90%] whitespace-pre-wrap break-words',
+                m.role === 'user'
+                  ? 'ml-auto bg-slate-900 text-white'
+                  : 'mr-auto bg-slate-50 border border-slate-200 text-slate-700',
+              )}
+            >
+              {m.text}
+            </div>
+          ))}
+          {busy && <div className="text-xs text-slate-400">Thinking…</div>}
+        </div>
+      )}
+
+      {messages.length === 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          {suggestions.map((s) => (
+            <button
+              key={s}
+              onClick={() => ask(s)}
+              disabled={busy}
+              className="text-[11px] px-2 py-1 rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="flex items-center gap-2">
+        <input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') ask(input);
+          }}
+          placeholder="Ask the copilot…"
+          className="flex-1 min-w-0 text-sm h-9 rounded-lg border border-slate-200 px-3 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+        />
+        <button
+          onClick={() => ask(input)}
+          disabled={busy || !input.trim()}
+          className="h-9 px-4 rounded-lg bg-slate-900 text-white text-sm font-medium hover:bg-slate-800 disabled:opacity-50 press"
+        >
+          Ask
+        </button>
+      </div>
+    </Section>
+  );
+}
+
 export function JobDetailView({ job, isConsultant }: { job: Job; isConsultant: boolean }) {
   const [reqs, setReqs] = useState<JobRequirements | null | undefined>(job.requirements);
   const [enriching, setEnriching] = useState(false);
@@ -267,6 +371,8 @@ export function JobDetailView({ job, isConsultant }: { job: Job; isConsultant: b
       <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
         {/* Main column */}
         <div className="lg:col-span-2 space-y-4 min-w-0">
+          <JobCopilot jobId={job.id} isConsultant={isConsultant} />
+
           {(reqs?.highlights ?? []).length > 0 && (
             <Section title="Highlights">
               <Bullets

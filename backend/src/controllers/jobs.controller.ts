@@ -1,6 +1,12 @@
 import { RequestHandler } from 'express';
+import { z } from 'zod';
 import { db } from '../config/db';
-import { matchJobsForConsultant, atsScore, scoreResumeAgainstJob } from '../services/ai.service';
+import {
+  matchJobsForConsultant,
+  atsScore,
+  scoreResumeAgainstJob,
+  jobCopilot,
+} from '../services/ai.service';
 import { parseJobRequirements } from '../services/jobParser.service';
 import { tailorForJob as resumeTailorForJob } from './resumes.controller';
 import { fromJob as applicationsFromJob } from './applications.controller';
@@ -681,6 +687,57 @@ export const skillMatchForMe: RequestHandler = async (req, res) => {
     },
   });
   res.json(result);
+};
+
+// ---------------------------------------------------------------------------
+// AI job copilot — answer a candidate's question about a specific job.
+// Available to any signed-in user; if the caller is a consultant we attach
+// their current resume for personalized answers. Requires ANTHROPIC_API_KEY.
+// ---------------------------------------------------------------------------
+const copilotSchema = z.object({ question: z.string().trim().min(1).max(500) }).strict();
+
+export const copilot: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  if (!process.env.ANTHROPIC_API_KEY) {
+    throw httpError(503, 'AI copilot is not configured (set ANTHROPIC_API_KEY).');
+  }
+  const parsed = copilotSchema.safeParse(req.body);
+  if (!parsed.success) throw httpError(400, 'A question is required', parsed.error.flatten());
+
+  const { data: job, error } = await db.from('jobs').select('*').eq('id', req.params.id).single();
+  if (error || !job) throw httpError(404, 'Job not found');
+
+  // Attach the caller's current resume when they're a consultant.
+  let resumeText: string | null = null;
+  const consultant = await getConsultantForUser(req.user.id);
+  if (consultant) {
+    const { data: resume } = await db
+      .from('resumes')
+      .select('ai_feedback')
+      .eq('consultant_id', consultant.id)
+      .eq('is_current', true)
+      .maybeSingle();
+    resumeText = extractResumeText(resume?.ai_feedback) || null;
+  }
+
+  const reqs = job.requirements ?? {};
+  try {
+    const answer = await jobCopilot({
+      question: parsed.data.question,
+      job: {
+        title: job.title,
+        company: job.company_name,
+        location: job.location,
+        description: job.description,
+        required_skills: reqs.required_skills ?? job.required_skills,
+        seniority: reqs.job_seniority ?? job.level ?? null,
+      },
+      resumeText,
+    });
+    res.json({ answer });
+  } catch (e) {
+    throw httpError(502, e instanceof Error ? e.message : 'Copilot request failed');
+  }
 };
 
 function extractResumeText(feedback: unknown): string {

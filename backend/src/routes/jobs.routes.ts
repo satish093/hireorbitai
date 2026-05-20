@@ -50,6 +50,7 @@ jobsRouter.post('/:id/ats-match', c.atsMatch);
 jobsRouter.post('/:id/enrich', c.enrichOne);
 jobsRouter.post('/:id/skill-match', c.skillMatchForMe);
 jobsRouter.post('/:id/skill-match-for-me', c.skillMatchForMe);
+jobsRouter.post('/:id/copilot', c.copilot);
 jobsRouter.get('/:id/duplicate-check', c.duplicateCheck);
 // Jobright-style apply funnel.
 jobsRouter.post('/:id/apply-options', c.applyOptions);
