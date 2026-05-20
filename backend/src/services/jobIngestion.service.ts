@@ -467,7 +467,7 @@ async function fetchJSearch(slug: string | null): Promise<NormalizedJob[]> {
 
   for (const query of queries) {
     try {
-      const { data } = await axios.get('https://jsearch.p.rapidapi.com/search-v2', {
+      const { data, status } = await axios.get('https://jsearch.p.rapidapi.com/search-v2', {
         params: { query, num_pages: 1, country, date_posted: 'week' },
         headers: {
           'x-rapidapi-host': 'jsearch.p.rapidapi.com',
@@ -478,12 +478,19 @@ async function fetchJSearch(slug: string | null): Promise<NormalizedJob[]> {
         // Don't auto-throw on 4xx so we can surface the actual API error message.
         validateStatus: () => true,
       });
-      if (typeof data === 'object' && data && 'message' in data && !data.data) {
-        // RapidAPI returns { message: 'You are not subscribed to this API.' } for 403, etc.
-        queryErrors.push(`"${query}": ${(data as any).message}`);
+      // RapidAPI surfaces problems as a string body ("Too many requests") or a
+      // { message } object (quota exceeded / not subscribed). Anything where
+      // `data.data` isn't an array means no results — report the real reason
+      // (status + message) instead of crashing on a non-iterable value.
+      if (!Array.isArray((data as any)?.data)) {
+        const msg =
+          typeof data === 'string'
+            ? data
+            : ((data as any)?.message ?? (data as any)?.error?.message ?? `HTTP ${status}`);
+        queryErrors.push(`"${query}": ${msg}`);
         continue;
       }
-      const rows = (data?.data ?? []) as any[];
+      const rows = (data as any).data as any[];
       for (const r of rows) {
         const minSal = nonZero(r.job_min_salary);
         const maxSal = nonZero(r.job_max_salary);
