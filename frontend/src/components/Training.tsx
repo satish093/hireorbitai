@@ -654,7 +654,7 @@ export function VideoLessonPlayer({ url }: { url: string }) {
       </div>
     );
   }
-  return <video controls src={url} className="w-full max-h-[60vh] rounded-xl bg-black" />;
+  return <video controls src={url} className="w-full max-h-[60dvh] rounded-xl bg-black" />;
 }
 
 // ---------------------------------------------------------------------------
@@ -663,7 +663,7 @@ export function VideoLessonPlayer({ url }: { url: string }) {
 export function DocumentViewer({ url }: { url: string }) {
   return (
     <div className="border border-slate-200 rounded-xl overflow-hidden">
-      <iframe src={url} className="w-full h-[70vh]" title="Document" />
+      <iframe src={url} className="w-full h-[70dvh]" title="Document" />
       <div className="px-3 py-2 text-xs text-slate-500 bg-slate-50 border-t border-slate-200">
         <a href={url} target="_blank" rel="noreferrer" className="text-brand-600 hover:underline">
           Open in new tab ↗

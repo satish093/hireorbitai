@@ -7,7 +7,13 @@ import { StatusBadge } from '../components/StatusBadge';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
 
-interface CalEvent { id: string; title: string; when: string; kind: 'interview' | 'reminder'; status: string; }
+interface CalEvent {
+  id: string;
+  title: string;
+  when: string;
+  kind: 'interview' | 'reminder';
+  status: string;
+}
 
 /**
  * Day grid for the current month, plus a detail list below for the SELECTED
@@ -34,33 +40,43 @@ export function Calendar() {
     const end = new Date(month.getFullYear(), month.getMonth() + 1, 0, 23, 59, 59, 999);
     const from = start.toISOString();
     const to = end.toISOString();
-    Promise.all([
-      api.get(`/interviews?from=${from}&to=${to}`),
-      api.get('/reminders'),
-    ]).then(([iRes, rRes]) => {
-      if (cancelled) return;
-      const interviews: CalEvent[] = (iRes.data ?? []).map((i: any) => ({
-        id: i.id,
-        title: `${i.type ?? 'Interview'}${i.is_mock ? ' (mock)' : ''}${i.interviewer ? ` · ${i.interviewer}` : ''}`,
-        when: i.scheduled_at,
-        kind: 'interview',
-        status: i.status,
-      }));
-      const reminders: CalEvent[] = (rRes.data ?? [])
-        .filter((r: any) => {
-          if (!r.due_at) return false;
-          const d = new Date(r.due_at);
-          return d >= start && d <= end;
-        })
-        .map((r: any) => ({ id: r.id, title: r.title, when: r.due_at, kind: 'reminder', status: r.status }));
-      setEvents([...interviews, ...reminders].sort((a, b) => a.when.localeCompare(b.when)));
-    }).catch((e) => {
-      if (cancelled) return;
-      toast.error(e?.response?.data?.error ?? 'Failed to load calendar');
-    }).finally(() => {
-      if (!cancelled) setLoading(false);
-    });
-    return () => { cancelled = true; };
+    Promise.all([api.get(`/interviews?from=${from}&to=${to}`), api.get('/reminders')])
+      .then(([iRes, rRes]) => {
+        if (cancelled) return;
+        const interviews: CalEvent[] = (iRes.data ?? []).map((i: any) => ({
+          id: i.id,
+          title: `${i.type ?? 'Interview'}${i.is_mock ? ' (mock)' : ''}${i.interviewer ? ` · ${i.interviewer}` : ''}`,
+          when: i.scheduled_at,
+          kind: 'interview',
+          status: i.status,
+        }));
+        const reminders: CalEvent[] = (rRes.data ?? [])
+          .filter((r: any) => {
+            if (!r.due_at) return false;
+            const d = new Date(r.due_at);
+            return d >= start && d <= end;
+          })
+          .map((r: any) => ({
+            id: r.id,
+            title: r.title,
+            when: r.due_at,
+            kind: 'reminder',
+            status: r.status,
+          }));
+        setEvents(
+          [...interviews, ...reminders].sort((a, b) => (a.when ?? '').localeCompare(b.when ?? '')),
+        );
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        toast.error(e?.response?.data?.error ?? 'Failed to load calendar');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [month]);
 
   const byDay = useMemo(() => {
@@ -77,12 +93,15 @@ export function Calendar() {
   const leading = start.getDay();
   const cells: (Date | null)[] = [];
   for (let i = 0; i < leading; i++) cells.push(null);
-  for (let d = 1; d <= end.getDate(); d++) cells.push(new Date(month.getFullYear(), month.getMonth(), d));
+  for (let d = 1; d <= end.getDate(); d++)
+    cells.push(new Date(month.getFullYear(), month.getMonth(), d));
   while (cells.length % 7 !== 0) cells.push(null);
 
   const today = new Date();
   const isToday = (d: Date) =>
-    d.getDate() === today.getDate() && d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
+    d.getDate() === today.getDate() &&
+    d.getMonth() === today.getMonth() &&
+    d.getFullYear() === today.getFullYear();
   const isSelected = (d: Date) =>
     !!selectedDate &&
     d.getDate() === selectedDate.getDate() &&
@@ -124,7 +143,9 @@ export function Calendar() {
               onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}
               className="w-7 h-7 inline-flex items-center justify-center rounded-md text-slate-600 hover:bg-slate-100"
               aria-label="Previous month"
-            >‹</button>
+            >
+              ‹
+            </button>
             <span className="text-sm font-medium text-slate-900 min-w-[120px] text-center">
               {month.toLocaleString(undefined, { month: 'long', year: 'numeric' })}
             </span>
@@ -132,13 +153,20 @@ export function Calendar() {
               onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}
               className="w-7 h-7 inline-flex items-center justify-center rounded-md text-slate-600 hover:bg-slate-100"
               aria-label="Next month"
-            >›</button>
+            >
+              ›
+            </button>
             <span className="w-px h-5 bg-slate-200 mx-1" />
             <Button
               size="sm"
               variant="ghost"
-              onClick={() => { setMonth(new Date()); setSelectedDate(null); }}
-            >Today</Button>
+              onClick={() => {
+                setMonth(new Date());
+                setSelectedDate(null);
+              }}
+            >
+              Today
+            </Button>
           </div>
         }
       />
@@ -146,7 +174,12 @@ export function Calendar() {
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
         <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50">
           {DOW.map((d) => (
-            <div key={d} className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 px-3 py-2">{d}</div>
+            <div
+              key={d}
+              className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 px-3 py-2"
+            >
+              {d}
+            </div>
           ))}
         </div>
         <div className="grid grid-cols-7">
@@ -178,33 +211,43 @@ export function Calendar() {
                   'cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40',
                   (idx + 1) % 7 === 0 && 'border-r-0',
                   idx >= cells.length - 7 && 'border-b-0',
-                  sel
-                    ? 'bg-brand-50 ring-1 ring-inset ring-brand-300'
-                    : 'hover:bg-slate-50',
+                  sel ? 'bg-brand-50 ring-1 ring-inset ring-brand-300' : 'hover:bg-slate-50',
                 )}
               >
-                <div className={clsx(
-                  'text-xs font-semibold mb-1.5 inline-flex items-center justify-center w-6 h-6 rounded-full',
-                  today_ ? 'bg-slate-900 text-white' :
-                  sel    ? 'bg-brand-600 text-white'
-                         : 'text-slate-700',
-                )}>
+                <div
+                  className={clsx(
+                    'text-xs font-semibold mb-1.5 inline-flex items-center justify-center w-6 h-6 rounded-full',
+                    today_
+                      ? 'bg-slate-900 text-white'
+                      : sel
+                        ? 'bg-brand-600 text-white'
+                        : 'text-slate-700',
+                  )}
+                >
                   {d.getDate()}
                 </div>
-                {!loading && dayEvents.slice(0, 3).map((e, ei) => (
-                  <div
-                    key={e.id}
-                    style={{ animationDelay: `${ei * 30}ms` }}
-                    className={clsx(
-                      'mb-1 rounded-md px-1.5 py-0.5 border text-[11px] leading-tight animate-fade-in-up transition',
-                      e.kind === 'interview' ? 'bg-indigo-50 border-indigo-100 text-indigo-800' : 'bg-amber-50 border-amber-100 text-amber-800',
-                    )}
-                    title={`${new Date(e.when).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} — ${e.title}`}
-                  >
-                    <span className="font-medium">{new Date(e.when).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>{' '}
-                    <span className="truncate">{e.title}</span>
-                  </div>
-                ))}
+                {!loading &&
+                  dayEvents.slice(0, 3).map((e, ei) => (
+                    <div
+                      key={e.id}
+                      style={{ animationDelay: `${ei * 30}ms` }}
+                      className={clsx(
+                        'mb-1 rounded-md px-1.5 py-0.5 border text-[11px] leading-tight animate-fade-in-up transition',
+                        e.kind === 'interview'
+                          ? 'bg-indigo-50 border-indigo-100 text-indigo-800'
+                          : 'bg-amber-50 border-amber-100 text-amber-800',
+                      )}
+                      title={`${new Date(e.when).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} — ${e.title}`}
+                    >
+                      <span className="font-medium">
+                        {new Date(e.when).toLocaleTimeString([], {
+                          hour: 'numeric',
+                          minute: '2-digit',
+                        })}
+                      </span>{' '}
+                      <span className="truncate">{e.title}</span>
+                    </div>
+                  ))}
                 {dayEvents.length > 3 && (
                   <div className="text-[10px] text-slate-500 mt-0.5">
                     +{dayEvents.length - 3} more
@@ -221,7 +264,11 @@ export function Calendar() {
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-sm font-semibold text-slate-900">
             {customSelected
-              ? focusDate.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })
+              ? focusDate.toLocaleDateString(undefined, {
+                  weekday: 'long',
+                  month: 'long',
+                  day: 'numeric',
+                })
               : 'Today'}
             <span className="ml-2 text-xs font-normal text-slate-500">
               {focusEvents.length} event{focusEvents.length === 1 ? '' : 's'}
@@ -242,21 +289,27 @@ export function Calendar() {
             <div className="px-4 py-6 text-sm text-slate-400 italic text-center">
               {customSelected ? 'Nothing scheduled this day.' : 'Nothing scheduled today.'}
             </div>
-          ) : focusEvents.map((e) => (
-            <div key={e.id} className="px-4 py-3 flex items-center gap-3">
-              <div className="w-16 text-xs font-mono text-slate-500">
-                {new Date(e.when).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+          ) : (
+            focusEvents.map((e) => (
+              <div key={e.id} className="px-4 py-3 flex items-center gap-3">
+                <div className="w-16 text-xs font-mono text-slate-500">
+                  {new Date(e.when).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                </div>
+                <div className="flex-1 min-w-0 text-sm text-slate-800 truncate">{e.title}</div>
+                <span
+                  className={clsx(
+                    'text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded',
+                    e.kind === 'interview'
+                      ? 'bg-indigo-50 text-indigo-700'
+                      : 'bg-amber-50 text-amber-700',
+                  )}
+                >
+                  {e.kind}
+                </span>
+                <StatusBadge status={e.status} />
               </div>
-              <div className="flex-1 min-w-0 text-sm text-slate-800 truncate">{e.title}</div>
-              <span className={clsx(
-                'text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded',
-                e.kind === 'interview' ? 'bg-indigo-50 text-indigo-700' : 'bg-amber-50 text-amber-700',
-              )}>
-                {e.kind}
-              </span>
-              <StatusBadge status={e.status} />
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </div>
     </Layout>

@@ -152,7 +152,7 @@ function FeatureDisabledPanel({ feature }: { feature: string }) {
   const isOwner = profile?.role === 'SUPER_ADMIN' || profile?.role === 'CEO';
   const label = feature.replace(/_/g, ' ');
   return (
-    <div className="min-h-[60vh] flex items-center justify-center p-6">
+    <div className="min-h-[60dvh] flex items-center justify-center p-6">
       <div className="max-w-md w-full text-center bg-white border border-slate-200 rounded-2xl p-8 shadow-sm">
         <div className="w-12 h-12 rounded-full bg-slate-100 text-slate-500 text-2xl mx-auto mb-3 flex items-center justify-center">
           ⌀

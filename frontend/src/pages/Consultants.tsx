@@ -61,12 +61,15 @@ export function Consultants() {
   const [picked, setPicked] = useState<ConsultantRow | null>(null);
   const [selectedRecruiter, setSelectedRecruiter] = useState('');
   const [saving, setSaving] = useState(false);
+  const [listLoading, setListLoading] = useState(true);
 
   function load() {
+    setListLoading(true);
     api
       .get('/consultants')
       .then((r) => setRows(r.data ?? []))
-      .catch((e) => toast.error(e?.response?.data?.error ?? 'Failed to load consultants'));
+      .catch((e) => toast.error(e?.response?.data?.error ?? 'Failed to load consultants'))
+      .finally(() => setListLoading(false));
   }
 
   useEffect(() => {
@@ -132,6 +135,7 @@ export function Consultants() {
       />
       <DataTable
         rows={rows}
+        loading={listLoading}
         empty="No consultants yet."
         columns={[
           {
