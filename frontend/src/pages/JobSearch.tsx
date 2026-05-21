@@ -4,7 +4,6 @@ import { invalidate } from '../hooks/useInvalidate';
 import toast from 'react-hot-toast';
 import { SkeletonCard } from '../components/Skeleton';
 import { Button } from '../components/Button';
-import { resolveApplyUrl } from '../components/jobs/helpers';
 import { JobCard } from '../components/jobs/JobCard';
 import { EmptyState } from '../components/jobs/EmptyState';
 import { MatchModeChip } from '../components/jobs/MatchModeChip';
@@ -16,7 +15,6 @@ import { RecruiterTargetingBar } from '../components/jobs/RecruiterTargetingBar'
 import { JobSearchHero } from '../components/jobs/JobSearchHero';
 import { JobTabsBar } from '../components/jobs/JobTabsBar';
 import { JobFilterBar } from '../components/jobs/JobFilterBar';
-import { JobDetailPane } from '../components/jobs/JobDetailPane';
 import { JobModals } from '../components/jobs/JobModals';
 import { useJobSearch } from '../components/jobs/useJobSearch';
 
@@ -25,7 +23,6 @@ export function JobSearch() {
     isManager,
     isConsultant,
     isRecruiterMode,
-    navigate,
     tab,
     setTab,
     rows,
@@ -75,7 +72,6 @@ export function JobSearch() {
     patchFilters,
     resetFilters,
     visible,
-    selectedJob,
     filterState,
     counts,
   } = useJobSearch();
@@ -157,88 +153,59 @@ export function JobSearch() {
           <AppliedSubTabs rows={rows} active={appliedSub} onChange={setAppliedSub} />
         )}
 
-        {/* Master-detail: list column (left) + sticky detail pane (right, xl+). */}
-        <div className="flex gap-5 items-start">
-          <div className="w-full xl:w-[440px] xl:shrink-0 space-y-3">
-            {loading ? (
-              <div className="space-y-3" aria-label="Loading jobs">
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <SkeletonCard key={i} lines={3} />
-                ))}
+        {/* Job grid — each card links to its own detail page at /jobs/:id. */}
+        {loading ? (
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" aria-label="Loading jobs">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <SkeletonCard key={i} lines={3} />
+            ))}
+          </div>
+        ) : visible.length === 0 ? (
+          <EmptyState tab={tab} onSync={isManager ? syncNow : undefined} />
+        ) : (
+          <>
+            {tab === 'recommended' && totalRows > 0 && (
+              <div className="text-xs text-muted px-1 mb-3">
+                Showing {visible.length} of {totalRows.toLocaleString()} jobs
               </div>
-            ) : visible.length === 0 ? (
-              <EmptyState tab={tab} onSync={isManager ? syncNow : undefined} />
-            ) : (
-              <>
-                {tab === 'recommended' && totalRows > 0 && (
-                  <div className="text-xs text-muted px-1">
-                    Showing {visible.length} of {totalRows.toLocaleString()} jobs
-                  </div>
-                )}
-                {visible.map((j) => (
-                  <JobCard
-                    key={j.id}
-                    job={j}
-                    selected={selectedJob?.id === j.id}
-                    onSelect={() => openJob(j)}
-                    onToggleLike={() => toggleLike(j)}
-                    onApply={() => handleApplyClick(j)}
-                    onChangeStatus={
-                      j.application_id
-                        ? async (next) => {
-                            const appId = j.application_id;
-                            if (!appId) return;
-                            setRows((rs) =>
-                              rs.map((r) =>
-                                r.id === j.id ? { ...r, application_status: next } : r,
-                              ),
-                            );
-                            try {
-                              await api.patch(`/applications/${appId}`, { status: next });
-                              invalidate('applications');
-                            } catch (e: any) {
-                              toast.error(e?.response?.data?.error ?? 'Failed to update status');
-                              load(tab);
-                            }
-                          }
-                        : undefined
-                    }
-                  />
-                ))}
-                {tab === 'recommended' && page < totalPages && (
-                  <div ref={loadMoreRef} className="py-6 text-center text-xs text-muted">
-                    {loading ? 'Loading more…' : 'Scroll for more'}
-                  </div>
-                )}
-              </>
             )}
-          </div>
-
-          <div className="hidden xl:block flex-1 min-w-0">
-            <div className="sticky top-4 h-[calc(100dvh-7rem)] overflow-hidden rounded-xl border border-border">
-              {selectedJob ? (
-                <JobDetailPane
-                  job={selectedJob}
-                  isConsultant={isConsultant}
-                  isRecruiterMode={isRecruiterMode}
-                  selectedConsultantId={
-                    isRecruiterMode ? (target?.consultantId ?? null) : myConsultantId
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 items-start">
+              {visible.map((j) => (
+                <JobCard
+                  key={j.id}
+                  job={j}
+                  selected={false}
+                  onSelect={() => openJob(j)}
+                  onToggleLike={() => toggleLike(j)}
+                  onApply={() => handleApplyClick(j)}
+                  onChangeStatus={
+                    j.application_id
+                      ? async (next) => {
+                          const appId = j.application_id;
+                          if (!appId) return;
+                          setRows((rs) =>
+                            rs.map((r) => (r.id === j.id ? { ...r, application_status: next } : r)),
+                          );
+                          try {
+                            await api.patch(`/applications/${appId}`, { status: next });
+                            invalidate('applications');
+                          } catch (e: any) {
+                            toast.error(e?.response?.data?.error ?? 'Failed to update status');
+                            load(tab);
+                          }
+                        }
+                      : undefined
                   }
-                  applyUrl={resolveApplyUrl(selectedJob)}
-                  onSave={() => toggleLike(selectedJob)}
-                  onPitch={() => navigate(`/ai-email?job=${selectedJob.id}`)}
-                  onApply={() => handleApplyClick(selectedJob)}
-                  onViewApplication={() => navigate('/applications')}
-                  onSeeBench={() => navigate('/consultants')}
                 />
-              ) : (
-                <div className="grid h-full place-items-center bg-bg-elev text-sm text-muted">
-                  Select a job to see details
-                </div>
-              )}
+              ))}
             </div>
-          </div>
-        </div>
+            {tab === 'recommended' && page < totalPages && (
+              <div ref={loadMoreRef} className="py-6 text-center text-xs text-muted">
+                {loading ? 'Loading more…' : 'Scroll for more'}
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       <JobModals

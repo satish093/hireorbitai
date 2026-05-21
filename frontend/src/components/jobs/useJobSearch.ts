@@ -473,8 +473,7 @@ export function useJobSearch() {
         e.preventDefault();
         setSelectedId(list[Math.max(0, idx - 1)]!.id);
       } else if (e.key === 'Enter' && idx >= 0) {
-        const j = list[idx]!;
-        if (!window.matchMedia('(min-width: 1280px)').matches) navigate(`/jobs/${j.id}`);
+        navigate(`/jobs/${list[idx]!.id}`);
       }
     }
     window.addEventListener('keydown', onKey);
@@ -482,10 +481,9 @@ export function useJobSearch() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /** Select on desktop (master-detail); navigate to the full page on mobile. */
+  /** Open the job's own detail page. Each card links to /jobs/:id. */
   function openJob(j: JobRow) {
-    if (window.matchMedia('(min-width: 1280px)').matches) setSelectedId(j.id);
-    else navigate(`/jobs/${j.id}`);
+    navigate(`/jobs/${j.id}`);
   }
 
   const filterState: JobFilterState = {
