@@ -1,6 +1,6 @@
 import { RequestHandler } from 'express';
 import { z } from 'zod';
-import { db } from '../config/db';
+import { db, pool } from '../config/db';
 import { httpError, ALL_ROLES, Role } from '../types';
 import { audit } from '../services/audit.service';
 import { requestPasswordReset } from '../services/auth.service';
@@ -122,13 +122,109 @@ export const list: RequestHandler = async (req, res) => {
   const { data, error, count } = await query;
   if (error) throw httpError(500, error.message);
 
+  // Enrich each row with its live (non-expired) session count for the table's
+  // Sessions column. One grouped query over only the page's ids — cheap, and
+  // kept out of the main query so the shim's search/filter path is untouched.
+  // Wrapped: if the auth_sessions table is somehow absent we just omit counts
+  // rather than 500 the whole list.
+  const rows = (data ?? []) as Array<Record<string, unknown> & { id: string }>;
+  if (rows.length > 0) {
+    try {
+      const ids = rows.map((r) => r.id);
+      const counts = await pool.query<{ user_id: string; n: string }>(
+        `SELECT user_id, count(*)::int AS n
+           FROM public.auth_sessions
+          WHERE user_id = ANY($1) AND expires_at > now()
+          GROUP BY user_id`,
+        [ids],
+      );
+      const byUser = new Map(counts.rows.map((c) => [c.user_id, Number(c.n)]));
+      for (const r of rows) r.session_count = byUser.get(r.id) ?? 0;
+    } catch {
+      for (const r of rows) r.session_count = 0;
+    }
+  }
+
   res.json({
-    rows: data ?? [],
+    rows,
     page,
     page_size,
     total: count ?? 0,
     total_pages: count ? Math.ceil(count / page_size) : 0,
   });
+};
+
+// ---------------------------------------------------------------------------
+// GET /admin/users/kpi
+//
+// Five workspace-wide counts for the KPI strip, computed in a single grouped
+// scan with FILTER aggregates — much cheaper than five round-trips. Degrades
+// to zeros (rather than a 500) if a late-migration column isn't present yet.
+// ---------------------------------------------------------------------------
+export const kpi: RequestHandler = async (_req, res) => {
+  const empty = { active: 0, online: 0, pending: 0, locked: 0, inactive: 0 };
+  try {
+    const r = await pool.query<{
+      active: string;
+      online: string;
+      pending: string;
+      locked: string;
+      inactive: string;
+    }>(
+      `SELECT
+         count(*) FILTER (WHERE coalesce(status, 'active') = 'active')                    AS active,
+         count(*) FILTER (WHERE last_seen_at > now() - interval '5 minutes')              AS online,
+         count(*) FILTER (WHERE status = 'pending_verification')                          AS pending,
+         count(*) FILTER (WHERE status IN ('suspended', 'banned'))                        AS locked,
+         count(*) FILTER (
+           WHERE coalesce(status, 'active') = 'active'
+             AND coalesce(last_seen_at, last_login_at, '-infinity'::timestamptz)
+                 < now() - interval '30 days'
+         )                                                                                AS inactive
+       FROM public.users`,
+    );
+    const row = r.rows[0];
+    if (!row) return res.json(empty);
+    res.json({
+      active: Number(row.active),
+      online: Number(row.online),
+      pending: Number(row.pending),
+      locked: Number(row.locked),
+      inactive: Number(row.inactive),
+    });
+  } catch {
+    res.json(empty);
+  }
+};
+
+// ---------------------------------------------------------------------------
+// GET /admin/users/:id/sessions
+//
+// Active (non-expired) refresh-token sessions for one user. The raw token is
+// never stored (only a bcrypt hash) so we can't surface it; we return the
+// device/ip metadata captured at issue time. There is no per-session "current
+// device" marker because the access token doesn't carry its session id.
+// ---------------------------------------------------------------------------
+export const sessions: RequestHandler = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const r = await pool.query<{
+      id: string;
+      issued_at: string;
+      expires_at: string;
+      user_agent: string | null;
+      ip_address: string | null;
+    }>(
+      `SELECT id, issued_at, expires_at, user_agent, ip_address
+         FROM public.auth_sessions
+        WHERE user_id = $1 AND expires_at > now()
+        ORDER BY issued_at DESC`,
+      [id],
+    );
+    res.json(r.rows);
+  } catch {
+    res.json([]);
+  }
 };
 
 // ---------------------------------------------------------------------------

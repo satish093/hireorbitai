@@ -8,8 +8,10 @@ export const adminUsersRouter = Router();
 adminUsersRouter.use(requireAdmin);
 
 adminUsersRouter.get('/', c.list);
+adminUsersRouter.get('/kpi', c.kpi);
 adminUsersRouter.get('/:id', c.get);
 adminUsersRouter.get('/:id/audit', c.auditLog);
+adminUsersRouter.get('/:id/sessions', c.sessions);
 adminUsersRouter.patch('/:id/status', c.setStatus);
 adminUsersRouter.patch('/:id/group', c.setGroup);
 adminUsersRouter.patch('/:id/notes', c.setNotes);
