@@ -5,6 +5,7 @@ import { Layout } from '../components/Layout';
 import { api } from '../services/api';
 import { TrainingProgressBar } from '../components/Training';
 import { DashboardCard } from '../components/DashboardCard';
+import { SkeletonMetricGrid } from '../components/Skeleton';
 import { StemOptDisclaimer } from '../components/StemOptDisclaimer';
 import { useAuth } from '../context/AuthContext';
 import { ADMIN_TIER } from '../types';
@@ -19,11 +20,7 @@ export function TrainingDashboard() {
     api
       .get('/training/reports')
       .then((r) => setData(r.data))
-      .catch((e) =>
-        toast.error(
-          e?.response?.data?.error ?? 'Failed to load reports (run database/training.sql)',
-        ),
-      )
+      .catch((e) => toast.error(e?.response?.data?.error ?? "Couldn't load the training overview."))
       .finally(() => setLoading(false));
   }, []);
 
@@ -56,7 +53,7 @@ export function TrainingDashboard() {
         </div>
       </div>
 
-      {loading && <p className="text-sm text-slate-500">Loading…</p>}
+      {loading && <SkeletonMetricGrid count={4} />}
       {!loading && data && (
         <>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">

@@ -4,6 +4,8 @@ import toast from 'react-hot-toast';
 import { Layout } from '../components/Layout';
 import { api } from '../services/api';
 import { TrainingCourseCard, CourseCardData } from '../components/Training';
+import { SkeletonCard } from '../components/Skeleton';
+import { EmptyState } from '../components/EmptyState';
 import { useAuth } from '../context/AuthContext';
 import { MANAGER_TIER, ADMIN_TIER } from '../types';
 
@@ -43,7 +45,7 @@ export function TrainingCourses() {
   async function backfillAll() {
     if (
       !confirm(
-        'AI-enrich all courses missing overview/roadmap/resources/capstone? Lessons are left untouched.',
+        'Use AI to fill in the overview, roadmap, resources, and final project for every course that is missing them? Existing lessons are left unchanged.',
       )
     )
       return;
@@ -51,7 +53,7 @@ export function TrainingCourses() {
     try {
       const r = await api.post('/training/courses/backfill');
       const enriched = (r.data?.results ?? []).filter((x: any) => x.result === 'enriched').length;
-      toast.success(`Backfill done · ${enriched} enriched`);
+      toast.success(`Done · ${enriched} course(s) updated`);
       await load();
     } catch (e: any) {
       toast.error(e?.response?.data?.error ?? 'Backfill failed');
@@ -115,10 +117,10 @@ export function TrainingCourses() {
             <button
               onClick={backfillAll}
               disabled={backfilling}
-              title="AI-enrich every course missing structured content (lessons untouched)"
+              title="Use AI to fill in missing course materials (overview, roadmap, resources, final project). Lessons are left unchanged."
               className="border border-brand-200 text-brand-700 bg-brand-50 text-sm px-3 py-2 rounded-lg hover:bg-brand-100 disabled:opacity-50"
             >
-              {backfilling ? 'Backfilling…' : '✦ Backfill all'}
+              {backfilling ? 'Filling in…' : '✦ Fill in missing materials'}
             </button>
           )}
           {isManager && (
@@ -132,18 +134,31 @@ export function TrainingCourses() {
         </div>
       </div>
 
-      {loading && <p className="text-sm text-slate-500">Loading…</p>}
-      {!loading && rows.length === 0 && (
-        <div className="bg-white border border-slate-200 rounded-xl p-10 text-center text-slate-500">
-          No courses yet. Apply <span className="font-mono text-xs">database/training.sql</span> and
-          refresh — or create one.
+      {loading && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <SkeletonCard key={i} lines={3} />
+          ))}
         </div>
       )}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {rows.map((c) => (
-          <TrainingCourseCard key={c.id} course={c} to={`/training/courses/${c.id}`} />
-        ))}
-      </div>
+      {!loading && rows.length === 0 && (
+        <EmptyState
+          icon="📚"
+          title="No courses yet"
+          description={
+            isManager
+              ? 'Create a course manually, or generate one with AI.'
+              : 'No training courses are available yet.'
+          }
+        />
+      )}
+      {!loading && rows.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {rows.map((c) => (
+            <TrainingCourseCard key={c.id} course={c} to={`/training/courses/${c.id}`} />
+          ))}
+        </div>
+      )}
     </Layout>
   );
 }

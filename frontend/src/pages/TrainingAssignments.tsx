@@ -3,6 +3,7 @@ import toast from 'react-hot-toast';
 import { Layout } from '../components/Layout';
 import { api } from '../services/api';
 import { AssignmentTable, AssignmentRow } from '../components/Training';
+import { SkeletonCard } from '../components/Skeleton';
 
 export function TrainingAssignments() {
   const [rows, setRows] = useState<AssignmentRow[]>([]);
@@ -43,15 +44,20 @@ export function TrainingAssignments() {
           className="text-sm border border-slate-200 rounded-md px-2 py-1.5"
         >
           <option value="">All statuses</option>
-          {['NOT_STARTED', 'IN_PROGRESS', 'COMPLETED', 'OVERDUE'].map((s) => (
-            <option key={s} value={s}>
-              {s.replace('_', ' ')}
+          {[
+            ['NOT_STARTED', 'Not started'],
+            ['IN_PROGRESS', 'In progress'],
+            ['COMPLETED', 'Completed'],
+            ['OVERDUE', 'Overdue'],
+          ].map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
             </option>
           ))}
         </select>
       </div>
       {loading ? (
-        <p className="text-sm text-slate-500">Loading…</p>
+        <SkeletonCard lines={6} />
       ) : (
         <AssignmentTable rows={rows} viewBase="/training/assignments" />
       )}

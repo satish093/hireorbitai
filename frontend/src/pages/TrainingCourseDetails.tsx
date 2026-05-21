@@ -16,6 +16,8 @@ import {
   CapstoneEditor,
   LessonEditorModal,
 } from '../components/TrainingAuthoring';
+import { SkeletonCard } from '../components/Skeleton';
+import { EmptyState } from '../components/EmptyState';
 import { useAuth } from '../context/AuthContext';
 import { MANAGER_TIER, ADMIN_TIER } from '../types';
 
@@ -132,7 +134,7 @@ export function TrainingCourseDetails() {
       setLessonOpen(false);
       load();
     } catch (e: any) {
-      toast.error(e?.response?.data?.error ?? 'Failed');
+      toast.error(e?.response?.data?.error ?? 'Something went wrong. Please try again.');
     }
   }
 
@@ -153,7 +155,7 @@ export function TrainingCourseDetails() {
       setAiContent('');
       load();
     } catch (e: any) {
-      toast.error(e?.response?.data?.error ?? 'Failed');
+      toast.error(e?.response?.data?.error ?? 'Something went wrong. Please try again.');
     } finally {
       setAiBusy(false);
     }
@@ -183,7 +185,7 @@ export function TrainingCourseDetails() {
       else toast.success('Lesson generated');
       await load();
     } catch (e: any) {
-      toast.error(e?.response?.data?.error ?? 'Failed');
+      toast.error(e?.response?.data?.error ?? 'Something went wrong. Please try again.');
     } finally {
       setGen({ running: false, done: 0, total: 0 });
     }
@@ -209,7 +211,7 @@ export function TrainingCourseDetails() {
       toast.success('Marked reviewed');
       await load();
     } catch (e: any) {
-      toast.error(e?.response?.data?.error ?? 'Failed');
+      toast.error(e?.response?.data?.error ?? 'Something went wrong. Please try again.');
     } finally {
       setLifecycleBusy(false);
     }
@@ -223,7 +225,7 @@ export function TrainingCourseDetails() {
       else toast.success('Course enriched');
       await load();
     } catch (e: any) {
-      toast.error(e?.response?.data?.error ?? 'Failed');
+      toast.error(e?.response?.data?.error ?? 'Something went wrong. Please try again.');
     } finally {
       setLifecycleBusy(false);
     }
@@ -232,7 +234,18 @@ export function TrainingCourseDetails() {
   if (loading || !course)
     return (
       <Layout title="Course">
-        <div className="text-sm text-slate-500">{loading ? 'Loading…' : 'Not found.'}</div>
+        {loading ? (
+          <div className="space-y-4">
+            <SkeletonCard lines={3} />
+            <SkeletonCard lines={5} />
+          </div>
+        ) : (
+          <EmptyState
+            icon="🔍"
+            title="Course not found"
+            description="It may have been removed, or you don't have access."
+          />
+        )}
       </Layout>
     );
 
@@ -308,10 +321,10 @@ export function TrainingCourseDetails() {
                   <button
                     onClick={enrich}
                     disabled={lifecycleBusy}
-                    title="AI-generate overview, roadmap, resources, capstone (lessons untouched)"
+                    title="Use AI to fill in the overview, roadmap, resources, and final project. Lessons are left unchanged."
                     className="border border-brand-200 text-brand-700 bg-brand-50 text-sm px-3 py-1.5 rounded-lg hover:bg-brand-100 disabled:opacity-50"
                   >
-                    ✦ Enrich
+                    ✦ Fill in materials
                   </button>
                 )}
                 {course.review_status !== 'REVIEWED' && course.review_status !== 'PUBLISHED' && (
@@ -364,6 +377,10 @@ export function TrainingCourseDetails() {
               <span className="text-[10px] text-slate-500">· ~{course.weekly_hours} h/week</span>
             )}
           </div>
+          <p className="text-xs text-slate-500 mb-4">
+            Details that go onto the official Form I-983 training plan for STEM OPT students. Shown
+            here so you can confirm the course matches what's on the plan.
+          </p>
 
           {course.stem_relevance && (
             <div className="mb-4">
@@ -493,9 +510,7 @@ export function TrainingCourseDetails() {
                 disabled={gen.running}
                 className="border border-brand-200 text-brand-700 bg-brand-50 text-sm px-3 py-1.5 rounded-lg hover:bg-brand-100 disabled:opacity-50"
               >
-                {gen.running
-                  ? 'Generating…'
-                  : `✦ Generate ${pendingLessonIds.length} pending lesson(s)`}
+                {gen.running ? 'Writing…' : `✦ Write ${pendingLessonIds.length} lesson(s) with AI`}
               </button>
             )}
             <button

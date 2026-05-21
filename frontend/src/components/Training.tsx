@@ -20,9 +20,26 @@ const STATUS_TONE: Record<string, string> = {
   IN_PROGRESS: 'bg-sky-50 text-sky-700 border-sky-100',
   COMPLETED: 'bg-emerald-50 text-emerald-700 border-emerald-100',
   OVERDUE: 'bg-rose-50 text-rose-700 border-rose-100',
+  FAILED: 'bg-rose-50 text-rose-700 border-rose-100',
   DRAFT: 'bg-slate-100 text-slate-500 border-slate-200',
   ACTIVE: 'bg-emerald-50 text-emerald-700 border-emerald-100',
   ARCHIVED: 'bg-slate-100 text-slate-400 border-slate-200',
+};
+// Plain-language labels for the assignment + course statuses learners and
+// managers see. Falls back to a de-underscored version for anything new.
+const STATUS_LABEL: Record<string, string> = {
+  NOT_STARTED: 'Not started',
+  IN_PROGRESS: 'In progress',
+  COMPLETED: 'Completed',
+  OVERDUE: 'Overdue',
+  FAILED: 'Not passed',
+  QUIZ_PENDING: 'Quiz to take',
+  ASSIGNMENT_PENDING: 'Work to submit',
+  FINAL_ASSESSMENT_PENDING: 'Final assessment due',
+  MANAGER_REVIEW_PENDING: 'Awaiting manager review',
+  DRAFT: 'Draft',
+  ACTIVE: 'Published',
+  ARCHIVED: 'Archived',
 };
 export function TrainingStatusBadge({ status }: { status: string }) {
   const tone = STATUS_TONE[status] ?? 'bg-slate-100 text-slate-700 border-slate-200';
@@ -33,7 +50,7 @@ export function TrainingStatusBadge({ status }: { status: string }) {
         tone,
       )}
     >
-      {status.replace('_', ' ')}
+      {STATUS_LABEL[status] ?? status.replace(/_/g, ' ')}
     </span>
   );
 }
@@ -586,7 +603,7 @@ export function FeedbackModal({
       onSaved();
       onClose();
     } catch (e: any) {
-      toast.error(e?.response?.data?.error ?? 'Failed');
+      toast.error(e?.response?.data?.error ?? 'Something went wrong. Please try again.');
     } finally {
       setBusy(false);
     }

@@ -70,6 +70,19 @@ export function useCompletionGates(assignmentId: string | undefined) {
   return { data, loading, refresh: load };
 }
 
+// Plain-language labels for the derived assignment status.
+const STATUS_LABEL: Record<string, string> = {
+  NOT_STARTED: 'Not started',
+  IN_PROGRESS: 'In progress',
+  QUIZ_PENDING: 'Quiz to take',
+  ASSIGNMENT_PENDING: 'Work to submit',
+  FINAL_ASSESSMENT_PENDING: 'Final assessment due',
+  MANAGER_REVIEW_PENDING: 'Awaiting manager review',
+  COMPLETED: 'Completed',
+  FAILED: 'Not passed',
+  OVERDUE: 'Overdue',
+};
+
 // ============================================================================
 // CompletionGatesPanel
 // ============================================================================
@@ -138,7 +151,7 @@ export function CompletionGatesPanel({ evaluation }: { evaluation: CompletionEva
       <div className="flex items-center justify-between mb-3">
         <div>
           <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
-            Completion checklist
+            What's left to finish
           </div>
           <h3 className="text-base font-semibold tracking-tight">
             Status:{' '}
@@ -151,7 +164,7 @@ export function CompletionGatesPanel({ evaluation }: { evaluation: CompletionEva
                     : 'text-slate-900'
               }
             >
-              {evaluation.status.replace(/_/g, ' ')}
+              {STATUS_LABEL[evaluation.status] ?? evaluation.status.replace(/_/g, ' ')}
             </span>
           </h3>
         </div>
@@ -179,7 +192,7 @@ export function CompletionGatesPanel({ evaluation }: { evaluation: CompletionEva
 
       {evaluation.blockers.length > 0 && evaluation.status !== 'COMPLETED' && (
         <div className="mt-3 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-          <span className="font-semibold">Blocking completion:</span>{' '}
+          <span className="font-semibold">Still needed to finish:</span>{' '}
           {evaluation.blockers.join(' · ')}
         </div>
       )}
@@ -391,14 +404,14 @@ export function FinalAssessmentCard({
                 Final assessment
               </div>
               <p className="text-sm text-slate-700 mt-0.5">
-                Author the assessment prompt the consultant has to complete.
+                Set the final task this consultant must complete to finish the course.
               </p>
             </div>
             <button
               onClick={() => setAuthorOpen(true)}
               className="bg-slate-900 text-white text-sm px-4 py-1.5 rounded-lg hover:bg-slate-800"
             >
-              + Author assessment
+              + Create assessment
             </button>
           </div>
           <FinalAssessmentAuthorModal
@@ -415,7 +428,7 @@ export function FinalAssessmentCard({
     }
     return (
       <div className="bg-white border border-slate-200 rounded-2xl p-4 text-sm text-slate-600">
-        No final assessment has been authored for this course yet.
+        No final assessment has been set for this course yet.
       </div>
     );
   }
@@ -476,7 +489,7 @@ export function FinalAssessmentCard({
                 onClick={() => setAuthorOpen(true)}
                 className="border border-slate-200 text-slate-700 text-sm px-3 py-1.5 rounded-lg hover:bg-slate-50"
               >
-                Edit prompt
+                Edit questions
               </button>
             )}
           </div>
@@ -610,7 +623,7 @@ function FinalAssessmentAuthorModal({
     <Modal
       open={open}
       onClose={onClose}
-      title={existing ? 'Edit final assessment' : 'Author final assessment'}
+      title={existing ? 'Edit final assessment' : 'Create final assessment'}
       footer={
         <button
           onClick={save}

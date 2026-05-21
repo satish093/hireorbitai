@@ -26,6 +26,16 @@ const CONTENT_STATUS_TONE: Record<string, string> = {
   OUTLINE_READY: 'bg-sky-50 text-sky-700 border-sky-200',
 };
 
+// Plain-language labels so authors don't have to decode the raw enum.
+const CONTENT_STATUS_LABEL: Record<string, string> = {
+  PENDING: 'Not written yet',
+  GENERATING: 'Writing…',
+  READY: 'Ready',
+  FAILED: 'Failed — retry',
+  NONE: 'Not written yet',
+  OUTLINE_READY: 'Needs content',
+};
+
 export function ContentStatusChip({ status }: { status?: string | null }) {
   const s = status ?? 'NONE';
   return (
@@ -34,7 +44,7 @@ export function ContentStatusChip({ status }: { status?: string | null }) {
         CONTENT_STATUS_TONE[s] ?? CONTENT_STATUS_TONE.NONE
       }`}
     >
-      {s.replace('_', ' ')}
+      {CONTENT_STATUS_LABEL[s] ?? s.replace(/_/g, ' ')}
     </span>
   );
 }
@@ -117,7 +127,7 @@ export function CapstoneEditor({
       else toast.success('Capstone generated');
       onChanged();
     } catch (e: any) {
-      toast.error(e?.response?.data?.error ?? 'Failed');
+      toast.error(e?.response?.data?.error ?? 'Something went wrong. Please try again.');
     } finally {
       setBusy(false);
     }
@@ -126,7 +136,7 @@ export function CapstoneEditor({
   return (
     <div className="bg-white border border-slate-200 rounded-2xl p-6">
       <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
-        <h2 className="text-lg font-semibold tracking-tight">Capstone / final assessment</h2>
+        <h2 className="text-lg font-semibold tracking-tight">Final project (capstone)</h2>
         <button
           onClick={generate}
           disabled={busy}
@@ -137,7 +147,8 @@ export function CapstoneEditor({
       </div>
       {!capstone ? (
         <p className="text-sm text-slate-400 italic">
-          No capstone yet. Generate one — it seeds each student's final assessment on assignment.
+          No final project yet. Generate one — it becomes each learner's final assessment when the
+          course is assigned to them.
         </p>
       ) : (
         <div className="space-y-3">
@@ -247,7 +258,7 @@ export function LessonEditorModal({
       });
       setQs([...qs, r.data]);
     } catch (e: any) {
-      toast.error(e?.response?.data?.error ?? 'Failed');
+      toast.error(e?.response?.data?.error ?? 'Something went wrong. Please try again.');
     }
   }
   async function saveQuestion(q: any) {
@@ -271,7 +282,7 @@ export function LessonEditorModal({
       setQs(qs.filter((x) => x.id !== id));
       onSaved();
     } catch (e: any) {
-      toast.error(e?.response?.data?.error ?? 'Failed');
+      toast.error(e?.response?.data?.error ?? 'Something went wrong. Please try again.');
     }
   }
 
@@ -320,7 +331,7 @@ export function LessonEditorModal({
             >
               {LESSON_STATUSES.map((s) => (
                 <option key={s} value={s}>
-                  {s}
+                  {CONTENT_STATUS_LABEL[s] ?? s}
                 </option>
               ))}
             </select>

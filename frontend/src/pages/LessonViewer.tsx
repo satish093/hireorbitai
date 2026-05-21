@@ -11,6 +11,7 @@ import {
   DocumentViewer,
   FeedbackModal,
 } from '../components/Training';
+import { SkeletonCard } from '../components/Skeleton';
 import {
   AcknowledgementCard,
   ComplianceReportButton,
@@ -143,7 +144,7 @@ export function LessonViewer() {
       setAssignment(a.data);
       gates.refresh();
     } catch (e: any) {
-      toast.error(e?.response?.data?.error ?? 'Failed');
+      toast.error(e?.response?.data?.error ?? 'Something went wrong. Please try again.');
     }
   }
 
@@ -164,7 +165,13 @@ export function LessonViewer() {
   if (!assignment || !course)
     return (
       <Layout title="Training plan">
-        <div className="text-sm text-slate-500">Loading…</div>
+        <div className="space-y-4">
+          <SkeletonCard lines={3} />
+          <div className="grid grid-cols-1 lg:grid-cols-[300px,1fr] gap-5">
+            <SkeletonCard lines={5} />
+            <SkeletonCard lines={8} />
+          </div>
+        </div>
       </Layout>
     );
 
@@ -503,7 +510,7 @@ export function LessonViewer() {
               final assessment + manager approval. */}
           <div className="mt-5 space-y-4">
             <div className="flex items-center justify-between gap-2 flex-wrap">
-              <h2 className="text-lg font-semibold tracking-tight">Completion workflow</h2>
+              <h2 className="text-lg font-semibold tracking-tight">Finishing this course</h2>
               <div className="flex items-center gap-2">
                 {course.quizzes?.length > 0 && (
                   <button
