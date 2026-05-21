@@ -140,6 +140,25 @@ body {
     transform: translateY(0);
   }
 
+  /* Job detail pane body: 2-column layout keyed off the PANE's own width
+     (container query), not the viewport — the pane is much narrower than the
+     viewport (sidebar + 440px list column eat the space), so a viewport
+     breakpoint engages two columns too early and squeezes the right-hand
+     cards. Stack until the pane itself is wide enough. */
+  .jobpane-body {
+    container-type: inline-size;
+  }
+  .jobpane-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.25rem;
+  }
+  @container (min-width: 52rem) {
+    .jobpane-grid {
+      grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+    }
+  }
+
   /* Buttons get a tiny press feedback when active. */
   .press {
     transition: transform 120ms ease;

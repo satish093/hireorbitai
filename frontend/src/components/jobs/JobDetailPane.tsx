@@ -205,7 +205,7 @@ export function JobDetailPane({
       </div>
 
       {/* Body (scrolls independently) */}
-      <div className="flex-1 min-h-0 overflow-y-auto p-5 space-y-5">
+      <div className="jobpane-body flex-1 min-h-0 overflow-y-auto p-5 space-y-5">
         <div className="rounded-xl border border-border bg-surface p-4">
           <div className="text-[11px] font-mono uppercase tracking-wider text-muted mb-3">
             Interview loop
@@ -213,7 +213,7 @@ export function JobDetailPane({
           <InterviewTimeline />
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[1.5fr_1fr] gap-5">
+        <div className="jobpane-grid">
           <div className="min-w-0">
             <JobDetailView job={job as unknown as Job} isConsultant={isConsultant} />
           </div>
