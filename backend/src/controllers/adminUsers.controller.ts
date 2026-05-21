@@ -673,3 +673,122 @@ export const auditLog: RequestHandler = async (req, res) => {
   if (error) throw httpError(500, error.message);
   res.json(data ?? []);
 };
+
+// ---------------------------------------------------------------------------
+// POST /admin/users/bulk
+//
+// Apply one lifecycle action to many users. Each id is guarded independently
+// (rank check + last-super-admin + self-protection); failures are collected
+// per-id rather than aborting the batch. All status changes funnel through the
+// same fields setStatus uses so audit + session revocation stay consistent.
+// ---------------------------------------------------------------------------
+const bulkSchema = z
+  .object({
+    ids: z.array(z.string().uuid()).min(1).max(200),
+    action: z.enum(['reset-password', 'change-role', 'move-group', 'suspend', 'deactivate']),
+    payload: z
+      .object({
+        role: z.enum(ALL_ROLES as unknown as [Role, ...Role[]]).optional(),
+        group_id: z.string().uuid().nullable().optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+
+export const bulk: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const parsed = bulkSchema.safeParse(req.body);
+  if (!parsed.success) throw httpError(400, parsed.error.issues[0]?.message ?? 'Invalid input');
+  const { ids, action, payload } = parsed.data;
+  const actor = { id: req.user.id, role: req.user.role };
+
+  const results: { id: string; ok: boolean; error?: string }[] = [];
+  for (const id of ids) {
+    try {
+      if (id === actor.id && action !== 'reset-password') {
+        throw httpError(400, 'Refusing to apply this action to your own account.');
+      }
+      const { data } = await db
+        .from('users')
+        .select('id, email, role, status')
+        .eq('id', id)
+        .maybeSingle();
+      if (!data) throw httpError(404, 'User not found');
+      const row = data as { id: string; email: string; role: Role; status: string | null };
+      assertOutranks(actor, row.role);
+
+      if (action === 'reset-password') {
+        await requestPasswordReset(row.email, req);
+        audit({
+          action: 'admin_user_password_reset',
+          user_id: id,
+          email: row.email,
+          req,
+          metadata: { by: actor.id, bulk: true },
+        });
+      } else if (action === 'change-role') {
+        const newRole = payload?.role;
+        if (!newRole) throw httpError(400, 'A role is required.');
+        assertOutranks(actor, newRole); // can't promote to a tier you don't outrank
+        const { error } = await db.from('users').update({ role: newRole }).eq('id', id);
+        if (error) throw httpError(500, error.message);
+        audit({
+          action: 'admin_role_changed',
+          user_id: id,
+          email: row.email,
+          req,
+          metadata: { from: row.role, to: newRole, by: actor.id, bulk: true },
+        });
+      } else if (action === 'move-group') {
+        const { error } = await db
+          .from('users')
+          .update({ group_id: payload?.group_id ?? null })
+          .eq('id', id);
+        if (error) throw httpError(500, error.message);
+        audit({
+          action: payload?.group_id ? 'group_user_moved' : 'group_user_removed',
+          user_id: id,
+          email: row.email,
+          req,
+          metadata: { to: payload?.group_id ?? null, by: actor.id, bulk: true },
+        });
+      } else {
+        // suspend | deactivate
+        const next = action === 'suspend' ? 'suspended' : 'inactive';
+        await assertNotLastSuperAdmin(id);
+        const { error } = await db
+          .from('users')
+          .update({
+            status: next,
+            status_changed_at: new Date().toISOString(),
+            status_changed_by: actor.id,
+            is_active: false,
+          })
+          .eq('id', id);
+        if (error) throw httpError(500, error.message);
+        await db.auth.admin.signOut(id, 'global').catch(() => {});
+        audit({
+          action: 'admin_user_deactivated',
+          user_id: id,
+          email: row.email,
+          req,
+          metadata: { to: next, by: actor.id, bulk: true },
+        });
+      }
+      results.push({ id, ok: true });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'failed';
+      results.push({ id, ok: false, error: msg });
+    }
+  }
+
+  audit({
+    action: 'admin_users_bulk_action',
+    user_id: actor.id,
+    email: req.user.email,
+    req,
+    metadata: { action, requested: ids.length, ok: results.filter((r) => r.ok).length },
+  });
+  res.json({ results });
+};
