@@ -16,3 +16,12 @@ reportsRouter.get('/consultant-pipeline', requireRole(...MANAGER_TIER), c.consul
 reportsRouter.get('/placement-analytics', requireRole(...MANAGER_TIER), c.placementAnalytics);
 // Time-in-app — per-user from the heartbeat-derived activity counter.
 reportsRouter.get('/user-time', requireRole(...MANAGER_TIER), c.userTime);
+
+// ---------------------------------------------------------------------------
+// Redesigned Reports analytics — range + compareToPrior aware.
+// ---------------------------------------------------------------------------
+reportsRouter.get('/pipeline', requireRole(...MANAGER_TIER), c.pipelineReport);
+reportsRouter.get('/recruiters', requireRole(...MANAGER_TIER), c.recruitersReport);
+reportsRouter.get('/consultants', requireRole(...MANAGER_TIER), c.consultantsReport);
+reportsRouter.get('/placements', requireRole(...MANAGER_TIER), c.placementsReport);
+reportsRouter.get('/sources', requireRole(...MANAGER_TIER), c.sourcesReport);
