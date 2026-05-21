@@ -11,6 +11,22 @@ export const REPORT_TABS: { key: ReportTab; label: string }[] = [
   { key: 'ai', label: 'AI usage' },
 ];
 
+/**
+ * Tabs shown in the nav. Superset of the analytics (payload-bearing) tabs plus
+ * two bespoke tabs that self-fetch their own non-uniform data: the manual daily
+ * activity log (a mutation surface) and the time-in-app report.
+ */
+export type PageTab = ReportTab | 'daily' | 'usertime';
+
+export const NAV_TABS: { key: PageTab; label: string }[] = [
+  ...REPORT_TABS,
+  { key: 'daily', label: 'Daily log' },
+  { key: 'usertime', label: 'Time in app' },
+];
+
+const ANALYTICS = new Set<string>(REPORT_TABS.map((t) => t.key));
+export const isAnalyticsTab = (t: PageTab): t is ReportTab => ANALYTICS.has(t);
+
 export type RangeKey = '7d' | '30d' | '90d' | 'qtd' | 'ytd' | 'custom';
 
 export interface CustomRange {

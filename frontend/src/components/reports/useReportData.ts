@@ -23,6 +23,7 @@ const MOCKS = {
 
 export function useReportData<T extends ReportTab>(
   tab: T,
+  enabled = true,
 ): { data: ReportPayloadMap[T] | null; loading: boolean } {
   const { resolved, compareToPrior } = useReportContext();
   // Tag the loaded payload with the tab it belongs to so a stale payload from
@@ -33,6 +34,7 @@ export function useReportData<T extends ReportTab>(
   const [loaded, setLoaded] = useState<{ tab: ReportTab; payload: unknown } | null>(null);
 
   useEffect(() => {
+    if (!enabled) return;
     let alive = true;
     api
       .get(`/reports/${tab}`, { params: { range: resolved.param, compareToPrior } })
@@ -46,7 +48,7 @@ export function useReportData<T extends ReportTab>(
       alive = false;
     };
     // resolved.from/to cover custom-range changes (same param key 'custom').
-  }, [tab, resolved.param, resolved.from, resolved.to, compareToPrior]);
+  }, [tab, enabled, resolved.param, resolved.from, resolved.to, compareToPrior]);
 
   const data = loaded && loaded.tab === tab ? (loaded.payload as ReportPayloadMap[T]) : null;
   return { data, loading: data === null };

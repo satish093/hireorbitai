@@ -1,14 +1,14 @@
 import clsx from 'clsx';
 import { useReportContext } from './ReportContext';
-import { REPORT_TABS, type ReportTab } from './types';
+import { NAV_TABS, type PageTab } from './types';
 
 /** Underline-style tab nav with a right-aligned mono echo of the date range. */
-export function ReportTabs({ tab, onTab }: { tab: ReportTab; onTab: (t: ReportTab) => void }) {
+export function ReportTabs({ tab, onTab }: { tab: PageTab; onTab: (t: PageTab) => void }) {
   const { resolved } = useReportContext();
   return (
     <div className="flex items-end justify-between gap-4 border-b border-border overflow-x-auto">
       <div className="flex items-end gap-5">
-        {REPORT_TABS.map((t) => (
+        {NAV_TABS.map((t) => (
           <button
             key={t.key}
             type="button"

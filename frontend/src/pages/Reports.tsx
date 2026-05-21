@@ -6,7 +6,12 @@ import { ReportControls } from '../components/reports/ReportControls';
 import { ReportTabs } from '../components/reports/ReportTabs';
 import { useReportData } from '../components/reports/useReportData';
 import { downloadCsv, payloadToCsvRows, exportPanelPng } from '../components/reports/exportUtils';
-import { REPORT_TABS, type ReportTab } from '../components/reports/types';
+import {
+  NAV_TABS,
+  isAnalyticsTab,
+  type PageTab,
+  type ReportTab,
+} from '../components/reports/types';
 import type {
   PipelinePayload,
   RecruitersPayload,
@@ -21,20 +26,23 @@ import { ConsultantReport } from '../components/reports/ConsultantReport';
 import { PlacementsReport } from '../components/reports/PlacementsReport';
 import { SourcesReport } from '../components/reports/SourcesReport';
 import { AIUsageReport } from '../components/reports/AIUsageReport';
+import { DailyActivityReport } from '../components/reports/DailyActivityReport';
+import { TimeInAppReport } from '../components/reports/TimeInAppReport';
 
-const TAB_KEYS = REPORT_TABS.map((t) => t.key);
-const isTab = (v: string | null): v is ReportTab => !!v && (TAB_KEYS as string[]).includes(v);
+const TAB_KEYS = NAV_TABS.map((t) => t.key);
+const isTab = (v: string | null): v is PageTab => !!v && (TAB_KEYS as string[]).includes(v);
 
 function ReportsInner() {
   const [params, setParams] = useSearchParams();
-  const tab: ReportTab = isTab(params.get('tab')) ? (params.get('tab') as ReportTab) : 'pipeline';
-  const setTab = (t: ReportTab) => {
+  const tab: PageTab = isTab(params.get('tab')) ? (params.get('tab') as PageTab) : 'pipeline';
+  const setTab = (t: PageTab) => {
     const next = new URLSearchParams(params);
     next.set('tab', t);
     setParams(next);
   };
 
-  const { data, loading } = useReportData(tab);
+  const analyticsTab: ReportTab | null = isAnalyticsTab(tab) ? tab : null;
+  const { data, loading } = useReportData(analyticsTab ?? 'pipeline', analyticsTab !== null);
 
   function handleExport(fmt: 'csv' | 'png') {
     if (fmt === 'png') {
@@ -73,6 +81,8 @@ function ReportsInner() {
           <SourcesReport data={data as SourcesPayload | null} loading={loading} />
         )}
         {tab === 'ai' && <AIUsageReport data={data as AIUsagePayload | null} loading={loading} />}
+        {tab === 'daily' && <DailyActivityReport />}
+        {tab === 'usertime' && <TimeInAppReport />}
       </div>
     </Layout>
   );
