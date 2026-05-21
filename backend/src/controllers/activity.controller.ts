@@ -31,6 +31,8 @@ interface ActivityEvent {
 }
 
 const isManagerTier = (role?: string) => !!role && (MANAGER_TIER as string[]).includes(role);
+const HOUR = 3_600_000;
+const MISSING = /schema cache|relation .* does not exist|column .* does not exist/i;
 
 async function recruiterRowId(userId: string): Promise<string | null> {
   const { data } = await db.from('recruiters').select('id').eq('user_id', userId).maybeSingle();
@@ -155,4 +157,116 @@ export const feed: RequestHandler = async (req, res) => {
 
   events.sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime());
   res.json(events.slice(0, limit));
+};
+
+// ---------------------------------------------------------------------------
+// Urgent signals for the dashboard UrgentRibbon: interviews starting within 4h,
+// offers expiring within 36h, and submissions stuck in SCREENING > 7 days — all
+// scoped to the consultants the caller may see. (Unread-DM signal is still
+// TODO: it needs per-consultant message rollups.) Returns plain data; the
+// frontend hook shapes it into ribbon items.
+// ---------------------------------------------------------------------------
+
+interface IvRow {
+  id: string;
+  scheduled_at: string;
+  type?: string | null;
+  interviewer?: string | null;
+  consultant?: { user?: { full_name?: string | null } | null } | null;
+}
+interface OfferRow {
+  id: string;
+  offer_expires_at?: string | null;
+  job?: { title?: string | null } | null;
+  consultant?: { user?: { full_name?: string | null } | null } | null;
+}
+
+const EMPTY = { interviews: [], offersExpiring: [], screeningStuck: 0 };
+
+export const urgent: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const role = req.user.role;
+  const now = Date.now();
+
+  // Consultant ids the caller may see (null = all, for managers).
+  let consultantIds: string[] | null = null;
+  if (isManagerTier(role)) {
+    consultantIds = null;
+  } else if (role === 'RECRUITER') {
+    const rec = await recruiterRowId(req.user.id);
+    if (!rec) {
+      res.json(EMPTY);
+      return;
+    }
+    const { data } = await db.from('consultants').select('id').eq('recruiter_id', rec);
+    consultantIds = ((data ?? []) as { id: string }[]).map((c) => c.id);
+  } else if (role === 'CONSULTANT') {
+    const cons = await consultantRowId(req.user.id);
+    consultantIds = cons ? [cons] : [];
+  } else {
+    res.json(EMPTY);
+    return;
+  }
+
+  if (consultantIds !== null && consultantIds.length === 0) {
+    res.json(EMPTY);
+    return;
+  }
+
+  // 1) Interviews within the next 4h.
+  let ivq = db
+    .from('interviews')
+    .select(
+      'id, scheduled_at, type, interviewer, consultant:consultants(user:users!user_id(full_name))',
+    )
+    .gte('scheduled_at', new Date(now).toISOString())
+    .lte('scheduled_at', new Date(now + 4 * HOUR).toISOString())
+    .eq('status', 'SCHEDULED')
+    .order('scheduled_at', { ascending: true })
+    .limit(10);
+  if (consultantIds) ivq = ivq.in('consultant_id', consultantIds);
+  const ivRes = await ivq;
+  if (ivRes.error && !MISSING.test(ivRes.error.message)) throw httpError(500, ivRes.error.message);
+  const interviews = ((ivRes.data ?? []) as IvRow[]).map((iv) => ({
+    id: iv.id,
+    consultantName: iv.consultant?.user?.full_name ?? null,
+    type: iv.type ?? null,
+    interviewer: iv.interviewer ?? null,
+    scheduled_at: iv.scheduled_at,
+  }));
+
+  // 2) Offers expiring within 36h (skipped gracefully if column not migrated).
+  let oq = db
+    .from('applications')
+    .select(
+      'id, offer_expires_at, job:jobs(title), consultant:consultants(user:users!user_id(full_name))',
+    )
+    .eq('status', 'OFFER')
+    .gte('offer_expires_at', new Date(now).toISOString())
+    .lte('offer_expires_at', new Date(now + 36 * HOUR).toISOString())
+    .order('offer_expires_at', { ascending: true })
+    .limit(10);
+  if (consultantIds) oq = oq.in('consultant_id', consultantIds);
+  const oRes = await oq;
+  if (oRes.error && !MISSING.test(oRes.error.message)) throw httpError(500, oRes.error.message);
+  const offersExpiring = ((oRes.data ?? []) as OfferRow[]).map((a) => ({
+    id: a.id,
+    consultantName: a.consultant?.user?.full_name ?? null,
+    jobTitle: a.job?.title ?? null,
+    expires_at: a.offer_expires_at ?? null,
+  }));
+
+  // 3) Submissions stuck in SCREENING > 7 days.
+  let sq = db
+    .from('applications')
+    .select('id')
+    .eq('status', 'SCREENING')
+    .lt('submitted_at', new Date(now - 7 * 24 * HOUR).toISOString())
+    .limit(100);
+  if (consultantIds) sq = sq.in('consultant_id', consultantIds);
+  const sRes = await sq;
+  if (sRes.error && !MISSING.test(sRes.error.message)) throw httpError(500, sRes.error.message);
+  const screeningStuck = (sRes.data ?? []).length;
+
+  res.json({ interviews, offersExpiring, screeningStuck });
 };
