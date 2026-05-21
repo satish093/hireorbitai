@@ -146,6 +146,37 @@ const feedbackSchema = z.object({
 });
 
 // ---------------------------------------------------------------------------
+// Scope resolution — mirrors the GET /interviews list visibility rules.
+//
+// Returns the set of consultant_ids the caller may see, or { all: true } for
+// manager-tier callers (no consultant filter). `null` means the caller can see
+// nothing (e.g. a recruiter with no consultants, or an unknown role) and the
+// caller should short-circuit to an empty result.
+// ---------------------------------------------------------------------------
+type InterviewScope = { all: true } | { all: false; consultantIds: string[] } | null;
+
+async function resolveInterviewScope(caller: {
+  id: string;
+  role: string;
+}): Promise<InterviewScope> {
+  if (isManagerTier(caller.role)) return { all: true };
+  if (caller.role === 'RECRUITER') {
+    const myRecId = await getCallerRecruiterRowId(caller.id);
+    if (!myRecId) return null;
+    const { data: cons } = await db.from('consultants').select('id').eq('recruiter_id', myRecId);
+    const ids = ((cons ?? []) as { id: string }[]).map((c) => c.id);
+    if (ids.length === 0) return null;
+    return { all: false, consultantIds: ids };
+  }
+  if (caller.role === 'CONSULTANT') {
+    const myConsId = await getCallerConsultantRowId(caller.id);
+    if (!myConsId) return null;
+    return { all: false, consultantIds: [myConsId] };
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // GET /interviews — scoped list.
 // ---------------------------------------------------------------------------
 export const list: RequestHandler = async (req, res) => {
@@ -241,6 +272,127 @@ export const update: RequestHandler = async (req, res) => {
   // date (or clear them if the interview is no longer SCHEDULED).
   await syncInterviewReminders(data as Parameters<typeof syncInterviewReminders>[0]);
   res.json(data);
+};
+
+// ---------------------------------------------------------------------------
+// GET /interviews/conflicts?from=&to= — overlapping interview pairs in the
+// window, scoped to what the caller may see (same rules as the list).
+// ---------------------------------------------------------------------------
+interface ConflictRow {
+  id: string;
+  title: string;
+  start_at: string;
+  duration_min: number;
+}
+
+const conflictsQuerySchema = z.object({
+  from: z.string().datetime().optional(),
+  to: z.string().datetime().optional(),
+});
+
+export const conflicts: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const parsed = conflictsQuerySchema.safeParse(req.query);
+  if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
+  const { from, to } = parsed.data;
+
+  const scope = await resolveInterviewScope(req.user);
+  if (!scope) {
+    res.json([]);
+    return;
+  }
+
+  let qb = db
+    .from('interviews')
+    .select('id, type, scheduled_at, duration_minutes')
+    .not('scheduled_at', 'is', null);
+  if (!scope.all) qb = qb.in('consultant_id', scope.consultantIds);
+  if (from) qb = qb.gte('scheduled_at', from);
+  if (to) qb = qb.lte('scheduled_at', to);
+
+  const { data, error } = await qb.order('scheduled_at', { ascending: true });
+  if (error) throw httpError(500, error.message);
+
+  type Raw = {
+    id: string;
+    type: string | null;
+    scheduled_at: string;
+    duration_minutes: number | null;
+  };
+  const events: ConflictRow[] = ((data ?? []) as Raw[]).map((r) => ({
+    id: r.id,
+    title: r.type ?? 'Interview',
+    start_at: r.scheduled_at,
+    duration_min: r.duration_minutes ?? 60,
+  }));
+
+  // Sweep-line: events are already sorted by start. Keep a list of "active"
+  // events whose interval [start, start+duration) overlaps the current one;
+  // every active event that hasn't ended before the current event begins is a
+  // conflict. O(n log n) overall (sort) + O(k) per overlap emitted.
+  const startMs = (e: ConflictRow) => new Date(e.start_at).getTime();
+  const endMs = (e: ConflictRow) => startMs(e) + Math.max(0, e.duration_min) * 60_000;
+
+  const result: { a: ConflictRow; b: ConflictRow }[] = [];
+  const active: ConflictRow[] = [];
+  for (const ev of events) {
+    const evStart = startMs(ev);
+    // Drop any active event that has already ended (no overlap possible).
+    for (let i = active.length - 1; i >= 0; i--) {
+      if (endMs(active[i]) <= evStart) active.splice(i, 1);
+    }
+    // Whatever remains active overlaps `ev` (their end > ev.start, and they
+    // started at or before ev.start since we iterate in start order).
+    for (const a of active) result.push({ a, b: ev });
+    active.push(ev);
+  }
+
+  res.json(result);
+};
+
+// ---------------------------------------------------------------------------
+// GET /interviews/next?for=<user_id> — nearest upcoming interview relevant to
+// the target user. If `for` differs from the caller and the caller is not
+// manager-tier, `for` is ignored and the caller's own scope is used.
+// ---------------------------------------------------------------------------
+const nextQuerySchema = z.object({ for: z.string().uuid().optional() });
+
+export const next: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const parsed = nextQuerySchema.safeParse(req.query);
+  if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
+
+  // Decide whose interviews to look at. Non-managers can never target another
+  // user; their request is silently scoped back to themselves.
+  let targetUserId = req.user.id;
+  if (parsed.data.for && isManagerTier(req.user.role)) {
+    targetUserId = parsed.data.for;
+  }
+
+  // Resolve the target user's consultant scope. We use the consultant row to
+  // find their interviews; managers querying a non-consultant user simply get
+  // their created interviews. The caller is already constrained to
+  // manager-tier when targeting someone else, so this can't leak across
+  // non-manager principals.
+  const targetConsId = await getCallerConsultantRowId(targetUserId);
+
+  let qb = db
+    .from('interviews')
+    .select('*, consultant:consultants(*), application:applications(*)')
+    .gt('scheduled_at', new Date().toISOString());
+
+  if (targetConsId) {
+    qb = qb.eq('consultant_id', targetConsId);
+  } else {
+    // No consultant row for the target. Fall back to interviews the target
+    // created (e.g. a recruiter/manager who scheduled mocks).
+    qb = qb.eq('created_by', targetUserId);
+  }
+
+  const { data, error } = await qb.order('scheduled_at', { ascending: true }).limit(1);
+  if (error) throw httpError(500, error.message);
+  const rows = (data ?? []) as unknown[];
+  res.json(rows.length > 0 ? rows[0] : null);
 };
 
 export const submitFeedback: RequestHandler = async (req, res) => {
