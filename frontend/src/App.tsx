@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { FeatureGuard } from './hooks/useFeatureFlags';
 import { RealtimeNotifications } from './components/RealtimeNotifications';
@@ -100,9 +100,11 @@ const DeactivatedAccounts = lazy(() =>
 const AdminUsers = lazy(() =>
   import('./pages/AdminUsers').then((m) => ({ default: m.AdminUsers })),
 );
-const AdminUserDetail = lazy(() =>
-  import('./pages/AdminUserDetail').then((m) => ({ default: m.AdminUserDetail })),
-);
+/** Legacy /admin/users/:id now opens the detail pane on the list page. */
+function AdminUserRedirect() {
+  const { id } = useParams<{ id: string }>();
+  return <Navigate to={id ? `/admin/users?user=${id}` : '/admin/users'} replace />;
+}
 
 // Training module — heavy, lots of sub-pages. Loads only when a training
 // route is hit.
@@ -403,7 +405,7 @@ export default function App() {
           path="/admin/users/:id"
           element={
             <ProtectedRoute allow={ADMIN_TIER}>
-              <AdminUserDetail />
+              <AdminUserRedirect />
             </ProtectedRoute>
           }
         />

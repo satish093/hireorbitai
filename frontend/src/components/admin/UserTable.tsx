@@ -1,6 +1,7 @@
 import { ReactNode } from 'react';
 import clsx from 'clsx';
 import { Avatar } from '../TaskBits';
+import { Button } from '../Button';
 import { Skeleton } from '../Skeleton';
 import { EmptyState } from '../EmptyState';
 import { Check, GroupBadge, RoleChip, StatusPill } from './UserBits';
@@ -246,6 +247,39 @@ export function UserTable({
             )}
           </tbody>
         </table>
+      </div>
+    </div>
+  );
+}
+
+/** Prev/next pager shown under the table when there's more than one page. */
+export function Pager({
+  page,
+  totalPages,
+  onPage,
+}: {
+  page: number;
+  totalPages: number;
+  onPage: (p: number) => void;
+}) {
+  if (totalPages <= 1) return null;
+  return (
+    <div className="flex items-center justify-between mt-3 text-sm">
+      <span className="text-muted">
+        Page {page} of {totalPages}
+      </span>
+      <div className="flex gap-2">
+        <Button size="sm" variant="secondary" disabled={page <= 1} onClick={() => onPage(page - 1)}>
+          ‹ Prev
+        </Button>
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={page >= totalPages}
+          onClick={() => onPage(page + 1)}
+        >
+          Next ›
+        </Button>
       </div>
     </div>
   );

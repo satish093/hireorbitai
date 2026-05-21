@@ -2,631 +2,195 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Layout } from '../components/Layout';
-import { DataTable } from '../components/DataTable';
 import { PageHeader } from '../components/PageHeader';
 import { Button } from '../components/Button';
-import { FormInput } from '../components/FormInput';
-import { SelectInput } from '../components/SelectInput';
-import { Avatar } from '../components/TaskBits';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
-import { invalidate, useInvalidationListener } from '../hooks/useInvalidate';
-import { ALL_ROLES, Role, ROLE_LABEL } from '../types';
-import clsx from 'clsx';
+import { invalidate } from '../hooks/useInvalidate';
+import { Role } from '../types';
+import { AdminKpiStrip } from '../components/admin/AdminKpiStrip';
+import { UserSegments } from '../components/admin/UserSegments';
+import { useUserSegments } from '../components/admin/useUserSegments';
+import { UserFilterBar } from '../components/admin/UserFilterBar';
+import { UserBulkBar } from '../components/admin/UserBulkBar';
+import { UserTable, Pager } from '../components/admin/UserTable';
+import { UserDetailPane } from '../components/admin/UserDetailPane';
+import { ConfirmDialog, type ConfirmSpec } from '../components/admin/ConfirmDialog';
+import { useAdminUsers, useColumnPrefs } from '../components/admin/useAdminUsers';
 
-type Status = 'active' | 'inactive' | 'suspended' | 'pending_verification' | 'banned';
+type BulkAction = 'reset-password' | 'change-role' | 'move-group' | 'suspend' | 'deactivate';
 
-interface AdminUserRow {
-  id: string;
-  email: string;
-  full_name: string | null;
-  role: Role;
-  status: Status | null;
-  must_change_password: boolean;
-  group_id: string | null;
-  created_at: string;
-  last_login_at: string | null;
-  last_seen_at: string | null;
-  status_reason: string | null;
-}
-
-interface GroupLite {
-  id: string;
-  name: string;
-  color?: string | null;
-  unique_group_id?: string | null;
-}
-
-interface ListResponse {
-  rows: AdminUserRow[];
-  page: number;
-  page_size: number;
-  total: number;
-  total_pages: number;
-}
-
-const STATUS_FILTERS: { value: Status | ''; label: string }[] = [
-  { value: '', label: 'All statuses' },
-  { value: 'active', label: 'Active' },
-  { value: 'inactive', label: 'Inactive' },
-  { value: 'suspended', label: 'Suspended' },
-  { value: 'pending_verification', label: 'Pending verification' },
-  { value: 'banned', label: 'Banned' },
-];
-
-const STATUS_PILL: Record<Status, string> = {
-  active:
-    'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30',
-  inactive: 'bg-hover  text-muted  border-border',
-  suspended:
-    'bg-amber-50 dark:bg-amber-500/15   text-amber-800 dark:text-amber-300  border-amber-200 dark:border-amber-500/30',
-  pending_verification:
-    'bg-sky-50 dark:bg-sky-500/15     text-sky-700 dark:text-sky-300    border-sky-200 dark:border-sky-500/30',
-  banned:
-    'bg-red-50 dark:bg-red-500/15     text-red-700 dark:text-red-300    border-red-200 dark:border-red-500/30',
-};
-
-const STATUS_DOT: Record<Status, string> = {
-  active: 'bg-emerald-500',
-  inactive: 'bg-muted',
-  suspended: 'bg-amber-500',
-  pending_verification: 'bg-sky-500',
-  banned: 'bg-red-500',
-};
-
-/**
- * Admin "All Users" — server-side paginated, filterable list.
- *
- * Filters live in the URL (?role=…&status=…&q=…&page=…) so the page is
- * shareable and the back button works. The state-derived URL also means
- * a hard refresh keeps the user where they were.
- */
+/** Admin Users — single workspace: KPI strip, segments, filter/bulk bar, a
+ *  selectable table, and a slide-in detail pane (selection persisted in ?user). */
 export function AdminUsers() {
-  const [params, setParams] = useSearchParams();
-  const q = params.get('q') ?? '';
-  const role = (params.get('role') as Role | '') ?? '';
-  const status = (params.get('status') as Status | '') ?? '';
-  const sort = params.get('sort') ?? 'created_at';
-  const order = (params.get('order') as 'asc' | 'desc') ?? 'desc';
-  const page = Number(params.get('page') ?? 1);
-  const page_size = Number(params.get('page_size') ?? 50);
-
-  // Local search input — debounced into the URL so we don't fetch per keystroke.
-  const [qInput, setQInput] = useState(q);
-  useEffect(() => {
-    setQInput(q);
-  }, [q]);
-  useEffect(() => {
-    const t = setTimeout(() => {
-      // Functional setSearchParams: reads the freshest URL state at fire
-      // time. The previous implementation captured `params` in the closure
-      // when the effect ran — if the user changed role/status/sort within
-      // the 300ms window, the timer fired with a stale params reference
-      // and silently clobbered those filters back to their old values.
-      setParams(
-        (prev) => {
-          const next = new URLSearchParams(prev);
-          // No-op if the URL already reflects the current input, so we don't
-          // churn history during paste/undo of identical text.
-          if ((next.get('q') ?? '') === qInput) return prev;
-          if (qInput) next.set('q', qInput);
-          else next.delete('q');
-          next.set('page', '1');
-          return next;
-        },
-        { replace: true },
-      );
-    }, 300);
-    return () => clearTimeout(t);
-  }, [qInput, setParams]);
-
-  const [data, setData] = useState<ListResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [busyRowId, setBusyRowId] = useState<string | null>(null);
-  // Groups lookup map — fetched once, used to render colored badges in the
-  // Group column. Empty map (e.g. migration not applied) means we just show
-  // "No Group" labels instead of crashing.
-  const [groupsById, setGroupsById] = useState<Record<string, GroupLite>>({});
-  useEffect(() => {
-    api
-      .get<GroupLite[]>('/user-groups')
-      .then((r) => {
-        const map: Record<string, GroupLite> = {};
-        for (const g of r.data ?? []) map[g.id] = g;
-        setGroupsById(map);
-      })
-      .catch(() => {
-        /* non-fatal — badges will fall back to "No Group" */
-      });
-  }, []);
-  // Bumped whenever a sibling page (or this one) invalidates the 'users'
-  // channel — see useInvalidationListener below. Drops into the fetch
-  // effect's deps so cross-page mutations refetch the list automatically.
-  const [reloadTick, setReloadTick] = useState(0);
   const { profile: me } = useAuth();
-  useInvalidationListener('users', () => setReloadTick((n) => n + 1));
+  const [params, setParams] = useSearchParams();
+  const a = useAdminUsers();
+  const rows = a.data?.rows ?? [];
+  const total = a.data?.total ?? 0;
+  const totalPages = a.data?.total_pages ?? 0;
+  const segments = useUserSegments(a.kpi);
 
-  // Memoize the param string we send to the API so the effect only fires
-  // when the relevant query changes.
-  const queryString = useMemo(() => {
-    const p: Record<string, string> = {
-      page: String(page),
-      page_size: String(page_size),
-      sort,
-      order,
-    };
-    if (q) p.q = q;
-    if (role) p.role = role;
-    if (status) p.status = status;
-    return p;
-  }, [q, role, status, sort, order, page, page_size]);
+  const selectedUserId = params.get('user');
+  const setSelected = (id: string | null) =>
+    setParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (id) next.set('user', id);
+      else next.delete('user');
+      return next;
+    });
 
+  // Row selection (per-view; cleared when the query changes).
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const { q, role, group_id, last_seen } = a.filters;
   useEffect(() => {
-    const ctl = new AbortController();
-    setLoading(true);
-    api
-      .get<ListResponse>('/admin/users', { params: queryString, signal: ctl.signal })
-      .then((r) => setData(r.data))
-      .catch((e) => {
-        if (e?.code === 'ERR_CANCELED') return;
-        toast.error(e?.response?.data?.error ?? 'Failed to load users');
-      })
-      .finally(() => {
-        if (!ctl.signal.aborted) setLoading(false);
-      });
-    return () => ctl.abort();
-  }, [queryString, reloadTick]);
+    setSelectedIds(new Set());
+  }, [a.segment, q, role, group_id, last_seen, a.page]);
+  const toggleSelect = (id: string) =>
+    setSelectedIds((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  const toggleAll = () =>
+    setSelectedIds((s) =>
+      rows.every((r) => s.has(r.id)) ? new Set() : new Set(rows.map((r) => r.id)),
+    );
 
-  function setParam(key: string, value: string | null) {
-    const next = new URLSearchParams(params);
-    if (value) next.set(key, value);
-    else next.delete(key);
-    if (key !== 'page') next.set('page', '1');
-    setParams(next, { replace: false });
-  }
+  const { columns, toggleColumn } = useColumnPrefs();
 
-  // Quick lifecycle actions invoked from the row menu. We patch the local
-  // row in place so the status pill flips immediately, without a full table
-  // reload — feels much snappier on large lists.
-  async function quickSetStatus(u: AdminUserRow, status: Status, reason?: string) {
-    if (!data || busyRowId) return;
-    if (me?.id === u.id && status !== 'active') {
-      toast.error("You can't change your own status — ask another admin.");
-      return;
+  // `/` focuses search; Esc closes the pane.
+  const searchRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (e.key === '/' && tag !== 'INPUT' && tag !== 'TEXTAREA') {
+        e.preventDefault();
+        searchRef.current?.focus();
+      } else if (e.key === 'Escape' && selectedUserId) {
+        setSelected(null);
+      }
     }
-    setBusyRowId(u.id);
-    try {
-      const { data: updated } = await api.patch(`/admin/users/${u.id}/status`, {
-        status,
-        reason: reason || undefined,
-      });
-      setData({
-        ...data,
-        rows: data.rows.map((r) =>
-          r.id === u.id
-            ? {
-                ...r,
-                status: (updated.status ?? status) as Status,
-                status_reason: updated.status_reason ?? null,
-              }
-            : r,
-        ),
-      });
-      toast.success(
-        status === 'active' ? `${u.email} reactivated` : `${u.email} ${status.replace(/_/g, ' ')}`,
-      );
-      // Tell sibling pages (detail view, deactivated accounts) that the
-      // users dataset is dirty so they refetch when they next render.
-      invalidate('users');
-    } catch (e: any) {
-      toast.error(e?.response?.data?.error ?? 'Status change failed');
-    } finally {
-      setBusyRowId(null);
-    }
-  }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
 
-  async function quickSendReset(u: AdminUserRow) {
-    if (busyRowId) return;
-    if (!confirm(`Send a password reset email to ${u.email}?`)) return;
-    setBusyRowId(u.id);
-    try {
-      await api.post(`/admin/users/${u.id}/send-password-reset`);
-      toast.success('Password reset email sent');
-    } catch (e: any) {
-      toast.error(e?.response?.data?.error ?? 'Send failed');
-    } finally {
-      setBusyRowId(null);
-    }
+  // Bulk runner — every action is confirmed; deactivate needs a typed phrase.
+  const [confirm, setConfirm] = useState<ConfirmSpec | null>(null);
+  const ids = useMemo(() => Array.from(selectedIds), [selectedIds]);
+  function runBulk(action: BulkAction, label: string, payload?: unknown, danger?: boolean) {
+    const n = ids.length;
+    setConfirm({
+      title: `${label} ${n} ${n === 1 ? 'user' : 'users'}?`,
+      message: `This applies "${label}" to ${n} selected ${n === 1 ? 'account' : 'accounts'}. Actions you don't outrank are skipped.`,
+      confirmLabel: label,
+      tone: danger ? 'danger' : 'default',
+      requireTyped: action === 'deactivate' ? 'DEACTIVATE' : undefined,
+      run: async () => {
+        const { data } = await api.post('/admin/users/bulk', { ids, action, payload });
+        const ok = (data.results ?? []).filter((r: { ok: boolean }) => r.ok).length;
+        toast.success(`${label}: ${ok}/${n} applied`);
+        setSelectedIds(new Set());
+        a.reload();
+        invalidate('users');
+      },
+    });
   }
-
-  const total = data?.total ?? 0;
-  const totalPages = data?.total_pages ?? 0;
 
   return (
     <Layout title="Admin · Users">
       <PageHeader
-        title="All users"
-        description="Manage every account in the workspace. Filter by role, status, or search by name/email."
+        title="Users"
+        description="Every account in the workspace — filter, inspect, and manage lifecycle."
         action={
-          <span className="text-sm text-muted">
-            {loading ? 'Loading…' : `${total.toLocaleString()} ${total === 1 ? 'user' : 'users'}`}
-          </span>
+          <>
+            <span className="text-sm text-muted">
+              {a.loading
+                ? 'Loading…'
+                : `${total.toLocaleString()} ${total === 1 ? 'user' : 'users'}`}
+            </span>
+            <Link
+              to="/admin/deactivated"
+              className="inline-flex items-center h-9 px-3 rounded-lg border border-border bg-surface text-sm text-ink-2 hover:bg-hover press"
+            >
+              Deactivated
+            </Link>
+            <Button variant="primary" size="sm" onClick={() => toast('Invites coming soon')}>
+              Invite
+            </Button>
+          </>
         }
       />
 
-      {/* Filters */}
-      <div className="bg-surface border border-border rounded-xl p-3 mb-4 flex flex-wrap items-end gap-3">
-        <div className="flex-1 min-w-[220px]">
-          <FormInput
-            label="Search"
-            placeholder="Name or email"
-            value={qInput}
-            onChange={(e) => setQInput(e.target.value)}
+      <AdminKpiStrip kpi={a.kpi} loading={a.loading && !a.kpi} />
+      <UserSegments segments={segments} active={a.segment} onSelect={a.setSegment} />
+
+      {ids.length > 0 ? (
+        <UserBulkBar
+          count={ids.length}
+          groups={a.groups}
+          onClear={() => setSelectedIds(new Set())}
+          onResetPassword={() => runBulk('reset-password', 'Send reset')}
+          onChangeRole={(role: Role) => runBulk('change-role', `Set role ${role}`, { role })}
+          onMoveGroup={(group_id) => runBulk('move-group', 'Move group', { group_id })}
+          onSuspend={() => runBulk('suspend', 'Suspend', undefined, true)}
+          onDeactivate={() => runBulk('deactivate', 'Deactivate', undefined, true)}
+        />
+      ) : (
+        <UserFilterBar
+          filters={{ ...a.filters, q: a.qInput }}
+          onChange={a.setFilter}
+          groups={a.groups}
+          total={total}
+          shown={rows.length}
+          loading={a.loading}
+          searchRef={searchRef}
+          columns={columns}
+          onToggleColumn={toggleColumn}
+          onReset={a.resetFilters}
+        />
+      )}
+
+      <div
+        className="grid gap-4 items-start transition-[grid-template-columns] duration-300 ease-out"
+        style={{
+          gridTemplateColumns: selectedUserId ? 'minmax(0,1fr) 380px' : 'minmax(0,1fr) 0px',
+        }}
+      >
+        <div className="min-w-0">
+          <UserTable
+            rows={rows}
+            groupsById={Object.fromEntries(a.groups.map((g) => [g.id, g]))}
+            columns={columns}
+            loading={a.loading}
+            selectedIds={selectedIds}
+            onToggleSelect={toggleSelect}
+            onToggleAll={toggleAll}
+            openId={selectedUserId}
+            onOpen={setSelected}
+            sort={a.sort}
+            order={a.order}
+            onSort={a.setSort}
           />
+          {!a.loading && <Pager page={a.page} totalPages={totalPages} onPage={a.setPage} />}
         </div>
-        <div className="w-44">
-          <SelectInput
-            label="Role"
-            placeholder="All roles"
-            value={role}
-            onChange={(e) => setParam('role', e.target.value || null)}
-            options={ALL_ROLES.map((r) => ({ value: r, label: ROLE_LABEL[r] }))}
-          />
+        <div className="overflow-hidden">
+          {selectedUserId && (
+            <div className="sticky top-4 h-[calc(100dvh-8rem)] overflow-hidden rounded-xl border border-border">
+              <UserDetailPane
+                userId={selectedUserId}
+                onClose={() => setSelected(null)}
+                groups={a.groups}
+                me={me ? { id: me.id } : null}
+                onChanged={a.reload}
+              />
+            </div>
+          )}
         </div>
-        <div className="w-48">
-          <SelectInput
-            label="Status"
-            value={status}
-            onChange={(e) => setParam('status', e.target.value || null)}
-            options={STATUS_FILTERS}
-          />
-        </div>
-        <div className="w-44">
-          <SelectInput
-            label="Sort by"
-            value={sort}
-            onChange={(e) => setParam('sort', e.target.value)}
-            options={[
-              { value: 'created_at', label: 'Newest first' },
-              { value: 'last_login_at', label: 'Recently active' },
-              { value: 'email', label: 'Email A→Z' },
-              { value: 'full_name', label: 'Name A→Z' },
-            ]}
-          />
-        </div>
-        {(q || role || status) && (
-          <Button
-            variant="ghost"
-            onClick={() => setParams(new URLSearchParams(), { replace: false })}
-          >
-            Reset
-          </Button>
-        )}
       </div>
 
-      <DataTable
-        loading={loading}
-        empty="No users match these filters."
-        rows={data?.rows ?? []}
-        columns={[
-          {
-            key: 'name',
-            header: 'Name',
-            render: (u: AdminUserRow) => (
-              <Link
-                to={`/admin/users/${u.id}`}
-                className="inline-flex items-center gap-2 hover:bg-hover rounded -mx-1 px-1 py-0.5"
-              >
-                <Avatar name={u.full_name} email={u.email} size={28} />
-                <div className="leading-tight">
-                  <div className="text-sm font-medium text-ink hover:underline">
-                    {u.full_name ?? u.email}
-                  </div>
-                  <div className="text-[11px] text-muted">{u.email}</div>
-                </div>
-              </Link>
-            ),
-          },
-          {
-            key: 'role',
-            header: 'Role',
-            render: (u: AdminUserRow) => (
-              <span className="text-[11px] font-medium bg-hover text-ink px-1.5 py-0.5 rounded">
-                {ROLE_LABEL[u.role] ?? u.role}
-              </span>
-            ),
-          },
-          {
-            key: 'group',
-            header: 'Group',
-            render: (u: AdminUserRow) => {
-              const g = u.group_id ? groupsById[u.group_id] : undefined;
-              if (!g) {
-                return <span className="text-[11px] text-muted italic">No Group</span>;
-              }
-              return (
-                <span
-                  className="inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded text-[11px] font-medium"
-                  style={{
-                    background: `${g.color ?? '#6366F1'}1A`, // 10% alpha
-                    color: g.color ?? '#4F46E5',
-                  }}
-                  title={g.unique_group_id ?? undefined}
-                >
-                  <span
-                    className="w-1.5 h-1.5 rounded-full"
-                    style={{ background: g.color ?? '#6366F1' }}
-                  />
-                  {g.name}
-                </span>
-              );
-            },
-          },
-          {
-            key: 'status',
-            header: 'Status',
-            render: (u: AdminUserRow) => {
-              const s = (u.status ?? 'active') as Status;
-              return (
-                <span
-                  className={clsx(
-                    'inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium border',
-                    STATUS_PILL[s],
-                  )}
-                  title={u.status_reason ?? undefined}
-                >
-                  <span className={clsx('w-1.5 h-1.5 rounded-full', STATUS_DOT[s])} />
-                  {s.replace(/_/g, ' ')}
-                </span>
-              );
-            },
-          },
-          {
-            key: 'verification',
-            header: 'Verification',
-            render: (u: AdminUserRow) =>
-              u.must_change_password ? (
-                <span className="text-[11px] text-amber-700 dark:text-amber-300">
-                  Pending password
-                </span>
-              ) : (
-                <span className="text-[11px] text-emerald-700 dark:text-emerald-300">
-                  ✓ Verified
-                </span>
-              ),
-          },
-          {
-            key: 'last_login_at',
-            header: 'Last login',
-            render: (u: AdminUserRow) =>
-              u.last_login_at ? (
-                <span
-                  className="text-xs text-ink"
-                  title={new Date(u.last_login_at).toLocaleString()}
-                >
-                  {relative(u.last_login_at)}
-                </span>
-              ) : (
-                <span className="text-xs text-muted italic">Never</span>
-              ),
-          },
-          {
-            key: 'created_at',
-            header: 'Joined',
-            render: (u: AdminUserRow) => (
-              <span className="text-xs text-muted">
-                {new Date(u.created_at).toLocaleDateString()}
-              </span>
-            ),
-          },
-          {
-            key: 'actions',
-            header: '',
-            align: 'right',
-            render: (u: AdminUserRow) => (
-              <RowActions
-                row={u}
-                isSelf={me?.id === u.id}
-                busy={busyRowId === u.id}
-                onView={() => {
-                  /* navigation handled by Link inside menu */
-                }}
-                onSendReset={() => quickSendReset(u)}
-                onDeactivate={() => quickSetStatus(u, 'inactive')}
-                onSuspend={() => quickSetStatus(u, 'suspended')}
-                onReactivate={() => quickSetStatus(u, 'active')}
-              />
-            ),
-          },
-        ]}
-      />
-
-      {/* Pagination */}
-      {!loading && totalPages > 1 && (
-        <div className="flex items-center justify-between mt-4 text-sm">
-          <div className="text-muted">
-            Page {page} of {totalPages} · showing {data?.rows.length ?? 0} of{' '}
-            {total.toLocaleString()}
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => setParam('page', String(Math.max(1, page - 1)))}
-              disabled={page <= 1}
-            >
-              ‹ Prev
-            </Button>
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => setParam('page', String(Math.min(totalPages, page + 1)))}
-              disabled={page >= totalPages}
-            >
-              Next ›
-            </Button>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog spec={confirm} onClose={() => setConfirm(null)} />
     </Layout>
-  );
-}
-
-function relative(iso: string): string {
-  const ms = Date.now() - new Date(iso).getTime();
-  if (ms < 60_000) return 'just now';
-  const min = Math.round(ms / 60_000);
-  if (min < 60) return `${min}m ago`;
-  const hr = Math.round(min / 60);
-  if (hr < 24) return `${hr}h ago`;
-  const d = Math.round(hr / 24);
-  if (d < 14) return `${d}d ago`;
-  return new Date(iso).toLocaleDateString();
-}
-
-// ---------------------------------------------------------------------------
-// Per-row action menu — keeps the all-users page workflow self-contained so
-// admins don't have to drill into the detail page just to deactivate someone.
-//
-// Self-protection lives at the action level (not the menu level) so the
-// admin still sees "View profile" and "Send reset" for their own row, just
-// no destructive options.
-// ---------------------------------------------------------------------------
-interface RowActionsProps {
-  row: { id: string; status: Status | null; email: string };
-  isSelf: boolean;
-  busy: boolean;
-  onView: () => void;
-  onSendReset: () => void;
-  onDeactivate: () => void;
-  onSuspend: () => void;
-  onReactivate: () => void;
-}
-
-function RowActions({
-  row,
-  isSelf,
-  busy,
-  onSendReset,
-  onDeactivate,
-  onSuspend,
-  onReactivate,
-}: RowActionsProps) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  // Close when the user clicks anywhere outside the menu, or hits Escape.
-  useEffect(() => {
-    if (!open) return;
-    const onDocClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
-    };
-    document.addEventListener('mousedown', onDocClick);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDocClick);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [open]);
-
-  const status = row.status ?? 'active';
-  const isActive = status === 'active';
-
-  return (
-    <div ref={ref} className="relative inline-block text-left">
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        iconOnly
-        onClick={() => setOpen((v) => !v)}
-        disabled={busy}
-        aria-label="Actions"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        leftIcon={
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-            <circle cx="3" cy="8" r="1.5" />
-            <circle cx="8" cy="8" r="1.5" />
-            <circle cx="13" cy="8" r="1.5" />
-          </svg>
-        }
-      />
-
-      {open && (
-        <div
-          role="menu"
-          className="absolute right-0 z-20 mt-1 w-52 rounded-lg border border-border bg-surface shadow-lg ring-1 ring-slate-900/5 overflow-hidden animate-fade-in-up"
-        >
-          <Link
-            to={`/admin/users/${row.id}`}
-            onClick={() => setOpen(false)}
-            className="block px-3 py-2 text-sm text-ink hover:bg-hover"
-          >
-            View profile
-          </Link>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setOpen(false);
-              onSendReset();
-            }}
-            className="block w-full text-left px-3 py-2 text-sm text-ink hover:bg-hover"
-          >
-            Send password reset
-          </Button>
-
-          {!isSelf && <div className="h-px bg-hover" />}
-
-          {!isSelf && isActive && (
-            <>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setOpen(false);
-                  onSuspend();
-                }}
-                className="block w-full text-left px-3 py-2 text-sm text-amber-700 dark:text-amber-300 hover:bg-amber-50"
-              >
-                Suspend
-              </Button>
-              <Button
-                type="button"
-                variant="danger-ghost"
-                size="sm"
-                onClick={() => {
-                  setOpen(false);
-                  onDeactivate();
-                }}
-                className="block w-full text-left px-3 py-2 text-sm"
-              >
-                Deactivate
-              </Button>
-            </>
-          )}
-          {!isSelf && !isActive && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setOpen(false);
-                onReactivate();
-              }}
-              className="block w-full text-left px-3 py-2 text-sm text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50"
-            >
-              Reactivate
-            </Button>
-          )}
-        </div>
-      )}
-    </div>
   );
 }
