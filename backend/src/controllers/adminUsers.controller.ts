@@ -99,7 +99,9 @@ const listSchema = z.object({
   last_seen: z.enum(['24h', '7d', '30d']).optional(),
   page: z.coerce.number().int().min(1).max(10000).default(1),
   page_size: z.coerce.number().int().min(1).max(200).default(50),
-  sort: z.enum(['created_at', 'last_login_at', 'email', 'full_name']).default('created_at'),
+  sort: z
+    .enum(['created_at', 'last_login_at', 'last_seen_at', 'email', 'full_name'])
+    .default('created_at'),
   order: z.enum(['asc', 'desc']).default('desc'),
 });
 
