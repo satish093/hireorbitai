@@ -29,9 +29,23 @@ tasksRouter.patch('/:id', t.update);
 tasksRouter.patch('/:id/status', t.updateStatus);
 tasksRouter.delete('/:id', requireRole(...MANAGER_TIER), t.remove);
 
-// Comments
+// Subtasks (checklist items). assertCanAccessTask inside the controller gates
+// visibility (assignee/creator/manager), so requireAuth upstream is enough.
+// Top-level /subtasks/:id is registered first so it doesn't get shadowed by a
+// /:id/* pattern.
+tasksRouter.patch('/subtasks/:id', t.updateSubtask);
+tasksRouter.delete('/subtasks/:id', t.removeSubtask);
+tasksRouter.get('/:id/subtasks', t.listSubtasks);
+tasksRouter.post('/:id/subtasks', t.createSubtask);
+
+// Activity feed.
+tasksRouter.get('/:id/activity', t.listActivity);
+
+// Comments. POST writes a task_activity row (kind='comment') so it shows up in
+// the activity feed the task detail pane reads. The legacy task_comments
+// GET/DELETE stay for the older TaskDetail page.
+tasksRouter.post('/:id/comments', t.createComment);
 tasksRouter.get('/:taskId/comments', tc.list);
-tasksRouter.post('/:taskId/comments', tc.create);
 tasksRouter.delete('/comments/:id', tc.remove);
 
 // Attachments

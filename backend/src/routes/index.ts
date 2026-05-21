@@ -16,6 +16,7 @@ import { remindersRouter } from './reminders.routes';
 import { reportsRouter } from './reports.routes';
 import { aiRouter } from './ai.routes';
 import { tasksRouter } from './tasks.routes';
+import { taskViewsRouter } from './taskViews.routes';
 import { messagesRouter } from './messages.routes';
 import { realtimeRouter } from './realtime.routes';
 import { featureFlagsRouter } from './featureFlags.routes';
@@ -88,6 +89,7 @@ router.use('/reminders', requireFeature('reminders'), remindersRouter);
 router.use('/reports', requireFeature('reports'), reportsRouter);
 router.use('/ai', requireFeature('ai_email'), aiRouter);
 router.use('/tasks', requireFeature('tasks'), tasksRouter);
+router.use('/task-views', requireFeature('tasks'), taskViewsRouter);
 router.use('/messages', requireFeature('messages'), messagesRouter);
 router.use('/training', requireFeature('training'), trainingRouter);
 

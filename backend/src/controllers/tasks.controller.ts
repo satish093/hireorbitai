@@ -1,4 +1,5 @@
 import { RequestHandler } from 'express';
+import { z } from 'zod';
 import { db } from '../config/db';
 import {
   httpError,
@@ -331,4 +332,234 @@ export const metrics: RequestHandler = async (req, res) => {
     due_this_week,
     completed_last_7_days,
   });
+};
+
+// ---------------------------------------------------------------------------
+// Subtasks + activity + comments (task-scoped resources).
+//
+// Every handler below first loads the parent task and verifies the caller may
+// see it via assertCanAccessTask(). This mirrors the visibility rule in `get`:
+// manager-tier sees everything; a non-manager may access a task only if they
+// are the assignee or the creator. Ownership failure throws 404 (not 403) so
+// the endpoint can't be used as an existence oracle, per .claude/rules/security.
+// ---------------------------------------------------------------------------
+
+interface AccessibleTask {
+  id: string;
+  assignee_id: string | null;
+  created_by: string | null;
+}
+
+/**
+ * Load the task and assert the caller may access it. Returns the task on
+ * success; throws httpError(404, 'Task not found') if the row is missing OR the
+ * caller is a non-manager who is neither the assignee nor the creator.
+ */
+async function assertCanAccessTask(
+  user: { id: string; role: string },
+  taskId: string,
+): Promise<AccessibleTask> {
+  const { data, error } = await db
+    .from('tasks')
+    .select('id, assignee_id, created_by')
+    .eq('id', taskId)
+    .maybeSingle();
+  if (error) throw httpError(500, error.message);
+  const task = data as AccessibleTask | null;
+  if (!task) throw httpError(404, 'Task not found');
+  const allowed =
+    isManagerLike(user.role) || task.assignee_id === user.id || task.created_by === user.id;
+  if (!allowed) throw httpError(404, 'Task not found');
+  return task;
+}
+
+const ACTIVITY_SELECT = `*, actor:users!actor_id ( id, full_name, email )`;
+
+// True when the error indicates the table/column hasn't been migrated in yet.
+// New task_activity / task_subtasks GETs return [] in that case, and activity
+// writes are swallowed, so the backend can deploy ahead of the migration.
+function isMissingRelation(message?: string): boolean {
+  return (
+    !!message && /schema cache|does not exist|relation .* does not exist|column/i.test(message)
+  );
+}
+
+// Append a task_activity row. Best-effort: a missing table (or any error) is
+// logged and swallowed so it never 500s the parent action.
+async function recordActivity(
+  req: Parameters<RequestHandler>[0],
+  taskId: string,
+  kind: string,
+  payload: Record<string, unknown> | null,
+): Promise<void> {
+  try {
+    const { error } = await db
+      .from('task_activity')
+      .insert({ task_id: taskId, actor_id: req.user?.id ?? null, kind, payload_json: payload });
+    if (error) req.log.warn({ err: error.message, taskId, kind }, 'task_activity insert failed');
+  } catch (err) {
+    req.log.warn({ err, taskId, kind }, 'task_activity insert threw');
+  }
+}
+
+// --- Subtasks ---------------------------------------------------------------
+
+const subtaskCreateSchema = z
+  .object({
+    label: z.string().trim().min(1).max(500),
+    order_idx: z.number().int().optional(),
+  })
+  .strict();
+
+const subtaskUpdateSchema = z
+  .object({
+    done: z.boolean().optional(),
+    label: z.string().trim().min(1).max(500).optional(),
+    order_idx: z.number().int().optional(),
+  })
+  .strict()
+  .refine((v) => Object.keys(v).length > 0, { message: 'No fields to update' });
+
+export const listSubtasks: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  await assertCanAccessTask(req.user, req.params.id);
+  const { data, error } = await db
+    .from('task_subtasks')
+    .select('*')
+    .eq('task_id', req.params.id)
+    .order('order_idx', { ascending: true })
+    .order('created_at', { ascending: true });
+  if (error) {
+    if (isMissingRelation(error.message)) return res.json([]);
+    throw httpError(500, error.message);
+  }
+  res.json(data ?? []);
+};
+
+export const createSubtask: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  await assertCanAccessTask(req.user, req.params.id);
+  const parsed = subtaskCreateSchema.safeParse(req.body);
+  if (!parsed.success) throw httpError(400, parsed.error.issues[0]?.message ?? 'Invalid input');
+
+  const { data, error } = await db
+    .from('task_subtasks')
+    .insert({
+      task_id: req.params.id,
+      label: parsed.data.label,
+      order_idx: parsed.data.order_idx ?? 0,
+    })
+    .select('*')
+    .single();
+  if (error) throw httpError(500, error.message);
+  await recordActivity(req, req.params.id, 'subtask_added', { label: parsed.data.label });
+  res.status(201).json(data);
+};
+
+export const updateSubtask: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const { data: existing, error: e0 } = await db
+    .from('task_subtasks')
+    .select('id, task_id, done')
+    .eq('id', req.params.id)
+    .maybeSingle();
+  if (e0) throw httpError(500, e0.message);
+  if (!existing) throw httpError(404, 'Subtask not found');
+  await assertCanAccessTask(req.user, existing.task_id);
+
+  const parsed = subtaskUpdateSchema.safeParse(req.body);
+  if (!parsed.success) throw httpError(400, parsed.error.issues[0]?.message ?? 'Invalid input');
+
+  const patch: Record<string, unknown> = {};
+  if (parsed.data.done !== undefined) patch.done = parsed.data.done;
+  if (parsed.data.label !== undefined) patch.label = parsed.data.label;
+  if (parsed.data.order_idx !== undefined) patch.order_idx = parsed.data.order_idx;
+
+  const { data, error } = await db
+    .from('task_subtasks')
+    .update(patch)
+    .eq('id', req.params.id)
+    .select('*')
+    .single();
+  if (error) throw httpError(500, error.message);
+
+  // Log a completion event only when done flips from falsey to true.
+  if (parsed.data.done === true && !existing.done) {
+    await recordActivity(req, existing.task_id, 'subtask_completed', {
+      label: (data as { label?: string })?.label,
+    });
+  }
+  res.json(data);
+};
+
+export const removeSubtask: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const { data: existing, error: e0 } = await db
+    .from('task_subtasks')
+    .select('id, task_id')
+    .eq('id', req.params.id)
+    .maybeSingle();
+  if (e0) throw httpError(500, e0.message);
+  if (!existing) throw httpError(404, 'Subtask not found');
+  await assertCanAccessTask(req.user, existing.task_id);
+
+  const { error } = await db.from('task_subtasks').delete().eq('id', req.params.id);
+  if (error) throw httpError(500, error.message);
+  res.json({ ok: true });
+};
+
+// --- Activity feed + comments -----------------------------------------------
+
+export const listActivity: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  await assertCanAccessTask(req.user, req.params.id);
+
+  const rawLimit = Number(req.query.limit);
+  const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 100) : 50;
+
+  const { data, error } = await db
+    .from('task_activity')
+    .select(ACTIVITY_SELECT)
+    .eq('task_id', req.params.id)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (error) {
+    if (isMissingRelation(error.message)) return res.json([]);
+    throw httpError(500, error.message);
+  }
+  res.json(data ?? []);
+};
+
+const commentCreateSchema = z.object({ body: z.string().trim().min(1).max(5000) }).strict();
+
+export const createComment: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  await assertCanAccessTask(req.user, req.params.id);
+  const parsed = commentCreateSchema.safeParse(req.body);
+  if (!parsed.success) throw httpError(400, parsed.error.issues[0]?.message ?? 'Invalid input');
+
+  const { data, error } = await db
+    .from('task_activity')
+    .insert({
+      task_id: req.params.id,
+      actor_id: req.user.id,
+      kind: 'comment',
+      payload_json: { body: parsed.data.body },
+    })
+    .select('*')
+    .single();
+  if (error) throw httpError(500, error.message);
+
+  // Re-fetch with the actor embedded for the response. Best-effort: if the
+  // embed select fails for any reason, fall back to the bare inserted row.
+  const created = data as { id: string } | null;
+  if (created?.id) {
+    const { data: withActor } = await db
+      .from('task_activity')
+      .select(ACTIVITY_SELECT)
+      .eq('id', created.id)
+      .maybeSingle();
+    if (withActor) return res.status(201).json(withActor);
+  }
+  res.status(201).json(data);
 };
