@@ -50,9 +50,12 @@ interface RecruiterRow {
 }
 
 const STATUS_TONE: Record<string, string> = {
-  ACTIVE: 'bg-emerald-50 text-emerald-700 border-emerald-200 focus:ring-emerald-500/30',
-  PAUSED: 'bg-amber-50  text-amber-800  border-amber-200  focus:ring-amber-500/30',
-  PLACED: 'bg-blue-50   text-blue-700   border-blue-200   focus:ring-blue-500/30',
+  ACTIVE:
+    'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30 focus:ring-emerald-500/30',
+  PAUSED:
+    'bg-amber-50 dark:bg-amber-500/15  text-amber-800 dark:text-amber-300  border-amber-200 dark:border-amber-500/30  focus:ring-amber-500/30',
+  PLACED:
+    'bg-blue-50 dark:bg-blue-500/15   text-blue-700 dark:text-blue-300   border-blue-200 dark:border-blue-500/30   focus:ring-blue-500/30',
 };
 
 export function Consultants() {
@@ -145,15 +148,15 @@ export function Consultants() {
               c.user?.id ? (
                 <Link
                   to={`/users/${c.user.id}`}
-                  className="inline-flex items-center gap-2 hover:bg-slate-50 rounded-md -mx-1 px-1 py-0.5"
+                  className="inline-flex items-center gap-2 hover:bg-muted rounded-md -mx-1 px-1 py-0.5"
                 >
                   <Avatar name={c.user?.full_name} email={c.user?.email} size={26} />
                   <div className="leading-tight">
-                    <div className="text-sm font-medium text-slate-900 hover:underline">
+                    <div className="text-sm font-medium text-foreground hover:underline">
                       {c.user?.full_name ?? c.user?.email ?? '—'}
                     </div>
                     {c.current_location && (
-                      <div className="text-[11px] text-slate-500">{c.current_location}</div>
+                      <div className="text-[11px] text-muted-foreground">{c.current_location}</div>
                     )}
                   </div>
                 </Link>
@@ -161,11 +164,11 @@ export function Consultants() {
                 <div className="inline-flex items-center gap-2">
                   <Avatar name={c.user?.full_name} email={c.user?.email} size={26} />
                   <div className="leading-tight">
-                    <div className="text-sm font-medium text-slate-900">
+                    <div className="text-sm font-medium text-foreground">
                       {c.user?.full_name ?? c.user?.email ?? '—'}
                     </div>
                     {c.current_location && (
-                      <div className="text-[11px] text-slate-500">{c.current_location}</div>
+                      <div className="text-[11px] text-muted-foreground">{c.current_location}</div>
                     )}
                   </div>
                 </div>
@@ -195,16 +198,16 @@ export function Consultants() {
                     size={20}
                   />
                   <div className="leading-tight">
-                    <div className="text-sm text-slate-900">
+                    <div className="text-sm text-foreground">
                       {c.recruiter.user?.full_name ?? c.recruiter.user?.email ?? '—'}
                     </div>
                     {c.recruiter.team && (
-                      <div className="text-[11px] text-slate-500">{c.recruiter.team}</div>
+                      <div className="text-[11px] text-muted-foreground">{c.recruiter.team}</div>
                     )}
                   </div>
                 </div>
               ) : (
-                <span className="text-xs italic text-slate-400">Unassigned</span>
+                <span className="text-xs italic text-muted-foreground">Unassigned</span>
               ),
           },
           {
@@ -268,9 +271,9 @@ export function Consultants() {
       >
         <div className="space-y-3">
           {picked?.recruiter && (
-            <div className="text-xs text-slate-500">
+            <div className="text-xs text-muted-foreground">
               Currently assigned to{' '}
-              <span className="font-medium text-slate-700">
+              <span className="font-medium text-foreground">
                 {picked.recruiter.user?.full_name ?? picked.recruiter.user?.email}
               </span>
               .

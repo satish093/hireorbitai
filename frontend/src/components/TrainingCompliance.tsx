@@ -147,10 +147,10 @@ export function CompletionGatesPanel({ evaluation }: { evaluation: CompletionEva
   ];
 
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-5">
+    <div className="bg-card border border-border rounded-2xl p-5">
       <div className="flex items-center justify-between mb-3">
         <div>
-          <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+          <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
             What's left to finish
           </div>
           <h3 className="text-base font-semibold tracking-tight">
@@ -158,10 +158,10 @@ export function CompletionGatesPanel({ evaluation }: { evaluation: CompletionEva
             <span
               className={
                 evaluation.status === 'COMPLETED'
-                  ? 'text-emerald-700'
+                  ? 'text-emerald-700 dark:text-emerald-300'
                   : evaluation.status === 'FAILED'
-                    ? 'text-red-700'
-                    : 'text-slate-900'
+                    ? 'text-red-700 dark:text-red-300'
+                    : 'text-foreground'
               }
             >
               {STATUS_LABEL[evaluation.status] ?? evaluation.status.replace(/_/g, ' ')}
@@ -169,7 +169,7 @@ export function CompletionGatesPanel({ evaluation }: { evaluation: CompletionEva
           </h3>
         </div>
         <div className="text-right">
-          <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+          <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
             Progress
           </div>
           <div className="text-lg font-semibold tabular-nums">
@@ -178,20 +178,20 @@ export function CompletionGatesPanel({ evaluation }: { evaluation: CompletionEva
         </div>
       </div>
 
-      <ul className="divide-y divide-slate-100">
+      <ul className="divide-y divide-border">
         {rows.map((r) => (
           <li key={r.label} className="flex items-center justify-between py-2">
             <div className="flex items-center gap-2">
               <Pip ok={r.ok} />
-              <span className="text-sm text-slate-800">{r.label}</span>
+              <span className="text-sm text-foreground">{r.label}</span>
             </div>
-            <span className="text-xs text-slate-500">{r.detail}</span>
+            <span className="text-xs text-muted-foreground">{r.detail}</span>
           </li>
         ))}
       </ul>
 
       {evaluation.blockers.length > 0 && evaluation.status !== 'COMPLETED' && (
-        <div className="mt-3 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+        <div className="mt-3 text-xs text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-500/15 border border-amber-200 dark:border-amber-500/30 rounded-lg px-3 py-2">
           <span className="font-semibold">Still needed to finish:</span>{' '}
           {evaluation.blockers.join(' · ')}
         </div>
@@ -204,7 +204,7 @@ function Pip({ ok }: { ok: boolean }) {
   return (
     <span
       className={`inline-flex w-4 h-4 rounded-full items-center justify-center text-[10px] font-bold ${
-        ok ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-500'
+        ok ? 'bg-emerald-500 text-white' : 'bg-muted text-muted-foreground'
       }`}
     >
       {ok ? '✓' : '·'}
@@ -262,12 +262,12 @@ export function AcknowledgementCard({
 
   if (ack) {
     return (
-      <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 text-sm text-emerald-900">
-        <div className="text-[10px] font-semibold uppercase tracking-widest text-emerald-700 mb-1">
+      <div className="bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/30 rounded-2xl p-4 text-sm text-emerald-900">
+        <div className="text-[10px] font-semibold uppercase tracking-widest text-emerald-700 dark:text-emerald-300 mb-1">
           Acknowledgement signed
         </div>
         <p className="italic">"{ack.acknowledgement_text}"</p>
-        <div className="text-xs text-emerald-800 mt-2">
+        <div className="text-xs text-emerald-800 dark:text-emerald-300 mt-2">
           Signed {new Date(ack.acknowledged_at).toLocaleString()}
         </div>
       </div>
@@ -276,7 +276,7 @@ export function AcknowledgementCard({
 
   if (!isConsultant) {
     return (
-      <div className="bg-white border border-slate-200 rounded-2xl p-4 text-sm text-slate-600">
+      <div className="bg-card border border-border rounded-2xl p-4 text-sm text-muted-foreground">
         Acknowledgement not yet submitted by the consultant.
       </div>
     );
@@ -284,18 +284,18 @@ export function AcknowledgementCard({
 
   return (
     <>
-      <div className="bg-white border border-slate-200 rounded-2xl p-4 flex items-center justify-between gap-3">
+      <div className="bg-card border border-border rounded-2xl p-4 flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+          <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
             Acknowledgement required
           </div>
-          <p className="text-sm text-slate-700 mt-0.5">
+          <p className="text-sm text-foreground mt-0.5">
             Confirm you've completed the training and understand the material.
           </p>
         </div>
         <button
           onClick={() => setOpen(true)}
-          className="bg-slate-900 text-white text-sm px-4 py-1.5 rounded-lg hover:bg-slate-800"
+          className="bg-foreground text-background text-sm px-4 py-1.5 rounded-lg hover:opacity-90"
         >
           Sign acknowledgement
         </button>
@@ -308,20 +308,20 @@ export function AcknowledgementCard({
           <button
             onClick={submit}
             disabled={submitting}
-            className="bg-slate-900 text-white text-sm px-4 py-2 rounded-lg hover:bg-slate-800 disabled:opacity-50"
+            className="bg-foreground text-background text-sm px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-50"
           >
             {submitting ? 'Recording…' : 'I confirm'}
           </button>
         }
       >
-        <p className="text-sm text-slate-700">
+        <p className="text-sm text-foreground">
           By clicking <span className="font-semibold">I confirm</span> you are signing the following
           statement, which becomes part of your training record:
         </p>
-        <blockquote className="mt-3 border-l-4 border-slate-300 pl-4 italic text-sm text-slate-800">
+        <blockquote className="mt-3 border-l-4 border-border pl-4 italic text-sm text-foreground">
           {REQUIRED_ACK_TEXT}
         </blockquote>
-        <p className="text-xs text-slate-500 mt-3">
+        <p className="text-xs text-muted-foreground mt-3">
           Your IP address and user agent are recorded alongside the timestamp for audit purposes.
         </p>
       </Modal>
@@ -387,7 +387,7 @@ export function FinalAssessmentCard({
 
   if (loading) {
     return (
-      <div className="bg-white border border-slate-200 rounded-2xl p-4 text-xs text-slate-500">
+      <div className="bg-card border border-border rounded-2xl p-4 text-xs text-muted-foreground">
         Loading final assessment…
       </div>
     );
@@ -398,18 +398,18 @@ export function FinalAssessmentCard({
     if (isManager) {
       return (
         <>
-          <div className="bg-white border border-dashed border-slate-300 rounded-2xl p-4 flex items-center justify-between">
+          <div className="bg-card border border-dashed border-border rounded-2xl p-4 flex items-center justify-between">
             <div>
-              <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+              <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
                 Final assessment
               </div>
-              <p className="text-sm text-slate-700 mt-0.5">
+              <p className="text-sm text-foreground mt-0.5">
                 Set the final task this consultant must complete to finish the course.
               </p>
             </div>
             <button
               onClick={() => setAuthorOpen(true)}
-              className="bg-slate-900 text-white text-sm px-4 py-1.5 rounded-lg hover:bg-slate-800"
+              className="bg-foreground text-background text-sm px-4 py-1.5 rounded-lg hover:opacity-90"
             >
               + Create assessment
             </button>
@@ -427,7 +427,7 @@ export function FinalAssessmentCard({
       );
     }
     return (
-      <div className="bg-white border border-slate-200 rounded-2xl p-4 text-sm text-slate-600">
+      <div className="bg-card border border-border rounded-2xl p-4 text-sm text-muted-foreground">
         No final assessment has been set for this course yet.
       </div>
     );
@@ -436,23 +436,27 @@ export function FinalAssessmentCard({
   // ----- Assessment exists -----
   return (
     <>
-      <div className="bg-white border border-slate-200 rounded-2xl p-4">
+      <div className="bg-card border border-border rounded-2xl p-4">
         <div className="flex items-start justify-between gap-3 mb-3">
           <div>
-            <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+            <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
               Final assessment ({fa.assessment_type.replace(/_/g, ' ').toLowerCase()})
             </div>
             <h3 className="text-base font-semibold tracking-tight">
               Status: <ApprovalBadge status={fa.approval_status} />
             </h3>
             {fa.score != null && (
-              <div className="text-xs text-slate-600 mt-1">
+              <div className="text-xs text-muted-foreground mt-1">
                 Score: <span className="font-semibold tabular-nums">{fa.score}%</span>
                 {fa.passed === true && (
-                  <span className="ml-2 text-emerald-700 font-semibold">✓ Passed</span>
+                  <span className="ml-2 text-emerald-700 dark:text-emerald-300 font-semibold">
+                    ✓ Passed
+                  </span>
                 )}
                 {fa.passed === false && (
-                  <span className="ml-2 text-red-700 font-semibold">✗ Did not pass</span>
+                  <span className="ml-2 text-red-700 dark:text-red-300 font-semibold">
+                    ✗ Did not pass
+                  </span>
                 )}
               </div>
             )}
@@ -462,7 +466,7 @@ export function FinalAssessmentCard({
             {isConsultant && fa.approval_status === 'PENDING' && (
               <button
                 onClick={() => setSubmitOpen(true)}
-                className="bg-slate-900 text-white text-sm px-3 py-1.5 rounded-lg hover:bg-slate-800"
+                className="bg-foreground text-background text-sm px-3 py-1.5 rounded-lg hover:opacity-90"
               >
                 Submit answers
               </button>
@@ -470,7 +474,7 @@ export function FinalAssessmentCard({
             {isConsultant && fa.approval_status === 'REJECTED' && (
               <button
                 onClick={() => setSubmitOpen(true)}
-                className="border border-slate-200 text-slate-700 text-sm px-3 py-1.5 rounded-lg hover:bg-slate-50"
+                className="border border-border text-foreground text-sm px-3 py-1.5 rounded-lg hover:bg-muted"
               >
                 Resubmit
               </button>
@@ -487,7 +491,7 @@ export function FinalAssessmentCard({
             {isManager && (
               <button
                 onClick={() => setAuthorOpen(true)}
-                className="border border-slate-200 text-slate-700 text-sm px-3 py-1.5 rounded-lg hover:bg-slate-50"
+                className="border border-border text-foreground text-sm px-3 py-1.5 rounded-lg hover:bg-muted"
               >
                 Edit questions
               </button>
@@ -496,20 +500,20 @@ export function FinalAssessmentCard({
         </div>
 
         {fa.questions ? (
-          <details className="text-xs text-slate-600">
-            <summary className="cursor-pointer text-slate-700 font-medium">View questions</summary>
-            <pre className="mt-2 bg-slate-50 border border-slate-100 rounded-md p-2 overflow-x-auto whitespace-pre-wrap">
+          <details className="text-xs text-muted-foreground">
+            <summary className="cursor-pointer text-foreground font-medium">View questions</summary>
+            <pre className="mt-2 bg-muted border border-border rounded-md p-2 overflow-x-auto whitespace-pre-wrap">
               {JSON.stringify(fa.questions, null, 2)}
             </pre>
           </details>
         ) : null}
 
         {fa.manager_feedback && (
-          <div className="mt-3 text-sm bg-slate-50 border border-slate-200 rounded-lg p-3">
-            <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-1">
+          <div className="mt-3 text-sm bg-muted border border-border rounded-lg p-3">
+            <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1">
               Manager feedback
             </div>
-            <p className="text-slate-800 whitespace-pre-wrap">{fa.manager_feedback}</p>
+            <p className="text-foreground whitespace-pre-wrap">{fa.manager_feedback}</p>
           </div>
         )}
       </div>
@@ -551,12 +555,12 @@ export function FinalAssessmentCard({
 function ApprovalBadge({ status }: { status: AssessmentStatus }) {
   const cls =
     status === 'APPROVED'
-      ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+      ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30'
       : status === 'REJECTED'
-        ? 'bg-red-100 text-red-700 border-red-200'
+        ? 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300 border-red-200 dark:border-red-500/30'
         : status === 'SUBMITTED'
-          ? 'bg-amber-100 text-amber-800 border-amber-200'
-          : 'bg-slate-100 text-slate-700 border-slate-200';
+          ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-500/30'
+          : 'bg-muted text-foreground border-border';
   return (
     <span
       className={`inline-block text-[11px] font-semibold border rounded-full px-2 py-0.5 ${cls}`}
@@ -628,20 +632,20 @@ function FinalAssessmentAuthorModal({
         <button
           onClick={save}
           disabled={saving}
-          className="bg-slate-900 text-white text-sm px-4 py-2 rounded-lg hover:bg-slate-800 disabled:opacity-50"
+          className="bg-foreground text-background text-sm px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-50"
         >
           {saving ? 'Saving…' : 'Save'}
         </button>
       }
     >
       <label className="block">
-        <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+        <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
           Assessment type
         </span>
         <select
           value={kind}
           onChange={(e) => setKind(e.target.value as AssessmentKind)}
-          className="mt-1 w-full text-sm border border-slate-200 rounded-md px-2 py-1.5"
+          className="mt-1 w-full text-sm border border-border rounded-md px-2 py-1.5"
         >
           <option value="MULTIPLE_CHOICE">Multiple choice</option>
           <option value="SHORT_ANSWER">Short answer</option>
@@ -650,7 +654,7 @@ function FinalAssessmentAuthorModal({
         </select>
       </label>
       <label className="block mt-3">
-        <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+        <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
           Questions (JSON — optional)
         </span>
         <textarea
@@ -658,10 +662,10 @@ function FinalAssessmentAuthorModal({
           value={questionsText}
           onChange={(e) => setQuestionsText(e.target.value)}
           placeholder='[\n  { "q": "Describe the bean lifecycle.", "max_words": 200 }\n]'
-          className="mt-1 w-full text-sm font-mono border border-slate-200 rounded-md px-2 py-1.5"
+          className="mt-1 w-full text-sm font-mono border border-border rounded-md px-2 py-1.5"
         />
       </label>
-      <p className="text-xs text-slate-500 mt-2">
+      <p className="text-xs text-muted-foreground mt-2">
         For MANAGER_REVIEW you can leave questions empty — you'll grade based on the consultant's
         overall work.
       </p>
@@ -738,7 +742,7 @@ function FinalAssessmentSubmitModal({
         <button
           onClick={submit}
           disabled={saving}
-          className="bg-slate-900 text-white text-sm px-4 py-2 rounded-lg hover:bg-slate-800 disabled:opacity-50"
+          className="bg-foreground text-background text-sm px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-50"
         >
           {saving ? 'Submitting…' : 'Submit'}
         </button>
@@ -746,23 +750,23 @@ function FinalAssessmentSubmitModal({
     >
       {questions && (
         <div className="mb-3">
-          <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-1">
+          <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1">
             Questions
           </div>
-          <pre className="text-xs bg-slate-50 border border-slate-100 rounded-md p-2 whitespace-pre-wrap">
+          <pre className="text-xs bg-muted border border-border rounded-md p-2 whitespace-pre-wrap">
             {questions}
           </pre>
         </div>
       )}
       <label className="block">
-        <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+        <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
           Your answers
         </span>
         <textarea
           rows={10}
           value={answersText}
           onChange={(e) => setAnswersText(e.target.value)}
-          className="mt-1 w-full text-sm border border-slate-200 rounded-md px-2 py-1.5"
+          className="mt-1 w-full text-sm border border-border rounded-md px-2 py-1.5"
           placeholder="Type your answers here. JSON is accepted but not required."
         />
       </label>
@@ -845,7 +849,7 @@ function FinalAssessmentGradeModal({
         <button
           onClick={save}
           disabled={saving}
-          className="bg-slate-900 text-white text-sm px-4 py-2 rounded-lg hover:bg-slate-800 disabled:opacity-50"
+          className="bg-foreground text-background text-sm px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-50"
         >
           {saving ? 'Saving…' : 'Save grade'}
         </button>
@@ -853,17 +857,17 @@ function FinalAssessmentGradeModal({
     >
       {answersBlock && (
         <div className="mb-3">
-          <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-1">
+          <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1">
             Consultant submission
           </div>
-          <pre className="text-xs bg-slate-50 border border-slate-100 rounded-md p-2 max-h-40 overflow-auto whitespace-pre-wrap">
+          <pre className="text-xs bg-muted border border-border rounded-md p-2 max-h-40 overflow-auto whitespace-pre-wrap">
             {answersBlock}
           </pre>
         </div>
       )}
       <div className="grid grid-cols-2 gap-3">
         <label className="block">
-          <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+          <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
             Score (0–100)
           </span>
           <input
@@ -872,17 +876,17 @@ function FinalAssessmentGradeModal({
             max={100}
             value={score}
             onChange={(e) => setScore(e.target.value)}
-            className="mt-1 w-full text-sm border border-slate-200 rounded-md px-2 py-1.5"
+            className="mt-1 w-full text-sm border border-border rounded-md px-2 py-1.5"
           />
         </label>
         <label className="block">
-          <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+          <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
             Pass / fail
           </span>
           <select
             value={passed ? 'pass' : 'fail'}
             onChange={(e) => setPassed(e.target.value === 'pass')}
-            className="mt-1 w-full text-sm border border-slate-200 rounded-md px-2 py-1.5"
+            className="mt-1 w-full text-sm border border-border rounded-md px-2 py-1.5"
           >
             <option value="pass">Pass</option>
             <option value="fail">Fail</option>
@@ -890,24 +894,24 @@ function FinalAssessmentGradeModal({
         </label>
       </div>
       <label className="block mt-3">
-        <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+        <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
           Manager feedback
         </span>
         <textarea
           rows={4}
           value={feedback}
           onChange={(e) => setFeedback(e.target.value)}
-          className="mt-1 w-full text-sm border border-slate-200 rounded-md px-2 py-1.5"
+          className="mt-1 w-full text-sm border border-border rounded-md px-2 py-1.5"
         />
       </label>
       <label className="block mt-3">
-        <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+        <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
           Decision
         </span>
         <select
           value={decision}
           onChange={(e) => setDecision(e.target.value as 'APPROVED' | 'REJECTED')}
-          className="mt-1 w-full text-sm border border-slate-200 rounded-md px-2 py-1.5"
+          className="mt-1 w-full text-sm border border-border rounded-md px-2 py-1.5"
         >
           <option value="APPROVED">Approve — counts toward completion</option>
           <option value="REJECTED">Reject — send back to consultant</option>
@@ -948,10 +952,10 @@ export function SupervisionNotesPanel({
 
   return (
     <>
-      <div className="bg-white border border-slate-200 rounded-2xl p-5">
+      <div className="bg-card border border-border rounded-2xl p-5">
         <div className="flex items-center justify-between mb-3">
           <div>
-            <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+            <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
               Supervision notes
             </div>
             <h3 className="text-base font-semibold tracking-tight">
@@ -961,7 +965,7 @@ export function SupervisionNotesPanel({
           {isManager && (
             <button
               onClick={() => setOpen(true)}
-              className="bg-slate-900 text-white text-sm px-3 py-1.5 rounded-lg hover:bg-slate-800"
+              className="bg-foreground text-background text-sm px-3 py-1.5 rounded-lg hover:opacity-90"
             >
               + Add note
             </button>
@@ -969,18 +973,18 @@ export function SupervisionNotesPanel({
         </div>
 
         {loading ? (
-          <p className="text-sm text-slate-500">Loading…</p>
+          <p className="text-sm text-muted-foreground">Loading…</p>
         ) : notes.length === 0 ? (
-          <p className="text-sm text-slate-500 italic">No supervision notes recorded yet.</p>
+          <p className="text-sm text-muted-foreground italic">No supervision notes recorded yet.</p>
         ) : (
           <ol className="space-y-3">
             {notes.map((n) => (
-              <li key={n.id} className="border-l-2 border-slate-200 pl-3">
-                <div className="text-xs text-slate-500">
+              <li key={n.id} className="border-l-2 border-border pl-3">
+                <div className="text-xs text-muted-foreground">
                   {new Date(n.observed_on).toLocaleDateString()} ·{' '}
                   {n.trainer?.full_name ?? 'Trainer'}
                 </div>
-                <p className="text-sm text-slate-800 whitespace-pre-wrap">{n.note}</p>
+                <p className="text-sm text-foreground whitespace-pre-wrap">{n.note}</p>
                 {(n.skill_progress || n.areas_for_improvement || n.next_steps) && (
                   <dl className="mt-2 grid sm:grid-cols-3 gap-2 text-xs">
                     {n.skill_progress && (
@@ -1010,11 +1014,11 @@ export function SupervisionNotesPanel({
 
 function NoteBlock({ label, value }: { label: string; value: string }) {
   return (
-    <div className="bg-slate-50 border border-slate-100 rounded-md p-2">
-      <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-0.5">
+    <div className="bg-muted border border-border rounded-md p-2">
+      <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-0.5">
         {label}
       </div>
-      <p className="text-slate-800 whitespace-pre-wrap">{value}</p>
+      <p className="text-foreground whitespace-pre-wrap">{value}</p>
     </div>
   );
 }
@@ -1084,7 +1088,7 @@ function SupervisionNoteModal({
         <button
           onClick={save}
           disabled={saving}
-          className="bg-slate-900 text-white text-sm px-4 py-2 rounded-lg hover:bg-slate-800 disabled:opacity-50"
+          className="bg-foreground text-background text-sm px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-50"
         >
           {saving ? 'Saving…' : 'Save'}
         </button>
@@ -1092,59 +1096,59 @@ function SupervisionNoteModal({
     >
       <div className="space-y-3">
         <label className="block">
-          <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+          <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
             Observed on
           </span>
           <input
             type="date"
             value={form.observed_on}
             onChange={(e) => setForm({ ...form, observed_on: e.target.value })}
-            className="mt-1 w-full text-sm border border-slate-200 rounded-md px-2 py-1.5"
+            className="mt-1 w-full text-sm border border-border rounded-md px-2 py-1.5"
           />
         </label>
         <label className="block">
-          <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+          <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
             Note (required)
           </span>
           <textarea
             rows={4}
             value={form.note}
             onChange={(e) => setForm({ ...form, note: e.target.value })}
-            className="mt-1 w-full text-sm border border-slate-200 rounded-md px-2 py-1.5"
+            className="mt-1 w-full text-sm border border-border rounded-md px-2 py-1.5"
           />
         </label>
         <div className="grid sm:grid-cols-3 gap-3">
           <label className="block">
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
               Skill progress
             </span>
             <textarea
               rows={3}
               value={form.skill_progress}
               onChange={(e) => setForm({ ...form, skill_progress: e.target.value })}
-              className="mt-1 w-full text-sm border border-slate-200 rounded-md px-2 py-1.5"
+              className="mt-1 w-full text-sm border border-border rounded-md px-2 py-1.5"
             />
           </label>
           <label className="block">
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
               Areas for improvement
             </span>
             <textarea
               rows={3}
               value={form.areas_for_improvement}
               onChange={(e) => setForm({ ...form, areas_for_improvement: e.target.value })}
-              className="mt-1 w-full text-sm border border-slate-200 rounded-md px-2 py-1.5"
+              className="mt-1 w-full text-sm border border-border rounded-md px-2 py-1.5"
             />
           </label>
           <label className="block">
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
               Next steps
             </span>
             <textarea
               rows={3}
               value={form.next_steps}
               onChange={(e) => setForm({ ...form, next_steps: e.target.value })}
-              className="mt-1 w-full text-sm border border-slate-200 rounded-md px-2 py-1.5"
+              className="mt-1 w-full text-sm border border-border rounded-md px-2 py-1.5"
             />
           </label>
         </div>
@@ -1185,7 +1189,7 @@ export function ComplianceReportButton({ assignmentId }: { assignmentId: string 
     <button
       onClick={download}
       disabled={busy}
-      className="border border-slate-200 text-slate-700 text-sm px-3 py-1.5 rounded-lg hover:bg-slate-50 disabled:opacity-50"
+      className="border border-border text-foreground text-sm px-3 py-1.5 rounded-lg hover:bg-muted disabled:opacity-50"
     >
       {busy ? 'Building…' : '⤓ Compliance report (CSV)'}
     </button>

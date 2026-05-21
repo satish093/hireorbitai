@@ -107,24 +107,24 @@ export function Modal({ open, onClose, title, description, children, footer, siz
       <div
         ref={dialogRef}
         tabIndex={-1}
-        className={`bg-white rounded-2xl shadow-2xl ring-1 ring-slate-900/5 w-full ${SIZE_CLASS[size]} my-4 sm:my-8 flex flex-col max-h-[calc(100dvh-2rem)] sm:max-h-[calc(100dvh-4rem)] overflow-hidden animate-scale-in focus:outline-none`}
+        className={`bg-card rounded-2xl shadow-2xl ring-1 ring-slate-900/5 w-full ${SIZE_CLASS[size]} my-4 sm:my-8 flex flex-col max-h-[calc(100dvh-2rem)] sm:max-h-[calc(100dvh-4rem)] overflow-hidden animate-scale-in focus:outline-none`}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-5 sm:px-6 pt-5 pb-4 border-b border-slate-100 shrink-0">
+        <div className="px-5 sm:px-6 pt-5 pb-4 border-b border-border shrink-0">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               <h3
                 id="modal-title"
-                className="text-base font-semibold tracking-tight text-slate-900"
+                className="text-base font-semibold tracking-tight text-foreground"
               >
                 {title}
               </h3>
-              {description && <p className="text-xs text-slate-500 mt-0.5">{description}</p>}
+              {description && <p className="text-xs text-muted-foreground mt-0.5">{description}</p>}
             </div>
             <button
               onClick={onClose}
               aria-label="Close"
-              className="-mr-2 -mt-1 w-8 h-8 inline-flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition press"
+              className="-mr-2 -mt-1 w-8 h-8 inline-flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition press"
             >
               ✕
             </button>
@@ -135,7 +135,7 @@ export function Modal({ open, onClose, title, description, children, footer, siz
             viewport which felt jarring. */}
         <div className="px-5 sm:px-6 py-5 overflow-y-auto flex-1 min-h-0">{children}</div>
         {footer && (
-          <div className="px-5 sm:px-6 py-3 bg-slate-50 border-t border-slate-100 flex flex-wrap justify-end items-center gap-2 shrink-0">
+          <div className="px-5 sm:px-6 py-3 bg-muted border-t border-border flex flex-wrap justify-end items-center gap-2 shrink-0">
             {footer}
           </div>
         )}

@@ -71,7 +71,7 @@ export function Brand({
       <BrandMark size={dim} />
       <div className="leading-tight">
         <div className={clsx('font-semibold tracking-tight', titleClass)}>
-          <span className="text-slate-900">Hire</span>
+          <span className="text-foreground">Hire</span>
           <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-violet-600">
             Orbit
           </span>
@@ -80,7 +80,9 @@ export function Brand({
           </span>
         </div>
         {caption && (
-          <div className="text-[10px] text-slate-500 uppercase tracking-widest">{caption}</div>
+          <div className="text-[10px] text-muted-foreground uppercase tracking-widest">
+            {caption}
+          </div>
         )}
       </div>
     </div>

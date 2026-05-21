@@ -160,11 +160,11 @@ export function CreateTrainingCourse() {
         {/* Mode toggle: AI-generate a full course from a title, or author
             manually. AI generation is admin-only — managers see manual only. */}
         {isAdmin && (
-          <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 mb-5">
+          <div className="inline-flex rounded-lg border border-border bg-card p-0.5 mb-5">
             <button
               onClick={() => setMode('ai')}
               className={`text-sm px-4 py-1.5 rounded-md ${
-                mode === 'ai' ? 'bg-brand-600 text-white' : 'text-slate-600 hover:bg-slate-50'
+                mode === 'ai' ? 'bg-brand-600 text-white' : 'text-muted-foreground hover:bg-muted'
               }`}
             >
               ✦ Generate with AI
@@ -172,7 +172,9 @@ export function CreateTrainingCourse() {
             <button
               onClick={() => setMode('manual')}
               className={`text-sm px-4 py-1.5 rounded-md ${
-                mode === 'manual' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-50'
+                mode === 'manual'
+                  ? 'bg-foreground text-background'
+                  : 'text-muted-foreground hover:bg-muted'
               }`}
             >
               Manual
@@ -182,8 +184,8 @@ export function CreateTrainingCourse() {
 
         {mode === 'ai' && isAdmin ? (
           <>
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4">
-              <p className="text-sm text-slate-500">
+            <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
+              <p className="text-sm text-muted-foreground">
                 Enter a title and a few details. We'll generate an overview, lesson outline,
                 per-lesson content, quizzes, exercises, and completion criteria. You can review and
                 edit everything before publishing.
@@ -231,7 +233,7 @@ export function CreateTrainingCourse() {
             <div className="flex justify-end gap-2 mt-4">
               <button
                 onClick={() => nav(-1)}
-                className="border border-slate-200 text-slate-700 text-sm px-4 py-2 rounded-lg hover:bg-slate-50"
+                className="border border-border text-foreground text-sm px-4 py-2 rounded-lg hover:bg-muted"
               >
                 Cancel
               </button>
@@ -255,7 +257,7 @@ export function CreateTrainingCourse() {
   function ManualForm() {
     return (
       <>
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4">
+        <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
           <Field
             label="Title"
             value={form.title}
@@ -263,14 +265,14 @@ export function CreateTrainingCourse() {
             required
           />
           <label className="block">
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
               Description
             </span>
             <textarea
               rows={3}
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
-              className="mt-1 w-full text-sm border border-slate-200 rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+              className="mt-1 w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
             />
           </label>
           <div className="grid grid-cols-2 gap-3">
@@ -315,14 +317,14 @@ export function CreateTrainingCourse() {
         {/* I-983 STEM-OPT Training Plan metadata. Filling these in turns the
             course into an audit-ready training module the supervisor can
             attach to the I-983 Section 5 + 6. */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4 mt-4">
+        <div className="bg-card border border-border rounded-2xl p-6 space-y-4 mt-4">
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/30 px-2 py-0.5 rounded-full">
               I-983
             </span>
             <h2 className="text-sm font-semibold tracking-tight">STEM-OPT Training Plan fields</h2>
           </div>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-muted-foreground">
             These map directly to the DHS I-983 Section 5 + 6 attestation. Fill them in for any
             course you'll list on a STEM-OPT training plan.
           </p>
@@ -363,14 +365,14 @@ export function CreateTrainingCourse() {
         <div className="flex justify-end gap-2 mt-4">
           <button
             onClick={() => nav(-1)}
-            className="border border-slate-200 text-slate-700 text-sm px-4 py-2 rounded-lg hover:bg-slate-50"
+            className="border border-border text-foreground text-sm px-4 py-2 rounded-lg hover:bg-muted"
           >
             Cancel
           </button>
           <button
             onClick={save}
             disabled={saving}
-            className="bg-slate-900 text-white text-sm font-semibold px-5 py-2 rounded-lg hover:bg-slate-800 disabled:opacity-50"
+            className="bg-foreground text-background text-sm font-semibold px-5 py-2 rounded-lg hover:opacity-90 disabled:opacity-50"
           >
             {saving ? 'Saving…' : 'Create'}
           </button>
@@ -397,7 +399,7 @@ function Field({
 }) {
   return (
     <label className="block">
-      <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+      <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
         {label}
         {required && <span className="text-rose-500 ml-0.5">*</span>}
       </span>
@@ -405,9 +407,9 @@ function Field({
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="mt-1 w-full text-sm border border-slate-200 rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+        className="mt-1 w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
       />
-      {hint && <p className="text-[10px] text-slate-400 mt-0.5">{hint}</p>}
+      {hint && <p className="text-[10px] text-muted-foreground mt-0.5">{hint}</p>}
     </label>
   );
 }
@@ -426,16 +428,16 @@ function TextArea({
 }) {
   return (
     <label className="block">
-      <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+      <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
         {label}
       </span>
       <textarea
         rows={rows}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="mt-1 w-full text-sm border border-slate-200 rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+        className="mt-1 w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
       />
-      {hint && <p className="text-[10px] text-slate-400 mt-0.5">{hint}</p>}
+      {hint && <p className="text-[10px] text-muted-foreground mt-0.5">{hint}</p>}
     </label>
   );
 }
@@ -452,13 +454,13 @@ function Selector({
 }) {
   return (
     <label className="block">
-      <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+      <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
         {label}
       </span>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="mt-1 w-full text-sm border border-slate-200 rounded-md px-2 py-1.5 bg-white"
+        className="mt-1 w-full text-sm border border-border rounded-md px-2 py-1.5 bg-card"
       >
         {options.map((o) => (
           <option key={o} value={o}>

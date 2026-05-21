@@ -29,11 +29,15 @@ interface DeactivatedRow {
 }
 
 const STATUS_PILL: Record<Status, string> = {
-  active: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  inactive: 'bg-slate-100  text-slate-600  border-slate-200',
-  suspended: 'bg-amber-50   text-amber-800  border-amber-200',
-  pending_verification: 'bg-sky-50     text-sky-700    border-sky-200',
-  banned: 'bg-red-50     text-red-700    border-red-200',
+  active:
+    'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30',
+  inactive: 'bg-muted  text-muted-foreground  border-border',
+  suspended:
+    'bg-amber-50 dark:bg-amber-500/15   text-amber-800 dark:text-amber-300  border-amber-200 dark:border-amber-500/30',
+  pending_verification:
+    'bg-sky-50 dark:bg-sky-500/15     text-sky-700 dark:text-sky-300    border-sky-200 dark:border-sky-500/30',
+  banned:
+    'bg-red-50 dark:bg-red-500/15     text-red-700 dark:text-red-300    border-red-200 dark:border-red-500/30',
 };
 
 type RoleFilter = 'ALL' | Role;
@@ -145,8 +149,8 @@ export function DeactivatedAccounts() {
             header: 'User',
             render: (r: DeactivatedRow) => (
               <button onClick={() => nav(`/users/${r.id}`)} className="text-left hover:underline">
-                <div className="font-medium text-slate-900">{r.full_name || r.email}</div>
-                {r.full_name && <div className="text-xs text-slate-500">{r.email}</div>}
+                <div className="font-medium text-foreground">{r.full_name || r.email}</div>
+                {r.full_name && <div className="text-xs text-muted-foreground">{r.email}</div>}
               </button>
             ),
           },
@@ -154,7 +158,7 @@ export function DeactivatedAccounts() {
             key: 'role',
             header: 'Role',
             render: (r: DeactivatedRow) => (
-              <span className="text-[11px] font-medium bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded">
+              <span className="text-[11px] font-medium bg-muted text-foreground px-1.5 py-0.5 rounded">
                 {ROLE_LABEL[r.role] ?? r.role}
               </span>
             ),
@@ -196,7 +200,7 @@ export function DeactivatedAccounts() {
               r.last_seen_at ? (
                 new Date(r.last_seen_at).toLocaleString()
               ) : (
-                <span className="text-slate-400">Never</span>
+                <span className="text-muted-foreground">Never</span>
               ),
           },
           {
@@ -213,7 +217,7 @@ export function DeactivatedAccounts() {
                   variant="ghost"
                   loading={busyId === r.id}
                   onClick={() => reactivate(r)}
-                  className="text-emerald-700 hover:text-emerald-800"
+                  className="text-emerald-700 dark:text-emerald-300 hover:text-emerald-800"
                 >
                   Reactivate
                 </Button>

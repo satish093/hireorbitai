@@ -38,9 +38,9 @@ interface AtsResp {
 
 function Section({ title, children }: { title?: string; children: ReactNode }) {
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm min-w-0">
+    <div className="bg-card border border-border rounded-2xl p-5 shadow-sm min-w-0">
       {title && (
-        <div className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase mb-2.5">
+        <div className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase mb-2.5">
           {title}
         </div>
       )}
@@ -51,11 +51,11 @@ function Section({ title, children }: { title?: string; children: ReactNode }) {
 
 function FactTile({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-0 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5">
-      <div className="text-[10px] font-semibold tracking-widest text-slate-400 uppercase">
+    <div className="min-w-0 bg-muted border border-border rounded-xl px-3 py-2.5">
+      <div className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">
         {label}
       </div>
-      <div className="text-sm font-medium text-slate-800 mt-0.5 break-words" title={value}>
+      <div className="text-sm font-medium text-foreground mt-0.5 break-words" title={value}>
         {value}
       </div>
     </div>
@@ -79,17 +79,17 @@ function ScoreCard({
     tone === 'primary'
       ? 'from-brand-50 to-white border-brand-100'
       : tone === 'info'
-        ? 'from-sky-50 to-white border-sky-100'
-        : 'from-emerald-50 to-white border-emerald-100';
+        ? 'from-sky-50 to-white border-sky-100 dark:border-sky-500/20'
+        : 'from-emerald-50 to-white border-emerald-100 dark:border-emerald-500/20';
   return (
     <div className={`min-w-0 rounded-xl border bg-gradient-to-br ${toneClass} p-4`}>
-      <div className="text-[10px] font-semibold tracking-widest uppercase mb-1 text-slate-500">
+      <div className="text-[10px] font-semibold tracking-widest uppercase mb-1 text-muted-foreground">
         {label}
       </div>
-      <div className="text-2xl font-semibold tabular-nums text-slate-900">
+      <div className="text-2xl font-semibold tabular-nums text-foreground">
         {value == null ? '—' : `${value}${suffix}`}
       </div>
-      {sub && <div className="text-[11px] text-slate-500 mt-0.5 break-words">{sub}</div>}
+      {sub && <div className="text-[11px] text-muted-foreground mt-0.5 break-words">{sub}</div>}
     </div>
   );
 }
@@ -97,14 +97,14 @@ function ScoreCard({
 function TagChip({ tag }: { tag: string }) {
   const t = tag.toLowerCase();
   const tone = /(no sponsor|no h1b)/.test(t)
-    ? 'bg-red-50 text-red-700 border-red-100'
+    ? 'bg-red-50 dark:bg-red-500/15 text-red-700 dark:text-red-300 border-red-100 dark:border-red-500/20'
     : /(sponsor|h1b)/.test(t)
-      ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+      ? 'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-100 dark:border-emerald-500/20'
       : /(clearance|secret)/.test(t)
-        ? 'bg-amber-50 text-amber-800 border-amber-100'
+        ? 'bg-amber-50 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-100 dark:border-amber-500/20'
         : /(remote)/.test(t)
-          ? 'bg-indigo-50 text-indigo-700 border-indigo-100'
-          : 'bg-slate-50 text-slate-700 border-slate-200';
+          ? 'bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border-indigo-100 dark:border-indigo-500/20'
+          : 'bg-muted text-foreground border-border';
   return (
     <span
       className={clsx(
@@ -120,14 +120,14 @@ function TagChip({ tag }: { tag: string }) {
 function Bullets({
   items,
   marker = '•',
-  tone = 'text-slate-400',
+  tone = 'text-muted-foreground',
 }: {
   items: string[];
   marker?: string;
   tone?: string;
 }) {
   return (
-    <ul className="space-y-1 text-sm text-slate-700">
+    <ul className="space-y-1 text-sm text-foreground">
       {items.map((b, i) => (
         <li key={i} className="flex items-start gap-1.5">
           <span className={tone}>{marker}</span>
@@ -183,7 +183,7 @@ function JobCopilot({ jobId, isConsultant }: { jobId: string; isConsultant: bool
   return (
     <Section title="AI Copilot">
       {messages.length === 0 ? (
-        <p className="text-sm text-slate-500 mb-3">
+        <p className="text-sm text-muted-foreground mb-3">
           Ask anything about this job — fit, requirements, or outreach.
         </p>
       ) : (
@@ -194,14 +194,14 @@ function JobCopilot({ jobId, isConsultant }: { jobId: string; isConsultant: bool
               className={clsx(
                 'text-sm rounded-xl px-3 py-2 max-w-[90%] whitespace-pre-wrap break-words',
                 m.role === 'user'
-                  ? 'ml-auto bg-slate-900 text-white'
-                  : 'mr-auto bg-slate-50 border border-slate-200 text-slate-700',
+                  ? 'ml-auto bg-foreground text-background'
+                  : 'mr-auto bg-muted border border-border text-foreground',
               )}
             >
               {m.text}
             </div>
           ))}
-          {busy && <div className="text-xs text-slate-400">Thinking…</div>}
+          {busy && <div className="text-xs text-muted-foreground">Thinking…</div>}
         </div>
       )}
 
@@ -212,7 +212,7 @@ function JobCopilot({ jobId, isConsultant }: { jobId: string; isConsultant: bool
               key={s}
               onClick={() => ask(s)}
               disabled={busy}
-              className="text-[11px] px-2 py-1 rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+              className="text-[11px] px-2 py-1 rounded-full border border-border text-muted-foreground hover:bg-muted disabled:opacity-50"
             >
               {s}
             </button>
@@ -228,12 +228,12 @@ function JobCopilot({ jobId, isConsultant }: { jobId: string; isConsultant: bool
             if (e.key === 'Enter') ask(input);
           }}
           placeholder="Ask the copilot…"
-          className="flex-1 min-w-0 text-sm h-9 rounded-lg border border-slate-200 px-3 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+          className="flex-1 min-w-0 text-sm h-9 rounded-lg border border-border px-3 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
         />
         <button
           onClick={() => ask(input)}
           disabled={busy || !input.trim()}
-          className="h-9 px-4 rounded-lg bg-slate-900 text-white text-sm font-medium hover:bg-slate-800 disabled:opacity-50 press"
+          className="h-9 px-4 rounded-lg bg-foreground text-background text-sm font-medium hover:opacity-90 disabled:opacity-50 press"
         >
           Ask
         </button>
@@ -326,7 +326,7 @@ export function JobDetailView({ job, isConsultant }: { job: Job; isConsultant: b
       target="_blank"
       rel="noopener noreferrer"
       className={clsx(
-        'inline-flex items-center justify-center gap-1.5 bg-slate-900 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-slate-800 press',
+        'inline-flex items-center justify-center gap-1.5 bg-foreground text-background text-sm font-medium px-4 py-2 rounded-lg hover:opacity-90 press',
         extra,
       )}
     >
@@ -338,7 +338,7 @@ export function JobDetailView({ job, isConsultant }: { job: Job; isConsultant: b
       href={googleUrl}
       target="_blank"
       rel="noopener noreferrer"
-      className="block text-xs text-slate-500 hover:text-slate-800 mt-1.5"
+      className="block text-xs text-muted-foreground hover:text-foreground mt-1.5"
     >
       Link not working? Search on Google ↗
     </a>
@@ -347,25 +347,25 @@ export function JobDetailView({ job, isConsultant }: { job: Job; isConsultant: b
   return (
     <div className="max-w-5xl mx-auto w-full min-w-0">
       {/* Company-first header */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-sm min-w-0">
+      <div className="bg-card border border-border rounded-2xl p-5 sm:p-6 shadow-sm min-w-0">
         <div className="flex items-start gap-4 min-w-0">
           <Avatar name={company} size={56} />
           <div className="flex-1 min-w-0">
             <div className="flex items-center flex-wrap gap-2 mb-1">
-              <span className="text-xs text-slate-500">
+              <span className="text-xs text-muted-foreground">
                 {relative(job.posted_at ?? job.created_at)}
               </span>
               {job.source && (
-                <span className="text-[10px] font-semibold uppercase tracking-wide bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">
+                <span className="text-[10px] font-semibold uppercase tracking-wide bg-muted text-muted-foreground px-1.5 py-0.5 rounded">
                   {job.publisher ?? job.source}
                 </span>
               )}
             </div>
-            <h1 className="text-2xl font-semibold text-slate-900 leading-tight break-words">
+            <h1 className="text-2xl font-semibold text-foreground leading-tight break-words">
               {company}
             </h1>
-            <div className="text-base text-slate-700 mt-0.5 break-words">{job.title}</div>
-            <div className="text-sm text-slate-500 mt-1 break-words">
+            <div className="text-base text-foreground mt-0.5 break-words">{job.title}</div>
+            <div className="text-sm text-muted-foreground mt-1 break-words">
               {job.location ?? 'Location N/A'} · {workModel}
             </div>
             <div className="mt-3 hidden sm:block">
@@ -382,8 +382,8 @@ export function JobDetailView({ job, isConsultant }: { job: Job; isConsultant: b
       </div>
 
       {enriching && (
-        <div className="mt-4 text-xs text-slate-500 flex items-center gap-2">
-          <span className="inline-block w-3 h-3 border-2 border-slate-300 border-t-slate-500 rounded-full animate-spin" />
+        <div className="mt-4 text-xs text-muted-foreground flex items-center gap-2">
+          <span className="inline-block w-3 h-3 border-2 border-border border-t-border rounded-full animate-spin" />
           Analyzing job…
         </div>
       )}
@@ -421,7 +421,7 @@ export function JobDetailView({ job, isConsultant }: { job: Job; isConsultant: b
                 {skills.map((s) => (
                   <span
                     key={s}
-                    className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-700"
+                    className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-muted text-foreground"
                   >
                     {s}
                   </span>
@@ -449,11 +449,11 @@ export function JobDetailView({ job, isConsultant }: { job: Job; isConsultant: b
                 <Section title="Job description">
                   {useHtml && html ? (
                     <div
-                      className="jd-prose text-sm text-slate-700"
+                      className="jd-prose text-sm text-foreground"
                       dangerouslySetInnerHTML={{ __html: html }}
                     />
                   ) : (
-                    <div className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed break-words">
+                    <div className="text-sm text-foreground whitespace-pre-wrap leading-relaxed break-words">
                       {jdToText(job.description!)}
                     </div>
                   )}
@@ -462,15 +462,17 @@ export function JobDetailView({ job, isConsultant }: { job: Job; isConsultant: b
             })()}
 
           {/* Consultant resume scoring */}
-          {loading && <div className="text-sm text-slate-500">Scoring against your resume…</div>}
+          {loading && (
+            <div className="text-sm text-muted-foreground">Scoring against your resume…</div>
+          )}
           {error && !loading && (
-            <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-3">
+            <div className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-500/15 border border-red-200 dark:border-red-500/30 rounded-lg p-3">
               {error}
             </div>
           )}
           {needsResume && !loading && (
             <Section title="No resume on file yet">
-              <p className="text-xs text-slate-600 mb-2">
+              <p className="text-xs text-muted-foreground mb-2">
                 Upload a resume on the Resumes page, or paste the text below to score this job now.
               </p>
               <textarea
@@ -478,12 +480,12 @@ export function JobDetailView({ job, isConsultant }: { job: Job; isConsultant: b
                 value={resumePaste}
                 onChange={(e) => setResumePaste(e.target.value)}
                 placeholder="Paste your resume here…"
-                className="w-full text-xs border border-slate-200 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+                className="w-full text-xs border border-border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
               />
               <button
                 onClick={() => run(resumePaste)}
                 disabled={!resumePaste.trim()}
-                className="mt-2 bg-slate-900 text-white text-sm px-4 py-1.5 rounded-lg hover:bg-slate-800 disabled:opacity-50"
+                className="mt-2 bg-foreground text-background text-sm px-4 py-1.5 rounded-lg hover:opacity-90 disabled:opacity-50"
               >
                 Score this resume
               </button>
@@ -519,24 +521,24 @@ export function JobDetailView({ job, isConsultant }: { job: Job; isConsultant: b
               {atsScore != null && (
                 <Section title="ATS score">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm font-semibold text-slate-900 tabular-nums">
+                    <span className="text-sm font-semibold text-foreground tabular-nums">
                       {atsScore}%
                     </span>
                   </div>
-                  <div className="h-1.5 bg-slate-200 rounded overflow-hidden mb-2">
+                  <div className="h-1.5 bg-muted rounded overflow-hidden mb-2">
                     <div className="h-full bg-emerald-500" style={{ width: `${atsScore}%` }} />
                   </div>
-                  {ats && <p className="text-xs text-slate-700 break-words">{ats.summary}</p>}
+                  {ats && <p className="text-xs text-foreground break-words">{ats.summary}</p>}
                   {ats?.missing_keywords && ats.missing_keywords.length > 0 && (
                     <div className="mt-2">
-                      <div className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase mb-1">
+                      <div className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase mb-1">
                         Missing keywords
                       </div>
                       <div className="flex flex-wrap gap-1">
                         {ats.missing_keywords.slice(0, 16).map((k) => (
                           <span
                             key={k}
-                            className="text-[11px] bg-red-50 text-red-700 border border-red-100 px-2 py-0.5 rounded-full"
+                            className="text-[11px] bg-red-50 dark:bg-red-500/15 text-red-700 dark:text-red-300 border border-red-100 dark:border-red-500/20 px-2 py-0.5 rounded-full"
                           >
                             {k}
                           </span>
@@ -555,7 +557,7 @@ export function JobDetailView({ job, isConsultant }: { job: Job; isConsultant: b
 
               {(skillMatch.per_skill?.length ?? 0) > 0 && (
                 <Section title="Skill-by-skill">
-                  <div className="divide-y divide-slate-100">
+                  <div className="divide-y divide-border">
                     {(skillMatch.per_skill ?? []).map((s) => {
                       const pct = Math.round((s.score ?? 0) * 100);
                       const tone =
@@ -563,18 +565,18 @@ export function JobDetailView({ job, isConsultant }: { job: Job; isConsultant: b
                       return (
                         <div key={s.skill} className="py-2.5 min-w-0">
                           <div className="flex items-center justify-between gap-3 min-w-0">
-                            <span className="text-sm font-medium text-slate-900 truncate min-w-0">
+                            <span className="text-sm font-medium text-foreground truncate min-w-0">
                               {s.skill}
                             </span>
-                            <span className="text-xs tabular-nums font-semibold text-slate-700 shrink-0">
+                            <span className="text-xs tabular-nums font-semibold text-foreground shrink-0">
                               {pct}%
                             </span>
                           </div>
-                          <div className="mt-1.5 h-1.5 bg-slate-100 rounded overflow-hidden">
+                          <div className="mt-1.5 h-1.5 bg-muted rounded overflow-hidden">
                             <div className={`h-full ${tone}`} style={{ width: `${pct}%` }} />
                           </div>
                           {s.evidence && (
-                            <div className="mt-1 text-[11px] text-slate-500 italic break-words">
+                            <div className="mt-1 text-[11px] text-muted-foreground italic break-words">
                               “{s.evidence}”
                             </div>
                           )}
@@ -595,7 +597,7 @@ export function JobDetailView({ job, isConsultant }: { job: Job; isConsultant: b
             (reqs?.core_responsibilities ?? []).length === 0 &&
             (reqs?.skill_summaries ?? []).length === 0 && (
               <Section>
-                <p className="text-sm text-slate-500 text-center">
+                <p className="text-sm text-muted-foreground text-center">
                   This listing hasn't been enriched yet — only the basic facts are available. Open
                   the original posting for the full description.
                 </p>

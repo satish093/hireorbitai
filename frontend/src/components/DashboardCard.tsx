@@ -14,23 +14,23 @@ const accents: Record<NonNullable<Props['accent']>, string> = {
   green: 'before:bg-emerald-500',
   amber: 'before:bg-amber-500',
   red: 'before:bg-red-500',
-  slate: 'before:bg-slate-400',
+  slate: 'before:bg-muted-foreground',
 };
 
 export function DashboardCard({ label, value, hint, accent = 'slate', selected }: Props) {
   return (
     <div
-      className={`group relative bg-white rounded-xl border ${
-        selected ? 'border-slate-900 shadow-sm' : 'border-slate-200'
+      className={`group relative bg-card rounded-xl border ${
+        selected ? 'border-foreground shadow-sm' : 'border-border'
       } p-5 overflow-hidden hover-lift before:absolute before:left-0 before:top-0 before:bottom-0 before:w-1 ${accents[accent]} before:scale-y-0 before:origin-top before:transition-transform before:duration-300 before:ease-out hover:before:scale-y-100`}
     >
-      <div className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase">
+      <div className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">
         {label}
       </div>
-      <div className="text-3xl font-semibold mt-2 tabular-nums tracking-tight text-slate-900">
+      <div className="text-3xl font-semibold mt-2 tabular-nums tracking-tight text-foreground">
         {typeof value === 'number' ? <CountUp value={value} /> : value}
       </div>
-      {hint && <div className="text-xs text-slate-500 mt-2">{hint}</div>}
+      {hint && <div className="text-xs text-muted-foreground mt-2">{hint}</div>}
     </div>
   );
 }

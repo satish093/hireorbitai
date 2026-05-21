@@ -87,9 +87,12 @@ const RANGE_OPTIONS = [
 ];
 
 const STATUS_TONE: Record<string, string> = {
-  ACTIVE: 'bg-emerald-50 text-emerald-700 border-emerald-100',
-  PAUSED: 'bg-amber-50 text-amber-800 border-amber-100',
-  PLACED: 'bg-blue-50 text-blue-700 border-blue-100',
+  ACTIVE:
+    'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-100 dark:border-emerald-500/20',
+  PAUSED:
+    'bg-amber-50 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-100 dark:border-amber-500/20',
+  PLACED:
+    'bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-100 dark:border-blue-500/20',
 };
 
 export function Reports() {
@@ -155,8 +158,8 @@ export function Reports() {
     <Layout title="Reports">
       <div className="flex flex-wrap items-end justify-between gap-3 mb-5">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Reports</h1>
-          <p className="text-sm text-slate-500 mt-1">
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Reports</h1>
+          <p className="text-sm text-muted-foreground mt-1">
             Performance across recruiters, consultant pipeline, and placement analytics.
           </p>
         </div>
@@ -169,7 +172,7 @@ export function Reports() {
       </div>
 
       {/* Tab strip */}
-      <div className="flex items-end gap-5 border-b border-slate-200 mb-5 overflow-x-auto">
+      <div className="flex items-end gap-5 border-b border-border mb-5 overflow-x-auto">
         {TABS.map((t) => (
           <button
             key={t.key}
@@ -177,15 +180,15 @@ export function Reports() {
             className={clsx(
               'relative pb-2.5 -mb-px text-sm transition-colors whitespace-nowrap press',
               tab === t.key
-                ? 'text-slate-900 font-semibold'
-                : 'text-slate-500 hover:text-slate-800',
+                ? 'text-foreground font-semibold'
+                : 'text-muted-foreground hover:text-foreground',
             )}
           >
             {t.label}
             <span
               aria-hidden="true"
               className={clsx(
-                'absolute left-0 right-0 -bottom-px h-0.5 bg-slate-900 rounded-full origin-center transition-transform duration-200 ease-out',
+                'absolute left-0 right-0 -bottom-px h-0.5 bg-foreground rounded-full origin-center transition-transform duration-200 ease-out',
                 tab === t.key ? 'scale-x-100' : 'scale-x-0',
               )}
             />
@@ -207,7 +210,7 @@ export function Reports() {
 // ---------------------------------------------------------------------------
 
 function RecruiterPerformance({ rows }: { rows: RecruiterRow[] | null }) {
-  if (rows === null) return <p className="text-sm text-slate-500">Loading…</p>;
+  if (rows === null) return <p className="text-sm text-muted-foreground">Loading…</p>;
   if (rows.length === 0) return <EmptyState label="No recruiters yet" />;
 
   const totals = rows.reduce(
@@ -231,9 +234,9 @@ function RecruiterPerformance({ rows }: { rows: RecruiterRow[] | null }) {
         <DashboardCard label="Placements" value={totals.placed} accent="green" />
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+      <div className="bg-card border border-border rounded-xl overflow-hidden">
         <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-[10px] font-semibold tracking-widest text-slate-500 uppercase">
+          <thead className="bg-muted text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">
             <tr>
               <th className="text-left px-3 py-2">Recruiter</th>
               <th className="text-left px-3 py-2">Team</th>
@@ -247,34 +250,36 @@ function RecruiterPerformance({ rows }: { rows: RecruiterRow[] | null }) {
           </thead>
           <tbody>
             {rows.map((r) => (
-              <tr key={r.recruiter_id} className="border-t border-slate-100 hover:bg-slate-50">
+              <tr key={r.recruiter_id} className="border-t border-border hover:bg-muted">
                 <td className="px-3 py-2.5">
                   <div className="inline-flex items-center gap-2">
                     <Avatar name={r.name} email={r.email} size={26} />
                     <div className="leading-tight">
-                      <div className="font-medium text-slate-900 inline-flex items-center gap-1.5">
+                      <div className="font-medium text-foreground inline-flex items-center gap-1.5">
                         {r.name}
                         <GroupBadge groupId={r.group_id} compact hideEmpty />
                       </div>
                       {r.target_per_week ? (
-                        <div className="text-[11px] text-slate-500">
+                        <div className="text-[11px] text-muted-foreground">
                           {r.target_per_week}/wk target
                         </div>
                       ) : null}
                     </div>
                   </div>
                 </td>
-                <td className="px-3 py-2.5 text-slate-700">{r.team ?? '—'}</td>
+                <td className="px-3 py-2.5 text-foreground">{r.team ?? '—'}</td>
                 <td className="px-3 py-2.5 text-right tabular-nums">{r.active_consultants}</td>
-                <td className="px-3 py-2.5 text-right tabular-nums text-emerald-700">
+                <td className="px-3 py-2.5 text-right tabular-nums text-emerald-700 dark:text-emerald-300">
                   {r.placed_consultants}
                 </td>
                 <td className="px-3 py-2.5">
                   <BarCell value={r.submissions} max={maxSubs} />
                 </td>
                 <td className="px-3 py-2.5 text-right tabular-nums">{r.interviews}</td>
-                <td className="px-3 py-2.5 text-right tabular-nums text-amber-700">{r.offers}</td>
-                <td className="px-3 py-2.5 text-right tabular-nums text-slate-500">
+                <td className="px-3 py-2.5 text-right tabular-nums text-amber-700 dark:text-amber-300">
+                  {r.offers}
+                </td>
+                <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">
                   {r.rejections}
                 </td>
               </tr>
@@ -290,7 +295,7 @@ function BarCell({ value, max }: { value: number; max: number }) {
   const pct = Math.round((value / max) * 100);
   return (
     <div className="flex items-center gap-2 w-44">
-      <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+      <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
         <div className="h-full bg-brand-500" style={{ width: `${pct}%` }} />
       </div>
       <span className="text-sm tabular-nums w-8 text-right">{value}</span>
@@ -303,13 +308,13 @@ function BarCell({ value, max }: { value: number; max: number }) {
 // ---------------------------------------------------------------------------
 
 function ConsultantPipeline({ rows }: { rows: ConsultantRow[] | null }) {
-  if (rows === null) return <p className="text-sm text-slate-500">Loading…</p>;
+  if (rows === null) return <p className="text-sm text-muted-foreground">Loading…</p>;
   if (rows.length === 0) return <EmptyState label="No consultants yet" />;
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+    <div className="bg-card border border-border rounded-xl overflow-hidden">
       <table className="w-full text-sm">
-        <thead className="bg-slate-50 text-[10px] font-semibold tracking-widest text-slate-500 uppercase">
+        <thead className="bg-muted text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">
           <tr>
             <th className="text-left px-3 py-2">Consultant</th>
             <th className="text-left px-3 py-2">Recruiter</th>
@@ -323,20 +328,22 @@ function ConsultantPipeline({ rows }: { rows: ConsultantRow[] | null }) {
         </thead>
         <tbody>
           {rows.map((c) => (
-            <tr key={c.consultant_id} className="border-t border-slate-100 hover:bg-slate-50">
+            <tr key={c.consultant_id} className="border-t border-border hover:bg-muted">
               <td className="px-3 py-2.5">
                 <div className="inline-flex items-center gap-2">
                   <Avatar name={c.name} email={c.email} size={26} />
                   <div className="leading-tight">
-                    <div className="font-medium text-slate-900">{c.name}</div>
+                    <div className="font-medium text-foreground">{c.name}</div>
                     {c.primary_skill && (
-                      <div className="text-[11px] text-slate-500">{c.primary_skill}</div>
+                      <div className="text-[11px] text-muted-foreground">{c.primary_skill}</div>
                     )}
                   </div>
                 </div>
               </td>
-              <td className="px-3 py-2.5 text-slate-700">
-                {c.recruiter_name ?? <span className="italic text-slate-400">Unassigned</span>}
+              <td className="px-3 py-2.5 text-foreground">
+                {c.recruiter_name ?? (
+                  <span className="italic text-muted-foreground">Unassigned</span>
+                )}
               </td>
               <td className="px-3 py-2.5">
                 <span
@@ -350,11 +357,13 @@ function ConsultantPipeline({ rows }: { rows: ConsultantRow[] | null }) {
               </td>
               <td className="px-3 py-2.5 text-right tabular-nums">{c.submissions}</td>
               <td className="px-3 py-2.5 text-right tabular-nums">{c.interviews_scheduled}</td>
-              <td className="px-3 py-2.5 text-right tabular-nums text-blue-700">
+              <td className="px-3 py-2.5 text-right tabular-nums text-blue-700 dark:text-blue-300">
                 {c.interviews_completed}
               </td>
-              <td className="px-3 py-2.5 text-right tabular-nums text-emerald-700">{c.offers}</td>
-              <td className="px-3 py-2.5 text-right text-slate-500 text-xs">
+              <td className="px-3 py-2.5 text-right tabular-nums text-emerald-700 dark:text-emerald-300">
+                {c.offers}
+              </td>
+              <td className="px-3 py-2.5 text-right text-muted-foreground text-xs">
                 {c.last_activity_at ? new Date(c.last_activity_at).toLocaleDateString() : '—'}
               </td>
             </tr>
@@ -370,10 +379,10 @@ function ConsultantPipeline({ rows }: { rows: ConsultantRow[] | null }) {
 // ---------------------------------------------------------------------------
 
 function PlacementAnalytics({ data }: { data: PlacementSnapshot | null }) {
-  if (data === null) return <p className="text-sm text-slate-500">Loading…</p>;
+  if (data === null) return <p className="text-sm text-muted-foreground">Loading…</p>;
   const f = data.funnel;
   const steps = [
-    { label: 'Submissions', value: f.submissions, color: 'bg-slate-400' },
+    { label: 'Submissions', value: f.submissions, color: 'bg-muted-foreground' },
     { label: 'Interviews', value: f.interviews, color: 'bg-blue-500' },
     { label: 'Offers', value: f.offers, color: 'bg-amber-500' },
     { label: 'Placements', value: f.placements, color: 'bg-emerald-500' },
@@ -409,18 +418,18 @@ function PlacementAnalytics({ data }: { data: PlacementSnapshot | null }) {
         />
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-xl p-5">
-        <h3 className="font-semibold text-slate-900 mb-3">Placement funnel</h3>
+      <div className="bg-card border border-border rounded-xl p-5">
+        <h3 className="font-semibold text-foreground mb-3">Placement funnel</h3>
         <div className="space-y-3">
           {steps.map((s) => {
             const pct = Math.round((s.value / max) * 100);
             return (
               <div key={s.label}>
                 <div className="flex items-center justify-between text-sm mb-1">
-                  <span className="text-slate-700">{s.label}</span>
-                  <span className="font-semibold tabular-nums text-slate-900">{s.value}</span>
+                  <span className="text-foreground">{s.label}</span>
+                  <span className="font-semibold tabular-nums text-foreground">{s.value}</span>
                 </div>
-                <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                <div className="h-2 bg-muted rounded-full overflow-hidden">
                   <div className={clsx('h-full', s.color)} style={{ width: `${pct}%` }} />
                 </div>
               </div>
@@ -430,27 +439,29 @@ function PlacementAnalytics({ data }: { data: PlacementSnapshot | null }) {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-white border border-slate-200 rounded-xl p-5">
-          <h3 className="font-semibold text-slate-900 mb-1">Interview health</h3>
-          <p className="text-xs text-slate-500 mb-3">Scheduled vs. completed in window</p>
-          <div className="text-3xl font-semibold tabular-nums text-slate-900">
+        <div className="bg-card border border-border rounded-xl p-5">
+          <h3 className="font-semibold text-foreground mb-1">Interview health</h3>
+          <p className="text-xs text-muted-foreground mb-3">Scheduled vs. completed in window</p>
+          <div className="text-3xl font-semibold tabular-nums text-foreground">
             {data.interviews.completion_rate}%
           </div>
-          <p className="text-xs text-slate-500 mt-1">
+          <p className="text-xs text-muted-foreground mt-1">
             {data.interviews.completed} completed of {data.interviews.scheduled} scheduled
           </p>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-xl p-5">
-          <h3 className="font-semibold text-slate-900 mb-3">Top vendors by submissions</h3>
+        <div className="bg-card border border-border rounded-xl p-5">
+          <h3 className="font-semibold text-foreground mb-3">Top vendors by submissions</h3>
           {data.top_vendors.length === 0 ? (
-            <p className="text-xs text-slate-400 italic">No vendor activity yet.</p>
+            <p className="text-xs text-muted-foreground italic">No vendor activity yet.</p>
           ) : (
             <div className="space-y-2">
               {data.top_vendors.map((v) => (
                 <div key={v.vendor_id} className="flex items-center justify-between text-sm">
-                  <span className="text-slate-700">{v.name}</span>
-                  <span className="tabular-nums font-semibold text-slate-900">{v.submissions}</span>
+                  <span className="text-foreground">{v.name}</span>
+                  <span className="tabular-nums font-semibold text-foreground">
+                    {v.submissions}
+                  </span>
                 </div>
               ))}
             </div>
@@ -458,12 +469,12 @@ function PlacementAnalytics({ data }: { data: PlacementSnapshot | null }) {
         </div>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-xl p-5">
-        <h3 className="font-semibold text-slate-900 mb-3">Applications by status</h3>
+      <div className="bg-card border border-border rounded-xl p-5">
+        <h3 className="font-semibold text-foreground mb-3">Applications by status</h3>
         <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
           {Object.entries(data.applications_by_status).map(([k, v]) => (
-            <div key={k} className="border border-slate-200 rounded-lg p-2 text-sm">
-              <div className="text-slate-500 text-[10px] uppercase tracking-wide">{k}</div>
+            <div key={k} className="border border-border rounded-lg p-2 text-sm">
+              <div className="text-muted-foreground text-[10px] uppercase tracking-wide">{k}</div>
               <div className="font-semibold tabular-nums">{v}</div>
             </div>
           ))}
@@ -534,14 +545,14 @@ function DailyActivity() {
       <div className="flex justify-end mb-3">
         <button
           onClick={() => setOpen(true)}
-          className="bg-slate-900 text-white text-sm px-3 py-2 rounded-lg hover:bg-slate-800"
+          className="bg-foreground text-background text-sm px-3 py-2 rounded-lg hover:opacity-90"
         >
           + Log activity
         </button>
       </div>
-      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+      <div className="bg-card border border-border rounded-xl overflow-hidden">
         <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-[10px] font-semibold tracking-widest text-slate-500 uppercase">
+          <thead className="bg-muted text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">
             <tr>
               <th className="text-left px-3 py-2">Date</th>
               <th className="text-left px-3 py-2">Recruiter</th>
@@ -556,15 +567,15 @@ function DailyActivity() {
           <tbody>
             {rows.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-3 py-6 text-center text-slate-400 italic">
+                <td colSpan={8} className="px-3 py-6 text-center text-muted-foreground italic">
                   No daily logs yet.
                 </td>
               </tr>
             )}
             {rows.map((r) => (
-              <tr key={r.id} className="border-t border-slate-100 hover:bg-slate-50">
+              <tr key={r.id} className="border-t border-border hover:bg-muted">
                 <td className="px-3 py-2.5">{r.activity_date}</td>
-                <td className="px-3 py-2.5 text-slate-700">{recruiterName(r.recruiter_id)}</td>
+                <td className="px-3 py-2.5 text-foreground">{recruiterName(r.recruiter_id)}</td>
                 <td className="px-3 py-2.5 text-right tabular-nums">{r.submissions_count ?? 0}</td>
                 <td className="px-3 py-2.5 text-right tabular-nums">
                   {r.interviews_scheduled ?? 0}
@@ -589,7 +600,7 @@ function DailyActivity() {
           <button
             onClick={save}
             disabled={saving}
-            className="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm hover:bg-slate-800 disabled:opacity-50"
+            className="bg-foreground text-background px-4 py-2 rounded-lg text-sm hover:opacity-90 disabled:opacity-50"
           >
             {saving ? 'Saving…' : 'Save'}
           </button>
@@ -697,7 +708,7 @@ function DailyActivity() {
 
 function EmptyState({ label }: { label: string; children?: ReactNode }) {
   return (
-    <div className="bg-white border border-slate-200 rounded-xl p-10 text-center text-slate-500 text-sm">
+    <div className="bg-card border border-border rounded-xl p-10 text-center text-muted-foreground text-sm">
       {label}
     </div>
   );
@@ -715,11 +726,11 @@ function UserTimeTable({ rows }: { rows: UserTimeRow[] | null }) {
     );
   }
   return (
-    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+    <div className="bg-card border border-border rounded-xl overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
-          <thead className="bg-slate-50 border-b border-slate-200">
-            <tr className="text-[10px] uppercase tracking-widest text-slate-500 font-semibold">
+          <thead className="bg-muted border-b border-border">
+            <tr className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">
               <th className="text-left px-4 py-2.5">User</th>
               <th className="text-left px-3 py-2.5">Role</th>
               <th className="text-right px-3 py-2.5">Time in app</th>
@@ -729,7 +740,7 @@ function UserTimeTable({ rows }: { rows: UserTimeRow[] | null }) {
               <th className="text-left px-3 py-2.5">Activity</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-border">
             {rows.map((r) => {
               const avg = r.days_active > 0 ? Math.round(r.total_seconds / r.days_active) : 0;
               const peak = Math.max(1, ...r.by_day.map((d) => d.active_seconds));
@@ -739,11 +750,13 @@ function UserTimeTable({ rows }: { rows: UserTimeRow[] | null }) {
                     <div className="flex items-center gap-2.5">
                       <Avatar name={r.full_name} email={r.email ?? undefined} size={28} />
                       <div className="leading-tight min-w-0">
-                        <div className="text-sm font-medium text-slate-900 truncate">
+                        <div className="text-sm font-medium text-foreground truncate">
                           {r.full_name ?? r.email ?? 'Unknown'}
                         </div>
                         {r.email && (
-                          <div className="text-[11px] text-slate-500 truncate">{r.email}</div>
+                          <div className="text-[11px] text-muted-foreground truncate">
+                            {r.email}
+                          </div>
                         )}
                       </div>
                     </div>
@@ -751,23 +764,23 @@ function UserTimeTable({ rows }: { rows: UserTimeRow[] | null }) {
                   <td className="px-3 py-2.5">
                     <div className="inline-flex items-center gap-1.5">
                       {r.role && (
-                        <span className="text-[10px] font-semibold uppercase tracking-wide bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded">
+                        <span className="text-[10px] font-semibold uppercase tracking-wide bg-muted text-foreground px-1.5 py-0.5 rounded">
                           {r.role}
                         </span>
                       )}
                       <GroupBadge groupId={r.group_id} compact hideEmpty />
                     </div>
                   </td>
-                  <td className="px-3 py-2.5 text-right tabular-nums font-semibold text-slate-900">
+                  <td className="px-3 py-2.5 text-right tabular-nums font-semibold text-foreground">
                     {formatDuration(r.total_seconds)}
                   </td>
-                  <td className="px-3 py-2.5 text-right tabular-nums text-slate-700">
+                  <td className="px-3 py-2.5 text-right tabular-nums text-foreground">
                     {r.days_active}
                   </td>
-                  <td className="px-3 py-2.5 text-right tabular-nums text-slate-700">
+                  <td className="px-3 py-2.5 text-right tabular-nums text-foreground">
                     {formatDuration(avg)}
                   </td>
-                  <td className="px-3 py-2.5 text-xs text-slate-600">
+                  <td className="px-3 py-2.5 text-xs text-muted-foreground">
                     {r.last_seen_at ? relativeTime(r.last_seen_at) : '—'}
                   </td>
                   <td className="px-3 py-2.5">

@@ -70,7 +70,7 @@ export function MyTraining() {
       <div className="flex items-end justify-between mb-5">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">My training</h1>
-          <p className="text-sm text-slate-500 mt-1">
+          <p className="text-sm text-muted-foreground mt-1">
             Your assigned STEM-OPT training plans. Click a card to start a session.
           </p>
         </div>
@@ -132,32 +132,34 @@ function PlanCard({ a, course }: { a: any; course: any | undefined }) {
   return (
     <Link
       to={`/training/assignments/${a.id}`}
-      className="block bg-white border border-slate-200 rounded-2xl p-5 hover:border-brand-300 hover:shadow-sm transition"
+      className="block bg-card border border-border rounded-2xl p-5 hover:border-brand-300 hover:shadow-sm transition"
     >
       <div className="flex items-center gap-2 flex-wrap mb-2">
         {category && <CourseCategoryBadge category={category} />}
         <TrainingStatusBadge status={a.status} />
         {typeof weekly_hours === 'number' && (
-          <span className="text-[10px] text-slate-500">· ~{weekly_hours} h/week</span>
+          <span className="text-[10px] text-muted-foreground">· ~{weekly_hours} h/week</span>
         )}
-        {a.due_date && <span className="text-[10px] text-slate-500">· due {a.due_date}</span>}
+        {a.due_date && (
+          <span className="text-[10px] text-muted-foreground">· due {a.due_date}</span>
+        )}
       </div>
 
-      <h2 className="text-lg font-semibold tracking-tight text-slate-900">{courseTitle}</h2>
+      <h2 className="text-lg font-semibold tracking-tight text-foreground">{courseTitle}</h2>
 
       {objectives.length > 0 && (
         <div className="mt-2">
-          <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-1">
+          <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1">
             You will learn
           </div>
-          <ul className="text-sm text-slate-700 list-disc list-outside pl-5 space-y-0.5">
+          <ul className="text-sm text-foreground list-disc list-outside pl-5 space-y-0.5">
             {objectives.slice(0, 3).map((o) => (
               <li key={o} className="line-clamp-1">
                 {o}
               </li>
             ))}
             {objectives.length > 3 && (
-              <li className="italic text-slate-400">+{objectives.length - 3} more</li>
+              <li className="italic text-muted-foreground">+{objectives.length - 3} more</li>
             )}
           </ul>
         </div>
@@ -167,7 +169,7 @@ function PlanCard({ a, course }: { a: any; course: any | undefined }) {
         <TrainingProgressBar value={a.progress_percentage} label="Progress" />
       </div>
 
-      <div className="flex items-center justify-between mt-3 text-[11px] text-slate-500">
+      <div className="flex items-center justify-between mt-3 text-[11px] text-muted-foreground">
         <span>
           {weeksTotal != null
             ? `Week ${Math.max(1, weeksDone ?? 0)} of ${weeksTotal}`

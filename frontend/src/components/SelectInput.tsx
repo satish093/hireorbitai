@@ -23,7 +23,7 @@ export const SelectInput = forwardRef<HTMLSelectElement, Props>(function SelectI
 ) {
   return (
     <label className="block">
-      {label && <span className="block text-xs font-medium text-slate-700 mb-1.5">{label}</span>}
+      {label && <span className="block text-xs font-medium text-foreground mb-1.5">{label}</span>}
       <div className="relative">
         <select
           ref={ref}
@@ -31,12 +31,12 @@ export const SelectInput = forwardRef<HTMLSelectElement, Props>(function SelectI
           className={clsx(
             // h-9 matches FormInput + Button(md). pr-9 leaves room for the
             // chevron at the right.
-            'w-full h-9 appearance-none rounded-lg border bg-white pl-3 pr-9 text-sm shadow-sm transition',
+            'w-full h-9 appearance-none rounded-lg border bg-card pl-3 pr-9 text-sm shadow-sm transition',
             'focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30 focus-visible:border-brand-500',
             error
               ? 'border-red-300 focus-visible:ring-red-200 focus-visible:border-red-500'
-              : 'border-slate-300 hover:border-slate-400',
-            rest.disabled && 'opacity-60 cursor-not-allowed bg-slate-50',
+              : 'border-border hover:border-muted-foreground',
+            rest.disabled && 'opacity-60 cursor-not-allowed bg-muted',
             className,
           )}
         >
@@ -49,7 +49,7 @@ export const SelectInput = forwardRef<HTMLSelectElement, Props>(function SelectI
         </select>
         <svg
           aria-hidden="true"
-          className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"
+          className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground"
           viewBox="0 0 20 20"
           fill="currentColor"
         >
@@ -60,7 +60,7 @@ export const SelectInput = forwardRef<HTMLSelectElement, Props>(function SelectI
           />
         </svg>
       </div>
-      {error && <span className="block text-xs text-red-600 mt-1">{error}</span>}
+      {error && <span className="block text-xs text-red-600 dark:text-red-400 mt-1">{error}</span>}
     </label>
   );
 });

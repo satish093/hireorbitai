@@ -32,13 +32,13 @@ export function DataTable<T extends { id?: string }>({
     a === 'right' ? 'text-right' : a === 'center' ? 'text-center' : 'text-left';
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden animate-fade-in">
+    <div className="bg-card rounded-xl border border-border overflow-hidden animate-fade-in">
       {/* `overflow-x-auto` scrolls the table on narrow viewports instead of
           squashing every column. A min-width keeps the columns from collapsing
           before the scroller engages. */}
       <div className="overflow-x-auto">
         <table className="w-full text-sm min-w-[560px]">
-          <thead className="bg-slate-50 text-[10px] font-semibold tracking-widest text-slate-500 uppercase">
+          <thead className="bg-muted text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">
             <tr>
               {columns.map((c) => (
                 <th
@@ -59,7 +59,7 @@ export function DataTable<T extends { id?: string }>({
               // Animated skeleton rows give the loading state real presence
               // instead of a single italic "Loading…" line.
               Array.from({ length: 5 }).map((_, i) => (
-                <tr key={`skel-${i}`} className="border-t border-slate-100">
+                <tr key={`skel-${i}`} className="border-t border-border">
                   {columns.map((c, j) => (
                     <td key={c.key} className={clsx('px-3 sm:px-4 py-3.5', alignClass(c.align))}>
                       <div
@@ -74,9 +74,9 @@ export function DataTable<T extends { id?: string }>({
               <tr>
                 <td
                   colSpan={columns.length}
-                  className="px-4 py-12 text-center text-slate-500 text-sm animate-fade-in-up"
+                  className="px-4 py-12 text-center text-muted-foreground text-sm animate-fade-in-up"
                 >
-                  {empty ?? <span className="italic text-slate-400">No records yet</span>}
+                  {empty ?? <span className="italic text-muted-foreground">No records yet</span>}
                 </td>
               </tr>
             ) : (
@@ -86,22 +86,22 @@ export function DataTable<T extends { id?: string }>({
                   onClick={onRowClick ? () => onRowClick(row) : undefined}
                   style={{ animationDelay: `${Math.min(i, STAGGER_MAX) * 25}ms` }}
                   className={clsx(
-                    'border-t border-slate-100 transition animate-fade-in-up',
-                    onRowClick ? 'cursor-pointer hover:bg-slate-50' : 'hover:bg-slate-50/50',
+                    'border-t border-border transition animate-fade-in-up',
+                    onRowClick ? 'cursor-pointer hover:bg-muted' : 'hover:bg-slate-50/50',
                   )}
                 >
                   {columns.map((c) => (
                     <td
                       key={c.key}
                       className={clsx(
-                        'px-3 sm:px-4 py-3 text-slate-700 align-middle',
+                        'px-3 sm:px-4 py-3 text-foreground align-middle',
                         alignClass(c.align),
                         c.className,
                       )}
                     >
                       {c.render
                         ? c.render(row)
-                        : ((row as any)[c.key] ?? <span className="text-slate-400">—</span>)}
+                        : ((row as any)[c.key] ?? <span className="text-muted-foreground">—</span>)}
                     </td>
                   ))}
                 </tr>

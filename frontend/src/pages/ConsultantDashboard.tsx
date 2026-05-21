@@ -84,7 +84,7 @@ export function ConsultantDashboard() {
         </div>
       )}
 
-      <h2 className="text-sm font-semibold text-slate-900 mb-2">Recent submissions</h2>
+      <h2 className="text-sm font-semibold text-foreground mb-2">Recent submissions</h2>
       <DataTable
         loading={loading}
         empty="No applications yet."

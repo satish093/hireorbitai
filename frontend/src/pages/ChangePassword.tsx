@@ -60,18 +60,18 @@ export function ChangePassword() {
   }
 
   return (
-    <div className="min-h-dvh bg-slate-50 flex items-center justify-center p-4 sm:p-6">
+    <div className="min-h-dvh bg-muted flex items-center justify-center p-4 sm:p-6">
       <div className="w-full max-w-sm animate-fade-in-up">
         <div className="flex justify-center mb-6">
           <Brand size="lg" />
         </div>
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-7">
+        <div className="bg-card rounded-2xl border border-border shadow-sm p-7">
           <div className="mb-4">
-            <h1 className="text-xl font-semibold tracking-tight text-slate-900">
+            <h1 className="text-xl font-semibold tracking-tight text-foreground">
               {forced ? 'Set a new password' : 'Change your password'}
             </h1>
             {forced && (
-              <p className="text-sm text-slate-500 mt-1">
+              <p className="text-sm text-muted-foreground mt-1">
                 You signed in with a temporary password. Choose a new one to continue.
               </p>
             )}
@@ -100,10 +100,10 @@ export function ChangePassword() {
               {...form.register('confirm_password', { required: 'Required' })}
               error={form.formState.errors.confirm_password?.message}
             />
-            {error && <p className="text-xs text-red-600">{error}</p>}
+            {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
             <button
               disabled={busy}
-              className="w-full bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white rounded-lg py-2.5 text-sm font-medium press"
+              className="w-full bg-foreground hover:opacity-90 disabled:opacity-50 text-background rounded-lg py-2.5 text-sm font-medium press"
             >
               {busy ? 'Saving…' : 'Update password'}
             </button>
@@ -114,7 +114,7 @@ export function ChangePassword() {
                   await signOut();
                   nav('/login', { replace: true });
                 }}
-                className="w-full text-xs text-slate-500 hover:text-slate-900 py-1"
+                className="w-full text-xs text-muted-foreground hover:text-foreground py-1"
               >
                 Sign out instead
               </button>

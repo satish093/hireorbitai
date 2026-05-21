@@ -129,7 +129,7 @@ export function TourOverlay({
       )}
 
       <div
-        className="absolute bg-white rounded-2xl shadow-2xl ring-1 ring-slate-900/5 p-5 animate-scale-in"
+        className="absolute bg-card rounded-2xl shadow-2xl ring-1 ring-slate-900/5 p-5 animate-scale-in"
         style={cardStyle}
       >
         <div className="flex items-center justify-between gap-3 mb-1">
@@ -139,29 +139,29 @@ export function TourOverlay({
           <button
             onClick={onClose}
             aria-label="Skip tour"
-            className="-mr-1 -mt-1 w-7 h-7 inline-flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+            className="-mr-1 -mt-1 w-7 h-7 inline-flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted"
           >
             ✕
           </button>
         </div>
-        <h3 className="text-base font-semibold text-slate-900">{step.title}</h3>
-        <p className="text-sm text-slate-600 mt-1.5 leading-relaxed">{step.body}</p>
+        <h3 className="text-base font-semibold text-foreground">{step.title}</h3>
+        <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">{step.body}</p>
         <div className="mt-4 flex items-center justify-between">
-          <button onClick={onClose} className="text-xs text-slate-500 hover:text-slate-700">
+          <button onClick={onClose} className="text-xs text-muted-foreground hover:text-foreground">
             Skip
           </button>
           <div className="flex items-center gap-2">
             {idx > 0 && (
               <button
                 onClick={() => setIdx((i) => i - 1)}
-                className="text-sm px-3 py-1.5 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50"
+                className="text-sm px-3 py-1.5 rounded-lg border border-border text-foreground hover:bg-muted"
               >
                 Back
               </button>
             )}
             <button
               onClick={() => (isLast ? onComplete() : setIdx((i) => i + 1))}
-              className="text-sm px-4 py-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-800"
+              className="text-sm px-4 py-1.5 rounded-lg bg-foreground text-background hover:opacity-90"
             >
               {isLast ? 'Done' : 'Next'}
             </button>

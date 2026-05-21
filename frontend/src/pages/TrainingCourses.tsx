@@ -95,7 +95,7 @@ export function TrainingCourses() {
           <select
             value={filter.status}
             onChange={(e) => setFilter({ ...filter, status: e.target.value })}
-            className="text-sm border border-slate-200 rounded-md px-2 py-1.5"
+            className="text-sm border border-border rounded-md px-2 py-1.5"
           >
             <option value="">All statuses</option>
             <option value="DRAFT">Draft</option>
@@ -105,7 +105,7 @@ export function TrainingCourses() {
           <select
             value={filter.category}
             onChange={(e) => setFilter({ ...filter, category: e.target.value })}
-            className="text-sm border border-slate-200 rounded-md px-2 py-1.5"
+            className="text-sm border border-border rounded-md px-2 py-1.5"
           >
             {CATEGORIES.map((c) => (
               <option key={c} value={c}>
@@ -126,7 +126,7 @@ export function TrainingCourses() {
           {isManager && (
             <Link
               to="/training/courses/new"
-              className="bg-slate-900 text-white text-sm px-4 py-2 rounded-lg hover:bg-slate-800"
+              className="bg-foreground text-background text-sm px-4 py-2 rounded-lg hover:opacity-90"
             >
               + New course
             </Link>

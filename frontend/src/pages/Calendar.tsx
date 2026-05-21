@@ -138,25 +138,25 @@ export function Calendar() {
         title="Calendar"
         description="Interviews and reminders across the month. Click a date to filter the list below."
         action={
-          <div className="inline-flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-1 shadow-sm">
+          <div className="inline-flex items-center gap-1 bg-card border border-border rounded-lg p-1 shadow-sm">
             <button
               onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}
-              className="w-7 h-7 inline-flex items-center justify-center rounded-md text-slate-600 hover:bg-slate-100"
+              className="w-7 h-7 inline-flex items-center justify-center rounded-md text-muted-foreground hover:bg-muted"
               aria-label="Previous month"
             >
               ‹
             </button>
-            <span className="text-sm font-medium text-slate-900 min-w-[120px] text-center">
+            <span className="text-sm font-medium text-foreground min-w-[120px] text-center">
               {month.toLocaleString(undefined, { month: 'long', year: 'numeric' })}
             </span>
             <button
               onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}
-              className="w-7 h-7 inline-flex items-center justify-center rounded-md text-slate-600 hover:bg-slate-100"
+              className="w-7 h-7 inline-flex items-center justify-center rounded-md text-muted-foreground hover:bg-muted"
               aria-label="Next month"
             >
               ›
             </button>
-            <span className="w-px h-5 bg-slate-200 mx-1" />
+            <span className="w-px h-5 bg-muted mx-1" />
             <Button
               size="sm"
               variant="ghost"
@@ -171,12 +171,12 @@ export function Calendar() {
         }
       />
 
-      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-        <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50">
+      <div className="bg-card border border-border rounded-xl overflow-hidden">
+        <div className="grid grid-cols-7 border-b border-border bg-muted">
           {DOW.map((d) => (
             <div
               key={d}
-              className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 px-3 py-2"
+              className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground px-3 py-2"
             >
               {d}
             </div>
@@ -189,7 +189,7 @@ export function Calendar() {
                 <div
                   key={`blank-${idx}`}
                   className={clsx(
-                    'min-h-[110px] border-r border-b border-slate-100 p-2 bg-slate-50/40',
+                    'min-h-[110px] border-r border-b border-border p-2 bg-slate-50/40',
                     (idx + 1) % 7 === 0 && 'border-r-0',
                     idx >= cells.length - 7 && 'border-b-0',
                   )}
@@ -207,21 +207,21 @@ export function Calendar() {
                 aria-pressed={sel}
                 aria-label={`${d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}${dayEvents.length ? ` — ${dayEvents.length} event${dayEvents.length === 1 ? '' : 's'}` : ''}`}
                 className={clsx(
-                  'min-h-[110px] border-r border-b border-slate-100 p-2 text-left transition',
+                  'min-h-[110px] border-r border-b border-border p-2 text-left transition',
                   'cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40',
                   (idx + 1) % 7 === 0 && 'border-r-0',
                   idx >= cells.length - 7 && 'border-b-0',
-                  sel ? 'bg-brand-50 ring-1 ring-inset ring-brand-300' : 'hover:bg-slate-50',
+                  sel ? 'bg-brand-50 ring-1 ring-inset ring-brand-300' : 'hover:bg-muted',
                 )}
               >
                 <div
                   className={clsx(
                     'text-xs font-semibold mb-1.5 inline-flex items-center justify-center w-6 h-6 rounded-full',
                     today_
-                      ? 'bg-slate-900 text-white'
+                      ? 'bg-foreground text-background'
                       : sel
                         ? 'bg-brand-600 text-white'
-                        : 'text-slate-700',
+                        : 'text-foreground',
                   )}
                 >
                   {d.getDate()}
@@ -234,8 +234,8 @@ export function Calendar() {
                       className={clsx(
                         'mb-1 rounded-md px-1.5 py-0.5 border text-[11px] leading-tight animate-fade-in-up transition',
                         e.kind === 'interview'
-                          ? 'bg-indigo-50 border-indigo-100 text-indigo-800'
-                          : 'bg-amber-50 border-amber-100 text-amber-800',
+                          ? 'bg-indigo-50 dark:bg-indigo-500/15 border-indigo-100 dark:border-indigo-500/20 text-indigo-800 dark:text-indigo-300'
+                          : 'bg-amber-50 dark:bg-amber-500/15 border-amber-100 dark:border-amber-500/20 text-amber-800 dark:text-amber-300',
                       )}
                       title={`${new Date(e.when).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} — ${e.title}`}
                     >
@@ -249,7 +249,7 @@ export function Calendar() {
                     </div>
                   ))}
                 {dayEvents.length > 3 && (
-                  <div className="text-[10px] text-slate-500 mt-0.5">
+                  <div className="text-[10px] text-muted-foreground mt-0.5">
                     +{dayEvents.length - 3} more
                   </div>
                 )}
@@ -262,7 +262,7 @@ export function Calendar() {
       {/* Detail list — defaults to today, follows the user's day selection. */}
       <div className="mt-5">
         <div className="flex items-center justify-between mb-2">
-          <h2 className="text-sm font-semibold text-slate-900">
+          <h2 className="text-sm font-semibold text-foreground">
             {customSelected
               ? focusDate.toLocaleDateString(undefined, {
                   weekday: 'long',
@@ -270,7 +270,7 @@ export function Calendar() {
                   day: 'numeric',
                 })
               : 'Today'}
-            <span className="ml-2 text-xs font-normal text-slate-500">
+            <span className="ml-2 text-xs font-normal text-muted-foreground">
               {focusEvents.length} event{focusEvents.length === 1 ? '' : 's'}
             </span>
           </h2>
@@ -278,30 +278,30 @@ export function Calendar() {
             <button
               type="button"
               onClick={() => setSelectedDate(null)}
-              className="text-xs text-slate-500 hover:text-slate-900 underline-offset-2 hover:underline"
+              className="text-xs text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
             >
               Clear ✕
             </button>
           )}
         </div>
-        <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100">
+        <div className="bg-card border border-border rounded-xl divide-y divide-border">
           {focusEvents.length === 0 ? (
-            <div className="px-4 py-6 text-sm text-slate-400 italic text-center">
+            <div className="px-4 py-6 text-sm text-muted-foreground italic text-center">
               {customSelected ? 'Nothing scheduled this day.' : 'Nothing scheduled today.'}
             </div>
           ) : (
             focusEvents.map((e) => (
               <div key={e.id} className="px-4 py-3 flex items-center gap-3">
-                <div className="w-16 text-xs font-mono text-slate-500">
+                <div className="w-16 text-xs font-mono text-muted-foreground">
                   {new Date(e.when).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
                 </div>
-                <div className="flex-1 min-w-0 text-sm text-slate-800 truncate">{e.title}</div>
+                <div className="flex-1 min-w-0 text-sm text-foreground truncate">{e.title}</div>
                 <span
                   className={clsx(
                     'text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded',
                     e.kind === 'interview'
-                      ? 'bg-indigo-50 text-indigo-700'
-                      : 'bg-amber-50 text-amber-700',
+                      ? 'bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300'
+                      : 'bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300',
                   )}
                 >
                   {e.kind}

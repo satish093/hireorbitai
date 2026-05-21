@@ -218,7 +218,7 @@ export function UserProfile() {
   if (!user)
     return (
       <Layout title="Profile">
-        <div className="text-sm text-slate-500">User not available.</div>
+        <div className="text-sm text-muted-foreground">User not available.</div>
       </Layout>
     );
 
@@ -234,27 +234,29 @@ export function UserProfile() {
     >
       <button
         onClick={() => navigate(-1)}
-        className="text-xs text-slate-500 hover:text-slate-900 mb-3"
+        className="text-xs text-muted-foreground hover:text-foreground mb-3"
       >
         ← Back
       </button>
 
-      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+      <div className="bg-card border border-border rounded-2xl overflow-hidden">
         {/* Header */}
-        <div className="px-6 py-5 border-b border-slate-100 flex items-start gap-4">
+        <div className="px-6 py-5 border-b border-border flex items-start gap-4">
           <Avatar name={displayName} email={user.email} size={64} />
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-xl font-semibold tracking-tight text-slate-900">{displayName}</h1>
+              <h1 className="text-xl font-semibold tracking-tight text-foreground">
+                {displayName}
+              </h1>
               <PresencePill lastSeenAt={user.last_seen_at} />
               {!user.is_active && (
-                <span className="text-[10px] font-semibold uppercase tracking-wider bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">
+                <span className="text-[10px] font-semibold uppercase tracking-wider bg-muted text-muted-foreground px-1.5 py-0.5 rounded">
                   Inactive
                 </span>
               )}
             </div>
-            <div className="text-sm text-slate-500 mt-0.5 flex items-center gap-2 flex-wrap">
-              <span className="text-[10px] font-semibold uppercase tracking-widest bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded">
+            <div className="text-sm text-muted-foreground mt-0.5 flex items-center gap-2 flex-wrap">
+              <span className="text-[10px] font-semibold uppercase tracking-widest bg-muted text-foreground px-1.5 py-0.5 rounded">
                 {ROLE_LABEL[user.role] ?? user.role}
               </span>
               <GroupBadge groupId={user.group_id} />
@@ -270,7 +272,7 @@ export function UserProfile() {
                     <button
                       onClick={() => setShowDeactivate(true)}
                       disabled={actBusy}
-                      className="border border-amber-300 text-amber-700 text-sm px-3 py-1.5 rounded-lg hover:bg-amber-50 disabled:opacity-50 press transition-colors"
+                      className="border border-amber-300 text-amber-700 dark:text-amber-300 text-sm px-3 py-1.5 rounded-lg hover:bg-amber-50 disabled:opacity-50 press transition-colors"
                     >
                       Deactivate
                     </button>
@@ -278,7 +280,7 @@ export function UserProfile() {
                     <button
                       onClick={reactivate}
                       disabled={actBusy}
-                      className="border border-emerald-300 text-emerald-700 text-sm px-3 py-1.5 rounded-lg hover:bg-emerald-50 disabled:opacity-50 press transition-colors"
+                      className="border border-emerald-300 text-emerald-700 dark:text-emerald-300 text-sm px-3 py-1.5 rounded-lg hover:bg-emerald-50 disabled:opacity-50 press transition-colors"
                     >
                       Reactivate
                     </button>
@@ -289,7 +291,7 @@ export function UserProfile() {
                       setDeleteConfirmText('');
                     }}
                     disabled={actBusy}
-                    className="border border-red-300 text-red-700 text-sm px-3 py-1.5 rounded-lg hover:bg-red-50 disabled:opacity-50 press transition-colors"
+                    className="border border-red-300 text-red-700 dark:text-red-300 text-sm px-3 py-1.5 rounded-lg hover:bg-red-50 disabled:opacity-50 press transition-colors"
                   >
                     Delete
                   </button>
@@ -298,7 +300,7 @@ export function UserProfile() {
               {isSelf && (
                 <button
                   onClick={replayTour}
-                  className="border border-slate-200 text-slate-700 text-sm px-3 py-1.5 rounded-lg hover:bg-slate-50 press transition-colors"
+                  className="border border-border text-foreground text-sm px-3 py-1.5 rounded-lg hover:bg-muted press transition-colors"
                   title="Replay the product tour"
                 >
                   Replay tour
@@ -306,7 +308,7 @@ export function UserProfile() {
               )}
               <button
                 onClick={() => setEditing(true)}
-                className="bg-slate-900 text-white text-sm px-4 py-1.5 rounded-lg hover:bg-slate-800"
+                className="bg-foreground text-background text-sm px-4 py-1.5 rounded-lg hover:opacity-90"
               >
                 Edit
               </button>
@@ -319,14 +321,14 @@ export function UserProfile() {
                   setEditing(false);
                   setForm(user);
                 }}
-                className="border border-slate-200 text-slate-700 text-sm px-3 py-1.5 rounded-lg hover:bg-slate-50"
+                className="border border-border text-foreground text-sm px-3 py-1.5 rounded-lg hover:bg-muted"
               >
                 Cancel
               </button>
               <button
                 onClick={save}
                 disabled={saving}
-                className="bg-slate-900 text-white text-sm px-4 py-1.5 rounded-lg hover:bg-slate-800 disabled:opacity-50"
+                className="bg-foreground text-background text-sm px-4 py-1.5 rounded-lg hover:opacity-90 disabled:opacity-50"
               >
                 {saving ? 'Saving…' : 'Save'}
               </button>
@@ -451,14 +453,14 @@ export function UserProfile() {
               />
               {user.context.consultant.skills && user.context.consultant.skills.length > 0 && (
                 <div className="pt-2">
-                  <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-1">
+                  <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1">
                     Skills
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     {user.context.consultant.skills.map((s) => (
                       <span
                         key={s}
-                        className="text-[11px] bg-slate-100 text-slate-800 px-2 py-0.5 rounded-full"
+                        className="text-[11px] bg-muted text-foreground px-2 py-0.5 rounded-full"
                       >
                         {s}
                       </span>
@@ -503,19 +505,20 @@ export function UserProfile() {
           aria-modal="true"
         >
           <div
-            className="bg-white rounded-2xl border border-slate-200 shadow-xl w-full max-w-md p-6 animate-scale-in"
+            className="bg-card rounded-2xl border border-border shadow-xl w-full max-w-md p-6 animate-scale-in"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-lg font-semibold text-slate-900">Deactivate account?</h2>
-            <p className="text-sm text-slate-600 mt-2">
-              <span className="font-medium text-slate-900">{user.email}</span> will be signed out of
-              every session and unable to log in until you reactivate them. Their data is preserved.
+            <h2 className="text-lg font-semibold text-foreground">Deactivate account?</h2>
+            <p className="text-sm text-muted-foreground mt-2">
+              <span className="font-medium text-foreground">{user.email}</span> will be signed out
+              of every session and unable to log in until you reactivate them. Their data is
+              preserved.
             </p>
             <div className="flex items-center justify-end gap-2 mt-5">
               <button
                 onClick={() => setShowDeactivate(false)}
                 disabled={actBusy}
-                className="border border-slate-200 text-slate-700 text-sm px-3 py-1.5 rounded-lg hover:bg-slate-50 disabled:opacity-50 press"
+                className="border border-border text-foreground text-sm px-3 py-1.5 rounded-lg hover:bg-muted disabled:opacity-50 press"
               >
                 Cancel
               </button>
@@ -539,16 +542,16 @@ export function UserProfile() {
           aria-modal="true"
         >
           <div
-            className="bg-white rounded-2xl border border-slate-200 shadow-xl w-full max-w-md p-6 animate-scale-in"
+            className="bg-card rounded-2xl border border-border shadow-xl w-full max-w-md p-6 animate-scale-in"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-lg font-semibold text-slate-900">Delete account permanently?</h2>
-            <p className="text-sm text-slate-600 mt-2">
+            <h2 className="text-lg font-semibold text-foreground">Delete account permanently?</h2>
+            <p className="text-sm text-muted-foreground mt-2">
               This will permanently remove{' '}
-              <span className="font-medium text-slate-900">{user.email}</span>'s auth user, profile
+              <span className="font-medium text-foreground">{user.email}</span>'s auth user, profile
               row, and active sessions. This action cannot be undone.
             </p>
-            <p className="text-xs text-slate-500 mt-3">
+            <p className="text-xs text-muted-foreground mt-3">
               Prefer{' '}
               <button
                 type="button"
@@ -556,29 +559,29 @@ export function UserProfile() {
                   setShowDelete(false);
                   setShowDeactivate(true);
                 }}
-                className="text-amber-700 hover:underline"
+                className="text-amber-700 dark:text-amber-300 hover:underline"
               >
                 deactivate
               </button>{' '}
               if you want to keep the audit trail.
             </p>
             <label className="block mt-4">
-              <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
-                Type <span className="text-slate-900">{user.email}</span> to confirm
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                Type <span className="text-foreground">{user.email}</span> to confirm
               </span>
               <input
                 type="text"
                 value={deleteConfirmText}
                 onChange={(e) => setDeleteConfirmText(e.target.value)}
                 autoComplete="off"
-                className="mt-1 w-full text-sm bg-white border border-slate-200 rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-red-500/40"
+                className="mt-1 w-full text-sm bg-card border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-red-500/40"
               />
             </label>
             <div className="flex items-center justify-end gap-2 mt-5">
               <button
                 onClick={() => setShowDelete(false)}
                 disabled={actBusy}
-                className="border border-slate-200 text-slate-700 text-sm px-3 py-1.5 rounded-lg hover:bg-slate-50 disabled:opacity-50"
+                className="border border-border text-foreground text-sm px-3 py-1.5 rounded-lg hover:bg-muted disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -601,8 +604,8 @@ export function UserProfile() {
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
-      <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-3">
+    <div className="bg-muted border border-border rounded-xl p-4">
+      <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-3">
         {title}
       </div>
       <div className="space-y-2.5">{children}</div>
@@ -630,7 +633,7 @@ function Field({
   if (editing && !readonly && onChange) {
     return (
       <label className="block">
-        <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+        <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
           {label}
         </span>
         <input
@@ -638,18 +641,18 @@ function Field({
           value={value ?? ''}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          className="mt-1 w-full text-sm bg-white border border-slate-200 rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+          className="mt-1 w-full text-sm bg-card border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
         />
       </label>
     );
   }
   return (
     <div>
-      <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+      <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
         {label}
       </div>
-      <div className="text-sm text-slate-900 mt-0.5">
-        {value || <span className="text-slate-400 italic">Not set</span>}
+      <div className="text-sm text-foreground mt-0.5">
+        {value || <span className="text-muted-foreground italic">Not set</span>}
       </div>
     </div>
   );

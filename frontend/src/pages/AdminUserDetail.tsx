@@ -54,15 +54,19 @@ interface AuditEvent {
 }
 
 const STATUS_PILL: Record<Status, string> = {
-  active: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  inactive: 'bg-slate-100  text-slate-600  border-slate-200',
-  suspended: 'bg-amber-50   text-amber-800  border-amber-200',
-  pending_verification: 'bg-sky-50     text-sky-700    border-sky-200',
-  banned: 'bg-red-50     text-red-700    border-red-200',
+  active:
+    'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30',
+  inactive: 'bg-muted  text-muted-foreground  border-border',
+  suspended:
+    'bg-amber-50 dark:bg-amber-500/15   text-amber-800 dark:text-amber-300  border-amber-200 dark:border-amber-500/30',
+  pending_verification:
+    'bg-sky-50 dark:bg-sky-500/15     text-sky-700 dark:text-sky-300    border-sky-200 dark:border-sky-500/30',
+  banned:
+    'bg-red-50 dark:bg-red-500/15     text-red-700 dark:text-red-300    border-red-200 dark:border-red-500/30',
 };
 const STATUS_DOT: Record<Status, string> = {
   active: 'bg-emerald-500',
-  inactive: 'bg-slate-400',
+  inactive: 'bg-muted-foreground',
   suspended: 'bg-amber-500',
   pending_verification: 'bg-sky-500',
   banned: 'bg-red-500',
@@ -217,7 +221,7 @@ export function AdminUserDetail() {
   if (!user) {
     return (
       <Layout title="Admin · User">
-        <div className="text-sm text-slate-500">User not available.</div>
+        <div className="text-sm text-muted-foreground">User not available.</div>
       </Layout>
     );
   }
@@ -251,12 +255,12 @@ export function AdminUserDetail() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Main column */}
         <div className="lg:col-span-2 space-y-5">
-          <div className="bg-white border border-slate-200 rounded-xl p-5">
+          <div className="bg-card border border-border rounded-xl p-5">
             <div className="flex items-start gap-4">
               <Avatar name={user.full_name} email={user.email} size={56} />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h2 className="text-lg font-semibold text-slate-900 truncate">
+                  <h2 className="text-lg font-semibold text-foreground truncate">
                     {user.full_name ?? user.email}
                   </h2>
                   <span
@@ -269,15 +273,15 @@ export function AdminUserDetail() {
                     {status.replace(/_/g, ' ')}
                   </span>
                 </div>
-                <div className="text-sm text-slate-500 mt-0.5">
-                  <span className="text-[10px] font-semibold uppercase tracking-widest bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded mr-1.5">
+                <div className="text-sm text-muted-foreground mt-0.5">
+                  <span className="text-[10px] font-semibold uppercase tracking-widest bg-muted text-foreground px-1.5 py-0.5 rounded mr-1.5">
                     {ROLE_LABEL[user.role] ?? user.role}
                   </span>
                   {user.email}
                 </div>
                 {user.status_reason && (
-                  <p className="text-xs text-slate-600 mt-2 italic">
-                    Status reason: <span className="text-slate-800">{user.status_reason}</span>
+                  <p className="text-xs text-muted-foreground mt-2 italic">
+                    Status reason: <span className="text-foreground">{user.status_reason}</span>
                   </p>
                 )}
               </div>
@@ -286,7 +290,7 @@ export function AdminUserDetail() {
               </Link>
             </div>
 
-            <dl className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-3 mt-5 pt-5 border-t border-slate-100 text-sm">
+            <dl className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-3 mt-5 pt-5 border-t border-border text-sm">
               <Cell label="Joined" value={new Date(user.created_at).toLocaleDateString()} />
               <Cell
                 label="Last login"
@@ -300,16 +304,16 @@ export function AdminUserDetail() {
                 label="Verification"
                 value={
                   user.must_change_password ? (
-                    <span className="text-amber-700">Pending password</span>
+                    <span className="text-amber-700 dark:text-amber-300">Pending password</span>
                   ) : (
-                    <span className="text-emerald-700">✓ Verified</span>
+                    <span className="text-emerald-700 dark:text-emerald-300">✓ Verified</span>
                   )
                 }
               />
             </dl>
 
             {!isActive && (
-              <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-900">
+              <div className="mt-4 bg-amber-50 dark:bg-amber-500/15 border border-amber-200 dark:border-amber-500/30 rounded-lg px-3 py-2 text-xs text-amber-900">
                 This account is <strong className="capitalize">{status.replace(/_/g, ' ')}</strong>{' '}
                 — sign-in is blocked and existing sessions have been revoked.
               </div>
@@ -318,8 +322,8 @@ export function AdminUserDetail() {
 
           {/* Role-specific context */}
           {user.context?.consultant && (
-            <div className="bg-white border border-slate-200 rounded-xl p-5">
-              <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-3">
+            <div className="bg-card border border-border rounded-xl p-5">
+              <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-3">
                 Consultant
               </div>
               <dl className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3 text-sm">
@@ -340,7 +344,7 @@ export function AdminUserDetail() {
                   {user.context.consultant.skills.map((s: string) => (
                     <span
                       key={s}
-                      className="text-[11px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full"
+                      className="text-[11px] bg-muted text-foreground px-2 py-0.5 rounded-full"
                     >
                       {s}
                     </span>
@@ -350,8 +354,8 @@ export function AdminUserDetail() {
             </div>
           )}
           {user.context?.recruiter && (
-            <div className="bg-white border border-slate-200 rounded-xl p-5">
-              <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-3">
+            <div className="bg-card border border-border rounded-xl p-5">
+              <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-3">
                 Recruiter
               </div>
               <dl className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3 text-sm">
@@ -373,18 +377,18 @@ export function AdminUserDetail() {
           )}
 
           {/* Audit timeline */}
-          <div className="bg-white border border-slate-200 rounded-xl p-5">
+          <div className="bg-card border border-border rounded-xl p-5">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold text-slate-900">Activity</h3>
-              <span className="text-xs text-slate-500">{audit.length} events</span>
+              <h3 className="text-sm font-semibold text-foreground">Activity</h3>
+              <span className="text-xs text-muted-foreground">{audit.length} events</span>
             </div>
             {audit.length === 0 ? (
-              <p className="text-sm italic text-slate-400">No audit events recorded.</p>
+              <p className="text-sm italic text-muted-foreground">No audit events recorded.</p>
             ) : (
-              <ul className="divide-y divide-slate-100">
+              <ul className="divide-y divide-border">
                 {audit.slice(0, 50).map((a) => (
                   <li key={a.id} className="py-2.5 text-sm flex items-start gap-3">
-                    <span className="text-[10px] font-mono text-slate-500 w-32 shrink-0 mt-0.5">
+                    <span className="text-[10px] font-mono text-muted-foreground w-32 shrink-0 mt-0.5">
                       {new Date(a.created_at).toLocaleString([], {
                         month: 'short',
                         day: 'numeric',
@@ -393,14 +397,14 @@ export function AdminUserDetail() {
                       })}
                     </span>
                     <span className="flex-1 min-w-0">
-                      <span className="font-medium text-slate-800">
+                      <span className="font-medium text-foreground">
                         {a.action.replace(/_/g, ' ')}
                       </span>
                       {a.ip_address && (
-                        <span className="text-slate-500 text-xs"> · IP {a.ip_address}</span>
+                        <span className="text-muted-foreground text-xs"> · IP {a.ip_address}</span>
                       )}
                       {a.metadata && Object.keys(a.metadata).length > 0 && (
-                        <pre className="text-[11px] text-slate-500 font-mono mt-0.5 truncate">
+                        <pre className="text-[11px] text-muted-foreground font-mono mt-0.5 truncate">
                           {JSON.stringify(a.metadata)}
                         </pre>
                       )}
@@ -414,8 +418,8 @@ export function AdminUserDetail() {
 
         {/* Sidebar */}
         <div className="space-y-5">
-          <div className="bg-white border border-slate-200 rounded-xl p-5">
-            <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-2">
+          <div className="bg-card border border-border rounded-xl p-5">
+            <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">
               Group
             </div>
             {(() => {
@@ -437,13 +441,13 @@ export function AdminUserDetail() {
                         />
                         {current.name}
                         {current.unique_group_id && (
-                          <span className="text-[10px] text-slate-500 ml-1">
+                          <span className="text-[10px] text-muted-foreground ml-1">
                             ({current.unique_group_id})
                           </span>
                         )}
                       </span>
                     ) : (
-                      <span className="text-[11px] text-slate-400 italic">No Group</span>
+                      <span className="text-[11px] text-muted-foreground italic">No Group</span>
                     )}
                   </div>
                   <SelectInput
@@ -472,8 +476,8 @@ export function AdminUserDetail() {
               );
             })()}
           </div>
-          <div className="bg-white border border-slate-200 rounded-xl p-5">
-            <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-2">
+          <div className="bg-card border border-border rounded-xl p-5">
+            <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">
               Admin notes
             </div>
             <textarea
@@ -481,7 +485,7 @@ export function AdminUserDetail() {
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Internal notes, never shown to the user"
               rows={6}
-              className="w-full text-sm rounded-lg border border-slate-300 hover:border-slate-400 bg-white px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 resize-none"
+              className="w-full text-sm rounded-lg border border-border hover:border-muted-foreground bg-card px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 resize-none"
             />
             <div className="mt-2 flex justify-end">
               <Button size="sm" onClick={saveNotes} loading={savingNotes}>
@@ -490,8 +494,8 @@ export function AdminUserDetail() {
             </div>
           </div>
 
-          <div className="bg-white border border-slate-200 rounded-xl p-5">
-            <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-2">
+          <div className="bg-card border border-border rounded-xl p-5">
+            <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">
               Quick actions
             </div>
             <div className="space-y-2">
@@ -540,7 +544,7 @@ export function AdminUserDetail() {
             ]}
           />
           <label className="block">
-            <span className="block text-xs font-medium text-slate-700 mb-1.5">
+            <span className="block text-xs font-medium text-foreground mb-1.5">
               Reason (optional)
             </span>
             <textarea
@@ -548,7 +552,7 @@ export function AdminUserDetail() {
               value={pendingReason}
               onChange={(e) => setPendingReason(e.target.value)}
               placeholder="Surfaces in the audit log"
-              className="w-full rounded-lg border border-slate-300 hover:border-slate-400 bg-white px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500"
+              className="w-full rounded-lg border border-border hover:border-muted-foreground bg-card px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500"
             />
           </label>
         </div>
@@ -560,10 +564,10 @@ export function AdminUserDetail() {
 function Cell({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div>
-      <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+      <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
         {label}
       </div>
-      <div className="text-sm text-slate-900 mt-0.5">{value}</div>
+      <div className="text-sm text-foreground mt-0.5">{value}</div>
     </div>
   );
 }

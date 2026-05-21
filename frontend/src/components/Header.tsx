@@ -1,4 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
+import { ThemeToggle } from './ui/curtain-theme-toggle';
+import { setTheme } from '../lib/theme';
 
 interface Crumb {
   label: string;
@@ -18,13 +20,13 @@ export function Header({ title, crumbs, onMenuClick }: Props) {
   const resolved: Crumb[] = crumbs ?? defaultCrumbs(loc.pathname, title);
 
   return (
-    <header className="bg-white border-b border-slate-200 px-4 sm:px-6 py-3 flex items-center gap-3 sm:gap-4">
+    <header className="bg-card border-b border-border px-4 sm:px-6 py-3 flex items-center gap-3 sm:gap-4">
       {/* Hamburger — mobile only. Opens the sidebar drawer. */}
       <button
         type="button"
         onClick={onMenuClick}
         aria-label="Open navigation"
-        className="md:hidden -ml-1 w-9 h-9 inline-flex items-center justify-center rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+        className="md:hidden -ml-1 w-9 h-9 inline-flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted"
       >
         <svg
           width="20"
@@ -43,31 +45,35 @@ export function Header({ title, crumbs, onMenuClick }: Props) {
 
       <nav
         aria-label="Breadcrumb"
-        className="flex items-center gap-2 text-sm text-slate-500 min-w-0 flex-1"
+        className="flex items-center gap-2 text-sm text-muted-foreground min-w-0 flex-1"
       >
         {resolved.map((c, i) => (
           <span key={i} className="flex items-center gap-2 min-w-0">
             {c.to ? (
-              <Link to={c.to} className="hover:text-slate-700 truncate">
+              <Link to={c.to} className="hover:text-foreground truncate">
                 {c.label}
               </Link>
             ) : (
               <span
                 className={
-                  i === resolved.length - 1 ? 'text-slate-900 font-medium truncate' : 'truncate'
+                  i === resolved.length - 1 ? 'text-foreground font-medium truncate' : 'truncate'
                 }
               >
                 {c.label}
               </span>
             )}
-            {i < resolved.length - 1 && <span className="text-slate-300 hidden sm:inline">›</span>}
+            {i < resolved.length - 1 && (
+              <span className="text-muted-foreground opacity-50 hidden sm:inline">›</span>
+            )}
           </span>
         ))}
       </nav>
 
-      {/* Header right-side actions intentionally left empty for now. The
-          previous disabled search + bell icons looked like broken UI; they'll
-          come back once search and notifications actually land. */}
+      {/* Light / dark theme switcher — the curtain toggle drives the global
+          `.dark` class; we persist the choice via setTheme. */}
+      <div className="flex items-center shrink-0">
+        <ThemeToggle variant="icon" buttonSize={32} onThemeChange={setTheme} />
+      </div>
     </header>
   );
 }

@@ -23,14 +23,14 @@ export function EmptyState({ icon, title, description, action, compact, classNam
     <div
       className={clsx(
         'flex flex-col items-center justify-center text-center',
-        compact ? 'py-8 px-4' : 'py-14 px-6 bg-white border border-slate-200 rounded-xl',
+        compact ? 'py-8 px-4' : 'py-14 px-6 bg-card border border-border rounded-xl',
         className,
       )}
     >
       {icon && (
         <div
           className={clsx(
-            'mb-3 inline-flex items-center justify-center rounded-full bg-slate-100 text-slate-500',
+            'mb-3 inline-flex items-center justify-center rounded-full bg-muted text-muted-foreground',
             compact ? 'w-10 h-10 text-lg' : 'w-14 h-14 text-2xl',
           )}
           aria-hidden="true"
@@ -38,11 +38,11 @@ export function EmptyState({ icon, title, description, action, compact, classNam
           {icon}
         </div>
       )}
-      <h3 className={clsx('font-semibold text-slate-900', compact ? 'text-sm' : 'text-base')}>
+      <h3 className={clsx('font-semibold text-foreground', compact ? 'text-sm' : 'text-base')}>
         {title}
       </h3>
       {description && (
-        <p className={clsx('text-slate-500 mt-1 max-w-sm', compact ? 'text-xs' : 'text-sm')}>
+        <p className={clsx('text-muted-foreground mt-1 max-w-sm', compact ? 'text-xs' : 'text-sm')}>
           {description}
         </p>
       )}

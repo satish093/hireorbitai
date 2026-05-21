@@ -77,7 +77,7 @@ export function RecruiterDashboard() {
         </div>
       )}
 
-      <h2 className="text-sm font-semibold text-slate-900 mb-2">My consultants</h2>
+      <h2 className="text-sm font-semibold text-foreground mb-2">My consultants</h2>
       <DataTable
         loading={loading}
         empty="No consultants assigned yet."

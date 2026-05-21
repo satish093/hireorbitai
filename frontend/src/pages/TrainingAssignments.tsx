@@ -41,7 +41,7 @@ export function TrainingAssignments() {
         <select
           value={status}
           onChange={(e) => setStatus(e.target.value)}
-          className="text-sm border border-slate-200 rounded-md px-2 py-1.5"
+          className="text-sm border border-border rounded-md px-2 py-1.5"
         >
           <option value="">All statuses</option>
           {[

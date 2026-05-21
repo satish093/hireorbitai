@@ -9,10 +9,7 @@
       accessibility while preventing iOS's auto-zoom on inputs <16px (CSS in
       index.css handles that separately).
     -->
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
-    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="theme-color" content="#4338ca" />
     <!--
@@ -29,8 +26,25 @@
       name="description"
       content="HireOrbit AI — AI-powered consultant marketing and recruiting platform"
     />
+    <!--
+      Apply the saved (or OS-preferred) theme before first paint so there's no
+      flash of the wrong theme. Mirrors src/lib/theme.ts resolveInitialTheme().
+    -->
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem('hireorbitai:theme');
+          if (!t)
+            t =
+              window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+                ? 'dark'
+                : 'light';
+          if (t === 'dark') document.documentElement.classList.add('dark');
+        } catch (e) {}
+      })();
+    </script>
   </head>
-  <body class="bg-slate-50 text-slate-900">
+  <body class="bg-background text-foreground">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

@@ -317,7 +317,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps = {}
       )}
       <aside
         className={clsx(
-          'w-60 shrink-0 bg-white border-r border-slate-200 flex flex-col',
+          'w-60 shrink-0 bg-card border-r border-border flex flex-col',
           // Desktop: static column inside the flex shell.
           'md:static md:min-h-dvh md:translate-x-0',
           // Mobile: fixed slide-over with a translate transition. Uses dvh so
@@ -328,14 +328,14 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps = {}
         aria-label="Primary navigation"
       >
         {/* Brand */}
-        <div className="px-4 py-4 border-b border-slate-100 flex items-center justify-between">
+        <div className="px-4 py-4 border-b border-border flex items-center justify-between">
           <Brand size="md" />
           {/* Close button on mobile only — desktop uses the inline sidebar. */}
           <button
             type="button"
             onClick={onMobileClose}
             aria-label="Close navigation"
-            className="md:hidden -mr-1 w-8 h-8 inline-flex items-center justify-center rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+            className="md:hidden -mr-1 w-8 h-8 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted"
           >
             ✕
           </button>
@@ -352,7 +352,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps = {}
             if (visible.length === 0) return null;
             return (
               <div key={section.heading}>
-                <div className="px-2 mb-1.5 text-[10px] font-semibold tracking-widest text-slate-400 uppercase">
+                <div className="px-2 mb-1.5 text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">
                   {section.heading}
                 </div>
                 <div className="space-y-0.5">
@@ -369,7 +369,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps = {}
                             'group relative flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-sm transition-all duration-200 ease-out',
                             isActive
                               ? 'bg-brand-50 text-brand-700 font-medium'
-                              : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900 hover:translate-x-0.5',
+                              : 'text-foreground hover:bg-muted hover:text-foreground hover:translate-x-0.5',
                           )
                         }
                       >
@@ -391,7 +391,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps = {}
                                 'shrink-0 transition-colors',
                                 isActive
                                   ? 'text-brand-600'
-                                  : 'text-slate-500 group-hover:text-slate-700',
+                                  : 'text-muted-foreground group-hover:text-foreground',
                               )}
                             />
                             <span className="flex-1 truncate">{i.label}</span>
@@ -400,9 +400,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps = {}
                                 key={badge}
                                 className={clsx(
                                   'text-[10px] font-semibold px-1.5 py-0.5 rounded-full tabular-nums animate-pop',
-                                  isActive
-                                    ? 'bg-brand-600 text-white'
-                                    : 'bg-slate-200 text-slate-700',
+                                  isActive ? 'bg-brand-600 text-white' : 'bg-muted text-foreground',
                                 )}
                               >
                                 {badge}
@@ -420,27 +418,27 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps = {}
         </nav>
 
         {/* User card pinned to bottom */}
-        <div className="border-t border-slate-100 p-3">
-          <div className="flex items-center gap-2.5 px-1.5 py-1.5 rounded-md hover:bg-slate-50">
+        <div className="border-t border-border p-3">
+          <div className="flex items-center gap-2.5 px-1.5 py-1.5 rounded-md hover:bg-muted">
             <NavLink
               to={profile?.id ? `/users/${profile.id}` : '#'}
               data-tour="nav-profile"
-              className="flex items-center gap-2.5 flex-1 min-w-0 hover:bg-slate-50 rounded-md -mx-1 px-1 py-0.5"
+              className="flex items-center gap-2.5 flex-1 min-w-0 hover:bg-muted rounded-md -mx-1 px-1 py-0.5"
               title="View your profile"
             >
               <div className="relative">
-                <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-semibold">
+                <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 flex items-center justify-center text-xs font-semibold">
                   {initials(profile?.full_name, profile?.email)}
                 </div>
-                <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-white rounded-full">
+                <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-card rounded-full">
                   <span className="absolute inset-0 rounded-full bg-emerald-500 animate-ping opacity-60" />
                 </span>
               </div>
               <div className="flex-1 min-w-0 leading-tight">
-                <div className="text-[13px] font-medium text-slate-900 truncate">
+                <div className="text-[13px] font-medium text-foreground truncate">
                   {profile?.full_name ?? profile?.email}
                 </div>
-                <div className="text-[10px] uppercase tracking-wider text-slate-500">
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
                   {role && ROLE_LABEL[role]}
                 </div>
               </div>
@@ -448,7 +446,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps = {}
             <button
               onClick={signOut}
               title="Sign out"
-              className="text-slate-400 hover:text-slate-700 p-1.5 rounded-md hover:bg-slate-100 transition-colors"
+              className="text-muted-foreground hover:text-foreground p-1.5 rounded-md hover:bg-muted transition-colors"
             >
               <IconLogOut size={16} />
             </button>

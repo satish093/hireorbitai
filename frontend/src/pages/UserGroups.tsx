@@ -131,10 +131,10 @@ export function UserGroups() {
       title="User groups"
       crumbs={[{ label: 'Workspace', to: '/dashboard' }, { label: 'Admin' }, { label: 'Groups' }]}
     >
-      <h1 className="text-2xl font-semibold tracking-tight text-slate-900 mb-5">User groups</h1>
+      <h1 className="text-2xl font-semibold tracking-tight text-foreground mb-5">User groups</h1>
 
       {/* Create */}
-      <div className="bg-white border border-slate-200 rounded-xl p-4 mb-6 flex items-center gap-2 flex-wrap">
+      <div className="bg-card border border-border rounded-xl p-4 mb-6 flex items-center gap-2 flex-wrap">
         <input
           value={name}
           onChange={(e) => {
@@ -143,7 +143,7 @@ export function UserGroups() {
             if (!slugEdited) setSlug(toSlug(v));
           }}
           placeholder="Group name (e.g. Cloudfen)"
-          className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm flex-1 min-w-[200px]"
+          className="border border-border rounded-lg px-3 py-1.5 text-sm flex-1 min-w-[200px]"
         />
         <input
           value={slug}
@@ -152,11 +152,11 @@ export function UserGroups() {
             setSlugEdited(true);
           }}
           placeholder="slug"
-          className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm font-mono"
+          className="border border-border rounded-lg px-3 py-1.5 text-sm font-mono"
         />
         <button
           onClick={create}
-          className="bg-slate-900 text-white text-sm px-4 py-1.5 rounded-lg hover:bg-slate-800"
+          className="bg-foreground text-background text-sm px-4 py-1.5 rounded-lg hover:opacity-90"
         >
           + Create group
         </button>
@@ -165,7 +165,7 @@ export function UserGroups() {
       {loading ? (
         <SkeletonCard lines={5} />
       ) : groups.length === 0 ? (
-        <div className="bg-white border border-slate-200 rounded-xl p-10 text-center text-slate-500">
+        <div className="bg-card border border-border rounded-xl p-10 text-center text-muted-foreground">
           No groups yet. Apply{' '}
           <span className="font-mono text-xs">database/user-groups-and-presence.sql</span> to seed
           Cloudfen / Zangle IT / Xeronix / Okta Solutions.
@@ -176,36 +176,33 @@ export function UserGroups() {
             const members = users.filter((u) => u.group_id === g.id);
             const candidates = users.filter((u) => u.group_id !== g.id);
             return (
-              <div
-                key={g.id}
-                className="bg-white border border-slate-200 rounded-xl overflow-hidden"
-              >
-                <div className="px-5 py-3 border-b border-slate-100 flex items-center gap-3">
+              <div key={g.id} className="bg-card border border-border rounded-xl overflow-hidden">
+                <div className="px-5 py-3 border-b border-border flex items-center gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <h3 className="text-sm font-semibold text-slate-900">{g.name}</h3>
-                      <span className="text-[10px] font-mono text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                      <h3 className="text-sm font-semibold text-foreground">{g.name}</h3>
+                      <span className="text-[10px] font-mono text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
                         {g.slug}
                       </span>
                       {!g.is_active && (
-                        <span className="text-[10px] uppercase tracking-widest text-amber-600">
+                        <span className="text-[10px] uppercase tracking-widest text-amber-600 dark:text-amber-400">
                           paused
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-muted-foreground">
                       {g.member_count} member{g.member_count === 1 ? '' : 's'}
                     </p>
                   </div>
                   <button
                     onClick={() => toggle(g)}
-                    className="text-xs text-slate-500 hover:text-slate-900 px-2"
+                    className="text-xs text-muted-foreground hover:text-foreground px-2"
                   >
                     {g.is_active ? 'Pause' : 'Resume'}
                   </button>
                   <button
                     onClick={() => remove(g)}
-                    className="text-xs text-red-600 hover:underline px-2"
+                    className="text-xs text-red-600 dark:text-red-400 hover:underline px-2"
                   >
                     Delete
                   </button>
@@ -213,12 +210,12 @@ export function UserGroups() {
 
                 <div className="px-5 py-3 max-h-64 overflow-y-auto">
                   {members.length === 0 ? (
-                    <p className="text-xs italic text-slate-400 mb-2">No members yet.</p>
+                    <p className="text-xs italic text-muted-foreground mb-2">No members yet.</p>
                   ) : (
                     <ul className="space-y-1.5 mb-3">
                       {members.map((u) => (
                         <li key={u.id} className="flex items-center justify-between text-sm">
-                          <span className="text-slate-800 truncate">{u.full_name ?? u.email}</span>
+                          <span className="text-foreground truncate">{u.full_name ?? u.email}</span>
                           <button
                             onClick={() => assign(u.id, null)}
                             className="text-[11px] text-red-500 hover:underline"
@@ -230,21 +227,23 @@ export function UserGroups() {
                     </ul>
                   )}
                   <details>
-                    <summary className="text-xs text-slate-500 cursor-pointer hover:text-slate-900">
+                    <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
                       + Add member
                     </summary>
-                    <div className="mt-2 max-h-44 overflow-y-auto border border-slate-100 rounded">
+                    <div className="mt-2 max-h-44 overflow-y-auto border border-border rounded">
                       {candidates.length === 0 ? (
-                        <p className="text-xs italic text-slate-400 p-2">No more users to add.</p>
+                        <p className="text-xs italic text-muted-foreground p-2">
+                          No more users to add.
+                        </p>
                       ) : (
                         candidates.map((u) => (
                           <button
                             key={u.id}
                             onClick={() => assign(u.id, g.id)}
-                            className="w-full text-left text-sm px-2 py-1.5 hover:bg-slate-50 flex items-center justify-between"
+                            className="w-full text-left text-sm px-2 py-1.5 hover:bg-muted flex items-center justify-between"
                           >
                             <span className="truncate">{u.full_name ?? u.email}</span>
-                            <span className="text-[10px] uppercase tracking-wider text-slate-400">
+                            <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
                               {u.role}
                             </span>
                           </button>

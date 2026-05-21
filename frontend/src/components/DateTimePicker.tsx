@@ -92,7 +92,7 @@ export function DateTimePicker({ label, value, onChange, required, hint, hidePre
   return (
     <div className="space-y-1.5" ref={wrapRef}>
       {label && (
-        <label className="text-sm font-medium text-slate-700">
+        <label className="text-sm font-medium text-foreground">
           {label}
           {required && <span className="text-rose-500 ml-0.5">*</span>}
         </label>
@@ -103,14 +103,14 @@ export function DateTimePicker({ label, value, onChange, required, hint, hidePre
         <div className="relative flex-1 min-w-0">
           <IconCalendar
             size={15}
-            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
           />
           <input
             type="date"
             value={date}
             onChange={(e) => onChange(combine(e.target.value, time))}
             required={required}
-            className="w-full text-sm bg-white border border-slate-200 rounded-lg pl-8 pr-2 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500/50"
+            className="w-full text-sm bg-card border border-border rounded-lg pl-8 pr-2 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500/50"
           />
         </div>
 
@@ -119,16 +119,16 @@ export function DateTimePicker({ label, value, onChange, required, hint, hidePre
           <button
             type="button"
             onClick={() => setTimeOpen((v) => !v)}
-            className="text-sm bg-white border border-slate-200 rounded-lg pl-8 pr-3 py-2 min-w-[120px] text-left hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-brand-500/40 relative"
+            className="text-sm bg-card border border-border rounded-lg pl-8 pr-3 py-2 min-w-[120px] text-left hover:bg-muted focus:outline-none focus:ring-2 focus:ring-brand-500/40 relative"
           >
             <IconReminder
               size={15}
-              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400"
+              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
             />
             <span className="tabular-nums">{pretty12hr(time)}</span>
           </button>
           {timeOpen && (
-            <div className="absolute right-0 mt-1 z-30 bg-white border border-slate-200 rounded-xl shadow-lg w-44 max-h-72 overflow-y-auto py-1.5">
+            <div className="absolute right-0 mt-1 z-30 bg-card border border-border rounded-xl shadow-lg w-44 max-h-72 overflow-y-auto py-1.5">
               {QUARTER_HOURS.map((t) => (
                 <button
                   key={t}
@@ -166,7 +166,7 @@ export function DateTimePicker({ label, value, onChange, required, hint, hidePre
         </div>
       )}
 
-      {hint && <p className="text-xs text-slate-500">{hint}</p>}
+      {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
     </div>
   );
 }
@@ -176,7 +176,7 @@ function Preset({ label, onClick }: { label: string; onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 hover:bg-brand-50 hover:text-brand-700 border border-slate-200"
+      className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-muted text-foreground hover:bg-brand-50 hover:text-brand-700 border border-border"
     >
       {label}
     </button>

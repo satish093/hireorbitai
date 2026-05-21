@@ -106,7 +106,7 @@ export function GroupBadge({ groupId, compact, hideEmpty, className }: GroupBadg
   if (!groupId) {
     if (hideEmpty) return null;
     return (
-      <span className={`text-[11px] text-slate-400 italic ${className ?? ''}`.trim()}>
+      <span className={`text-[11px] text-muted-foreground italic ${className ?? ''}`.trim()}>
         No Group
       </span>
     );
@@ -115,7 +115,7 @@ export function GroupBadge({ groupId, compact, hideEmpty, className }: GroupBadg
   if (!g) {
     // Cache hasn't loaded yet OR group was deleted while still referenced.
     if (hideEmpty) return null;
-    return <span className={`text-[11px] text-slate-400 ${className ?? ''}`.trim()}>—</span>;
+    return <span className={`text-[11px] text-muted-foreground ${className ?? ''}`.trim()}>—</span>;
   }
   const color = g.color ?? '#6366F1';
   if (compact) {

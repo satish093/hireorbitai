@@ -208,37 +208,43 @@ export function LessonViewer() {
       ]}
     >
       {/* =================== PLAN HEADER =================== */}
-      <section className="bg-white border border-slate-200 rounded-2xl p-6 mb-5">
+      <section className="bg-card border border-border rounded-2xl p-6 mb-5">
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-[10px] font-semibold uppercase tracking-widest text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/30 px-2 py-0.5 rounded-full">
                 I-983 training plan
               </span>
               <TrainingStatusBadge status={assignment.status} />
               {typeof course.weekly_hours === 'number' && (
-                <span className="text-[10px] text-slate-500">· ~{course.weekly_hours} h/week</span>
+                <span className="text-[10px] text-muted-foreground">
+                  · ~{course.weekly_hours} h/week
+                </span>
               )}
               {assignment.due_date && (
-                <span className="text-[10px] text-slate-500">· due {assignment.due_date}</span>
+                <span className="text-[10px] text-muted-foreground">
+                  · due {assignment.due_date}
+                </span>
               )}
             </div>
             <h1 className="text-2xl font-semibold tracking-tight">{course.title}</h1>
             {course.stem_relevance && (
-              <p className="text-sm text-slate-600 mt-1.5 max-w-3xl">{course.stem_relevance}</p>
+              <p className="text-sm text-muted-foreground mt-1.5 max-w-3xl">
+                {course.stem_relevance}
+              </p>
             )}
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <Link
               to={`/training/assignments/${id}/plan`}
-              className="border border-emerald-200 bg-emerald-50 text-emerald-800 text-xs px-3 py-1.5 rounded-lg hover:bg-emerald-100"
+              className="border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 text-xs px-3 py-1.5 rounded-lg hover:bg-emerald-100"
             >
               View I-983 plan
             </Link>
             {isManager && (
               <button
                 onClick={() => setFeedbackOpen(true)}
-                className="text-xs border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg hover:bg-slate-50"
+                className="text-xs border border-border text-foreground px-3 py-1.5 rounded-lg hover:bg-muted"
               >
                 + Feedback
               </button>
@@ -250,39 +256,39 @@ export function LessonViewer() {
         <div className="grid md:grid-cols-3 gap-4 mt-5">
           <Stat label="Overall progress">
             <TrainingProgressBar value={assignment.progress_percentage} />
-            <div className="text-[11px] text-slate-500 mt-1">
+            <div className="text-[11px] text-muted-foreground mt-1">
               {Math.round(assignment.progress_percentage)}% complete · {lessons.length} lessons
             </div>
           </Stat>
           <Stat label="Schedule">
-            <div className="text-sm text-slate-900">
+            <div className="text-sm text-foreground">
               {start ? (
                 start.toLocaleDateString()
               ) : (
-                <span className="italic text-slate-400">Start date not set</span>
+                <span className="italic text-muted-foreground">Start date not set</span>
               )}
               {' → '}
               {end ? (
                 end.toLocaleDateString()
               ) : (
-                <span className="italic text-slate-400">end not set</span>
+                <span className="italic text-muted-foreground">end not set</span>
               )}
             </div>
             {weeksTotal != null && (
-              <div className="text-[11px] text-slate-500 mt-1">
+              <div className="text-[11px] text-muted-foreground mt-1">
                 Week {Math.max(1, weeksDone ?? 0)} of {weeksTotal}
               </div>
             )}
           </Stat>
           <Stat label="Evaluations">
-            <div className="text-sm text-slate-900 space-y-0.5">
+            <div className="text-sm text-foreground space-y-0.5">
               <div className="flex items-center gap-2">
                 <Tick on={has12Mo} />
                 <span>12-month self-evaluation</span>
                 {due12 && !has12Mo && (
                   <Link
                     to={`/training/assignments/${id}/plan`}
-                    className="text-[11px] text-rose-700 underline"
+                    className="text-[11px] text-rose-700 dark:text-rose-300 underline"
                   >
                     due
                   </Link>
@@ -298,13 +304,13 @@ export function LessonViewer() {
 
         {/* Objectives + assessment methods — the I-983 Section 5 contract */}
         {(course.learning_objectives?.length || course.assessment_methods?.length) && (
-          <div className="grid md:grid-cols-2 gap-5 mt-5 pt-5 border-t border-slate-100">
+          <div className="grid md:grid-cols-2 gap-5 mt-5 pt-5 border-t border-border">
             {course.learning_objectives?.length ? (
               <div>
-                <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-1.5">
+                <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1.5">
                   What you'll learn
                 </div>
-                <ul className="list-disc list-outside pl-5 space-y-1 text-sm text-slate-700">
+                <ul className="list-disc list-outside pl-5 space-y-1 text-sm text-foreground">
                   {course.learning_objectives.map((o: string) => (
                     <li key={o}>{o}</li>
                   ))}
@@ -313,10 +319,10 @@ export function LessonViewer() {
             ) : null}
             {course.assessment_methods?.length ? (
               <div>
-                <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-1.5">
+                <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1.5">
                   How you'll be assessed
                 </div>
-                <ul className="list-disc list-outside pl-5 space-y-1 text-sm text-slate-700">
+                <ul className="list-disc list-outside pl-5 space-y-1 text-sm text-foreground">
                   {course.assessment_methods.map((m: string) => (
                     <li key={m}>{m}</li>
                   ))}
@@ -330,8 +336,8 @@ export function LessonViewer() {
       {/* =================== CURRICULUM =================== */}
       <div className="grid grid-cols-1 lg:grid-cols-[300px,1fr] gap-5">
         <aside className="space-y-3">
-          <div className="bg-white border border-slate-200 rounded-xl p-3">
-            <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-2">
+          <div className="bg-card border border-border rounded-xl p-3">
+            <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">
               Curriculum
             </div>
             <div className="space-y-1.5">
@@ -354,7 +360,7 @@ export function LessonViewer() {
             {course.quizzes?.length > 0 && (
               <button
                 onClick={() => nav(`/training/assignments/${id}/quiz`)}
-                className="mt-3 w-full bg-slate-900 text-white text-sm px-3 py-2 rounded-lg hover:bg-slate-800"
+                className="mt-3 w-full bg-foreground text-background text-sm px-3 py-2 rounded-lg hover:opacity-90"
               >
                 Take quiz ({course.quizzes.length} Q)
               </button>
@@ -363,15 +369,15 @@ export function LessonViewer() {
 
           {/* Skills you'll be picking up. Mirrors I-983 Section 6 on a small card. */}
           {course.skills_taught?.length ? (
-            <div className="bg-white border border-slate-200 rounded-xl p-3">
-              <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-2">
+            <div className="bg-card border border-border rounded-xl p-3">
+              <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">
                 Skills
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {course.skills_taught.map((s: string) => (
                   <span
                     key={s}
-                    className="text-[11px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full"
+                    className="text-[11px] bg-muted text-foreground px-2 py-0.5 rounded-full"
                   >
                     {s}
                   </span>
@@ -384,18 +390,18 @@ export function LessonViewer() {
         {/* =================== ACTIVE LESSON =================== */}
         <main>
           {!activeLesson && (
-            <p className="text-sm text-slate-500">Pick a lesson on the left to begin.</p>
+            <p className="text-sm text-muted-foreground">Pick a lesson on the left to begin.</p>
           )}
           {activeLesson && (
-            <article className="bg-white border border-slate-200 rounded-2xl p-6">
-              <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+            <article className="bg-card border border-border rounded-2xl p-6">
+              <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
                 Lesson {activeIdx + 1} of {lessons.length}
                 {typeof activeLesson.estimated_minutes === 'number' &&
                   ` · ${activeLesson.estimated_minutes} min`}
               </div>
               <h2 className="text-xl font-semibold tracking-tight mt-1">{activeLesson.title}</h2>
               {activeLesson.description && (
-                <p className="text-slate-600 mt-1">{activeLesson.description}</p>
+                <p className="text-muted-foreground mt-1">{activeLesson.description}</p>
               )}
 
               {activeLesson.video_url && (
@@ -404,13 +410,13 @@ export function LessonViewer() {
                 </div>
               )}
               {activeLesson.content && (
-                <div className="mt-4 max-w-none text-slate-700">
+                <div className="mt-4 max-w-none text-foreground">
                   <LessonBody text={activeLesson.content} />
                 </div>
               )}
               {activeLesson.practical_example && (
-                <div className="mt-4 border border-slate-100 rounded-xl bg-slate-50 p-4">
-                  <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-1.5">
+                <div className="mt-4 border border-border rounded-xl bg-muted p-4">
+                  <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1.5">
                     Worked example
                   </div>
                   <LessonBody text={activeLesson.practical_example} />
@@ -418,20 +424,20 @@ export function LessonViewer() {
               )}
               {Array.isArray(activeLesson.exercises) && activeLesson.exercises.length > 0 && (
                 <div className="mt-4">
-                  <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-2">
+                  <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">
                     Exercises
                   </div>
                   <div className="space-y-2">
                     {activeLesson.exercises.map((ex: any, i: number) => (
-                      <div key={i} className="border border-slate-200 rounded-lg p-3">
-                        <div className="text-sm font-medium text-slate-900">{ex.prompt}</div>
+                      <div key={i} className="border border-border rounded-lg p-3">
+                        <div className="text-sm font-medium text-foreground">{ex.prompt}</div>
                         {ex.expected_outcome && (
-                          <div className="text-xs text-slate-500 mt-1">
+                          <div className="text-xs text-muted-foreground mt-1">
                             <span className="font-semibold">Goal:</span> {ex.expected_outcome}
                           </div>
                         )}
                         {Array.isArray(ex.hints) && ex.hints.length > 0 && (
-                          <ul className="mt-1 text-xs text-slate-500 list-disc list-inside">
+                          <ul className="mt-1 text-xs text-muted-foreground list-disc list-inside">
                             {ex.hints.map((h: string, j: number) => (
                               <li key={j}>{h}</li>
                             ))}
@@ -444,11 +450,11 @@ export function LessonViewer() {
               )}
               {Array.isArray(activeLesson.key_takeaways) &&
                 activeLesson.key_takeaways.length > 0 && (
-                  <div className="mt-4 border border-emerald-100 bg-emerald-50/60 rounded-xl p-4">
-                    <div className="text-[10px] font-semibold uppercase tracking-widest text-emerald-700 mb-1.5">
+                  <div className="mt-4 border border-emerald-100 dark:border-emerald-500/20 bg-emerald-50/60 rounded-xl p-4">
+                    <div className="text-[10px] font-semibold uppercase tracking-widest text-emerald-700 dark:text-emerald-300 mb-1.5">
                       Key takeaways
                     </div>
-                    <ul className="list-disc list-outside pl-5 space-y-1 text-sm text-slate-700">
+                    <ul className="list-disc list-outside pl-5 space-y-1 text-sm text-foreground">
                       {activeLesson.key_takeaways.map((k: string, i: number) => (
                         <li key={i}>{k}</li>
                       ))}
@@ -473,13 +479,13 @@ export function LessonViewer() {
                 </div>
               )}
 
-              <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between flex-wrap gap-2">
+              <div className="mt-6 pt-4 border-t border-border flex items-center justify-between flex-wrap gap-2">
                 <button
                   onClick={() => toggle(activeLesson)}
                   className={`text-sm font-semibold px-4 py-2 rounded-lg ${
                     progressById.get(activeLesson.id)?.completed
-                      ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
-                      : 'bg-slate-900 text-white hover:bg-slate-800'
+                      ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30'
+                      : 'bg-foreground text-background hover:opacity-90'
                   }`}
                 >
                   {progressById.get(activeLesson.id)?.completed ? '✓ Completed' : 'Mark complete'}
@@ -488,14 +494,14 @@ export function LessonViewer() {
                   <button
                     disabled={activeIdx <= 0}
                     onClick={() => setActiveLessonId(lessons[activeIdx - 1]?.id ?? null)}
-                    className="text-xs border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-white"
+                    className="text-xs border border-border text-foreground px-3 py-1.5 rounded-lg hover:bg-muted disabled:opacity-40 disabled:hover:bg-card"
                   >
                     ← Previous
                   </button>
                   <button
                     disabled={activeIdx >= lessons.length - 1}
                     onClick={() => setActiveLessonId(lessons[activeIdx + 1]?.id ?? null)}
-                    className="text-xs border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-white"
+                    className="text-xs border border-border text-foreground px-3 py-1.5 rounded-lg hover:bg-muted disabled:opacity-40 disabled:hover:bg-card"
                   >
                     Next →
                   </button>
@@ -515,14 +521,14 @@ export function LessonViewer() {
                 {course.quizzes?.length > 0 && (
                   <button
                     onClick={() => nav(`/training/assignments/${id}/quiz`)}
-                    className="text-xs border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg hover:bg-slate-50"
+                    className="text-xs border border-border text-foreground px-3 py-1.5 rounded-lg hover:bg-muted"
                   >
                     Take quiz
                   </button>
                 )}
                 <Link
                   to={`/training/assignments/${id}/plan`}
-                  className="text-xs border border-emerald-200 bg-emerald-50 text-emerald-800 px-3 py-1.5 rounded-lg hover:bg-emerald-100"
+                  className="text-xs border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 px-3 py-1.5 rounded-lg hover:bg-emerald-100"
                 >
                   I-983 plan + evaluation
                 </Link>
@@ -562,8 +568,8 @@ export function LessonViewer() {
 // ===========================================================================
 function Stat({ label, children }: { label: string; children: any }) {
   return (
-    <div className="bg-slate-50 border border-slate-100 rounded-xl px-4 py-3">
-      <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-1.5">
+    <div className="bg-muted border border-border rounded-xl px-4 py-3">
+      <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1.5">
         {label}
       </div>
       {children}
@@ -573,7 +579,7 @@ function Stat({ label, children }: { label: string; children: any }) {
 function Tick({ on }: { on: boolean }) {
   return (
     <span
-      className={`inline-flex w-4 h-4 rounded-full items-center justify-center text-[10px] font-bold ${on ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-400'}`}
+      className={`inline-flex w-4 h-4 rounded-full items-center justify-center text-[10px] font-bold ${on ? 'bg-emerald-500 text-white' : 'bg-muted text-muted-foreground'}`}
     >
       {on ? '✓' : '—'}
     </span>
@@ -645,7 +651,7 @@ function LessonBody({ text }: { text: string }) {
           return (
             <h3
               key={i}
-              className="text-[11px] font-semibold tracking-widest uppercase text-slate-500 mt-4"
+              className="text-[11px] font-semibold tracking-widest uppercase text-muted-foreground mt-4"
             >
               {b.lines[0]}
             </h3>
@@ -690,14 +696,14 @@ function inlineMd(text: string) {
   return parts.map((p, i) => {
     if (/^\*\*[^*]+\*\*$/.test(p)) {
       return (
-        <strong key={i} className="font-semibold text-slate-900">
+        <strong key={i} className="font-semibold text-foreground">
           {p.slice(2, -2)}
         </strong>
       );
     }
     if (/^`[^`]+`$/.test(p)) {
       return (
-        <code key={i} className="text-[0.85em] bg-slate-100 text-slate-800 rounded px-1 py-0.5">
+        <code key={i} className="text-[0.85em] bg-muted text-foreground rounded px-1 py-0.5">
           {p.slice(1, -1)}
         </code>
       );

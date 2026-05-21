@@ -37,7 +37,7 @@ export function ProtectedRoute({ children, allow, bypassOnboarding, bypassPasswo
 
   if (loading) {
     return (
-      <div className="min-h-dvh flex items-center justify-center text-slate-400 text-sm">
+      <div className="min-h-dvh flex items-center justify-center text-muted-foreground text-sm">
         Loading…
       </div>
     );

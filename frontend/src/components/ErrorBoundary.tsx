@@ -40,24 +40,24 @@ export class ErrorBoundary extends Component<Props, State> {
     if (this.props.fallback) return this.props.fallback(error, this.reset);
 
     return (
-      <div className="min-h-dvh bg-slate-50 flex items-center justify-center p-6">
-        <div className="max-w-md w-full bg-white border border-slate-200 rounded-2xl shadow-sm p-7 text-center animate-fade-in-up">
-          <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center text-red-600 text-2xl mx-auto mb-3">
+      <div className="min-h-dvh bg-muted flex items-center justify-center p-6">
+        <div className="max-w-md w-full bg-card border border-border rounded-2xl shadow-sm p-7 text-center animate-fade-in-up">
+          <div className="w-12 h-12 rounded-full bg-red-50 dark:bg-red-500/15 flex items-center justify-center text-red-600 dark:text-red-400 text-2xl mx-auto mb-3">
             ⚠
           </div>
-          <h1 className="text-lg font-semibold tracking-tight text-slate-900">
+          <h1 className="text-lg font-semibold tracking-tight text-foreground">
             Something went wrong
           </h1>
-          <p className="text-sm text-slate-600 mt-1">
+          <p className="text-sm text-muted-foreground mt-1">
             The app hit an unexpected error and stopped rendering this view.
           </p>
-          <pre className="mt-3 text-[11px] text-left text-red-700 bg-red-50 border border-red-100 rounded-lg px-3 py-2 overflow-x-auto max-h-32">
+          <pre className="mt-3 text-[11px] text-left text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-500/15 border border-red-100 dark:border-red-500/20 rounded-lg px-3 py-2 overflow-x-auto max-h-32">
             {error.message}
           </pre>
           <div className="mt-4 flex items-center justify-center gap-2">
             <button
               onClick={this.reset}
-              className="bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium px-4 py-2 rounded-lg press"
+              className="bg-foreground hover:opacity-90 text-background text-sm font-medium px-4 py-2 rounded-lg press"
             >
               Try again
             </button>
@@ -65,7 +65,7 @@ export class ErrorBoundary extends Component<Props, State> {
               onClick={() => {
                 window.location.href = '/';
               }}
-              className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-sm font-medium px-4 py-2 rounded-lg press"
+              className="bg-card border border-border hover:bg-muted text-foreground text-sm font-medium px-4 py-2 rounded-lg press"
             >
               Go home
             </button>

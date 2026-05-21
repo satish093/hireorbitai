@@ -115,17 +115,17 @@ export function Recruiters() {
               r.user?.id ? (
                 <Link
                   to={`/users/${r.user.id}`}
-                  className="inline-flex items-center gap-2 hover:bg-slate-50 rounded-md -mx-1 px-1 py-0.5"
+                  className="inline-flex items-center gap-2 hover:bg-muted rounded-md -mx-1 px-1 py-0.5"
                 >
                   <Avatar name={r.user?.full_name} email={r.user?.email} size={26} />
-                  <div className="text-sm font-medium text-slate-900 hover:underline">
+                  <div className="text-sm font-medium text-foreground hover:underline">
                     {r.user?.full_name ?? r.user?.email ?? '—'}
                   </div>
                 </Link>
               ) : (
                 <div className="inline-flex items-center gap-2">
                   <Avatar name={r.user?.full_name} email={r.user?.email} size={26} />
-                  <div className="text-sm font-medium text-slate-900">
+                  <div className="text-sm font-medium text-foreground">
                     {r.user?.full_name ?? r.user?.email ?? '—'}
                   </div>
                 </div>
@@ -143,7 +143,7 @@ export function Recruiters() {
             render: (r: RecruiterRow) => {
               const mgrs = effectiveManagers(r);
               if (mgrs.length === 0)
-                return <span className="text-xs italic text-slate-400">None</span>;
+                return <span className="text-xs italic text-muted-foreground">None</span>;
               return (
                 <div className="flex flex-wrap gap-1.5">
                   {mgrs.map((m) => (
@@ -153,7 +153,7 @@ export function Recruiters() {
                         'inline-flex items-center gap-1.5 text-xs rounded-full px-2 py-0.5 border',
                         m.is_primary
                           ? 'bg-brand-50 text-brand-700 border-brand-200'
-                          : 'bg-slate-50 text-slate-700 border-slate-200',
+                          : 'bg-muted text-foreground border-border',
                       )}
                       title={m.is_primary ? 'Primary supervisor' : 'Secondary supervisor'}
                     >
@@ -280,7 +280,7 @@ function ManageManagersModal({
       title={`Supervisors for ${recruiter.user?.full_name ?? recruiter.user?.email ?? 'recruiter'}`}
     >
       <div className="space-y-4">
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-muted-foreground">
           A recruiter can report to multiple managers / directors. The{' '}
           <span className="font-medium text-brand-700">★ primary</span> supervisor appears as their
           default in reports.
@@ -288,24 +288,24 @@ function ManageManagersModal({
 
         {/* Existing managers */}
         <div>
-          <h3 className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-1.5">
+          <h3 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1.5">
             Current supervisors
           </h3>
           {existing.length === 0 ? (
-            <p className="text-sm italic text-slate-400">None assigned yet</p>
+            <p className="text-sm italic text-muted-foreground">None assigned yet</p>
           ) : (
             <div className="space-y-1.5">
               {existing.map((m) => (
                 <div
                   key={m.manager!.id}
-                  className="flex items-center gap-2 border border-slate-200 rounded-lg px-3 py-2"
+                  className="flex items-center gap-2 border border-border rounded-lg px-3 py-2"
                 >
                   <Avatar name={m.manager!.full_name} email={m.manager!.email} size={28} />
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-slate-900 truncate">
+                    <div className="text-sm font-medium text-foreground truncate">
                       {m.manager!.full_name ?? m.manager!.email}
                     </div>
-                    <div className="text-[10px] uppercase tracking-wider text-slate-500">
+                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
                       {m.manager!.role && ROLE_LABEL[m.manager!.role]}
                       {m.is_primary && <span className="ml-2 text-brand-700">★ Primary</span>}
                     </div>
@@ -322,7 +322,7 @@ function ManageManagersModal({
                   <button
                     onClick={() => remove(m.manager!.id)}
                     disabled={busy === 'remove-' + m.manager!.id}
-                    className="text-xs text-red-600 hover:underline disabled:opacity-50"
+                    className="text-xs text-red-600 dark:text-red-400 hover:underline disabled:opacity-50"
                   >
                     Remove
                   </button>
@@ -334,11 +334,13 @@ function ManageManagersModal({
 
         {/* Add a new manager */}
         <div>
-          <h3 className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-1.5">
+          <h3 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1.5">
             Add a supervisor
           </h3>
           {available.length === 0 ? (
-            <p className="text-sm italic text-slate-400">No more eligible supervisors available.</p>
+            <p className="text-sm italic text-muted-foreground">
+              No more eligible supervisors available.
+            </p>
           ) : (
             <div className="flex items-end gap-2">
               <div className="flex-1">

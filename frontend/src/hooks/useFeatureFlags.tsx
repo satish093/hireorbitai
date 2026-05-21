@@ -132,7 +132,7 @@ export function FeatureGuard({
   // keeps the page from flashing partial UI before the flag check resolves.
   if (!ctx || ctx.loading) {
     return (
-      <div className="min-h-dvh flex items-center justify-center text-slate-400 text-sm">
+      <div className="min-h-dvh flex items-center justify-center text-muted-foreground text-sm">
         Loading…
       </div>
     );
@@ -153,12 +153,12 @@ function FeatureDisabledPanel({ feature }: { feature: string }) {
   const label = feature.replace(/_/g, ' ');
   return (
     <div className="min-h-[60dvh] flex items-center justify-center p-6">
-      <div className="max-w-md w-full text-center bg-white border border-slate-200 rounded-2xl p-8 shadow-sm">
-        <div className="w-12 h-12 rounded-full bg-slate-100 text-slate-500 text-2xl mx-auto mb-3 flex items-center justify-center">
+      <div className="max-w-md w-full text-center bg-card border border-border rounded-2xl p-8 shadow-sm">
+        <div className="w-12 h-12 rounded-full bg-muted text-muted-foreground text-2xl mx-auto mb-3 flex items-center justify-center">
           ⌀
         </div>
-        <h2 className="text-lg font-semibold text-slate-900 capitalize">{label} is turned off</h2>
-        <p className="text-sm text-slate-500 mt-2">
+        <h2 className="text-lg font-semibold text-foreground capitalize">{label} is turned off</h2>
+        <p className="text-sm text-muted-foreground mt-2">
           This feature is disabled for your workspace.
           {isOwner
             ? ' You can re-enable it from Feature flags.'
@@ -167,14 +167,14 @@ function FeatureDisabledPanel({ feature }: { feature: string }) {
         <div className="mt-5 flex items-center justify-center gap-2">
           <Link
             to="/dashboard"
-            className="text-sm px-4 py-2 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50"
+            className="text-sm px-4 py-2 rounded-lg border border-border text-foreground hover:bg-muted"
           >
             Back to dashboard
           </Link>
           {isOwner && (
             <Link
               to="/admin/features"
-              className="text-sm px-4 py-2 rounded-lg bg-slate-900 text-white hover:bg-slate-800"
+              className="text-sm px-4 py-2 rounded-lg bg-foreground text-background hover:opacity-90"
             >
               Open Feature flags
             </Link>

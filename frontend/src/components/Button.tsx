@@ -13,11 +13,11 @@ interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const VARIANT: Record<Variant, string> = {
   primary:
-    'bg-slate-900 text-white hover:bg-slate-800 focus-visible:ring-slate-900/40 disabled:bg-slate-300',
+    'bg-foreground text-background hover:opacity-90 focus-visible:ring-ring disabled:opacity-50',
   secondary:
-    'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 hover:border-slate-300 focus-visible:ring-slate-300/60 disabled:opacity-60',
+    'bg-card text-foreground border border-border hover:bg-muted hover:border-border focus-visible:ring-ring disabled:opacity-60',
   ghost:
-    'bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus-visible:ring-slate-300/60 disabled:opacity-60',
+    'bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-ring disabled:opacity-60',
   danger:
     'bg-red-600 text-white hover:bg-red-700 focus-visible:ring-red-500/40 disabled:bg-red-300',
 };

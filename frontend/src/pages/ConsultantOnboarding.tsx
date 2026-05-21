@@ -74,13 +74,13 @@ export function ConsultantOnboarding() {
     <Layout title="Consultant onboarding">
       <form
         onSubmit={handleSubmit(submit)}
-        className="bg-white rounded-xl border border-slate-200 p-6 max-w-3xl mx-auto"
+        className="bg-card rounded-xl border border-border p-6 max-w-3xl mx-auto"
       >
         <div className="mb-5">
-          <h2 className="text-lg font-semibold text-slate-900">
+          <h2 className="text-lg font-semibold text-foreground">
             Welcome — tell us about your profile
           </h2>
-          <p className="text-sm text-slate-500 mt-1">
+          <p className="text-sm text-muted-foreground mt-1">
             These fields drive your job recommendations and vendor pitch.
           </p>
         </div>
@@ -117,19 +117,19 @@ export function ConsultantOnboarding() {
           />
           <FormInput label="LinkedIn URL" {...register('linkedin_url')} />
           <FormInput label="GitHub URL" {...register('github_url')} />
-          <label className="flex items-center gap-2 text-sm bg-slate-50 rounded-lg px-3 py-2 border border-slate-200 cursor-pointer hover:border-slate-300">
+          <label className="flex items-center gap-2 text-sm bg-muted rounded-lg px-3 py-2 border border-border cursor-pointer hover:border-border">
             <input
               type="checkbox"
               {...register('relocation')}
-              className="rounded border-slate-300 text-brand-600 focus:ring-brand-500/30"
+              className="rounded border-border text-brand-600 focus:ring-brand-500/30"
             />{' '}
             Open to relocation
           </label>
-          <label className="flex items-center gap-2 text-sm bg-slate-50 rounded-lg px-3 py-2 border border-slate-200 cursor-pointer hover:border-slate-300">
+          <label className="flex items-center gap-2 text-sm bg-muted rounded-lg px-3 py-2 border border-border cursor-pointer hover:border-border">
             <input
               type="checkbox"
               {...register('remote_only')}
-              className="rounded border-slate-300 text-brand-600 focus:ring-brand-500/30"
+              className="rounded border-border text-brand-600 focus:ring-brand-500/30"
             />{' '}
             Remote only
           </label>
@@ -137,8 +137,10 @@ export function ConsultantOnboarding() {
 
         {/* Desired positions — multi-select chips */}
         <div className="mt-6">
-          <label className="block text-xs font-medium text-slate-700 mb-1">Desired positions</label>
-          <p className="text-xs text-slate-500 mb-2">
+          <label className="block text-xs font-medium text-foreground mb-1">
+            Desired positions
+          </label>
+          <p className="text-xs text-muted-foreground mb-2">
             Pick all employment types you're open to. Recruiters filter against this.
           </p>
           <div className="flex flex-wrap gap-1.5">
@@ -152,8 +154,8 @@ export function ConsultantOnboarding() {
                   className={clsx(
                     'rounded-full border px-3 py-1 text-xs font-medium transition',
                     active
-                      ? 'bg-slate-900 border-slate-900 text-white'
-                      : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300',
+                      ? 'bg-foreground border-foreground text-background'
+                      : 'bg-card border-border text-foreground hover:bg-muted hover:border-border',
                   )}
                 >
                   {active ? '✓ ' : ''}
@@ -165,11 +167,11 @@ export function ConsultantOnboarding() {
         </div>
 
         <div className="mt-6">
-          <label className="block text-xs font-medium text-slate-700 mb-1.5">Notes</label>
+          <label className="block text-xs font-medium text-foreground mb-1.5">Notes</label>
           <textarea
             placeholder="Anything else recruiters should know"
             {...register('notes')}
-            className="w-full rounded-lg border border-slate-300 hover:border-slate-400 bg-white px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500"
+            className="w-full rounded-lg border border-border hover:border-muted-foreground bg-card px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500"
             rows={3}
           />
         </div>
@@ -177,7 +179,7 @@ export function ConsultantOnboarding() {
         <div className="mt-6 flex justify-end">
           <button
             disabled={isSubmitting}
-            className="h-10 bg-slate-900 text-white px-5 rounded-lg text-sm font-medium shadow-sm disabled:opacity-50 hover:bg-slate-800 transition"
+            className="h-10 bg-foreground text-background px-5 rounded-lg text-sm font-medium shadow-sm disabled:opacity-50 hover:opacity-90 transition"
           >
             {isSubmitting ? 'Saving…' : 'Save and continue'}
           </button>

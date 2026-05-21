@@ -150,15 +150,15 @@ export function AcceptInvitation() {
   }
 
   return (
-    <div className="min-h-dvh bg-slate-50 flex items-center justify-center p-4 sm:p-6">
+    <div className="min-h-dvh bg-muted flex items-center justify-center p-4 sm:p-6">
       <div className="w-full max-w-md animate-fade-in-up">
         <div className="flex justify-center mb-6">
           <Brand size="lg" />
         </div>
 
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8">
+        <div className="bg-card rounded-2xl border border-border shadow-sm p-8">
           {loading ? (
-            <p className="text-sm text-slate-500 text-center">Loading invitation…</p>
+            <p className="text-sm text-muted-foreground text-center">Loading invitation…</p>
           ) : error ? (
             <ErrorState message={error} />
           ) : !preview ? (
@@ -169,15 +169,15 @@ export function AcceptInvitation() {
             <ErrorState message="This invitation has been revoked." />
           ) : preview.status === 'ACCEPTED' ? (
             <div className="text-center space-y-3">
-              <h1 className="text-xl font-semibold tracking-tight text-slate-900">
+              <h1 className="text-xl font-semibold tracking-tight text-foreground">
                 Already accepted
               </h1>
-              <p className="text-sm text-slate-600">
+              <p className="text-sm text-muted-foreground">
                 This invitation has been used. Sign in to continue.
               </p>
               <button
                 onClick={() => nav('/login')}
-                className="bg-slate-900 text-white text-sm px-4 py-2 rounded-lg press"
+                className="bg-foreground text-background text-sm px-4 py-2 rounded-lg press"
               >
                 Go to sign in
               </button>
@@ -188,13 +188,13 @@ export function AcceptInvitation() {
                 <div className="text-[10px] font-semibold tracking-widest text-brand-700 uppercase mb-1">
                   You've been invited
                 </div>
-                <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+                <h1 className="text-2xl font-semibold tracking-tight text-foreground">
                   Set up your account
                 </h1>
-                <p className="text-sm text-slate-600 mt-1">
+                <p className="text-sm text-muted-foreground mt-1">
                   Joining as{' '}
-                  <span className="font-medium text-slate-900">{roleLabel(preview.role)}</span> ·{' '}
-                  <span className="text-slate-700">{preview.email}</span>
+                  <span className="font-medium text-foreground">{roleLabel(preview.role)}</span> ·{' '}
+                  <span className="text-foreground">{preview.email}</span>
                 </p>
               </div>
 
@@ -225,7 +225,7 @@ export function AcceptInvitation() {
                 <p
                   role="alert"
                   aria-live="polite"
-                  className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-md px-2.5 py-1.5 animate-fade-in-down"
+                  className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-500/15 border border-red-100 dark:border-red-500/20 rounded-md px-2.5 py-1.5 animate-fade-in-down"
                 >
                   {submitErr}
                 </p>
@@ -233,12 +233,12 @@ export function AcceptInvitation() {
 
               <button
                 disabled={submitting}
-                className="w-full bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white rounded-lg py-2.5 text-sm font-medium press"
+                className="w-full bg-foreground hover:opacity-90 disabled:opacity-50 text-background rounded-lg py-2.5 text-sm font-medium press"
               >
                 {submitting ? 'Creating account…' : 'Create account & continue'}
               </button>
 
-              <p className="text-xs text-slate-500 text-center">
+              <p className="text-xs text-muted-foreground text-center">
                 Expires {new Date(preview.expires_at).toLocaleString()}
               </p>
             </form>
@@ -253,10 +253,10 @@ function ErrorState({ message }: { message: string }) {
   const nav = useNavigate();
   return (
     <div className="text-center space-y-3">
-      <h1 className="text-xl font-semibold tracking-tight text-slate-900">
+      <h1 className="text-xl font-semibold tracking-tight text-foreground">
         Can't open this invitation
       </h1>
-      <p className="text-sm text-slate-600">{message}</p>
+      <p className="text-sm text-muted-foreground">{message}</p>
       <button onClick={() => nav('/login')} className="text-sm text-brand-700 hover:underline">
         Back to sign in
       </button>

@@ -50,14 +50,14 @@ export function SkillGap({ jobId, compact }: { jobId: string; compact?: boolean 
 
   if (loading) {
     return (
-      <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs text-slate-500">
+      <div className="bg-muted border border-border rounded-lg p-3 text-xs text-muted-foreground">
         Analyzing skill match…
       </div>
     );
   }
   if (error) {
     return (
-      <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs text-slate-500">
+      <div className="bg-muted border border-border rounded-lg p-3 text-xs text-muted-foreground">
         Skill gap unavailable.
       </div>
     );
@@ -70,7 +70,7 @@ export function SkillGap({ jobId, compact }: { jobId: string; compact?: boolean 
 
   if (!data.consultant_resolved) {
     return (
-      <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">
+      <div className="bg-amber-50 dark:bg-amber-500/15 border border-amber-200 dark:border-amber-500/30 rounded-lg p-3 text-xs text-amber-800 dark:text-amber-300">
         Complete your consultant profile (skills) to see how this role matches you.
       </div>
     );
@@ -80,21 +80,29 @@ export function SkillGap({ jobId, compact }: { jobId: string; compact?: boolean 
   const pct = data.coverage;
   const tone = pct >= 80 ? 'emerald' : pct >= 60 ? 'sky' : pct >= 40 ? 'amber' : 'rose';
   const toneClasses: Record<string, { bar: string; text: string; ring: string }> = {
-    emerald: { bar: 'bg-emerald-500', text: 'text-emerald-700', ring: 'ring-emerald-200' },
-    sky: { bar: 'bg-sky-500', text: 'text-sky-700', ring: 'ring-sky-200' },
-    amber: { bar: 'bg-amber-500', text: 'text-amber-700', ring: 'ring-amber-200' },
-    rose: { bar: 'bg-rose-500', text: 'text-rose-700', ring: 'ring-rose-200' },
+    emerald: {
+      bar: 'bg-emerald-500',
+      text: 'text-emerald-700 dark:text-emerald-300',
+      ring: 'ring-emerald-200',
+    },
+    sky: { bar: 'bg-sky-500', text: 'text-sky-700 dark:text-sky-300', ring: 'ring-sky-200' },
+    amber: {
+      bar: 'bg-amber-500',
+      text: 'text-amber-700 dark:text-amber-300',
+      ring: 'ring-amber-200',
+    },
+    rose: { bar: 'bg-rose-500', text: 'text-rose-700 dark:text-rose-300', ring: 'ring-rose-200' },
   };
   const t = toneClasses[tone];
 
   return (
     <div
-      className={`bg-white border border-slate-200 rounded-lg p-4 ring-1 ${t.ring} ${
+      className={`bg-card border border-border rounded-lg p-4 ring-1 ${t.ring} ${
         compact ? 'space-y-2' : 'space-y-3'
       }`}
     >
       <div className="flex items-center justify-between">
-        <div className="text-[11px] font-semibold uppercase tracking-widest text-slate-500">
+        <div className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
           Skill match
         </div>
         <div className={`text-sm font-semibold ${t.text}`}>
@@ -103,20 +111,20 @@ export function SkillGap({ jobId, compact }: { jobId: string; compact?: boolean 
       </div>
 
       {/* Coverage bar */}
-      <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+      <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
         <div className={`h-full ${t.bar} transition-all`} style={{ width: `${pct}%` }} />
       </div>
 
       {data.have.length > 0 && (
         <div>
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700 mb-1.5">
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300 mb-1.5">
             ✓ You have
           </div>
           <div className="flex flex-wrap gap-1">
             {data.have.map((s) => (
               <span
                 key={s}
-                className="inline-flex items-center text-[11px] font-medium bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-100"
+                className="inline-flex items-center text-[11px] font-medium bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-100 dark:border-emerald-500/20"
               >
                 {s}
               </span>
@@ -127,14 +135,14 @@ export function SkillGap({ jobId, compact }: { jobId: string; compact?: boolean 
 
       {data.missing.length > 0 && (
         <div>
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-rose-700 mb-1.5">
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-rose-700 dark:text-rose-300 mb-1.5">
             ✗ Missing
           </div>
           <div className="flex flex-wrap gap-1">
             {data.missing.map((s) => (
               <span
                 key={s}
-                className="inline-flex items-center text-[11px] font-medium bg-rose-50 text-rose-700 px-2 py-0.5 rounded-full border border-rose-100"
+                className="inline-flex items-center text-[11px] font-medium bg-rose-50 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300 px-2 py-0.5 rounded-full border border-rose-100 dark:border-rose-500/20"
               >
                 {s}
               </span>

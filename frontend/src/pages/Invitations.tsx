@@ -91,7 +91,7 @@ export function Invitations() {
           (t) => (
             <div className="space-y-1">
               <div className="font-medium">Invitation created, but email failed</div>
-              <div className="text-xs text-slate-600">
+              <div className="text-xs text-muted-foreground">
                 {r.data?.email_error ?? 'Unknown email error'}
               </div>
               <button
@@ -157,7 +157,7 @@ export function Invitations() {
             key: 'role',
             header: 'Role',
             render: (r: any) => (
-              <span className="text-[11px] font-medium bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded">
+              <span className="text-[11px] font-medium bg-muted text-foreground px-1.5 py-0.5 rounded">
                 {r.role}
               </span>
             ),
@@ -188,7 +188,7 @@ export function Invitations() {
                     size="sm"
                     variant="ghost"
                     onClick={() => revoke(r.id)}
-                    className="text-red-600 hover:text-red-700"
+                    className="text-red-600 dark:text-red-400 hover:text-red-700"
                   >
                     Revoke
                   </Button>

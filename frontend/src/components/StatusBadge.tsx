@@ -5,31 +5,95 @@ import { Pill, PillTone } from './Pill';
 // Tones for each known status string. Falls back to a neutral slate tone when
 // the backend ships a status we don't know about yet.
 const tone: Record<string, PillTone> = {
-  ACTIVE: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
-  PAUSED: { bg: 'bg-amber-50', text: 'text-amber-700', dot: 'bg-amber-500' },
-  PLACED: { bg: 'bg-blue-50', text: 'text-blue-700', dot: 'bg-blue-500' },
-  SUBMITTED: { bg: 'bg-slate-100', text: 'text-slate-700', dot: 'bg-slate-400' },
-  SCREENING: { bg: 'bg-sky-50', text: 'text-sky-700', dot: 'bg-sky-500' },
-  INTERVIEW: { bg: 'bg-indigo-50', text: 'text-indigo-700', dot: 'bg-indigo-500' },
-  OFFER: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
-  REJECTED: { bg: 'bg-red-50', text: 'text-red-700', dot: 'bg-red-500' },
-  WITHDRAWN: { bg: 'bg-slate-100', text: 'text-slate-500', dot: 'bg-slate-300' },
-  SCHEDULED: { bg: 'bg-indigo-50', text: 'text-indigo-700', dot: 'bg-indigo-500' },
-  COMPLETED: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
-  CANCELLED: { bg: 'bg-red-50', text: 'text-red-700', dot: 'bg-red-500' },
-  NO_SHOW: { bg: 'bg-red-50', text: 'text-red-700', dot: 'bg-red-500' },
-  PENDING: { bg: 'bg-amber-50', text: 'text-amber-700', dot: 'bg-amber-500' },
-  SENT: { bg: 'bg-sky-50', text: 'text-sky-700', dot: 'bg-sky-500' },
-  DONE: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
-  EXPIRED: { bg: 'bg-red-50', text: 'text-red-700', dot: 'bg-red-500' },
-  ACCEPTED: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
-  REVOKED: { bg: 'bg-slate-100', text: 'text-slate-500', dot: 'bg-slate-300' },
+  ACTIVE: {
+    bg: 'bg-emerald-50 dark:bg-emerald-500/15',
+    text: 'text-emerald-700 dark:text-emerald-300',
+    dot: 'bg-emerald-500',
+  },
+  PAUSED: {
+    bg: 'bg-amber-50 dark:bg-amber-500/15',
+    text: 'text-amber-700 dark:text-amber-300',
+    dot: 'bg-amber-500',
+  },
+  PLACED: {
+    bg: 'bg-blue-50 dark:bg-blue-500/15',
+    text: 'text-blue-700 dark:text-blue-300',
+    dot: 'bg-blue-500',
+  },
+  SUBMITTED: { bg: 'bg-muted', text: 'text-foreground', dot: 'bg-muted-foreground' },
+  SCREENING: {
+    bg: 'bg-sky-50 dark:bg-sky-500/15',
+    text: 'text-sky-700 dark:text-sky-300',
+    dot: 'bg-sky-500',
+  },
+  INTERVIEW: {
+    bg: 'bg-indigo-50 dark:bg-indigo-500/15',
+    text: 'text-indigo-700 dark:text-indigo-300',
+    dot: 'bg-indigo-500',
+  },
+  OFFER: {
+    bg: 'bg-emerald-50 dark:bg-emerald-500/15',
+    text: 'text-emerald-700 dark:text-emerald-300',
+    dot: 'bg-emerald-500',
+  },
+  REJECTED: {
+    bg: 'bg-red-50 dark:bg-red-500/15',
+    text: 'text-red-700 dark:text-red-300',
+    dot: 'bg-red-500',
+  },
+  WITHDRAWN: { bg: 'bg-muted', text: 'text-muted-foreground', dot: 'bg-muted-foreground' },
+  SCHEDULED: {
+    bg: 'bg-indigo-50 dark:bg-indigo-500/15',
+    text: 'text-indigo-700 dark:text-indigo-300',
+    dot: 'bg-indigo-500',
+  },
+  COMPLETED: {
+    bg: 'bg-emerald-50 dark:bg-emerald-500/15',
+    text: 'text-emerald-700 dark:text-emerald-300',
+    dot: 'bg-emerald-500',
+  },
+  CANCELLED: {
+    bg: 'bg-red-50 dark:bg-red-500/15',
+    text: 'text-red-700 dark:text-red-300',
+    dot: 'bg-red-500',
+  },
+  NO_SHOW: {
+    bg: 'bg-red-50 dark:bg-red-500/15',
+    text: 'text-red-700 dark:text-red-300',
+    dot: 'bg-red-500',
+  },
+  PENDING: {
+    bg: 'bg-amber-50 dark:bg-amber-500/15',
+    text: 'text-amber-700 dark:text-amber-300',
+    dot: 'bg-amber-500',
+  },
+  SENT: {
+    bg: 'bg-sky-50 dark:bg-sky-500/15',
+    text: 'text-sky-700 dark:text-sky-300',
+    dot: 'bg-sky-500',
+  },
+  DONE: {
+    bg: 'bg-emerald-50 dark:bg-emerald-500/15',
+    text: 'text-emerald-700 dark:text-emerald-300',
+    dot: 'bg-emerald-500',
+  },
+  EXPIRED: {
+    bg: 'bg-red-50 dark:bg-red-500/15',
+    text: 'text-red-700 dark:text-red-300',
+    dot: 'bg-red-500',
+  },
+  ACCEPTED: {
+    bg: 'bg-emerald-50 dark:bg-emerald-500/15',
+    text: 'text-emerald-700 dark:text-emerald-300',
+    dot: 'bg-emerald-500',
+  },
+  REVOKED: { bg: 'bg-muted', text: 'text-muted-foreground', dot: 'bg-muted-foreground' },
 };
 
 const DEFAULT_TONE: PillTone = {
-  bg: 'bg-slate-100',
-  text: 'text-slate-700',
-  dot: 'bg-slate-400',
+  bg: 'bg-muted',
+  text: 'text-foreground',
+  dot: 'bg-muted-foreground',
 };
 
 // Statuses that benefit from a slow ambient pulse on the dot (active states
@@ -51,7 +115,7 @@ export function StatusBadge({ status }: { status: string }) {
     }
   }, [status]);
 
-  if (!status) return <span className="text-slate-400 text-xs italic">—</span>;
+  if (!status) return <span className="text-muted-foreground text-xs italic">—</span>;
   const t = tone[status] ?? DEFAULT_TONE;
   return (
     <Pill tone={t} pulseDot={PULSING.has(status)} className={clsx(pop && 'animate-pop')}>

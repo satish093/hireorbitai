@@ -61,13 +61,13 @@ function toCriteria(f: FilterState) {
 }
 
 const STATUS_DOT: Record<TaskStatus, string> = {
-  BACKLOG: 'bg-slate-400',
+  BACKLOG: 'bg-muted-foreground',
   TODO: 'bg-blue-500',
   IN_PROGRESS: 'bg-amber-500',
   BLOCKED: 'bg-red-500',
   REVIEW: 'bg-purple-500',
   COMPLETED: 'bg-emerald-500',
-  CANCELLED: 'bg-slate-300',
+  CANCELLED: 'bg-muted-foreground',
 };
 
 export function Tasks() {
@@ -199,14 +199,14 @@ export function Tasks() {
           actions can break to their own line on mobile. */}
       <div className="flex flex-wrap items-center gap-3 mb-5">
         <div className="flex items-center gap-2 min-w-0">
-          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-slate-900 truncate">
+          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-foreground truncate">
             Team tasks
           </h1>
-          <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 shrink-0">
+          <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground shrink-0">
             {tasks.length} total
           </span>
         </div>
-        <div className="inline-flex rounded-lg bg-slate-100 p-0.5 text-sm">
+        <div className="inline-flex rounded-lg bg-muted p-0.5 text-sm">
           <ViewToggleBtn active={view === 'board'} onClick={() => setParams({ view: 'board' })}>
             Board
           </ViewToggleBtn>
@@ -218,7 +218,7 @@ export function Tasks() {
         <div className="ml-auto flex items-center gap-2">
           <Link
             to="/tasks/me"
-            className="text-sm text-slate-600 hover:text-slate-900 inline-flex items-center gap-1 whitespace-nowrap"
+            className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1 whitespace-nowrap"
           >
             <span className="hidden sm:inline">Assigned to me</span>
             <span className="sm:hidden">Mine</span>
@@ -227,7 +227,7 @@ export function Tasks() {
           {isManager && (
             <button
               onClick={() => setCreateOpen(true)}
-              className="bg-slate-900 text-white text-sm px-3 py-1.5 rounded-lg hover:bg-slate-800 inline-flex items-center gap-1.5 whitespace-nowrap"
+              className="bg-foreground text-background text-sm px-3 py-1.5 rounded-lg hover:opacity-90 inline-flex items-center gap-1.5 whitespace-nowrap"
             >
               <span>+</span>
               <span className="hidden sm:inline">New task</span>
@@ -298,8 +298,8 @@ function ViewToggleBtn({
       className={clsx(
         'px-3 py-1 rounded-md transition',
         active
-          ? 'bg-white text-slate-900 shadow-sm font-medium'
-          : 'text-slate-600 hover:text-slate-900',
+          ? 'bg-card text-foreground shadow-sm font-medium'
+          : 'text-muted-foreground hover:text-foreground',
       )}
     >
       {children}
@@ -322,12 +322,12 @@ function FilterBar({
   isManager: boolean;
 }) {
   const pill =
-    'border border-slate-200 bg-white rounded-full pl-3 pr-2.5 py-1 text-sm text-slate-700 inline-flex items-center gap-1.5 hover:bg-slate-50 focus-within:ring-2 focus-within:ring-brand-500/40';
+    'border border-border bg-card rounded-full pl-3 pr-2.5 py-1 text-sm text-foreground inline-flex items-center gap-1.5 hover:bg-muted focus-within:ring-2 focus-within:ring-brand-500/40';
 
   return (
     <div className="flex flex-wrap items-center gap-2">
       <div className={pill}>
-        <span className="text-slate-400">⌕</span>
+        <span className="text-muted-foreground">⌕</span>
         <input
           type="text"
           placeholder="Search title…"
@@ -370,8 +370,8 @@ function FilterBar({
         className={clsx(
           'rounded-full border px-3 py-1 text-sm',
           filters.overdue
-            ? 'bg-red-50 border-red-200 text-red-700'
-            : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50',
+            ? 'bg-red-50 dark:bg-red-500/15 border-red-200 dark:border-red-500/30 text-red-700 dark:text-red-300'
+            : 'bg-card border-border text-muted-foreground hover:bg-muted',
         )}
       >
         {filters.overdue ? '⚠ Overdue only' : 'Overdue'}
@@ -392,12 +392,12 @@ function PillSelect({
   options: { value: string; label: string }[];
 }) {
   return (
-    <label className="inline-flex items-center gap-1.5 border border-slate-200 bg-white rounded-full pl-3 pr-1 py-1 text-sm text-slate-700 hover:bg-slate-50">
-      <span className="text-slate-500">{label}:</span>
+    <label className="inline-flex items-center gap-1.5 border border-border bg-card rounded-full pl-3 pr-1 py-1 text-sm text-foreground hover:bg-muted">
+      <span className="text-muted-foreground">{label}:</span>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="bg-transparent text-sm font-medium text-slate-900 outline-none pr-1"
+        className="bg-transparent text-sm font-medium text-foreground outline-none pr-1"
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>
@@ -464,8 +464,8 @@ function BoardView({
           <div className="flex items-center justify-between mb-2 px-1">
             <div className="flex items-center gap-2">
               <span className={`w-2 h-2 rounded-full ${STATUS_DOT[status]}`} />
-              <h3 className="text-sm font-semibold text-slate-900">{TASK_STATUS_LABEL[status]}</h3>
-              <span className="text-xs font-medium text-slate-500 tabular-nums bg-slate-100 rounded px-1.5">
+              <h3 className="text-sm font-semibold text-foreground">{TASK_STATUS_LABEL[status]}</h3>
+              <span className="text-xs font-medium text-muted-foreground tabular-nums bg-muted rounded px-1.5">
                 {grouped[status].length}
               </span>
             </div>
@@ -475,7 +475,9 @@ function BoardView({
               <BoardCard key={t.id} task={t} onDragStart={onDragStart} />
             ))}
             {grouped[status].length === 0 && (
-              <div className="text-xs text-slate-400 italic px-1 py-3 text-center">No tasks</div>
+              <div className="text-xs text-muted-foreground italic px-1 py-3 text-center">
+                No tasks
+              </div>
             )}
           </div>
         </div>
@@ -496,15 +498,17 @@ function BoardCard({
       to={`/tasks/${task.id}`}
       draggable
       onDragStart={(e) => onDragStart(e, task.id)}
-      className="block bg-white rounded-lg border border-slate-200 p-3 cursor-grab active:cursor-grabbing hover:border-slate-300 hover-lift animate-fade-in-up"
+      className="block bg-card rounded-lg border border-border p-3 cursor-grab active:cursor-grabbing hover:border-border hover-lift animate-fade-in-up"
     >
       <div className="flex items-center justify-between mb-1.5">
-        <span className="text-[10px] font-mono text-slate-400">{shortId(task.id)}</span>
+        <span className="text-[10px] font-mono text-muted-foreground">{shortId(task.id)}</span>
         {task.tags && task.tags.length > 0 && <TagPill tag={task.tags[0]!} />}
       </div>
-      <h4 className="text-sm font-medium text-slate-900 leading-snug line-clamp-2">{task.title}</h4>
+      <h4 className="text-sm font-medium text-foreground leading-snug line-clamp-2">
+        {task.title}
+      </h4>
       {task.consultant && (
-        <div className="mt-2 inline-flex items-center gap-1.5 text-xs text-slate-600 bg-slate-50 border border-slate-100 rounded-full pl-1 pr-2 py-0.5">
+        <div className="mt-2 inline-flex items-center gap-1.5 text-xs text-muted-foreground bg-muted border border-border rounded-full pl-1 pr-2 py-0.5">
           <Avatar
             name={task.consultant.user?.full_name}
             email={task.consultant.user?.email}
@@ -521,7 +525,7 @@ function BoardCard({
             <Avatar name={task.assignee.full_name} email={task.assignee.email} size={22} />
           </div>
         ) : (
-          <span className="text-[10px] text-slate-400 italic">Unassigned</span>
+          <span className="text-[10px] text-muted-foreground italic">Unassigned</span>
         )}
       </div>
     </Link>
@@ -533,9 +537,9 @@ function BoardCard({
 // ---------------------------------------------------------------------------
 function ListView({ tasks }: { tasks: Task[] }) {
   return (
-    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+    <div className="bg-card border border-border rounded-xl overflow-hidden">
       <table className="w-full text-sm">
-        <thead className="bg-slate-50 text-[10px] font-semibold tracking-widest text-slate-500 uppercase">
+        <thead className="bg-muted text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">
           <tr>
             <th className="px-3 py-2 text-left w-20">ID</th>
             <th className="px-3 py-2 text-left">Title</th>
@@ -549,7 +553,7 @@ function ListView({ tasks }: { tasks: Task[] }) {
         <tbody>
           {tasks.length === 0 && (
             <tr>
-              <td colSpan={7} className="px-3 py-8 text-center text-slate-400 italic">
+              <td colSpan={7} className="px-3 py-8 text-center text-muted-foreground italic">
                 No tasks match these filters.
               </td>
             </tr>
@@ -558,13 +562,15 @@ function ListView({ tasks }: { tasks: Task[] }) {
             <tr
               key={t.id}
               className={clsx(
-                'border-t border-slate-100 hover:bg-slate-50',
+                'border-t border-border hover:bg-muted',
                 isOverdue(t) && 'bg-red-50/30',
               )}
             >
-              <td className="px-3 py-2 text-[11px] font-mono text-slate-500">{shortId(t.id)}</td>
+              <td className="px-3 py-2 text-[11px] font-mono text-muted-foreground">
+                {shortId(t.id)}
+              </td>
               <td className="px-3 py-2">
-                <Link to={`/tasks/${t.id}`} className="text-slate-900 hover:underline">
+                <Link to={`/tasks/${t.id}`} className="text-foreground hover:underline">
                   {t.title}
                 </Link>
                 {t.tags && t.tags.length > 0 && (
@@ -586,7 +592,7 @@ function ListView({ tasks }: { tasks: Task[] }) {
               </td>
               <td className="px-3 py-2">
                 {t.consultant ? (
-                  <span className="inline-flex items-center gap-1.5 text-slate-700">
+                  <span className="inline-flex items-center gap-1.5 text-foreground">
                     <Avatar
                       name={t.consultant.user?.full_name}
                       email={t.consultant.user?.email}
@@ -597,7 +603,7 @@ function ListView({ tasks }: { tasks: Task[] }) {
                     </span>
                   </span>
                 ) : (
-                  <span className="text-slate-400 italic text-xs">—</span>
+                  <span className="text-muted-foreground italic text-xs">—</span>
                 )}
               </td>
               <td className="px-3 py-2">
@@ -675,7 +681,7 @@ function CreateTaskModal({
         <button
           onClick={save}
           disabled={saving}
-          className="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm disabled:opacity-50"
+          className="bg-foreground text-background px-4 py-2 rounded-lg text-sm disabled:opacity-50"
         >
           {saving ? 'Saving…' : '+ Create task'}
         </button>
@@ -686,13 +692,13 @@ function CreateTaskModal({
           autoFocus
           placeholder="Title"
           onChange={(e) => setForm({ ...form, title: e.target.value })}
-          className="w-full text-lg font-semibold text-slate-900 placeholder-slate-400 border-0 focus:outline-none px-0"
+          className="w-full text-lg font-semibold text-foreground placeholder:text-muted-foreground border-0 focus:outline-none px-0"
         />
         <textarea
           placeholder="Description"
           rows={3}
           onChange={(e) => setForm({ ...form, description: e.target.value })}
-          className="w-full text-sm text-slate-700 placeholder-slate-400 border-0 focus:outline-none px-0 resize-none"
+          className="w-full text-sm text-foreground placeholder:text-muted-foreground border-0 focus:outline-none px-0 resize-none"
         />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <SelectInput
@@ -726,19 +732,19 @@ function CreateTaskModal({
 
         {/* Tags */}
         <div>
-          <span className="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">
+          <span className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
             Tags
           </span>
           <div className="flex flex-wrap gap-1.5 items-center">
             {form.tags.map((t: string) => (
               <span
                 key={t}
-                className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-700"
+                className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-muted text-foreground"
               >
                 {t}
                 <button
                   onClick={() => removeTag(t)}
-                  className="text-slate-400 hover:text-slate-700"
+                  className="text-muted-foreground hover:text-foreground"
                 >
                   ×
                 </button>
@@ -757,7 +763,7 @@ function CreateTaskModal({
                   removeTag(form.tags[form.tags.length - 1]!);
                 }
               }}
-              className="border border-slate-200 rounded-full px-2.5 py-0.5 text-xs outline-none focus:ring-2 focus:ring-brand-500/30"
+              className="border border-border rounded-full px-2.5 py-0.5 text-xs outline-none focus:ring-2 focus:ring-brand-500/30"
             />
           </div>
         </div>

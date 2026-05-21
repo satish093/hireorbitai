@@ -538,9 +538,11 @@ export function JobSearch() {
               ? `${totalRows.toLocaleString()} live openings`
               : 'Search thousands of live openings'}
           </p>
-          <div className="mt-4 flex flex-col sm:flex-row gap-2 bg-white rounded-xl p-2 shadow-lg max-w-2xl">
+          <div className="mt-4 flex flex-col sm:flex-row gap-2 bg-card rounded-xl p-2 shadow-lg max-w-2xl">
             <div className="relative flex-1 min-w-0">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">⌕</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                ⌕
+              </span>
               <input
                 type="text"
                 value={q}
@@ -549,12 +551,12 @@ export function JobSearch() {
                   if (e.key === 'Enter') load();
                 }}
                 placeholder="Job title, company, or skill"
-                className="w-full h-10 pl-9 pr-3 rounded-lg text-sm text-slate-900 placeholder-slate-400 focus:outline-none"
+                className="w-full h-10 pl-9 pr-3 rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
               />
             </div>
             <button
               onClick={() => load()}
-              className="h-10 px-6 rounded-lg bg-slate-900 text-white text-sm font-medium hover:bg-slate-800 press shrink-0"
+              className="h-10 px-6 rounded-lg bg-foreground text-background text-sm font-medium hover:opacity-90 press shrink-0"
             >
               Search
             </button>
@@ -577,8 +579,8 @@ export function JobSearch() {
               className={clsx(
                 'pb-1.5 text-sm border-b-2 transition',
                 tab === t.key
-                  ? 'border-slate-900 text-slate-900 font-semibold'
-                  : 'border-transparent text-slate-500 hover:text-slate-800',
+                  ? 'border-foreground text-foreground font-semibold'
+                  : 'border-transparent text-muted-foreground hover:text-foreground',
               )}
             >
               {t.label}
@@ -589,7 +591,7 @@ export function JobSearch() {
           <div className="ml-auto flex items-center gap-2">
             <button
               onClick={() => setSourcesOpen(true)}
-              className="border border-slate-200 bg-white rounded-full px-3 py-1.5 text-sm hover:bg-slate-50"
+              className="border border-border bg-card rounded-full px-3 py-1.5 text-sm hover:bg-muted"
               title="Manage live job sources"
             >
               Sources
@@ -605,7 +607,7 @@ export function JobSearch() {
             <button
               onClick={syncNow}
               disabled={syncing}
-              className="bg-slate-900 text-white rounded-full px-3 py-1.5 text-sm hover:bg-slate-800 disabled:opacity-50 inline-flex items-center gap-1.5"
+              className="bg-foreground text-background rounded-full px-3 py-1.5 text-sm hover:opacity-90 disabled:opacity-50 inline-flex items-center gap-1.5"
               title="Pull fresh jobs from all sources"
             >
               <span className={syncing ? 'inline-block animate-spin' : ''}>↻</span>
@@ -744,7 +746,7 @@ export function JobSearch() {
           />
           <button
             onClick={() => load()}
-            className="ml-1 bg-slate-900 text-white text-sm px-4 py-1.5 rounded-full hover:bg-slate-800"
+            className="ml-1 bg-foreground text-background text-sm px-4 py-1.5 rounded-full hover:opacity-90"
           >
             Apply
           </button>
@@ -759,7 +761,7 @@ export function JobSearch() {
               setPublisherFilter('');
               setJobFunction('');
             }}
-            className="text-xs text-slate-500 hover:text-slate-900 ml-1"
+            className="text-xs text-muted-foreground hover:text-foreground ml-1"
           >
             Reset
           </button>
@@ -808,7 +810,7 @@ export function JobSearch() {
         return (
           <div className="space-y-3">
             {tab === 'recommended' && totalRows > 0 && (
-              <div className="text-xs text-slate-500 px-1">
+              <div className="text-xs text-muted-foreground px-1">
                 Showing {filtered.length} of {totalRows.toLocaleString()} jobs
               </div>
             )}
@@ -846,7 +848,7 @@ export function JobSearch() {
             ))}
             {/* Infinite scroll sentinel — entering view loads the next page. */}
             {tab === 'recommended' && page < totalPages && (
-              <div ref={loadMoreRef} className="py-6 text-center text-xs text-slate-400">
+              <div ref={loadMoreRef} className="py-6 text-center text-xs text-muted-foreground">
                 {loading ? 'Loading more…' : 'Scroll for more'}
               </div>
             )}
@@ -981,12 +983,12 @@ function PillSelect({
   placeholder?: string;
 }) {
   return (
-    <label className="inline-flex items-center gap-1.5 border border-slate-200 bg-white rounded-full pl-3 pr-1 py-1 text-sm text-slate-700 hover:bg-slate-50">
-      <span className="text-slate-500">{label}:</span>
+    <label className="inline-flex items-center gap-1.5 border border-border bg-card rounded-full pl-3 pr-1 py-1 text-sm text-foreground hover:bg-muted">
+      <span className="text-muted-foreground">{label}:</span>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="bg-transparent text-sm font-medium text-slate-900 outline-none pr-1"
+        className="bg-transparent text-sm font-medium text-foreground outline-none pr-1"
       >
         {placeholder && !options.find((o) => o.value === '') && (
           <option value="">{placeholder}</option>
@@ -1008,12 +1010,12 @@ function EmptyState({ tab, onSync }: { tab: TabKey; onSync?: () => void }) {
     applied: "You haven't submitted to any jobs yet.",
   };
   return (
-    <div className="bg-white border border-slate-200 rounded-xl p-10 text-center text-slate-500">
+    <div className="bg-card border border-border rounded-xl p-10 text-center text-muted-foreground">
       <div className="mb-3">{map[tab]}</div>
       {tab === 'recommended' && onSync && (
         <button
           onClick={onSync}
-          className="bg-slate-900 text-white text-sm px-4 py-2 rounded-full hover:bg-slate-800 inline-flex items-center gap-1.5"
+          className="bg-foreground text-background text-sm px-4 py-2 rounded-full hover:opacity-90 inline-flex items-center gap-1.5"
         >
           <span>↻</span> Sync jobs now
         </button>
@@ -1082,7 +1084,7 @@ function JobCard({
           onOpenInsight();
         }
       }}
-      className="bg-white border border-slate-200 rounded-xl flex overflow-hidden hover:border-slate-300 hover:shadow-md transition cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"
+      className="bg-card border border-border rounded-xl flex overflow-hidden hover:border-border hover:shadow-md transition cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"
     >
       {/* Left: job content */}
       <div className="flex-1 p-5 min-w-0">
@@ -1090,11 +1092,11 @@ function JobCard({
           <Avatar name={companyName} size={44} />
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1 flex-wrap">
-              <span className="text-xs text-slate-500">
+              <span className="text-xs text-muted-foreground">
                 {relative(job.posted_at ?? job.created_at)}
               </span>
               {isEarly(job.posted_at ?? job.created_at) && (
-                <span className="text-[10px] font-semibold uppercase tracking-wide bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded">
+                <span className="text-[10px] font-semibold uppercase tracking-wide bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 rounded">
                   Be an early applicant
                 </span>
               )}
@@ -1111,12 +1113,12 @@ function JobCard({
                 <MatchScoreChip score={Math.round(job.match_score)} />
               )}
               {job.application_status && !onChangeStatus && (
-                <span className="text-[10px] font-semibold uppercase tracking-wide bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded">
+                <span className="text-[10px] font-semibold uppercase tracking-wide bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded">
                   {STATUS_LABEL[job.application_status as AppStatus] ?? job.application_status}
                 </span>
               )}
               {job.applied_method && (
-                <span className="text-[10px] font-semibold uppercase tracking-wide bg-violet-50 text-violet-700 px-1.5 py-0.5 rounded">
+                <span className="text-[10px] font-semibold uppercase tracking-wide bg-violet-50 dark:bg-violet-500/15 text-violet-700 dark:text-violet-300 px-1.5 py-0.5 rounded">
                   {job.applied_method === 'CUSTOMIZED' ? '✦ Customized' : 'Original'}
                 </span>
               )}
@@ -1127,14 +1129,14 @@ function JobCard({
               className="text-left group"
               title="View full requirements + match insight"
             >
-              <h3 className="text-lg font-semibold text-slate-900 leading-tight group-hover:text-brand-700 transition-colors">
+              <h3 className="text-lg font-semibold text-foreground leading-tight group-hover:text-brand-700 transition-colors">
                 {job.title}
               </h3>
             </button>
-            <div className="text-sm text-slate-600 mt-0.5">
+            <div className="text-sm text-muted-foreground mt-0.5">
               <span className="font-medium">{companyName}</span>
               {job.client && job.client.company_name !== companyName && (
-                <span className="text-slate-400"> · {job.client.company_name}</span>
+                <span className="text-muted-foreground"> · {job.client.company_name}</span>
               )}
             </div>
           </div>
@@ -1149,7 +1151,7 @@ function JobCard({
               'shrink-0 w-9 h-9 rounded-full border flex items-center justify-center',
               job.liked
                 ? 'bg-brand-50 border-brand-200 text-brand-600'
-                : 'bg-white border-slate-200 text-slate-400 hover:text-brand-600 hover:border-brand-200',
+                : 'bg-card border-border text-muted-foreground hover:text-brand-600 hover:border-brand-200',
             )}
           >
             {job.liked ? '🔖' : '🔖'}
@@ -1187,7 +1189,7 @@ function JobCard({
             Strips HTML tags, caps at 200 chars. Hidden when expanded so the
             expanded responsibilities + skills sections take over. */}
         {!expanded && job.description && (
-          <p className="mt-3 text-sm text-slate-600 leading-snug line-clamp-2">
+          <p className="mt-3 text-sm text-muted-foreground leading-snug line-clamp-2">
             {job.description
               .replace(/<[^>]+>/g, ' ')
               .replace(/\s+/g, ' ')
@@ -1208,13 +1210,13 @@ function JobCard({
             {requiredSkills.slice(0, 6).map((s) => (
               <span
                 key={s}
-                className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-700"
+                className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-muted text-foreground"
               >
                 {s}
               </span>
             ))}
             {requiredSkills.length > 6 && (
-              <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-slate-50 text-slate-500 border border-slate-200">
+              <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">
                 +{requiredSkills.length - 6} more
               </span>
             )}
@@ -1233,13 +1235,13 @@ function JobCard({
           <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-5">
             {responsibilities.length > 0 && (
               <div>
-                <div className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase mb-1.5">
+                <div className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase mb-1.5">
                   Core responsibilities
                 </div>
-                <ul className="space-y-1 text-sm text-slate-700">
+                <ul className="space-y-1 text-sm text-foreground">
                   {responsibilities.slice(0, 6).map((b, i) => (
                     <li key={i} className="flex items-start gap-1.5">
-                      <span className="text-slate-400">•</span>
+                      <span className="text-muted-foreground">•</span>
                       <span>{b}</span>
                     </li>
                   ))}
@@ -1248,13 +1250,13 @@ function JobCard({
             )}
             {skillSummaries.length > 0 && (
               <div>
-                <div className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase mb-1.5">
+                <div className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase mb-1.5">
                   Skill requirements
                 </div>
-                <ul className="space-y-1 text-sm text-slate-700">
+                <ul className="space-y-1 text-sm text-foreground">
                   {skillSummaries.slice(0, 6).map((b, i) => (
                     <li key={i} className="flex items-start gap-1.5">
-                      <span className="text-slate-400">•</span>
+                      <span className="text-muted-foreground">•</span>
                       <span>{b}</span>
                     </li>
                   ))}
@@ -1263,10 +1265,10 @@ function JobCard({
             )}
             {highlights.length > 0 && (
               <div>
-                <div className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase mb-1.5">
+                <div className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase mb-1.5">
                   Why it might fit
                 </div>
-                <ul className="space-y-1 text-sm text-slate-700">
+                <ul className="space-y-1 text-sm text-foreground">
                   {highlights.slice(0, 4).map((b, i) => (
                     <li key={i} className="flex items-start gap-1.5">
                       <span className="text-sky-500">★</span>
@@ -1278,10 +1280,10 @@ function JobCard({
             )}
             {benefits.length > 0 && (
               <div>
-                <div className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase mb-1.5">
+                <div className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase mb-1.5">
                   Benefits
                 </div>
-                <ul className="space-y-1 text-sm text-slate-700">
+                <ul className="space-y-1 text-sm text-foreground">
                   {benefits.slice(0, 4).map((b, i) => (
                     <li key={i} className="flex items-start gap-1.5">
                       <span className="text-emerald-500">+</span>
@@ -1296,7 +1298,7 @@ function JobCard({
 
         {/* Applied-on caption (only on the Applied tab). */}
         {job.applied_at && (
-          <div className="mt-3 text-xs text-slate-500">
+          <div className="mt-3 text-xs text-muted-foreground">
             Applied on{' '}
             {new Date(job.applied_at).toLocaleDateString(undefined, {
               year: 'numeric',
@@ -1319,7 +1321,7 @@ function JobCard({
                 e.stopPropagation();
                 onApply();
               }}
-              className="inline-flex items-center gap-1.5 bg-slate-900 text-white text-sm px-4 py-2 rounded-lg hover:bg-slate-800"
+              className="inline-flex items-center gap-1.5 bg-foreground text-background text-sm px-4 py-2 rounded-lg hover:opacity-90"
             >
               Apply on company site <span>↗</span>
             </button>
@@ -1338,7 +1340,7 @@ function JobCard({
               </button>
             )}
             {!enriched && (
-              <span className="text-[10px] font-medium text-amber-700 bg-amber-50 border border-amber-100 px-2 py-0.5 rounded">
+              <span className="text-[10px] font-medium text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-500/15 border border-amber-100 dark:border-amber-500/20 px-2 py-0.5 rounded">
                 Not yet enriched
               </span>
             )}
@@ -1348,7 +1350,7 @@ function JobCard({
                   e.stopPropagation();
                   setExpanded((v) => !v);
                 }}
-                className="text-xs text-slate-600 hover:text-slate-900"
+                className="text-xs text-muted-foreground hover:text-foreground"
               >
                 {expanded ? 'Show less ▴' : 'Show details ▾'}
               </button>
@@ -1405,8 +1407,8 @@ function JobCard({
 
 function MetaItem({ icon, label }: { icon: string; label: string }) {
   return (
-    <div className="inline-flex items-center gap-2 text-slate-600">
-      <span className="text-slate-400">{icon}</span>
+    <div className="inline-flex items-center gap-2 text-muted-foreground">
+      <span className="text-muted-foreground">{icon}</span>
       <span className="truncate">{label}</span>
     </div>
   );
@@ -1423,12 +1425,12 @@ function MetaItem({ icon, label }: { icon: string; label: string }) {
 function MatchScoreChip({ score }: { score: number }) {
   const tone =
     score >= 85
-      ? 'bg-emerald-50 text-emerald-700 border-emerald-200 ring-emerald-100'
+      ? 'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30 ring-emerald-100'
       : score >= 70
-        ? 'bg-sky-50 text-sky-700 border-sky-200 ring-sky-100'
+        ? 'bg-sky-50 dark:bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-500/30 ring-sky-100'
         : score >= 50
-          ? 'bg-amber-50 text-amber-700 border-amber-200 ring-amber-100'
-          : 'bg-rose-50 text-rose-700 border-rose-200 ring-rose-100';
+          ? 'bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-500/30 ring-amber-100'
+          : 'bg-rose-50 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-500/30 ring-rose-100';
   const dot =
     score >= 85
       ? 'bg-emerald-500'
@@ -1459,7 +1461,7 @@ function MatchScoreChip({ score }: { score: number }) {
 function MatchModeChip({ mode, isRecruiterMode }: { mode: string; isRecruiterMode: boolean }) {
   if (mode === 'skills-only') {
     return (
-      <span className="inline-flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-800 rounded-full px-3 py-1 text-xs font-medium">
+      <span className="inline-flex items-center gap-2 bg-amber-50 dark:bg-amber-500/15 border border-amber-200 dark:border-amber-500/30 text-amber-800 dark:text-amber-300 rounded-full px-3 py-1 text-xs font-medium">
         <span aria-hidden="true">⚡</span>
         <span>
           Scored against your skills only —{' '}
@@ -1473,7 +1475,7 @@ function MatchModeChip({ mode, isRecruiterMode }: { mode: string; isRecruiterMod
   }
   if (mode === 'no-consultant' && isRecruiterMode) {
     return (
-      <span className="inline-flex items-center gap-2 bg-sky-50 border border-sky-200 text-sky-800 rounded-full px-3 py-1 text-xs font-medium">
+      <span className="inline-flex items-center gap-2 bg-sky-50 dark:bg-sky-500/15 border border-sky-200 dark:border-sky-500/30 text-sky-800 dark:text-sky-300 rounded-full px-3 py-1 text-xs font-medium">
         <span aria-hidden="true">ℹ️</span>
         <span>Pick a consultant in the targeting bar to see resume-aware match scores.</span>
       </span>
@@ -1481,7 +1483,7 @@ function MatchModeChip({ mode, isRecruiterMode }: { mode: string; isRecruiterMod
   }
   if (mode === 'no-signal') {
     return (
-      <span className="inline-flex items-center gap-2 bg-slate-100 border border-slate-200 text-slate-700 rounded-full px-3 py-1 text-xs font-medium">
+      <span className="inline-flex items-center gap-2 bg-muted border border-border text-foreground rounded-full px-3 py-1 text-xs font-medium">
         <span aria-hidden="true">ℹ️</span>
         <span>Add skills to your profile for personalised matches.</span>
       </span>
@@ -1504,7 +1506,7 @@ function SalaryPill({ min, max }: { min?: number | null; max?: number | null }) 
         ? `$${min}+/hr`
         : `Up to $${max}/hr`;
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 text-[11px] font-medium">
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-100 dark:border-emerald-500/20 text-[11px] font-medium">
       <span aria-hidden="true">$</span>
       {label}
     </span>
@@ -1518,23 +1520,29 @@ function SalaryPill({ min, max }: { min?: number | null; max?: number | null }) 
  */
 function HighlightTagChip({ tag }: { tag: string }) {
   const t = tag.toLowerCase();
-  let tone = 'bg-slate-50 text-slate-700 border-slate-200';
+  let tone = 'bg-muted text-foreground border-border';
   let label = tag;
   if (/(no sponsor|no h1b)/.test(t)) {
-    tone = 'bg-rose-50 text-rose-700 border-rose-200';
+    tone =
+      'bg-rose-50 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-500/30';
   } else if (/(sponsor|h1b)/.test(t)) {
-    tone = 'bg-indigo-50 text-indigo-700 border-indigo-200';
+    tone =
+      'bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-500/30';
     label = 'H1B Sponsor';
   } else if (/clearance|secret/.test(t)) {
-    tone = 'bg-amber-50 text-amber-800 border-amber-200';
+    tone =
+      'bg-amber-50 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-500/30';
   } else if (/remote/.test(t)) {
-    tone = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+    tone =
+      'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30';
     label = 'Remote';
   } else if (/hybrid/.test(t)) {
-    tone = 'bg-sky-50 text-sky-700 border-sky-200';
+    tone =
+      'bg-sky-50 dark:bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-500/30';
     label = 'Hybrid';
   } else if (/relocat/.test(t)) {
-    tone = 'bg-amber-50 text-amber-700 border-amber-200';
+    tone =
+      'bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-500/30';
     label = 'Relocation';
   }
   return (
@@ -1636,7 +1644,7 @@ function AppliedSubTabs({
   };
   for (const r of rows) counts[matchSubTab(r.application_status ?? 'SUBMITTED')]++;
   return (
-    <div className="border-b border-slate-200 mb-5 flex items-center gap-4 flex-wrap">
+    <div className="border-b border-border mb-5 flex items-center gap-4 flex-wrap">
       {APPLIED_SUB_TABS.map((t) => (
         <button
           key={t.key}
@@ -1644,15 +1652,15 @@ function AppliedSubTabs({
           className={clsx(
             'pb-2 text-sm flex items-center gap-1.5 border-b-2 transition -mb-px',
             active === t.key
-              ? 'border-slate-900 text-slate-900 font-semibold'
-              : 'border-transparent text-slate-500 hover:text-slate-800',
+              ? 'border-foreground text-foreground font-semibold'
+              : 'border-transparent text-muted-foreground hover:text-foreground',
           )}
         >
           {t.label}
           <span
             className={clsx(
               'text-[10px] font-semibold tabular-nums rounded-full px-1.5 py-0.5',
-              active === t.key ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600',
+              active === t.key ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground',
             )}
           >
             {counts[t.key]}
@@ -1674,14 +1682,14 @@ function StatusDropdown({
   const label = STATUS_LABEL[status] ?? status;
   const tone =
     status === 'OFFER'
-      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+      ? 'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30'
       : status === 'INTERVIEW'
-        ? 'bg-sky-50 text-sky-700 border-sky-200'
+        ? 'bg-sky-50 dark:bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-500/30'
         : status === 'REJECTED'
-          ? 'bg-rose-50 text-rose-700 border-rose-200'
+          ? 'bg-rose-50 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-500/30'
           : status === 'ARCHIVED' || status === 'WITHDRAWN'
-            ? 'bg-slate-100 text-slate-600 border-slate-200'
-            : 'bg-amber-50 text-amber-800 border-amber-200';
+            ? 'bg-muted text-muted-foreground border-border'
+            : 'bg-amber-50 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-500/30';
   return (
     <select
       value={status}
@@ -1804,6 +1812,9 @@ function AlertsToggle() {
       >
         <span
           className={clsx(
+            // Fixed dark knob: this toggle lives on the always-indigo hero with
+            // an always-white track, so the knob must stay dark in both themes
+            // (a token like bg-foreground would invert to light and vanish).
             'block w-4 h-4 rounded-full bg-slate-900 transition-transform',
             on ? 'translate-x-4' : '',
           )}
@@ -1867,12 +1878,12 @@ function SkillsPicker({
   }
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl px-4 py-3 mb-3 flex items-center gap-2 flex-wrap">
-      <span className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase">
+    <div className="bg-card border border-border rounded-xl px-4 py-3 mb-3 flex items-center gap-2 flex-wrap">
+      <span className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">
         My skills
       </span>
       {skills.length === 0 && (
-        <span className="text-xs text-slate-400 italic">
+        <span className="text-xs text-muted-foreground italic">
           Add skills (React, Java, AWS, Python…) to tune recommendations.
         </span>
       )}
@@ -1888,12 +1899,12 @@ function SkillsPicker({
               if (e.key === 'Enter') commitEdit();
               else if (e.key === 'Escape') cancelEdit();
             }}
-            className="text-xs bg-white border border-brand-400 text-slate-800 font-medium rounded-full px-2.5 py-0.5 focus:outline-none focus:ring-2 focus:ring-brand-500/40 w-28"
+            className="text-xs bg-card border border-brand-400 text-foreground font-medium rounded-full px-2.5 py-0.5 focus:outline-none focus:ring-2 focus:ring-brand-500/40 w-28"
           />
         ) : (
           <span
             key={s}
-            className="inline-flex items-center gap-1 bg-slate-100 text-slate-800 text-xs font-medium px-2 py-0.5 rounded-full"
+            className="inline-flex items-center gap-1 bg-muted text-foreground text-xs font-medium px-2 py-0.5 rounded-full"
           >
             <button
               onClick={() => startEdit(i)}
@@ -1904,7 +1915,7 @@ function SkillsPicker({
             </button>
             <button
               onClick={() => remove(s)}
-              className="text-slate-400 hover:text-red-500 text-sm leading-none"
+              className="text-muted-foreground hover:text-red-500 text-sm leading-none"
               title="Remove"
             >
               ×
@@ -1920,17 +1931,17 @@ function SkillsPicker({
             if (e.key === 'Enter') add();
           }}
           placeholder="Add skill…"
-          className="text-xs bg-slate-50 border border-slate-200 rounded-full px-2.5 py-1 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+          className="text-xs bg-muted border border-border rounded-full px-2.5 py-1 placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-brand-500/40"
         />
         <button
           onClick={add}
-          className="text-xs bg-slate-900 text-white px-2.5 py-1 rounded-full hover:bg-slate-800"
+          className="text-xs bg-foreground text-background px-2.5 py-1 rounded-full hover:opacity-90"
         >
           +
         </button>
         <button
           onClick={onRecompute}
-          className="text-xs text-slate-600 hover:text-slate-900 ml-1"
+          className="text-xs text-muted-foreground hover:text-foreground ml-1"
           title="Re-run AI ranking with these skills"
         >
           Recompute ⟳
@@ -1945,21 +1956,35 @@ function SkillsPicker({
 // ---------------------------------------------------------------------------
 
 const SOURCE_TONE: Record<string, string> = {
-  remoteok: 'bg-indigo-50 text-indigo-700 border-indigo-100',
-  greenhouse: 'bg-emerald-50 text-emerald-700 border-emerald-100',
-  lever: 'bg-purple-50 text-purple-700 border-purple-100',
-  adzuna: 'bg-orange-50 text-orange-700 border-orange-100',
-  remotive: 'bg-sky-50 text-sky-700 border-sky-100',
-  arbeitnow: 'bg-amber-50 text-amber-800 border-amber-100',
-  jsearch: 'bg-rose-50 text-rose-700 border-rose-100',
-  ashby: 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-100',
-  jooble: 'bg-cyan-50 text-cyan-700 border-cyan-100',
-  usajobs: 'bg-blue-50 text-blue-700 border-blue-100',
-  serpapi: 'bg-yellow-50 text-yellow-800 border-yellow-100',
-  searchapi: 'bg-violet-50 text-violet-700 border-violet-100',
-  linkedin: 'bg-sky-100 text-sky-800 border-sky-200',
-  monster: 'bg-violet-100 text-violet-800 border-violet-200',
-  manual: 'bg-slate-100 text-slate-700 border-slate-200',
+  remoteok:
+    'bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border-indigo-100 dark:border-indigo-500/20',
+  greenhouse:
+    'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-100 dark:border-emerald-500/20',
+  lever:
+    'bg-purple-50 dark:bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-100 dark:border-purple-500/20',
+  adzuna:
+    'bg-orange-50 dark:bg-orange-500/15 text-orange-700 dark:text-orange-300 border-orange-100 dark:border-orange-500/20',
+  remotive:
+    'bg-sky-50 dark:bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-100 dark:border-sky-500/20',
+  arbeitnow:
+    'bg-amber-50 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-100 dark:border-amber-500/20',
+  jsearch:
+    'bg-rose-50 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-100 dark:border-rose-500/20',
+  ashby:
+    'bg-fuchsia-50 dark:bg-fuchsia-500/15 text-fuchsia-700 dark:text-fuchsia-300 border-fuchsia-100 dark:border-fuchsia-500/20',
+  jooble:
+    'bg-cyan-50 dark:bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border-cyan-100 dark:border-cyan-500/20',
+  usajobs:
+    'bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-100 dark:border-blue-500/20',
+  serpapi:
+    'bg-yellow-50 dark:bg-yellow-500/15 text-yellow-800 dark:text-yellow-300 border-yellow-100 dark:border-yellow-500/20',
+  searchapi:
+    'bg-violet-50 dark:bg-violet-500/15 text-violet-700 dark:text-violet-300 border-violet-100 dark:border-violet-500/20',
+  linkedin:
+    'bg-sky-100 dark:bg-sky-500/20 text-sky-800 dark:text-sky-300 border-sky-200 dark:border-sky-500/30',
+  monster:
+    'bg-violet-100 dark:bg-violet-500/20 text-violet-800 dark:text-violet-300 border-violet-200 dark:border-violet-500/30',
+  manual: 'bg-muted text-foreground border-border',
 };
 const SOURCE_LABEL: Record<string, string> = {
   remoteok: 'RemoteOK',
@@ -1996,8 +2021,8 @@ function SourceBreakdown({
   if (counts.size === 0) return null;
   const ordered = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
   return (
-    <div className="bg-white border border-slate-200 rounded-xl px-4 py-3 mb-4 flex items-center gap-2 flex-wrap">
-      <span className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase">
+    <div className="bg-card border border-border rounded-xl px-4 py-3 mb-4 flex items-center gap-2 flex-wrap">
+      <span className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">
         By source
       </span>
       {ordered.map(([source, n]) => (
@@ -2007,8 +2032,8 @@ function SourceBreakdown({
           className={clsx(
             'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs transition',
             active === source
-              ? 'bg-slate-900 text-white border-slate-900'
-              : (SOURCE_TONE[source] ?? 'bg-slate-100 text-slate-700 border-slate-200') +
+              ? 'bg-foreground text-background border-foreground'
+              : (SOURCE_TONE[source] ?? 'bg-muted text-foreground border-border') +
                   ' hover:opacity-80',
           )}
         >
@@ -2016,13 +2041,15 @@ function SourceBreakdown({
           <span className="tabular-nums opacity-90">{n}</span>
         </button>
       ))}
-      <span className="ml-auto text-xs text-slate-500 tabular-nums">{rows.length} total</span>
+      <span className="ml-auto text-xs text-muted-foreground tabular-nums">
+        {rows.length} total
+      </span>
     </div>
   );
 }
 
 function SourceBadge({ source }: { source: string }) {
-  const tone = SOURCE_TONE[source] ?? 'bg-slate-100 text-slate-700 border-slate-200';
+  const tone = SOURCE_TONE[source] ?? 'bg-muted text-foreground border-border';
   return (
     <span
       className={clsx(
@@ -2038,13 +2065,19 @@ function SourceBadge({ source }: { source: string }) {
 // Publisher = the user-facing job board (LinkedIn, Dice, Monster, …).
 // Distinct from `source`, which is the ingestion driver (e.g. JSearch).
 const PUBLISHER_TONE: Record<string, string> = {
-  LinkedIn: 'bg-sky-50 text-sky-700 border-sky-100',
-  Dice: 'bg-red-50 text-red-700 border-red-100',
-  Monster: 'bg-violet-50 text-violet-700 border-violet-100',
-  CareerBuilder: 'bg-emerald-50 text-emerald-700 border-emerald-100',
-  Indeed: 'bg-blue-50 text-blue-700 border-blue-100',
-  Glassdoor: 'bg-teal-50 text-teal-700 border-teal-100',
-  ZipRecruiter: 'bg-orange-50 text-orange-700 border-orange-100',
+  LinkedIn:
+    'bg-sky-50 dark:bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-100 dark:border-sky-500/20',
+  Dice: 'bg-red-50 dark:bg-red-500/15 text-red-700 dark:text-red-300 border-red-100 dark:border-red-500/20',
+  Monster:
+    'bg-violet-50 dark:bg-violet-500/15 text-violet-700 dark:text-violet-300 border-violet-100 dark:border-violet-500/20',
+  CareerBuilder:
+    'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-100 dark:border-emerald-500/20',
+  Indeed:
+    'bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-100 dark:border-blue-500/20',
+  Glassdoor:
+    'bg-teal-50 dark:bg-teal-500/15 text-teal-700 dark:text-teal-300 border-teal-100 dark:border-teal-500/20',
+  ZipRecruiter:
+    'bg-orange-50 dark:bg-orange-500/15 text-orange-700 dark:text-orange-300 border-orange-100 dark:border-orange-500/20',
 };
 // ---------------------------------------------------------------------------
 // Recruiter targeting bar — pick a consultant + resume to apply on behalf of.
@@ -2141,7 +2174,7 @@ function RecruiterTargetingBar({
           const c = consultants.find((x) => x.id === e.target.value) ?? null;
           pickConsultant(c);
         }}
-        className="text-sm bg-white border border-slate-200 rounded-md px-2 py-1 min-w-[200px]"
+        className="text-sm bg-card border border-border rounded-md px-2 py-1 min-w-[200px]"
       >
         <option value="">— Select consultant —</option>
         {consultants.map((c) => (
@@ -2156,7 +2189,7 @@ function RecruiterTargetingBar({
           <select
             value={value.resumeId ?? ''}
             onChange={(e) => pickResume(e.target.value)}
-            className="text-sm bg-white border border-slate-200 rounded-md px-2 py-1 min-w-[180px]"
+            className="text-sm bg-card border border-border rounded-md px-2 py-1 min-w-[180px]"
           >
             <option value="">— Select resume —</option>
             {resumes.map((r) => (
@@ -2166,12 +2199,12 @@ function RecruiterTargetingBar({
               </option>
             ))}
           </select>
-          <span className="text-xs text-slate-600">
+          <span className="text-xs text-muted-foreground">
             {value.skills.length} skill{value.skills.length === 1 ? '' : 's'} on file
           </span>
           <button
             onClick={() => pickConsultant(null)}
-            className="ml-auto text-xs text-slate-500 hover:text-slate-900"
+            className="ml-auto text-xs text-muted-foreground hover:text-foreground"
           >
             Clear ×
           </button>
@@ -2200,11 +2233,11 @@ function ApplyConfirmModal({
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6"
+        className="bg-card rounded-2xl shadow-xl w-full max-w-md p-6"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="text-base font-semibold text-slate-900 mb-1">Did you apply?</h2>
-        <p className="text-sm text-slate-600 mb-4">
+        <h2 className="text-base font-semibold text-foreground mb-1">Did you apply?</h2>
+        <p className="text-sm text-muted-foreground mb-4">
           We just opened the apply page for <strong>{job.title}</strong>
           {job.company_name ? (
             <>
@@ -2217,7 +2250,7 @@ function ApplyConfirmModal({
         <div className="flex justify-end gap-2">
           <button
             onClick={() => onConfirm(false)}
-            className="border border-slate-200 text-slate-700 text-sm px-4 py-2 rounded-lg hover:bg-slate-50"
+            className="border border-border text-foreground text-sm px-4 py-2 rounded-lg hover:bg-muted"
           >
             No, not yet
           </button>
@@ -2234,7 +2267,7 @@ function ApplyConfirmModal({
 }
 
 function PublisherBadge({ publisher }: { publisher: string }) {
-  const tone = PUBLISHER_TONE[publisher] ?? 'bg-slate-100 text-slate-700 border-slate-200';
+  const tone = PUBLISHER_TONE[publisher] ?? 'bg-muted text-foreground border-border';
   return (
     <span
       className={clsx(
@@ -2371,32 +2404,32 @@ function SourcesDrawer({ onClose, onAfterSync }: { onClose: () => void; onAfterS
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/30 flex justify-end" onClick={onClose}>
       <div
-        className="bg-white w-full max-w-md h-full overflow-y-auto shadow-xl"
+        className="bg-card w-full max-w-md h-full overflow-y-auto shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
+        <div className="px-5 py-4 border-b border-border flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-slate-900">Live job sources</h2>
-            <p className="text-xs text-slate-500">
+            <h2 className="text-lg font-semibold text-foreground">Live job sources</h2>
+            <p className="text-xs text-muted-foreground">
               Pull real-time listings from legitimate public APIs.
             </p>
           </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-900 text-xl leading-none"
+            className="text-muted-foreground hover:text-foreground text-xl leading-none"
           >
             ×
           </button>
         </div>
 
         {/* Add new source */}
-        <div className="p-5 border-b border-slate-100 bg-slate-50">
-          <h3 className="text-sm font-semibold text-slate-900 mb-2">Add a company / feed</h3>
+        <div className="p-5 border-b border-border bg-muted">
+          <h3 className="text-sm font-semibold text-foreground mb-2">Add a company / feed</h3>
           <div className="grid grid-cols-3 gap-2">
             <select
               value={newSource}
               onChange={(e) => setNewSource(e.target.value as any)}
-              className="border border-slate-300 rounded-lg px-2 py-1.5 text-sm bg-white"
+              className="border border-border rounded-lg px-2 py-1.5 text-sm bg-card"
             >
               <option value="greenhouse">Greenhouse</option>
               <option value="lever">Lever</option>
@@ -2437,16 +2470,16 @@ function SourcesDrawer({ onClose, onAfterSync }: { onClose: () => void; onAfterS
                 newSource === 'remotive' ||
                 newSource === 'arbeitnow'
               }
-              className="border border-slate-300 rounded-lg px-2 py-1.5 text-sm col-span-1 disabled:bg-slate-100"
+              className="border border-border rounded-lg px-2 py-1.5 text-sm col-span-1 disabled:bg-muted"
             />
             <button
               onClick={add}
-              className="bg-slate-900 text-white text-sm px-3 py-1.5 rounded-lg hover:bg-slate-800"
+              className="bg-foreground text-background text-sm px-3 py-1.5 rounded-lg hover:opacity-90"
             >
               + Add
             </button>
           </div>
-          <p className="text-[11px] text-slate-500 mt-2">
+          <p className="text-[11px] text-muted-foreground mt-2">
             Greenhouse / Lever slugs come from the careers URL — e.g.{' '}
             <span className="font-mono">boards.greenhouse.io/stripe</span> → slug{' '}
             <span className="font-mono">stripe</span>.
@@ -2455,8 +2488,8 @@ function SourcesDrawer({ onClose, onAfterSync }: { onClose: () => void; onAfterS
 
         {/* Per-driver health summary */}
         {!loading && health.length > 0 && (
-          <div className="p-5 border-b border-slate-100">
-            <div className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase mb-2">
+          <div className="p-5 border-b border-border">
+            <div className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase mb-2">
               Driver health
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
@@ -2470,12 +2503,12 @@ function SourcesDrawer({ onClose, onAfterSync }: { onClose: () => void; onAfterS
                         : h.status === 'missing_key'
                           ? 'bg-amber-500'
                           : h.status === 'no_rows'
-                            ? 'bg-slate-300'
+                            ? 'bg-muted-foreground'
                             : 'bg-rose-500',
                     )}
                   />
-                  <span className="font-medium text-slate-800 w-20 truncate">{h.source}</span>
-                  <span className="text-slate-500">
+                  <span className="font-medium text-foreground w-20 truncate">{h.source}</span>
+                  <span className="text-muted-foreground">
                     {h.status === 'missing_key' && '⚠ API key missing'}
                     {h.status === 'no_rows' && 'no rows seeded'}
                     {h.status === 'error' && (h.last_error?.slice(0, 60) ?? 'error')}
@@ -2494,9 +2527,9 @@ function SourcesDrawer({ onClose, onAfterSync }: { onClose: () => void; onAfterS
             <SkeletonCard lines={4} />
           </div>
         ) : (
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-border">
             {rows.length === 0 && (
-              <div className="p-6 text-sm text-slate-400 italic text-center">
+              <div className="p-6 text-sm text-muted-foreground italic text-center">
                 No sources configured yet.
               </div>
             )}
@@ -2505,16 +2538,16 @@ function SourcesDrawer({ onClose, onAfterSync }: { onClose: () => void; onAfterS
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <SourceBadge source={c.source} />
-                    <span className="text-sm font-medium text-slate-900 truncate">
+                    <span className="text-sm font-medium text-foreground truncate">
                       {c.display_name ?? c.slug ?? c.source}
                     </span>
                     {!c.is_active && (
-                      <span className="text-[10px] text-slate-400 uppercase tracking-wide">
+                      <span className="text-[10px] text-muted-foreground uppercase tracking-wide">
                         Paused
                       </span>
                     )}
                   </div>
-                  <div className="text-xs text-slate-500 mt-0.5">
+                  <div className="text-xs text-muted-foreground mt-0.5">
                     {c.slug && <span className="font-mono">{c.slug}</span>}
                     {c.last_synced_at ? (
                       <>
@@ -2527,7 +2560,10 @@ function SourcesDrawer({ onClose, onAfterSync }: { onClose: () => void; onAfterS
                     )}
                   </div>
                   {c.last_sync_error && (
-                    <p className="text-[11px] text-red-600 mt-1 truncate" title={c.last_sync_error}>
+                    <p
+                      className="text-[11px] text-red-600 dark:text-red-400 mt-1 truncate"
+                      title={c.last_sync_error}
+                    >
                       ⚠ {c.last_sync_error}
                     </p>
                   )}
@@ -2536,19 +2572,19 @@ function SourcesDrawer({ onClose, onAfterSync }: { onClose: () => void; onAfterS
                   <button
                     onClick={() => syncOne(c.id)}
                     disabled={busy === c.id}
-                    className="text-xs border border-slate-200 rounded-md px-2 py-1 hover:bg-slate-50 disabled:opacity-50"
+                    className="text-xs border border-border rounded-md px-2 py-1 hover:bg-muted disabled:opacity-50"
                   >
                     {busy === c.id ? '…' : 'Sync'}
                   </button>
                   <button
                     onClick={() => toggle(c)}
-                    className="text-xs text-slate-500 hover:text-slate-900 px-1"
+                    className="text-xs text-muted-foreground hover:text-foreground px-1"
                   >
                     {c.is_active ? 'Pause' : 'Resume'}
                   </button>
                   <button
                     onClick={() => remove(c)}
-                    className="text-xs text-red-600 hover:underline px-1"
+                    className="text-xs text-red-600 dark:text-red-400 hover:underline px-1"
                   >
                     Remove
                   </button>

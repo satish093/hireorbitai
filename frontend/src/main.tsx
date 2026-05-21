@@ -30,11 +30,11 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
                 // enter/exit motion itself with a default slide+fade.
                 style: {
                   borderRadius: '12px',
-                  background: '#ffffff',
-                  color: '#0f172a',
+                  background: 'var(--popover)',
+                  color: 'var(--popover-foreground)',
                   boxShadow:
                     '0 1px 0 rgba(15, 23, 42, 0.04), 0 8px 24px -8px rgba(15, 23, 42, 0.18)',
-                  border: '1px solid #e2e8f0',
+                  border: '1px solid var(--border)',
                   padding: '10px 14px',
                   fontSize: '13.5px',
                   fontWeight: 500,

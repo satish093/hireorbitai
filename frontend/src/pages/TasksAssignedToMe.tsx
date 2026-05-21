@@ -30,8 +30,8 @@ const SECTION_DOT: Record<SectionKey, string> = {
   overdue: 'bg-red-500',
   today: 'bg-amber-500',
   this_week: 'bg-blue-500',
-  later: 'bg-slate-400',
-  no_due: 'bg-slate-300',
+  later: 'bg-muted-foreground',
+  no_due: 'bg-muted-foreground',
 };
 
 function bucketize(tasks: Task[]): Record<SectionKey, Task[]> {
@@ -118,22 +118,24 @@ export function TasksAssignedToMe() {
     >
       <div className="flex items-end justify-between gap-3 mb-5">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">My tasks</h1>
-          <p className="text-sm text-slate-600 mt-1">
-            <span className="font-semibold text-slate-900">{active.length} active</span>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">My tasks</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            <span className="font-semibold text-foreground">{active.length} active</span>
             {' · '}
-            <span className={overdueCount > 0 ? 'font-semibold text-red-600' : ''}>
+            <span
+              className={overdueCount > 0 ? 'font-semibold text-red-600 dark:text-red-400' : ''}
+            >
               {overdueCount} overdue
             </span>
             {' · '}
-            <span className="font-semibold text-slate-900">{dueThisWeek} due this week</span>
+            <span className="font-semibold text-foreground">{dueThisWeek} due this week</span>
           </p>
         </div>
         <div className="flex items-center gap-2">
           {/* Static date pill — purely informational, not a button. The
               previous render used <button> with no onClick which looked
               clickable but did nothing. */}
-          <span className="border border-slate-200 bg-white rounded-lg px-3 py-1.5 text-sm text-slate-700">
+          <span className="border border-border bg-card rounded-lg px-3 py-1.5 text-sm text-foreground">
             📅 Today ·{' '}
             {new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
           </span>
@@ -156,12 +158,12 @@ export function TasksAssignedToMe() {
           </div>
           <div className="flex flex-wrap items-center gap-2 mb-2">
             <span className="inline-flex items-center gap-1.5 bg-white/15 backdrop-blur-sm rounded-full text-xs px-2 py-0.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-white" />
+              <span className="w-1.5 h-1.5 rounded-full bg-card" />
               {nextUp.priority.toLowerCase()} priority
             </span>
             {nextUp.due_at && (
               <span className="inline-flex items-center gap-1.5 bg-white/15 backdrop-blur-sm rounded-full text-xs px-2 py-0.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-white" />
+                <span className="w-1.5 h-1.5 rounded-full bg-card" />
                 {humanDue(nextUp.due_at)}
               </span>
             )}
@@ -202,10 +204,10 @@ export function TasksAssignedToMe() {
               <section key={key}>
                 <div className="flex items-center gap-2 mb-2">
                   <span className={`w-2 h-2 rounded-full ${SECTION_DOT[key]}`} />
-                  <h3 className="text-sm font-semibold text-slate-900">{SECTION_LABEL[key]}</h3>
-                  <span className="text-xs text-slate-500 tabular-nums">{list.length}</span>
+                  <h3 className="text-sm font-semibold text-foreground">{SECTION_LABEL[key]}</h3>
+                  <span className="text-xs text-muted-foreground tabular-nums">{list.length}</span>
                 </div>
-                <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100">
+                <div className="bg-card border border-border rounded-xl divide-y divide-border">
                   {list.map((t) => (
                     <RowCard key={t.id} task={t} />
                   ))}
@@ -223,16 +225,18 @@ function RowCard({ task }: { task: Task }) {
   return (
     <Link
       to={`/tasks/${task.id}`}
-      className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 first:rounded-t-xl last:rounded-b-xl"
+      className="flex items-center gap-3 px-4 py-3 hover:bg-muted first:rounded-t-xl last:rounded-b-xl"
     >
       {/* The dead checkbox column was removed — no onChange, no state, no
           backend wiring. When a "mark complete" inline-action is needed,
           wire it to PATCH /tasks/:id/status with status=COMPLETED and add
           invalidate('tasks'). */}
-      <span className="text-[11px] font-mono text-slate-400 shrink-0">{shortId(task.id)}</span>
+      <span className="text-[11px] font-mono text-muted-foreground shrink-0">
+        {shortId(task.id)}
+      </span>
       <span className="flex-1 min-w-0">
-        <div className="text-sm font-medium text-slate-900 truncate">{task.title}</div>
-        <div className="flex items-center gap-2 mt-1 text-xs text-slate-500">
+        <div className="text-sm font-medium text-foreground truncate">{task.title}</div>
+        <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
           {task.assignee && (
             <span className="inline-flex items-center gap-1">
               <Avatar name={task.assignee.full_name} email={task.assignee.email} size={16} />

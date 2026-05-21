@@ -19,12 +19,28 @@ export interface GeneratedLessonStub {
 }
 
 const CONTENT_STATUS_TONE: Record<string, PillTone> = {
-  PENDING: { bg: 'bg-slate-100', text: 'text-slate-600', dot: 'bg-slate-400' },
-  GENERATING: { bg: 'bg-amber-50', text: 'text-amber-700', dot: 'bg-amber-500' },
-  READY: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
-  FAILED: { bg: 'bg-rose-50', text: 'text-rose-700', dot: 'bg-rose-500' },
-  NONE: { bg: 'bg-slate-100', text: 'text-slate-600', dot: 'bg-slate-400' },
-  OUTLINE_READY: { bg: 'bg-sky-50', text: 'text-sky-700', dot: 'bg-sky-500' },
+  PENDING: { bg: 'bg-muted', text: 'text-muted-foreground', dot: 'bg-muted-foreground' },
+  GENERATING: {
+    bg: 'bg-amber-50 dark:bg-amber-500/15',
+    text: 'text-amber-700 dark:text-amber-300',
+    dot: 'bg-amber-500',
+  },
+  READY: {
+    bg: 'bg-emerald-50 dark:bg-emerald-500/15',
+    text: 'text-emerald-700 dark:text-emerald-300',
+    dot: 'bg-emerald-500',
+  },
+  FAILED: {
+    bg: 'bg-rose-50 dark:bg-rose-500/15',
+    text: 'text-rose-700 dark:text-rose-300',
+    dot: 'bg-rose-500',
+  },
+  NONE: { bg: 'bg-muted', text: 'text-muted-foreground', dot: 'bg-muted-foreground' },
+  OUTLINE_READY: {
+    bg: 'bg-sky-50 dark:bg-sky-500/15',
+    text: 'text-sky-700 dark:text-sky-300',
+    dot: 'bg-sky-500',
+  },
 };
 
 // Plain-language labels so authors don't have to decode the raw enum.
@@ -48,11 +64,23 @@ export function ContentStatusChip({ status }: { status?: string | null }) {
 
 // Editorial lifecycle pill: DRAFT → GENERATED → REVIEWED → PUBLISHED → ARCHIVED.
 const REVIEW_STATUS_TONE: Record<string, PillTone> = {
-  DRAFT: { bg: 'bg-slate-100', text: 'text-slate-600', dot: 'bg-slate-400' },
-  GENERATED: { bg: 'bg-sky-50', text: 'text-sky-700', dot: 'bg-sky-500' },
-  REVIEWED: { bg: 'bg-indigo-50', text: 'text-indigo-700', dot: 'bg-indigo-500' },
-  PUBLISHED: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
-  ARCHIVED: { bg: 'bg-slate-100', text: 'text-slate-400', dot: 'bg-slate-300' },
+  DRAFT: { bg: 'bg-muted', text: 'text-muted-foreground', dot: 'bg-muted-foreground' },
+  GENERATED: {
+    bg: 'bg-sky-50 dark:bg-sky-500/15',
+    text: 'text-sky-700 dark:text-sky-300',
+    dot: 'bg-sky-500',
+  },
+  REVIEWED: {
+    bg: 'bg-indigo-50 dark:bg-indigo-500/15',
+    text: 'text-indigo-700 dark:text-indigo-300',
+    dot: 'bg-indigo-500',
+  },
+  PUBLISHED: {
+    bg: 'bg-emerald-50 dark:bg-emerald-500/15',
+    text: 'text-emerald-700 dark:text-emerald-300',
+    dot: 'bg-emerald-500',
+  },
+  ARCHIVED: { bg: 'bg-muted', text: 'text-muted-foreground', dot: 'bg-muted-foreground' },
 };
 const REVIEW_STATUS_LABEL: Record<string, string> = {
   DRAFT: 'Draft',
@@ -105,14 +133,14 @@ export function GenerationProgress({
 }) {
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
   return (
-    <div className="bg-white border border-slate-200 rounded-xl p-3">
-      <div className="flex items-center justify-between text-xs text-slate-600 mb-1.5">
+    <div className="bg-card border border-border rounded-xl p-3">
+      <div className="flex items-center justify-between text-xs text-muted-foreground mb-1.5">
         <span>{label ?? 'Generating lessons…'}</span>
         <span>
           {done}/{total}
         </span>
       </div>
-      <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
+      <div className="h-2 rounded-full bg-muted overflow-hidden">
         <div
           className="h-full bg-brand-500 transition-all"
           style={{ width: `${pct}%` }}
@@ -155,7 +183,7 @@ export function CapstoneEditor({
   }
 
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-6">
+    <div className="bg-card border border-border rounded-2xl p-6">
       <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
         <h2 className="text-lg font-semibold tracking-tight">Final project (capstone)</h2>
         <button
@@ -167,20 +195,20 @@ export function CapstoneEditor({
         </button>
       </div>
       {!capstone ? (
-        <p className="text-sm text-slate-400 italic">
+        <p className="text-sm text-muted-foreground italic">
           No final project yet. Generate one — it becomes each learner's final assessment when the
           course is assigned to them.
         </p>
       ) : (
         <div className="space-y-3">
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             {capstone.assessment_type}
           </div>
           {capstone.instructions && (
-            <p className="text-sm text-slate-700 whitespace-pre-wrap">{capstone.instructions}</p>
+            <p className="text-sm text-foreground whitespace-pre-wrap">{capstone.instructions}</p>
           )}
           {Array.isArray(capstone.questions) && capstone.questions.length > 0 && (
-            <ol className="list-decimal list-outside pl-5 space-y-1 text-sm text-slate-700">
+            <ol className="list-decimal list-outside pl-5 space-y-1 text-sm text-foreground">
               {capstone.questions.map((q: any, i: number) => (
                 <li key={i}>{q.prompt ?? q.question ?? String(q)}</li>
               ))}
@@ -191,7 +219,7 @@ export function CapstoneEditor({
               {capstone.rubric.map((r: any, i: number) => (
                 <span
                   key={i}
-                  className="text-[11px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full"
+                  className="text-[11px] bg-muted text-foreground px-2 py-0.5 rounded-full"
                 >
                   {r.criterion} · {r.weight}
                 </span>
@@ -317,7 +345,7 @@ export function LessonEditorModal({
         <button
           onClick={saveLesson}
           disabled={saving}
-          className="bg-slate-900 text-white text-sm px-4 py-2 rounded-lg hover:bg-slate-800 disabled:opacity-50"
+          className="bg-foreground text-background text-sm px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-50"
         >
           {saving ? 'Saving…' : 'Save lesson'}
         </button>
@@ -342,13 +370,13 @@ export function LessonEditorModal({
             onChange={(v) => setForm({ ...form, estimated_minutes: v })}
           />
           <label className="block">
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
               Status
             </span>
             <select
               value={form.content_status}
               onChange={(e) => setForm({ ...form, content_status: e.target.value })}
-              className="mt-1 w-full text-sm border border-slate-200 rounded-md px-2 py-1.5 bg-white"
+              className="mt-1 w-full text-sm border border-border rounded-md px-2 py-1.5 bg-card"
             >
               {LESSON_STATUSES.map((s) => (
                 <option key={s} value={s}>
@@ -383,7 +411,7 @@ export function LessonEditorModal({
 
         <div>
           <div className="flex items-center justify-between mb-1">
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
               Exercises
             </span>
             <button
@@ -397,7 +425,7 @@ export function LessonEditorModal({
           </div>
           <div className="space-y-2">
             {exercises.map((ex, i) => (
-              <div key={i} className="border border-slate-200 rounded-lg p-2 space-y-1.5">
+              <div key={i} className="border border-border rounded-lg p-2 space-y-1.5">
                 <input
                   value={ex.prompt ?? ''}
                   placeholder="Prompt"
@@ -406,7 +434,7 @@ export function LessonEditorModal({
                     next[i] = { ...ex, prompt: e.target.value };
                     setExercises(next);
                   }}
-                  className="w-full text-sm border border-slate-200 rounded-md px-2 py-1"
+                  className="w-full text-sm border border-border rounded-md px-2 py-1"
                 />
                 <input
                   value={ex.expected_outcome ?? ''}
@@ -416,12 +444,12 @@ export function LessonEditorModal({
                     next[i] = { ...ex, expected_outcome: e.target.value };
                     setExercises(next);
                   }}
-                  className="w-full text-sm border border-slate-200 rounded-md px-2 py-1"
+                  className="w-full text-sm border border-border rounded-md px-2 py-1"
                 />
                 <div className="flex justify-end">
                   <button
                     onClick={() => setExercises(exercises.filter((_, j) => j !== i))}
-                    className="text-xs text-rose-600 hover:underline"
+                    className="text-xs text-rose-600 dark:text-rose-400 hover:underline"
                   >
                     Remove
                   </button>
@@ -431,9 +459,9 @@ export function LessonEditorModal({
           </div>
         </div>
 
-        <div className="border-t border-slate-100 pt-3">
+        <div className="border-t border-border pt-3">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
               Knowledge-check questions ({qs.length})
             </span>
             <button onClick={addQuestion} className="text-xs text-brand-700 hover:underline">
@@ -474,12 +502,12 @@ function QuizQuestionEditor({
 }) {
   const optionsText = Array.isArray(q.options) ? q.options.join('\n') : '';
   return (
-    <div className="border border-slate-200 rounded-lg p-3 space-y-2">
+    <div className="border border-border rounded-lg p-3 space-y-2">
       <input
         value={q.question ?? ''}
         placeholder="Question"
         onChange={(e) => onChange({ ...q, question: e.target.value })}
-        className="w-full text-sm font-medium border border-slate-200 rounded-md px-2 py-1"
+        className="w-full text-sm font-medium border border-border rounded-md px-2 py-1"
       />
       <EditArea
         label="Options (one per line)"
@@ -506,12 +534,15 @@ function QuizQuestionEditor({
         onChange={(v) => onChange({ ...q, explanation: v })}
       />
       <div className="flex justify-end gap-2">
-        <button onClick={onDelete} className="text-xs text-rose-600 hover:underline">
+        <button
+          onClick={onDelete}
+          className="text-xs text-rose-600 dark:text-rose-400 hover:underline"
+        >
           Delete
         </button>
         <button
           onClick={onSave}
-          className="text-xs border border-slate-200 px-2.5 py-1 rounded-lg hover:bg-slate-50"
+          className="text-xs border border-border px-2.5 py-1 rounded-lg hover:bg-muted"
         >
           Save question
         </button>
@@ -533,14 +564,14 @@ function EditField({
 }) {
   return (
     <label className="block">
-      <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+      <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
         {label}
       </span>
       <input
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="mt-1 w-full text-sm border border-slate-200 rounded-md px-2 py-1.5"
+        className="mt-1 w-full text-sm border border-border rounded-md px-2 py-1.5"
       />
     </label>
   );
@@ -559,14 +590,14 @@ function EditArea({
 }) {
   return (
     <label className="block">
-      <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+      <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
         {label}
       </span>
       <textarea
         rows={rows}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="mt-1 w-full text-sm border border-slate-200 rounded-md px-2 py-1.5 font-mono"
+        className="mt-1 w-full text-sm border border-border rounded-md px-2 py-1.5 font-mono"
       />
     </label>
   );

@@ -9,24 +9,29 @@ import { Pill, PillTone, TagPillBase } from './Pill';
 // ---- Priority --------------------------------------------------------------
 
 const PRIORITY_TONE: Record<TaskPriority, PillTone> = {
-  LOW: { bg: 'bg-blue-50', text: 'text-blue-700', dot: 'bg-blue-400', border: 'border-blue-100' },
+  LOW: {
+    bg: 'bg-blue-50 dark:bg-blue-500/15',
+    text: 'text-blue-700 dark:text-blue-300',
+    dot: 'bg-blue-400',
+    border: 'border-blue-100 dark:border-blue-500/20',
+  },
   MEDIUM: {
-    bg: 'bg-yellow-50',
-    text: 'text-yellow-800',
+    bg: 'bg-yellow-50 dark:bg-yellow-500/15',
+    text: 'text-yellow-800 dark:text-yellow-300',
     dot: 'bg-yellow-400',
-    border: 'border-yellow-100',
+    border: 'border-yellow-100 dark:border-yellow-500/20',
   },
   HIGH: {
-    bg: 'bg-amber-50',
-    text: 'text-amber-800',
+    bg: 'bg-amber-50 dark:bg-amber-500/15',
+    text: 'text-amber-800 dark:text-amber-300',
     dot: 'bg-amber-500',
-    border: 'border-amber-100',
+    border: 'border-amber-100 dark:border-amber-500/20',
   },
   CRITICAL: {
-    bg: 'bg-red-50',
-    text: 'text-red-700',
+    bg: 'bg-red-50 dark:bg-red-500/15',
+    text: 'text-red-700 dark:text-red-300',
     dot: 'bg-red-500',
-    border: 'border-red-100',
+    border: 'border-red-100 dark:border-red-500/20',
   },
 };
 
@@ -38,13 +43,33 @@ export function PriorityBadge({ priority }: { priority: TaskPriority }) {
 // ---- Status ----------------------------------------------------------------
 
 const STATUS_TONE: Record<TaskStatus, PillTone> = {
-  BACKLOG: { bg: 'bg-slate-100', text: 'text-slate-700', dot: 'bg-slate-400' },
-  TODO: { bg: 'bg-blue-50', text: 'text-blue-700', dot: 'bg-blue-500' },
-  IN_PROGRESS: { bg: 'bg-amber-50', text: 'text-amber-800', dot: 'bg-amber-500' },
-  BLOCKED: { bg: 'bg-red-50', text: 'text-red-700', dot: 'bg-red-500' },
-  REVIEW: { bg: 'bg-purple-50', text: 'text-purple-700', dot: 'bg-purple-500' },
-  COMPLETED: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
-  CANCELLED: { bg: 'bg-slate-100', text: 'text-slate-500', dot: 'bg-slate-300' },
+  BACKLOG: { bg: 'bg-muted', text: 'text-foreground', dot: 'bg-muted-foreground' },
+  TODO: {
+    bg: 'bg-blue-50 dark:bg-blue-500/15',
+    text: 'text-blue-700 dark:text-blue-300',
+    dot: 'bg-blue-500',
+  },
+  IN_PROGRESS: {
+    bg: 'bg-amber-50 dark:bg-amber-500/15',
+    text: 'text-amber-800 dark:text-amber-300',
+    dot: 'bg-amber-500',
+  },
+  BLOCKED: {
+    bg: 'bg-red-50 dark:bg-red-500/15',
+    text: 'text-red-700 dark:text-red-300',
+    dot: 'bg-red-500',
+  },
+  REVIEW: {
+    bg: 'bg-purple-50 dark:bg-purple-500/15',
+    text: 'text-purple-700 dark:text-purple-300',
+    dot: 'bg-purple-500',
+  },
+  COMPLETED: {
+    bg: 'bg-emerald-50 dark:bg-emerald-500/15',
+    text: 'text-emerald-700 dark:text-emerald-300',
+    dot: 'bg-emerald-500',
+  },
+  CANCELLED: { bg: 'bg-muted', text: 'text-muted-foreground', dot: 'bg-muted-foreground' },
 };
 
 const STATUS_LABELS: Record<TaskStatus, string> = {
@@ -84,12 +109,20 @@ function dueRelative(due: Date): string {
   return due.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
-const DUE_OVERDUE: PillTone = { bg: 'bg-red-50', text: 'text-red-700', dot: 'bg-red-500' };
-const DUE_NORMAL: PillTone = { bg: 'bg-slate-100', text: 'text-slate-700', dot: 'bg-slate-400' };
+const DUE_OVERDUE: PillTone = {
+  bg: 'bg-red-50 dark:bg-red-500/15',
+  text: 'text-red-700 dark:text-red-300',
+  dot: 'bg-red-500',
+};
+const DUE_NORMAL: PillTone = {
+  bg: 'bg-muted',
+  text: 'text-foreground',
+  dot: 'bg-muted-foreground',
+};
 
 export function DuePill({ task }: { task: Task }) {
   if (!task.due_at) {
-    return <span className="text-xs text-slate-400">No due date</span>;
+    return <span className="text-xs text-muted-foreground">No due date</span>;
   }
   const overdue = isOverdue(task);
   const due = new Date(task.due_at);
@@ -104,14 +137,14 @@ export function DueDate({ task }: { task: Task }) {
 // ---- Avatar ----------------------------------------------------------------
 
 const AVATAR_COLORS = [
-  'bg-rose-100 text-rose-700',
-  'bg-amber-100 text-amber-800',
-  'bg-emerald-100 text-emerald-700',
-  'bg-sky-100 text-sky-700',
-  'bg-violet-100 text-violet-700',
-  'bg-blue-100 text-blue-700',
-  'bg-orange-100 text-orange-700',
-  'bg-fuchsia-100 text-fuchsia-700',
+  'bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-300',
+  'bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300',
+  'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300',
+  'bg-sky-100 dark:bg-sky-500/20 text-sky-700 dark:text-sky-300',
+  'bg-violet-100 dark:bg-violet-500/20 text-violet-700 dark:text-violet-300',
+  'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300',
+  'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-300',
+  'bg-fuchsia-100 dark:bg-fuchsia-500/20 text-fuchsia-700 dark:text-fuchsia-300',
 ];
 
 function hashColor(seed: string): string {
@@ -154,10 +187,10 @@ export function Avatar({
 
 export function AssigneeChip({ task }: { task: Task }) {
   if (!task.assignee) {
-    return <span className="text-xs text-slate-400 italic">Unassigned</span>;
+    return <span className="text-xs text-muted-foreground italic">Unassigned</span>;
   }
   return (
-    <span className="inline-flex items-center gap-1.5 text-xs text-slate-700">
+    <span className="inline-flex items-center gap-1.5 text-xs text-foreground">
       <GroupBadge groupId={task.assignee.group_id ?? null} compact hideEmpty />
       <Avatar name={task.assignee.full_name} email={task.assignee.email} size={20} />
       <span className="truncate max-w-[110px]">

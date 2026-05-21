@@ -266,7 +266,7 @@ export function TrainingCourseDetails() {
         { label: course.title },
       ]}
     >
-      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden mb-6">
+      <div className="bg-card border border-border rounded-2xl overflow-hidden mb-6">
         {course.thumbnail_url && (
           <img src={course.thumbnail_url} alt={course.title} className="w-full h-48 object-cover" />
         )}
@@ -282,23 +282,25 @@ export function TrainingCourseDetails() {
                   course.content_status !== 'READY' && (
                     <ContentStatusChip status={course.content_status} />
                   )}
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                   {course.difficulty}
                 </span>
                 {typeof course.estimated_duration_hours === 'number' && (
-                  <span className="text-[10px] text-slate-500">
+                  <span className="text-[10px] text-muted-foreground">
                     · ~{course.estimated_duration_hours}h
                   </span>
                 )}
               </div>
               <h1 className="text-2xl font-semibold tracking-tight">{course.title}</h1>
-              {course.description && <p className="text-slate-600 mt-2">{course.description}</p>}
+              {course.description && (
+                <p className="text-muted-foreground mt-2">{course.description}</p>
+              )}
               {course.tags.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mt-3">
                   {course.tags.map((t) => (
                     <span
                       key={t}
-                      className="text-[11px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full"
+                      className="text-[11px] bg-muted text-foreground px-2 py-0.5 rounded-full"
                     >
                       {t}
                     </span>
@@ -310,7 +312,7 @@ export function TrainingCourseDetails() {
               <div className="flex items-center gap-2">
                 <Link
                   to={`/training/courses/${course.id}/edit`}
-                  className="border border-slate-200 text-slate-700 text-sm px-3 py-1.5 rounded-lg hover:bg-slate-50"
+                  className="border border-border text-foreground text-sm px-3 py-1.5 rounded-lg hover:bg-muted"
                 >
                   Edit
                 </Link>
@@ -328,7 +330,7 @@ export function TrainingCourseDetails() {
                   <button
                     onClick={markReviewed}
                     disabled={lifecycleBusy}
-                    className="border border-slate-200 text-slate-700 text-sm px-3 py-1.5 rounded-lg hover:bg-slate-50 disabled:opacity-50"
+                    className="border border-border text-foreground text-sm px-3 py-1.5 rounded-lg hover:bg-muted disabled:opacity-50"
                   >
                     Mark reviewed
                   </button>
@@ -340,14 +342,14 @@ export function TrainingCourseDetails() {
                     title={
                       allReady ? 'Publish course' : 'All lessons need content before publishing'
                     }
-                    className="border border-emerald-200 bg-emerald-50 text-emerald-800 text-sm px-3 py-1.5 rounded-lg hover:bg-emerald-100 disabled:opacity-50"
+                    className="border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 text-sm px-3 py-1.5 rounded-lg hover:bg-emerald-100 disabled:opacity-50"
                   >
                     {publishing ? 'Publishing…' : 'Publish'}
                   </button>
                 )}
                 <button
                   onClick={() => setAssignOpen(true)}
-                  className="bg-slate-900 text-white text-sm px-4 py-1.5 rounded-lg hover:bg-slate-800"
+                  className="bg-foreground text-background text-sm px-4 py-1.5 rounded-lg hover:opacity-90"
                 >
                   Assign
                 </button>
@@ -364,37 +366,39 @@ export function TrainingCourseDetails() {
       course.assessment_methods?.length ||
       course.stem_relevance ||
       course.weekly_hours ? (
-        <div className="bg-white border border-emerald-200 rounded-2xl p-6 mb-8">
+        <div className="bg-card border border-emerald-200 dark:border-emerald-500/30 rounded-2xl p-6 mb-8">
           <div className="flex items-center gap-2 mb-3">
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/30 px-2 py-0.5 rounded-full">
               I-983
             </span>
             <h2 className="text-sm font-semibold tracking-tight">STEM-OPT Training Plan</h2>
             {typeof course.weekly_hours === 'number' && (
-              <span className="text-[10px] text-slate-500">· ~{course.weekly_hours} h/week</span>
+              <span className="text-[10px] text-muted-foreground">
+                · ~{course.weekly_hours} h/week
+              </span>
             )}
           </div>
-          <p className="text-xs text-slate-500 mb-4">
+          <p className="text-xs text-muted-foreground mb-4">
             Details that go onto the official Form I-983 training plan for STEM OPT students. Shown
             here so you can confirm the course matches what's on the plan.
           </p>
 
           {course.stem_relevance && (
             <div className="mb-4">
-              <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-1">
+              <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1">
                 STEM degree relevance
               </div>
-              <p className="text-sm text-slate-700">{course.stem_relevance}</p>
+              <p className="text-sm text-foreground">{course.stem_relevance}</p>
             </div>
           )}
 
           <div className="grid md:grid-cols-2 gap-4">
             {course.learning_objectives?.length ? (
               <div>
-                <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-1">
+                <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1">
                   Learning objectives
                 </div>
-                <ul className="list-disc list-outside pl-5 space-y-1 text-sm text-slate-700">
+                <ul className="list-disc list-outside pl-5 space-y-1 text-sm text-foreground">
                   {course.learning_objectives.map((o) => (
                     <li key={o}>{o}</li>
                   ))}
@@ -404,14 +408,14 @@ export function TrainingCourseDetails() {
 
             {course.skills_taught?.length ? (
               <div>
-                <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-1">
+                <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1">
                   Skills / techniques taught
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   {course.skills_taught.map((s) => (
                     <span
                       key={s}
-                      className="text-[11px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full"
+                      className="text-[11px] bg-muted text-foreground px-2 py-0.5 rounded-full"
                     >
                       {s}
                     </span>
@@ -422,10 +426,10 @@ export function TrainingCourseDetails() {
 
             {course.assessment_methods?.length ? (
               <div className="md:col-span-2">
-                <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-1">
+                <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1">
                   Assessment methods
                 </div>
-                <ul className="list-disc list-outside pl-5 space-y-1 text-sm text-slate-700">
+                <ul className="list-disc list-outside pl-5 space-y-1 text-sm text-foreground">
                   {course.assessment_methods.map((m) => (
                     <li key={m}>{m}</li>
                   ))}
@@ -438,27 +442,27 @@ export function TrainingCourseDetails() {
 
       {/* Course overview (AI-generated, editable). */}
       {(course.overview || course.roadmap?.length || course.resources?.length) && (
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 mb-6 space-y-5">
+        <div className="bg-card border border-border rounded-2xl p-6 mb-6 space-y-5">
           {course.overview && (
             <div>
-              <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-1">
+              <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1">
                 Overview
               </div>
-              <p className="text-sm text-slate-700 whitespace-pre-wrap">{course.overview}</p>
+              <p className="text-sm text-foreground whitespace-pre-wrap">{course.overview}</p>
             </div>
           )}
           {course.roadmap?.length ? (
             <div>
-              <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-2">
+              <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">
                 Roadmap
               </div>
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
                 {course.roadmap.map((p: any, i: number) => (
-                  <div key={i} className="border border-slate-100 rounded-lg p-3 bg-slate-50">
-                    <div className="text-sm font-medium text-slate-900">{p.phase}</div>
-                    <div className="text-[11px] text-slate-500">{p.duration_label}</div>
+                  <div key={i} className="border border-border rounded-lg p-3 bg-muted">
+                    <div className="text-sm font-medium text-foreground">{p.phase}</div>
+                    <div className="text-[11px] text-muted-foreground">{p.duration_label}</div>
                     {Array.isArray(p.focus_areas) && (
-                      <ul className="mt-1 text-xs text-slate-600 list-disc list-inside">
+                      <ul className="mt-1 text-xs text-muted-foreground list-disc list-inside">
                         {p.focus_areas.map((f: string) => (
                           <li key={f}>{f}</li>
                         ))}
@@ -471,7 +475,7 @@ export function TrainingCourseDetails() {
           ) : null}
           {course.resources?.length ? (
             <div>
-              <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-2">
+              <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">
                 Recommended resources
               </div>
               <ul className="space-y-1 text-sm">
@@ -486,7 +490,7 @@ export function TrainingCourseDetails() {
                       {r.title}
                     </a>
                     {r.type && (
-                      <span className="text-[11px] text-slate-400 ml-1.5">· {r.type}</span>
+                      <span className="text-[11px] text-muted-foreground ml-1.5">· {r.type}</span>
                     )}
                   </li>
                 ))}
@@ -512,7 +516,7 @@ export function TrainingCourseDetails() {
             )}
             <button
               onClick={() => setLessonOpen(true)}
-              className="bg-slate-900 text-white text-sm px-3 py-1.5 rounded-lg hover:bg-slate-800"
+              className="bg-foreground text-background text-sm px-3 py-1.5 rounded-lg hover:opacity-90"
             >
               + Add lesson
             </button>
@@ -526,22 +530,22 @@ export function TrainingCourseDetails() {
       )}
       <div className="space-y-2 mb-8">
         {sortedLessons.length === 0 ? (
-          <p className="text-sm text-slate-400 italic">No lessons yet.</p>
+          <p className="text-sm text-muted-foreground italic">No lessons yet.</p>
         ) : (
           sortedLessons.map((l) => {
             const status = l.content_status ?? 'READY';
             return (
               <div
                 key={l.id}
-                className="bg-white border border-slate-200 rounded-lg p-3 flex items-center justify-between gap-3"
+                className="bg-card border border-border rounded-lg p-3 flex items-center justify-between gap-3"
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-sm font-medium text-slate-900 truncate">{l.title}</span>
+                    <span className="text-sm font-medium text-foreground truncate">{l.title}</span>
                     {isManager && <ContentStatusChip status={status} />}
                   </div>
                   {(l.summary || l.description) && (
-                    <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">
+                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
                       {l.summary || l.description}
                     </p>
                   )}
@@ -550,7 +554,7 @@ export function TrainingCourseDetails() {
                   {isManager && (
                     <button
                       onClick={() => setEditingLesson(l)}
-                      className="text-xs border border-slate-200 text-slate-700 px-2.5 py-1 rounded-lg hover:bg-slate-50"
+                      className="text-xs border border-border text-foreground px-2.5 py-1 rounded-lg hover:bg-muted"
                     >
                       Edit
                     </button>
@@ -559,7 +563,7 @@ export function TrainingCourseDetails() {
                     <button
                       onClick={() => generateOneLesson(l.id)}
                       disabled={gen.running}
-                      className="text-xs border border-slate-200 text-slate-700 px-2.5 py-1 rounded-lg hover:bg-slate-50 disabled:opacity-50"
+                      className="text-xs border border-border text-foreground px-2.5 py-1 rounded-lg hover:bg-muted disabled:opacity-50"
                     >
                       {status === 'READY'
                         ? '✦ Regenerate'
@@ -606,19 +610,23 @@ export function TrainingCourseDetails() {
         )}
       </div>
       {(course.quizzes?.length ?? 0) === 0 ? (
-        <p className="text-sm text-slate-400 italic">
+        <p className="text-sm text-muted-foreground italic">
           No quiz questions yet. Use the AI generator on a lesson body to create them.
         </p>
       ) : (
         <ul className="space-y-2">
           {course.quizzes.map((q: any) => (
-            <li key={q.id} className="bg-white border border-slate-200 rounded-lg p-3">
-              <div className="text-sm font-medium text-slate-900">{q.question}</div>
-              <ul className="mt-1 text-xs text-slate-500 list-disc list-inside">
+            <li key={q.id} className="bg-card border border-border rounded-lg p-3">
+              <div className="text-sm font-medium text-foreground">{q.question}</div>
+              <ul className="mt-1 text-xs text-muted-foreground list-disc list-inside">
                 {(q.options ?? []).map((o: string) => (
                   <li
                     key={o}
-                    className={o === q.correct_answer ? 'text-emerald-700 font-semibold' : ''}
+                    className={
+                      o === q.correct_answer
+                        ? 'text-emerald-700 dark:text-emerald-300 font-semibold'
+                        : ''
+                    }
                   >
                     {o}
                   </li>
@@ -643,7 +651,7 @@ export function TrainingCourseDetails() {
         footer={
           <button
             onClick={addLesson}
-            className="bg-slate-900 text-white text-sm px-4 py-2 rounded-lg hover:bg-slate-800"
+            className="bg-foreground text-background text-sm px-4 py-2 rounded-lg hover:opacity-90"
           >
             Add
           </button>
@@ -661,14 +669,14 @@ export function TrainingCourseDetails() {
             onChange={(v) => setLessonForm({ ...lessonForm, description: v })}
           />
           <label className="block">
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
               Content (markdown supported)
             </span>
             <textarea
               rows={5}
               value={lessonForm.content}
               onChange={(e) => setLessonForm({ ...lessonForm, content: e.target.value })}
-              className="mt-1 w-full text-sm border border-slate-200 rounded-md px-2 py-1.5"
+              className="mt-1 w-full text-sm border border-border rounded-md px-2 py-1.5"
             />
           </label>
           <div className="grid grid-cols-2 gap-3">
@@ -700,21 +708,21 @@ export function TrainingCourseDetails() {
           <button
             onClick={generateQuizFromContent}
             disabled={aiBusy}
-            className="bg-slate-900 text-white text-sm px-4 py-2 rounded-lg hover:bg-slate-800 disabled:opacity-50"
+            className="bg-foreground text-background text-sm px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-50"
           >
             {aiBusy ? 'Generating…' : '✦ Generate 5 questions'}
           </button>
         }
       >
         <label className="block">
-          <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+          <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
             Lesson content
           </span>
           <textarea
             rows={10}
             value={aiContent}
             onChange={(e) => setAiContent(e.target.value)}
-            className="mt-1 w-full text-sm border border-slate-200 rounded-md px-2 py-1.5 font-mono"
+            className="mt-1 w-full text-sm border border-border rounded-md px-2 py-1.5 font-mono"
             placeholder="Paste 100+ words from the lesson body. The AI will only use this content to write questions — it won't introduce outside facts."
           />
         </label>
@@ -736,14 +744,14 @@ function LField({
 }) {
   return (
     <label className="block">
-      <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+      <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
         {label}
       </span>
       <input
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="mt-1 w-full text-sm border border-slate-200 rounded-md px-2 py-1.5"
+        className="mt-1 w-full text-sm border border-border rounded-md px-2 py-1.5"
       />
     </label>
   );
