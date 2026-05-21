@@ -1,27 +1,54 @@
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
-  darkMode: 'class',
+  darkMode: ['selector', '[data-theme="dark"]'],
   theme: {
     extend: {
       fontFamily: {
         sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'sans-serif'],
       },
       colors: {
-        // Semantic design tokens (Twitter theme) — values live as CSS vars in
-        // index.css and swap under `.dark`. Use bg-background / text-foreground
-        // / bg-card / border-border / bg-primary etc. for theme-aware UI.
+        // ── New "calm enterprise" design tokens ──────────────────────────────
+        // Values live as CSS vars in src/styles/tokens.css and flip on the
+        // [data-theme="dark"] attribute. Prefer these in new code.
+        bg: 'var(--bg)',
+        'bg-elev': 'var(--bg-elev)',
+        'bg-sunken': 'var(--bg-sunken)',
+        surface: 'var(--surface)',
+        'surface-2': 'var(--surface-2)',
+        hover: 'var(--hover)',
+        faint: 'var(--faint)',
+        success: { DEFAULT: 'var(--success)', soft: 'var(--success-soft)' },
+        warn: { DEFAULT: 'var(--warn)', soft: 'var(--warn-soft)' },
+        danger: { DEFAULT: 'var(--danger)', soft: 'var(--danger-soft)' },
+
+        // ── Tokens shared between new + legacy semantics ─────────────────────
+        // `ink` is now the primary text token (DEFAULT) + a secondary (ink-2).
+        // The old numeric ink scale (ink-900 etc.) had zero usages.
+        ink: { DEFAULT: 'var(--ink)', 2: 'var(--ink-2)' },
+        // `muted` keeps `.foreground` for the ~520 legacy text-muted-foreground
+        // usages; `text-muted` (DEFAULT) is the new muted-text token.
+        muted: { DEFAULT: 'var(--muted)', foreground: 'var(--muted-foreground)' },
+        // `accent` gains the new purple family (2/soft/fg) while keeping
+        // `.foreground` so legacy text-accent-foreground still resolves.
+        accent: {
+          DEFAULT: 'var(--accent)',
+          2: 'var(--accent-2)',
+          soft: 'var(--accent-soft)',
+          fg: 'var(--accent-fg)',
+          foreground: 'var(--accent-foreground)',
+        },
+        border: { DEFAULT: 'var(--border)', strong: 'var(--border-strong)' },
+        ring: 'var(--ring)',
+
+        // ── Legacy "Twitter theme" semantic tokens (aliased in tokens.css) ───
         background: 'var(--background)',
         foreground: 'var(--foreground)',
-        border: 'var(--border)',
         input: 'var(--input)',
-        ring: 'var(--ring)',
         card: { DEFAULT: 'var(--card)', foreground: 'var(--card-foreground)' },
         popover: { DEFAULT: 'var(--popover)', foreground: 'var(--popover-foreground)' },
         primary: { DEFAULT: 'var(--primary)', foreground: 'var(--primary-foreground)' },
         secondary: { DEFAULT: 'var(--secondary)', foreground: 'var(--secondary-foreground)' },
-        muted: { DEFAULT: 'var(--muted)', foreground: 'var(--muted-foreground)' },
-        accent: { DEFAULT: 'var(--accent)', foreground: 'var(--accent-foreground)' },
         destructive: { DEFAULT: 'var(--destructive)', foreground: 'var(--destructive-foreground)' },
         sidebar: {
           DEFAULT: 'var(--sidebar)',
@@ -41,14 +68,20 @@ export default {
           600: '#4f46e5',
           700: '#4338ca',
           900: '#312e81',
-        },
-        ink: {
-          900: '#0f172a',
-          700: '#334155',
-          500: '#64748b',
-          300: '#cbd5e1',
+          from: 'var(--brand-from)',
+          to: 'var(--brand-to)',
         },
       },
+      backgroundImage: {
+        'brand-grad': 'linear-gradient(135deg, var(--brand-from), var(--brand-to))',
+      },
+      boxShadow: {
+        btn: 'inset 0 1px 0 rgb(255 255 255 / 0.08), inset 0 -1px 0 rgb(0 0 0 / 0.12), 0 1px 2px rgb(0 0 0 / 0.18), 0 0 0 0.5px rgb(0 0 0 / 0.10)',
+        'btn-hover':
+          'inset 0 1px 0 rgb(255 255 255 / 0.10), 0 2px 4px rgb(0 0 0 / 0.18), 0 0 0 0.5px rgb(0 0 0 / 0.15)',
+        'btn-soft': '0 1px 0 rgb(0 0 0 / 0.02)',
+      },
+      ringColor: { DEFAULT: 'var(--ring)' },
       // Custom keyframes powering the motion system. Pair each with an entry
       // in `animation` below so it can be used as `animate-fade-in` etc.
       keyframes: {

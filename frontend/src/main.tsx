@@ -10,6 +10,7 @@ import { ScrollToTop } from './components/ScrollToTop';
 // Validate env vars at module load — throws synchronously if anything is
 // missing/malformed so we surface a clean error before React even mounts.
 import './config/env';
+import './styles/tokens.css';
 import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

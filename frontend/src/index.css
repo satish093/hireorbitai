@@ -4,90 +4,8 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ---------------------------------------------------------------------------
- * Theme tokens (21st.dev "Twitter" theme).
- *
- * Semantic design tokens consumed via Tailwind utilities (bg-background,
- * text-foreground, bg-card, border-border, …). The values swap automatically
- * under the `.dark` class (toggled by the theme switcher), so components use a
- * single set of utilities for both modes — no per-class `dark:` variants needed.
- *
- * Two deliberate deviations from the upstream theme:
- *   - --primary / --ring stay INDIGO (the app's brand), not the theme's blue.
- *   - The Tailwind v4 `@theme inline { … }` block is intentionally omitted;
- *     tokens are mapped the v3 way in tailwind.config.js.
- * --------------------------------------------------------------------------- */
-:root {
-  color-scheme: light;
-  --card: #f7f8f8;
-  --ring: #4f46e5; /* indigo (brand) — override */
-  --input: #f7f9fa;
-  --muted: #e5e5e6;
-  --accent: #e3ecf6;
-  --border: #e1eaef;
-  --chart-1: #1e9df1;
-  --chart-2: #00b87a;
-  --chart-3: #f7b928;
-  --chart-4: #17bf63;
-  --chart-5: #e0245e;
-  --popover: #ffffff;
-  --primary: #4f46e5; /* indigo (brand) — override */
-  --sidebar: #f7f8f8;
-  --secondary: #0f1419;
-  --background: #ffffff;
-  --foreground: #0f1419;
-  --destructive: #f4212e;
-  --sidebar-ring: #4f46e5; /* indigo — override */
-  --sidebar-accent: #e3ecf6;
-  --sidebar-border: #e1e8ed;
-  --card-foreground: #0f1419;
-  --sidebar-primary: #4f46e5; /* indigo — override */
-  --muted-foreground: #5b6b78;
-  --accent-foreground: #1e9df1;
-  --popover-foreground: #0f1419;
-  --primary-foreground: #ffffff;
-  --sidebar-foreground: #0f1419;
-  --secondary-foreground: #ffffff;
-  --destructive-foreground: #ffffff;
-  --sidebar-accent-foreground: #1e9df1;
-  --sidebar-primary-foreground: #ffffff;
-}
-
-.dark {
-  color-scheme: dark;
-  --card: #17181c;
-  --ring: #6366f1; /* indigo (brand) — override */
-  --input: #22303c;
-  --muted: #181818;
-  --accent: #061622;
-  --border: #242628;
-  --chart-1: #1e9df1;
-  --chart-2: #00b87a;
-  --chart-3: #f7b928;
-  --chart-4: #17bf63;
-  --chart-5: #e0245e;
-  --popover: #000000;
-  --primary: #6366f1; /* indigo (brand) — override */
-  --sidebar: #17181c;
-  --secondary: #f0f3f4;
-  --background: #000000;
-  --foreground: #e7e9ea;
-  --destructive: #f4212e;
-  --sidebar-ring: #6366f1; /* indigo — override */
-  --sidebar-accent: #061622;
-  --sidebar-border: #38444d;
-  --card-foreground: #d9d9d9;
-  --sidebar-primary: #6366f1; /* indigo — override */
-  --muted-foreground: #8b98a5;
-  --accent-foreground: #1c9cf0;
-  --popover-foreground: #e7e9ea;
-  --primary-foreground: #ffffff;
-  --sidebar-foreground: #d9d9d9;
-  --secondary-foreground: #0f1419;
-  --destructive-foreground: #ffffff;
-  --sidebar-accent-foreground: #1c9cf0;
-  --sidebar-primary-foreground: #ffffff;
-}
+/* Theme tokens live in src/styles/tokens.css (new "calm enterprise" system +
+ * legacy aliases). They flip on the [data-theme="dark"] attribute. */
 
 html,
 body,
@@ -198,7 +116,7 @@ body {
     animation: shimmer 1.4s linear infinite;
   }
   /* The white shimmer reads as a harsh flash on the dark muted base — dim it. */
-  .dark .skeleton::after {
+  [data-theme='dark'] .skeleton::after {
     background-image: linear-gradient(
       90deg,
       rgba(255, 255, 255, 0) 0%,
@@ -252,11 +170,11 @@ body {
 }
 /* On dark, the near-black thumb is invisible against the dark track — flip it
    to a light translucent fill. */
-.dark ::-webkit-scrollbar-thumb {
+[data-theme='dark'] ::-webkit-scrollbar-thumb {
   background: rgba(231, 233, 234, 0.18);
   background-clip: content-box;
 }
-.dark ::-webkit-scrollbar-thumb:hover {
+[data-theme='dark'] ::-webkit-scrollbar-thumb:hover {
   background: rgba(231, 233, 234, 0.32);
   background-clip: content-box;
 }
