@@ -99,6 +99,35 @@ export const STATUS_LABEL: Record<Status, string> = {
 
 export const statusOf = (u: { status: Status | null }): Status => u.status ?? 'active';
 
+// Optional (toggleable) table columns. checkbox · User · Status · actions are
+// always shown; these can be hidden via the Columns picker.
+export type ColumnKey = 'role' | 'group' | 'last_seen' | 'sessions' | 'joined';
+
+export const OPTIONAL_COLUMNS: { key: ColumnKey; label: string }[] = [
+  { key: 'role', label: 'Role' },
+  { key: 'group', label: 'Group' },
+  { key: 'last_seen', label: 'Last seen' },
+  { key: 'sessions', label: 'Sessions' },
+  { key: 'joined', label: 'Joined' },
+];
+
+export const DEFAULT_COLUMNS: Record<ColumnKey, boolean> = {
+  role: true,
+  group: true,
+  last_seen: true,
+  sessions: true,
+  joined: false,
+};
+
+export type LastSeenFilter = '' | '24h' | '7d' | '30d';
+
+export const LAST_SEEN_OPTIONS: { value: LastSeenFilter; label: string }[] = [
+  { value: '', label: 'Any time' },
+  { value: '24h', label: 'Last 24 hours' },
+  { value: '7d', label: 'Last 7 days' },
+  { value: '30d', label: 'Last 30 days' },
+];
+
 /** Compact relative time, e.g. "3m ago" / "2d ago" / a date for older. */
 export function relativeTime(iso: string | null): string {
   if (!iso) return 'Never';

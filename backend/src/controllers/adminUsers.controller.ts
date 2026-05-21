@@ -95,6 +95,8 @@ const listSchema = z.object({
   role: z.enum(ALL_ROLES as unknown as [Role, ...Role[]]).optional(),
   status: z.enum(STATUSES).optional(),
   segment: z.enum(SEGMENTS).optional(),
+  group_id: z.string().uuid().optional(),
+  last_seen: z.enum(['24h', '7d', '30d']).optional(),
   page: z.coerce.number().int().min(1).max(10000).default(1),
   page_size: z.coerce.number().int().min(1).max(200).default(50),
   sort: z.enum(['created_at', 'last_login_at', 'email', 'full_name']).default('created_at'),
@@ -104,7 +106,8 @@ const listSchema = z.object({
 export const list: RequestHandler = async (req, res) => {
   const parsed = listSchema.safeParse(req.query);
   if (!parsed.success) throw httpError(400, parsed.error.issues[0]?.message ?? 'Invalid query');
-  const { q, role, status, segment, page, page_size, sort, order } = parsed.data;
+  const { q, role, status, segment, group_id, last_seen, page, page_size, sort, order } =
+    parsed.data;
 
   const from = (page - 1) * page_size;
   const to = from + page_size - 1;
@@ -159,6 +162,12 @@ export const list: RequestHandler = async (req, res) => {
     case 'all':
     default:
       break;
+  }
+  if (group_id) query = query.eq('group_id', group_id);
+  if (last_seen) {
+    const ms =
+      last_seen === '24h' ? 86_400_000 : last_seen === '7d' ? 7 * 86_400_000 : 30 * 86_400_000;
+    query = query.gte('last_seen_at', new Date(Date.now() - ms).toISOString());
   }
   if (q) {
     // `or()` with ilike on email + full_name covers the common search cases.
