@@ -33,13 +33,13 @@
     <script>
       (function () {
         try {
-          var t = localStorage.getItem('hireorbitai:theme');
+          var t = localStorage.getItem('ho-theme');
           if (!t)
             t =
               window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
                 ? 'dark'
                 : 'light';
-          if (t === 'dark') document.documentElement.classList.add('dark');
+          document.documentElement.setAttribute('data-theme', t);
         } catch (e) {}
       })();
     </script>

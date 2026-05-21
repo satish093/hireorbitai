@@ -1,72 +1,100 @@
-import { ButtonHTMLAttributes, forwardRef, ReactNode } from 'react';
+import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
 import clsx from 'clsx';
 
-type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
+type Variant = 'primary' | 'accent' | 'secondary' | 'outline' | 'ghost' | 'danger' | 'danger-ghost';
 type Size = 'sm' | 'md' | 'lg';
 
 interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant;
   size?: Size;
   loading?: boolean;
+  iconOnly?: boolean;
+  block?: boolean;
+  pill?: boolean;
+  leftIcon?: ReactNode;
+  rightIcon?: ReactNode;
+  /** @deprecated use `leftIcon`. Kept for back-compat with older call sites. */
   icon?: ReactNode;
 }
 
-const VARIANT: Record<Variant, string> = {
-  primary:
-    'bg-foreground text-background hover:opacity-90 focus-visible:ring-ring disabled:opacity-50',
-  secondary:
-    'bg-card text-foreground border border-border hover:bg-muted hover:border-border focus-visible:ring-ring disabled:opacity-60',
-  ghost:
-    'bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-ring disabled:opacity-60',
-  danger:
-    'bg-red-600 text-white hover:bg-red-700 focus-visible:ring-red-500/40 disabled:bg-red-300',
+const base =
+  'relative inline-flex items-center justify-center font-medium tracking-tight whitespace-nowrap select-none transition-all duration-150 ease-out shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-bg focus-visible:ring-accent disabled:opacity-45 disabled:cursor-not-allowed active:translate-y-px active:scale-[0.995]';
+
+const sizes: Record<Size, string> = {
+  sm: 'h-7 px-2.5 text-xs gap-1.5 rounded-[5px]',
+  md: 'h-8 px-3 text-[13px] gap-1.5 rounded-md',
+  lg: 'h-[38px] px-4 text-sm gap-2 rounded-[7px]',
 };
 
-const SIZE: Record<Size, string> = {
-  sm: 'h-7 text-xs px-2.5 rounded-md gap-1',
-  md: 'h-9 text-sm px-3.5 rounded-lg gap-1.5',
-  lg: 'h-10 text-sm px-5 rounded-lg gap-2',
+const variants: Record<Variant, string> = {
+  primary:
+    'bg-ink text-bg border border-ink shadow-btn ' +
+    'hover:bg-[oklch(0.12_0.012_260)] hover:border-[oklch(0.12_0.012_260)] hover:shadow-btn-hover ' +
+    'dark:bg-ink dark:text-[oklch(0.15_0.012_260)] dark:border-ink dark:hover:bg-white',
+  accent: 'bg-brand-grad text-white border-transparent shadow-btn hover:brightness-110',
+  secondary:
+    'bg-[oklch(0.94_0.005_260)] text-ink border-transparent hover:bg-[oklch(0.91_0.006_260)] ' +
+    'dark:bg-[oklch(0.245_0.010_260)] dark:text-ink dark:hover:bg-[oklch(0.30_0.011_260)]',
+  outline:
+    'bg-surface text-ink border border-border-strong shadow-btn-soft ' +
+    'hover:bg-[oklch(0.97_0.005_260)] hover:border-[oklch(0.78_0.010_260)] ' +
+    'dark:bg-[oklch(0.245_0.010_260)] dark:border-[oklch(0.38_0.012_260)] dark:hover:bg-[oklch(0.295_0.011_260)]',
+  ghost:
+    'bg-transparent text-ink-2 border-transparent ' +
+    'hover:bg-[oklch(0.94_0.006_260)] hover:text-ink ' +
+    'dark:hover:bg-[oklch(0.245_0.010_260)] dark:hover:text-white',
+  danger: 'bg-danger text-white border border-danger shadow-btn hover:bg-[oklch(0.52_0.19_25)]',
+  'danger-ghost': 'bg-transparent text-danger hover:bg-danger-soft',
 };
 
 /**
- * Standard button used across the app. Use `<Button variant="primary">` for the
- * page's primary CTA, `secondary` for cancel/secondary actions, `ghost` for
- * inline text-like buttons, and `danger` for destructive actions.
+ * Standard button. Use `variant="primary"` for the page's single primary CTA,
+ * `accent` for AI/highlight actions, `outline` for secondary siblings, `ghost`
+ * for inline/filter actions, and `danger` / `danger-ghost` for destructive ops.
  */
 export const Button = forwardRef<HTMLButtonElement, Props>(function Button(
-  { variant = 'primary', size = 'md', loading, icon, className, children, disabled, ...rest },
+  {
+    variant = 'outline',
+    size = 'md',
+    loading,
+    iconOnly,
+    block,
+    pill,
+    leftIcon,
+    rightIcon,
+    icon,
+    className,
+    children,
+    disabled,
+    ...rest
+  },
   ref,
 ) {
   return (
     <button
       ref={ref}
       disabled={disabled || loading}
+      data-loading={loading ? 'true' : undefined}
       className={clsx(
-        'inline-flex items-center justify-center font-medium transition shadow-sm press',
-        'focus:outline-none focus-visible:ring-2',
-        'disabled:cursor-not-allowed',
-        VARIANT[variant],
-        SIZE[size],
+        base,
+        sizes[size],
+        variants[variant],
+        iconOnly && 'aspect-square !px-0',
+        block && 'w-full',
+        pill && '!rounded-full',
+        loading && '[&_*]:invisible',
         className,
       )}
       {...rest}
     >
-      {loading ? (
-        <svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
-          <circle
-            cx="12"
-            cy="12"
-            r="10"
-            stroke="currentColor"
-            strokeOpacity="0.25"
-            strokeWidth="4"
-          />
-          <path d="M4 12a8 8 0 018-8" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
-        </svg>
-      ) : (
-        icon
-      )}
+      {leftIcon ?? icon}
       {children}
+      {rightIcon}
+      {loading && (
+        <span aria-hidden className="absolute inset-0 grid place-items-center !visible">
+          <span className="size-3.5 rounded-full border-[1.6px] border-current border-t-transparent animate-spin" />
+        </span>
+      )}
     </button>
   );
 });

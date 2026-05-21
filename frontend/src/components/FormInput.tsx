@@ -8,9 +8,9 @@ interface Props extends InputHTMLAttributes<HTMLInputElement> {
 }
 
 /**
- * Standard text input. Height (h-9), radius (rounded-lg), focus-visible ring
- * colour, and border treatment match Button + SelectInput exactly so a row
- * of [Input] [Select] [Button] aligns perfectly.
+ * Standard text input. Height (h-8), radius (rounded-md), focus-visible ring
+ * colour (--ring), and border treatment match Button(md) + SelectInput exactly
+ * so a row of [Input] [Select] [Button] aligns perfectly.
  */
 export const FormInput = forwardRef<HTMLInputElement, Props>(function FormInput(
   { label, error, hint, className, ...rest },
@@ -18,22 +18,22 @@ export const FormInput = forwardRef<HTMLInputElement, Props>(function FormInput(
 ) {
   return (
     <label className="block">
-      {label && <span className="block text-xs font-medium text-foreground mb-1.5">{label}</span>}
+      {label && <span className="block text-xs font-medium text-ink mb-1.5">{label}</span>}
       <input
         ref={ref}
         {...rest}
         className={clsx(
           // Same height + radius + base padding as Button size="md" so they
           // align inside toolbars without a top-row reset.
-          'w-full h-9 rounded-lg border bg-card px-3 text-sm shadow-sm transition',
-          'placeholder:text-muted-foreground',
+          'w-full h-8 rounded-md border bg-surface px-3 text-[13px] text-ink shadow-btn-soft transition',
+          'placeholder:text-muted',
           // focus-visible so a mouse click doesn't trigger the ring (matches
           // Button behaviour). The keyboard-only ring still shows on Tab.
-          'focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30 focus-visible:border-brand-500',
+          'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-0 focus-visible:border-accent',
           error
-            ? 'border-red-300 focus-visible:ring-red-200 focus-visible:border-red-500'
-            : 'border-border hover:border-muted-foreground',
-          rest.disabled && 'opacity-60 cursor-not-allowed bg-muted',
+            ? 'border-danger focus-visible:border-danger'
+            : 'border-border-strong hover:border-[oklch(0.78_0.010_260)]',
+          rest.disabled && 'opacity-60 cursor-not-allowed bg-hover',
           className,
         )}
       />

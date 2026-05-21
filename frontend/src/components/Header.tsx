@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
-import { ThemeToggle } from './ui/curtain-theme-toggle';
-import { setTheme } from '../lib/theme';
+import { useTheme } from '../hooks/useTheme';
+import { Button } from './Button';
 
 interface Crumb {
   label: string;
@@ -18,9 +18,10 @@ interface Props {
 export function Header({ title, crumbs, onMenuClick }: Props) {
   const loc = useLocation();
   const resolved: Crumb[] = crumbs ?? defaultCrumbs(loc.pathname, title);
+  const { theme, toggle } = useTheme();
 
   return (
-    <header className="bg-card border-b border-border px-4 sm:px-6 py-3 flex items-center gap-3 sm:gap-4">
+    <header className="bg-surface border-b border-border px-4 sm:px-6 py-3 flex items-center gap-3 sm:gap-4">
       {/* Hamburger — mobile only. Opens the sidebar drawer. */}
       <button
         type="button"
@@ -69,12 +70,64 @@ export function Header({ title, crumbs, onMenuClick }: Props) {
         ))}
       </nav>
 
-      {/* Light / dark theme switcher — the curtain toggle drives the global
-          `.dark` class; we persist the choice via setTheme. */}
+      {/* Light / dark theme switcher — flips the [data-theme] attribute via
+          useTheme(), persisted to localStorage. */}
       <div className="flex items-center shrink-0">
-        <ThemeToggle variant="icon" buttonSize={32} onThemeChange={setTheme} />
+        <Button
+          variant="ghost"
+          size="sm"
+          iconOnly
+          onClick={toggle}
+          aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          aria-pressed={theme === 'dark'}
+          leftIcon={theme === 'dark' ? <SunIcon /> : <MoonIcon />}
+        />
       </div>
     </header>
+  );
+}
+
+function MoonIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+    </svg>
+  );
+}
+
+function SunIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="4" />
+      <line x1="12" y1="1" x2="12" y2="3" />
+      <line x1="12" y1="21" x2="12" y2="23" />
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+      <line x1="1" y1="12" x2="3" y2="12" />
+      <line x1="21" y1="12" x2="23" y2="12" />
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+    </svg>
   );
 }
 

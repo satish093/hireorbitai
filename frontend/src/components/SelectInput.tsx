@@ -23,20 +23,20 @@ export const SelectInput = forwardRef<HTMLSelectElement, Props>(function SelectI
 ) {
   return (
     <label className="block">
-      {label && <span className="block text-xs font-medium text-foreground mb-1.5">{label}</span>}
+      {label && <span className="block text-xs font-medium text-ink mb-1.5">{label}</span>}
       <div className="relative">
         <select
           ref={ref}
           {...rest}
           className={clsx(
-            // h-9 matches FormInput + Button(md). pr-9 leaves room for the
+            // h-8 matches FormInput + Button(md). pr-9 leaves room for the
             // chevron at the right.
-            'w-full h-9 appearance-none rounded-lg border bg-card pl-3 pr-9 text-sm shadow-sm transition',
-            'focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30 focus-visible:border-brand-500',
+            'w-full h-8 appearance-none rounded-md border bg-surface pl-3 pr-9 text-[13px] text-ink shadow-btn-soft transition',
+            'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-0 focus-visible:border-accent',
             error
-              ? 'border-red-300 focus-visible:ring-red-200 focus-visible:border-red-500'
-              : 'border-border hover:border-muted-foreground',
-            rest.disabled && 'opacity-60 cursor-not-allowed bg-muted',
+              ? 'border-danger focus-visible:border-danger'
+              : 'border-border-strong hover:border-[oklch(0.78_0.010_260)]',
+            rest.disabled && 'opacity-60 cursor-not-allowed bg-hover',
             className,
           )}
         >

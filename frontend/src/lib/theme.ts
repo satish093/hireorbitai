@@ -1,12 +1,11 @@
-// Light/dark theme runtime. The actual colors live as CSS variables in
-// index.css and swap under the `.dark` class on <html>. This module owns
-// persistence + applying that class. The pre-paint inline script in index.html
-// sets the class before React mounts (no flash-of-wrong-theme); this module
-// keeps it in sync at runtime.
+// Light/dark theme helpers. Colors live as CSS variables in
+// src/styles/tokens.css and flip on the `data-theme` attribute on <html>.
+// The canonical runtime is the useTheme() hook (src/hooks/useTheme.ts); these
+// imperative helpers exist for non-React call sites.
 
 export type Theme = 'light' | 'dark';
 
-const STORAGE_KEY = 'hireorbitai:theme';
+const STORAGE_KEY = 'ho-theme';
 
 export function getStoredTheme(): Theme | null {
   try {
@@ -32,10 +31,10 @@ export function resolveInitialTheme(): Theme {
 
 export function applyTheme(theme: Theme): void {
   if (typeof document === 'undefined') return;
-  document.documentElement.classList.toggle('dark', theme === 'dark');
+  document.documentElement.setAttribute('data-theme', theme);
 }
 
-/** Persist + apply. Call from the theme toggle's onThemeChange. */
+/** Persist + apply. */
 export function setTheme(theme: Theme): void {
   try {
     localStorage.setItem(STORAGE_KEY, theme);
@@ -47,5 +46,5 @@ export function setTheme(theme: Theme): void {
 
 export function getCurrentTheme(): Theme {
   if (typeof document === 'undefined') return 'light';
-  return document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+  return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
 }
