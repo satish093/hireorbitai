@@ -300,6 +300,122 @@ export const sessions: RequestHandler = async (req, res) => {
   }
 };
 
+/** Loads a target's email+role and refuses if the actor doesn't outrank them. */
+async function loadTargetOrThrow(actor: { role: Role }, id: string) {
+  const { data } = await db.from('users').select('id, email, role').eq('id', id).maybeSingle();
+  if (!data) throw httpError(404, 'User not found');
+  const row = data as { id: string; email: string; role: Role };
+  assertOutranks(actor, row.role);
+  return row;
+}
+
+// ---------------------------------------------------------------------------
+// DELETE /admin/users/:id/sessions/:sessionId   — revoke one session
+// DELETE /admin/users/:id/sessions              — revoke all sessions
+// ---------------------------------------------------------------------------
+export const revokeSession: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const { id, sessionId } = req.params;
+  const target = await loadTargetOrThrow({ role: req.user.role }, id);
+  const r = await pool.query(`DELETE FROM public.auth_sessions WHERE id = $1 AND user_id = $2`, [
+    sessionId,
+    id,
+  ]);
+  audit({
+    action: 'admin_session_revoked',
+    user_id: id,
+    email: target.email,
+    req,
+    metadata: { by: req.user.id, session_id: sessionId },
+  });
+  res.json({ ok: true, revoked: r.rowCount ?? 0 });
+};
+
+export const revokeAllSessions: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const { id } = req.params;
+  const target = await loadTargetOrThrow({ role: req.user.role }, id);
+  const { error } = await db.auth.admin.signOut(id, 'global');
+  if (error) throw httpError(500, error.message);
+  audit({
+    action: 'admin_sessions_revoked_all',
+    user_id: id,
+    email: target.email,
+    req,
+    metadata: { by: req.user.id },
+  });
+  res.json({ ok: true });
+};
+
+// ---------------------------------------------------------------------------
+// POST /admin/users/:id/force-password-change
+//
+// Sets must_change_password and revokes all sessions so the user is forced
+// through the change-password flow on next sign-in.
+// ---------------------------------------------------------------------------
+export const forcePasswordChange: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const { id } = req.params;
+  if (req.user.id === id)
+    throw httpError(400, 'Use your own account settings to change your password.');
+  const target = await loadTargetOrThrow({ role: req.user.role }, id);
+  const { error } = await db.from('users').update({ must_change_password: true }).eq('id', id);
+  if (error) throw httpError(500, error.message);
+  await db.auth.admin.signOut(id, 'global').catch(() => {});
+  audit({
+    action: 'admin_user_force_password_change',
+    user_id: id,
+    email: target.email,
+    req,
+    metadata: { by: req.user.id },
+  });
+  res.json({ ok: true });
+};
+
+// ---------------------------------------------------------------------------
+// POST /admin/users/:id/impersonate
+//
+// SUPER_ADMIN-only. Mints a real session for the target and returns it so the
+// admin's browser can adopt it. Rank-gated (can't impersonate an equal/higher
+// admin) and audited. The impersonated session is a normal login — it ends
+// when the target next signs out globally or their status changes.
+// ---------------------------------------------------------------------------
+export const impersonate: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  if (req.user.role !== 'SUPER_ADMIN') throw httpError(403, 'Only a SUPER_ADMIN can impersonate.');
+  const { id } = req.params;
+  if (req.user.id === id) throw httpError(400, 'You are already signed in as yourself.');
+
+  const { data: target } = await db
+    .from('users')
+    .select('id, email, full_name, role')
+    .eq('id', id)
+    .maybeSingle();
+  if (!target) throw httpError(404, 'User not found');
+  const t = target as { id: string; email: string; full_name: string | null; role: Role };
+  // Can't impersonate an equal/higher-ranked admin (another SUPER_ADMIN).
+  assertOutranks({ role: req.user.role }, t.role);
+
+  const { data, error } = await db.auth.admin.createSessionForUser(id);
+  if (error || !data?.session) {
+    throw httpError(500, error?.message ?? 'Failed to start impersonation');
+  }
+  audit({
+    action: 'admin_user_impersonated',
+    user_id: id,
+    email: t.email,
+    req,
+    metadata: { by: req.user.id, by_email: req.user.email },
+  });
+  const s = data.session;
+  res.json({
+    access_token: s.access_token,
+    refresh_token: s.refresh_token,
+    expires_at: s.expires_at,
+    user: { id: t.id, email: t.email, full_name: t.full_name, role: t.role },
+  });
+};
+
 // ---------------------------------------------------------------------------
 // GET /admin/users/:id
 //

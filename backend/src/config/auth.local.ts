@@ -344,6 +344,31 @@ export const admin = {
     }
   },
 
+  /**
+   * Mint a fresh session for an arbitrary user WITHOUT a password — used only
+   * by the admin impersonation flow, which is rank-gated + audited upstream.
+   * Issues a real access + refresh pair so the impersonated browser behaves
+   * exactly like a normal login (and is revoked by the target's next global
+   * sign-out / status change).
+   */
+  async createSessionForUser(userId: string): Promise<AuthResp<{ session: Session | null }>> {
+    try {
+      const r = await pool.query<UserRow>(
+        `SELECT id, email, full_name, password_hash, session_version
+           FROM public.users WHERE id = $1 LIMIT 1`,
+        [userId],
+      );
+      const row = r.rows[0];
+      if (!row)
+        return { data: { session: null }, error: { message: 'User not found', status: 404 } };
+      const { session } = await issueSession(row);
+      return { data: { session }, error: null };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'createSessionForUser failed';
+      return { data: { session: null }, error: { message: msg, status: 500 } };
+    }
+  },
+
   /** Used in one place (jobIngestion). Returns just enough to satisfy callers. */
   async listUsers(): Promise<AuthResp<{ users: AuthUser[] }>> {
     const r = await pool.query<{ id: string; email: string; full_name: string | null }>(

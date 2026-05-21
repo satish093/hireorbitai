@@ -16,3 +16,7 @@ adminUsersRouter.patch('/:id/status', c.setStatus);
 adminUsersRouter.patch('/:id/group', c.setGroup);
 adminUsersRouter.patch('/:id/notes', c.setNotes);
 adminUsersRouter.post('/:id/send-password-reset', c.sendPasswordReset);
+adminUsersRouter.post('/:id/force-password-change', c.forcePasswordChange);
+adminUsersRouter.post('/:id/impersonate', c.impersonate);
+adminUsersRouter.delete('/:id/sessions/:sessionId', c.revokeSession);
+adminUsersRouter.delete('/:id/sessions', c.revokeAllSessions);
