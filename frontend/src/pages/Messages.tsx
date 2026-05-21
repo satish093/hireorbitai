@@ -4,6 +4,7 @@ import { Layout } from '../components/Layout';
 import { Avatar } from '../components/TaskBits';
 import { PresenceDot, PresencePill } from '../components/PresenceDot';
 import { GroupBadge } from '../components/GroupBadge';
+import { IconSearch, IconVideo, IconPhone, IconSend } from '../components/Icons';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useRealtime } from '../hooks/useRealtime';
@@ -53,8 +54,10 @@ export function Messages() {
   const [directory, setDirectory] = useState<Party[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState('');
-  const [composerOpen, setComposerOpen] = useState(false);
-  const [composeSearch, setComposeSearch] = useState('');
+  // Single search box at the top of the chat list. Filters existing
+  // conversations and, when non-empty, surfaces matching directory people so
+  // you can start a brand-new chat without a separate compose popover.
+  const [search, setSearch] = useState('');
   const [sending, setSending] = useState(false);
   // True when the backend returned 403 for the currently-targeted thread.
   // Triggers the "you no longer have access" panel + suppresses message-
@@ -311,14 +314,20 @@ export function Messages() {
     }
   }
 
+  const q = search.trim().toLowerCase();
   const conversationPeerIds = new Set(conversations.map((c) => c.peer.id));
-  const filteredDirectory = directory
-    .filter((p) => !conversationPeerIds.has(p.id))
-    .filter((p) => {
-      const q = composeSearch.toLowerCase();
-      if (!q) return true;
-      return (p.full_name ?? p.email).toLowerCase().includes(q);
-    });
+  // Existing conversations matching the search box.
+  const filteredConversations = conversations.filter((c) => {
+    if (!q) return true;
+    return (c.peer.full_name ?? c.peer.email).toLowerCase().includes(q);
+  });
+  // People not yet in a conversation — only surfaced once the user starts
+  // searching, so the list isn't cluttered with the whole directory by default.
+  const filteredDirectory = q
+    ? directory
+        .filter((p) => !conversationPeerIds.has(p.id))
+        .filter((p) => (p.full_name ?? p.email).toLowerCase().includes(q))
+    : [];
 
   return (
     <Layout
@@ -327,127 +336,132 @@ export function Messages() {
     >
       <div className="bg-card border border-border rounded-xl overflow-hidden h-[calc(100dvh-180px)] min-h-[480px] flex flex-col sm:flex-row">
         {/* Left: conversation list. Becomes a full-width column on phones
-            (stacked above the chat pane); fixed 18rem rail on tablet+. */}
-        <aside className="w-full sm:w-72 shrink-0 border-b sm:border-b-0 sm:border-r border-border flex flex-col bg-slate-50/50 max-h-64 sm:max-h-none">
-          <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-foreground">Conversations</h2>
-            <button
-              onClick={() => setComposerOpen((v) => !v)}
-              className="w-7 h-7 flex items-center justify-center rounded-full bg-foreground text-background text-sm hover:opacity-90"
-              title="Start a new chat"
-            >
-              +
-            </button>
+            (stacked above the chat pane); fixed 20rem rail on tablet+. */}
+        <aside className="w-full sm:w-80 shrink-0 border-b sm:border-b-0 sm:border-r border-border flex flex-col bg-card max-h-72 sm:max-h-none">
+          <div className="px-4 pt-3.5 pb-2 flex items-center justify-between">
+            <h2 className="text-base font-semibold text-foreground">Chats</h2>
           </div>
 
-          {composerOpen && (
-            <div className="border-b border-border px-3 py-2 bg-card">
-              <input
-                value={composeSearch}
-                onChange={(e) => setComposeSearch(e.target.value)}
-                placeholder="Find a person…"
-                autoFocus
-                className="w-full text-sm border border-border rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+          {/* Persistent search bar — filters chats and, once you type, also
+              surfaces matching people you haven't messaged yet. */}
+          <div className="px-3 pb-2">
+            <div className="relative">
+              <IconSearch
+                size={16}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
               />
-              <div className="mt-2 max-h-44 overflow-y-auto -mx-1">
-                {filteredDirectory.length === 0 ? (
-                  <p className="text-xs text-muted-foreground italic px-2 py-3 text-center">
-                    {directory.length === 0 ? 'No contacts yet' : 'No matches'}
-                  </p>
-                ) : (
-                  filteredDirectory.map((p) => (
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search or start a new chat"
+                className="w-full text-sm bg-muted/60 rounded-full pl-9 pr-3 py-2 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+              />
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto">
+            {filteredConversations.length === 0 && filteredDirectory.length === 0 ? (
+              <p className="text-xs text-muted-foreground italic px-4 py-6 text-center">
+                {conversations.length === 0
+                  ? 'No messages yet. Search a name above to start a chat.'
+                  : 'No matches.'}
+              </p>
+            ) : (
+              <>
+                {filteredConversations.map((c) => {
+                  const active = c.peer.id === activePeerId;
+                  return (
                     <button
-                      key={p.id}
-                      onClick={() => {
-                        setParams({ with: p.id });
-                        setComposerOpen(false);
-                        setComposeSearch('');
-                      }}
-                      className="w-full flex items-center gap-2 px-2 py-1.5 hover:bg-muted rounded text-left"
+                      key={c.peer.id}
+                      onClick={() => setParams({ with: c.peer.id })}
+                      className={clsx(
+                        'w-full flex items-start gap-3 px-3 py-3 text-left transition-colors hover:bg-muted/60',
+                        active && 'bg-muted',
+                      )}
                     >
-                      <div className="relative">
-                        <Avatar name={p.full_name} email={p.email} size={28} />
+                      <div className="relative shrink-0">
+                        <Avatar name={c.peer.full_name} email={c.peer.email} size={44} />
                         <PresenceDot
-                          lastSeenAt={p.last_seen_at}
-                          size={8}
+                          lastSeenAt={c.peer.last_seen_at}
                           className="absolute -bottom-0.5 -right-0.5"
                         />
                       </div>
-                      <div className="min-w-0">
-                        <div className="text-sm text-foreground truncate">
-                          {p.full_name ?? p.email}
+                      <div className="flex-1 min-w-0 border-b border-border/60 pb-2.5 -mt-0.5">
+                        <div className="flex items-baseline justify-between gap-2">
+                          <span className="text-sm font-medium truncate inline-flex items-center gap-1.5 text-foreground">
+                            <GroupBadge groupId={c.peer.group_id ?? null} compact hideEmpty />
+                            {c.peer.full_name ?? c.peer.email}
+                          </span>
+                          <span
+                            className={clsx(
+                              'text-[11px] shrink-0',
+                              c.unread_count > 0
+                                ? 'text-brand-600 dark:text-brand-400 font-semibold'
+                                : 'text-muted-foreground',
+                            )}
+                          >
+                            {relative(c.last_message.created_at)}
+                          </span>
                         </div>
-                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                          <span>{p.role && ROLE_LABEL[p.role]}</span>
-                          <GroupBadge groupId={p.group_id ?? null} compact hideEmpty />
+                        <div className="flex items-center justify-between gap-2 mt-0.5">
+                          <p
+                            className={clsx(
+                              'text-xs truncate',
+                              c.unread_count > 0
+                                ? 'text-foreground font-medium'
+                                : 'text-muted-foreground',
+                            )}
+                          >
+                            {c.last_message.sender_id === profile?.id ? 'You: ' : ''}
+                            {c.last_message.body}
+                          </p>
+                          {c.unread_count > 0 && (
+                            <span className="shrink-0 bg-brand-500 text-white text-[10px] font-semibold rounded-full px-1.5 min-w-[18px] h-[18px] flex items-center justify-center">
+                              {c.unread_count}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </button>
-                  ))
-                )}
-              </div>
-            </div>
-          )}
+                  );
+                })}
 
-          <div className="flex-1 overflow-y-auto">
-            {conversations.length === 0 ? (
-              <p className="text-xs text-muted-foreground italic px-4 py-6 text-center">
-                No messages yet. Click + to start a chat.
-              </p>
-            ) : (
-              conversations.map((c) => {
-                const active = c.peer.id === activePeerId;
-                return (
-                  <button
-                    key={c.peer.id}
-                    onClick={() => setParams({ with: c.peer.id })}
-                    className={clsx(
-                      'w-full flex items-start gap-2.5 px-4 py-3 text-left border-b border-border hover:bg-card',
-                      active && 'bg-card border-l-2 border-l-brand-500',
-                    )}
-                  >
-                    <div className="relative">
-                      <Avatar name={c.peer.full_name} email={c.peer.email} size={36} />
-                      <PresenceDot
-                        lastSeenAt={c.peer.last_seen_at}
-                        className="absolute -bottom-0.5 -right-0.5"
-                      />
-                      {c.unread_count > 0 && (
-                        <span className="absolute -top-1 -right-1 bg-brand-500 text-white text-[10px] font-semibold rounded-full px-1.5 min-w-[18px] h-[18px] flex items-center justify-center">
-                          {c.unread_count}
-                        </span>
-                      )}
+                {filteredDirectory.length > 0 && (
+                  <>
+                    <div className="px-4 pt-3 pb-1 text-[10px] uppercase tracking-widest text-muted-foreground">
+                      People
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-baseline justify-between gap-2">
-                        <span
-                          className={clsx(
-                            'text-sm font-medium truncate inline-flex items-center gap-1.5',
-                            c.unread_count > 0 ? 'text-foreground' : 'text-foreground',
-                          )}
-                        >
-                          <GroupBadge groupId={c.peer.group_id ?? null} compact hideEmpty />
-                          {c.peer.full_name ?? c.peer.email}
-                        </span>
-                        <span className="text-[10px] text-muted-foreground shrink-0">
-                          {relative(c.last_message.created_at)}
-                        </span>
-                      </div>
-                      <p
-                        className={clsx(
-                          'text-xs truncate mt-0.5',
-                          c.unread_count > 0
-                            ? 'text-foreground font-medium'
-                            : 'text-muted-foreground',
-                        )}
+                    {filteredDirectory.map((p) => (
+                      <button
+                        key={p.id}
+                        onClick={() => {
+                          setParams({ with: p.id });
+                          setSearch('');
+                        }}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-muted/60 text-left transition-colors"
                       >
-                        {c.last_message.sender_id === profile?.id ? 'You: ' : ''}
-                        {c.last_message.body}
-                      </p>
-                    </div>
-                  </button>
-                );
-              })
+                        <div className="relative shrink-0">
+                          <Avatar name={p.full_name} email={p.email} size={40} />
+                          <PresenceDot
+                            lastSeenAt={p.last_seen_at}
+                            size={9}
+                            className="absolute -bottom-0.5 -right-0.5"
+                          />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-sm text-foreground truncate">
+                            {p.full_name ?? p.email}
+                          </div>
+                          <div className="text-[10px] uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                            <span>{p.role && ROLE_LABEL[p.role]}</span>
+                            <GroupBadge groupId={p.group_id ?? null} compact hideEmpty />
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </>
+                )}
+              </>
             )}
           </div>
         </aside>
@@ -455,27 +469,46 @@ export function Messages() {
         {/* Right: active thread */}
         <main className="flex-1 flex flex-col min-w-0">
           {!activePeer ? (
-            <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
-              Select a conversation, or hit + to start a new one.
+            <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm bg-muted/30">
+              Select a conversation, or search a name to start a new one.
             </div>
           ) : (
             <>
-              <header className="px-5 py-3 border-b border-border flex items-center gap-3">
-                <div className="relative">
-                  <Avatar name={activePeer.full_name} email={activePeer.email} size={36} />
+              <header className="px-5 py-3 border-b border-border flex items-center gap-3 bg-card">
+                <div className="relative shrink-0">
+                  <Avatar name={activePeer.full_name} email={activePeer.email} size={40} />
                   <PresenceDot
                     lastSeenAt={activePeer.last_seen_at}
                     className="absolute -bottom-0.5 -right-0.5"
                   />
                 </div>
-                <div className="leading-tight">
+                <div className="leading-tight min-w-0">
                   <div className="text-sm font-semibold text-foreground flex items-center gap-2">
-                    {activePeer.full_name ?? activePeer.email}
+                    <span className="truncate">{activePeer.full_name ?? activePeer.email}</span>
                     <PresencePill lastSeenAt={activePeer.last_seen_at} />
                   </div>
-                  <div className="text-[11px] text-muted-foreground">
+                  <div className="text-[11px] text-muted-foreground truncate">
                     {activePeer.role && ROLE_LABEL[activePeer.role]} · {activePeer.email}
                   </div>
+                </div>
+                {/* Header actions — visual affordances matching a standard chat
+                    header. Call/video are placeholders (no telephony backend);
+                    search toggles the chat-list search box focus. */}
+                <div className="ml-auto flex items-center gap-1 text-muted-foreground">
+                  <button
+                    type="button"
+                    title="Video call (coming soon)"
+                    className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-muted hover:text-foreground transition-colors"
+                  >
+                    <IconVideo size={18} />
+                  </button>
+                  <button
+                    type="button"
+                    title="Voice call (coming soon)"
+                    className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-muted hover:text-foreground transition-colors"
+                  >
+                    <IconPhone size={18} />
+                  </button>
                 </div>
               </header>
 
@@ -484,7 +517,7 @@ export function Messages() {
                 // instead of the messages + composer. The user can pick a
                 // different conversation from the sidebar, or hit the "Back
                 // to inbox" button to clear the ?with= URL param.
-                <div className="flex-1 flex items-center justify-center px-6 py-8 bg-slate-50/30">
+                <div className="flex-1 flex items-center justify-center px-6 py-8 bg-muted/30">
                   <div className="max-w-sm text-center space-y-3">
                     <div className="text-4xl text-muted-foreground">🔒</div>
                     <h3 className="text-base font-semibold text-foreground">
@@ -512,7 +545,7 @@ export function Messages() {
                   <div
                     ref={scrollContainerRef}
                     onScroll={onScrollMessages}
-                    className="flex-1 overflow-y-auto px-5 py-4 space-y-3 bg-slate-50/30"
+                    className="flex-1 overflow-y-auto px-5 py-4 space-y-3 bg-muted/30"
                   >
                     {messages.length === 0 ? (
                       <p className="text-center text-sm text-muted-foreground italic mt-6">
@@ -592,7 +625,7 @@ export function Messages() {
                       e.preventDefault();
                       send();
                     }}
-                    className="border-t border-border px-4 py-3 flex items-end gap-2 bg-card"
+                    className="border-t border-border px-3 py-3 flex items-end gap-2 bg-card"
                   >
                     <textarea
                       value={draft}
@@ -605,14 +638,15 @@ export function Messages() {
                       }}
                       rows={1}
                       placeholder="Write a message… (Shift+Enter for newline)"
-                      className="flex-1 resize-none border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40 max-h-32"
+                      className="flex-1 resize-none bg-muted/60 rounded-2xl px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-brand-500/40 max-h-32"
                     />
                     <button
                       type="submit"
                       disabled={sending || !draft.trim()}
-                      className="bg-foreground text-background text-sm px-4 py-2 rounded-lg disabled:opacity-50 hover:opacity-90"
+                      title="Send message"
+                      className="shrink-0 w-10 h-10 flex items-center justify-center rounded-full bg-brand-600 text-white disabled:opacity-40 hover:bg-brand-600/90 transition-colors"
                     >
-                      {sending ? 'Sending…' : 'Send'}
+                      <IconSend size={18} />
                     </button>
                   </form>
                 </>
