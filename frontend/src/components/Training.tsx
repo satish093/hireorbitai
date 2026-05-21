@@ -278,15 +278,94 @@ function coverColors(category: string): [string, string] {
   return [`hsl(${hue} 68% 55%)`, `hsl(${(hue + 28) % 360} 72% 42%)`];
 }
 
-// Up to two initials from the most significant words of the title.
-function courseInitials(title: string): string {
-  const words = title
-    .replace(/[^\p{L}\p{N} ]/gu, ' ')
-    .split(/\s+/)
-    .filter(Boolean);
-  if (words.length === 0) return '★';
-  if (words.length === 1) return words[0]!.slice(0, 2).toUpperCase();
-  return (words[0]![0]! + words[1]![0]!).toUpperCase();
+// Topic glyphs, drawn on a 24×24 grid (stroke-based, no fill) so the cover
+// shows an *icon* rather than letters. Keyed by a small set of icon names that
+// categories map onto below.
+const ICON_PATHS: Record<string, string[]> = {
+  shield: ['M12 2l7.5 3v6.5c0 4.6-3.2 7.9-7.5 9.5-4.3-1.6-7.5-4.9-7.5-9.5V5z', 'M9 11.5l2 2 4-4'],
+  code: ['M9 8l-4 4 4 4', 'M15 8l4 4-4 4'],
+  braces: [
+    'M8 4c-1.6 0-2.5.9-2.5 2.5V9c0 1.1-.8 2-2 2 1.2 0 2 .9 2 2v2.5C5.5 19.1 6.4 20 8 20',
+    'M16 4c1.6 0 2.5.9 2.5 2.5V9c0 1.1.8 2 2 2-1.2 0-2 .9-2 2v2.5c0 1.6-.9 2.5-2.5 2.5',
+  ],
+  check: ['M22 12a10 10 0 11-20 0 10 10 0 0120 0z', 'M8 12.5l2.5 2.5 5-5'],
+  pipeline: [
+    'M10 12a3.5 3.5 0 11-7 0 3.5 3.5 0 017 0z',
+    'M21 12a3.5 3.5 0 11-7 0 3.5 3.5 0 017 0z',
+  ],
+  cloud: ['M7.5 19a4.5 4.5 0 01-.5-9 6 6 0 0111.4 1.4A4 4 0 0118 19z'],
+  database: [
+    'M12 3c4.4 0 8 1.3 8 3s-3.6 3-8 3-8-1.3-8-3 3.6-3 8-3z',
+    'M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6',
+    'M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6',
+  ],
+  chart: ['M3 21h18', 'M6 21v-6', 'M11 21V8', 'M16 21v-10'],
+  chip: [
+    'M7 7h10v10H7z',
+    'M10 10h4v4h-4z',
+    'M9 7V4',
+    'M15 7V4',
+    'M9 20v-3',
+    'M15 20v-3',
+    'M7 9H4',
+    'M7 15H4',
+    'M20 9h-3',
+    'M20 15h-3',
+  ],
+  chat: ['M20 12a8 8 0 01-8 8 8.5 8.5 0 01-3-.6L4 21l1.4-4.4A8 8 0 1120 12z'],
+  document: [
+    'M14 3H7a1 1 0 00-1 1v16a1 1 0 001 1h10a1 1 0 001-1V7z',
+    'M14 3v4h4',
+    'M9 12h6',
+    'M9 16h4',
+  ],
+  building: [
+    'M5 21V6l7-3 7 3v15',
+    'M3 21h18',
+    'M9 9h2',
+    'M13 9h2',
+    'M9 13h2',
+    'M13 13h2',
+    'M9 17h2',
+    'M13 17h2',
+  ],
+  book: ['M5 4h12a1 1 0 011 1v15H7a2 2 0 01-2-2z', 'M5 18a2 2 0 002 2', 'M9 4v14'],
+};
+
+// Each category points at one glyph. Mirrors the CATEGORY_TONE families so the
+// cover, icon, and badge all read as the same subject.
+const CATEGORY_ICON: Record<string, string> = {
+  Java: 'braces',
+  'Spring Boot': 'braces',
+  'Node.js': 'braces',
+  React: 'code',
+  Angular: 'code',
+  'QA Automation': 'check',
+  Selenium: 'check',
+  Playwright: 'check',
+  Cypress: 'check',
+  DevOps: 'pipeline',
+  AWS: 'cloud',
+  Azure: 'cloud',
+  SQL: 'database',
+  'Data Engineering': 'database',
+  'Data Science': 'chart',
+  'Machine Learning': 'chip',
+  AI: 'chip',
+  'Network Security': 'shield',
+  'Application Security': 'shield',
+  Cybersecurity: 'shield',
+  'Cloud Security': 'shield',
+  'Interview Preparation': 'chat',
+  'Communication Skills': 'chat',
+  'Resume Building': 'document',
+  'Banking Domain': 'building',
+  'Insurance Domain': 'building',
+  'Healthcare Domain': 'building',
+};
+
+function categoryIcon(category: string): string[] {
+  return ICON_PATHS[CATEGORY_ICON[category] ?? 'book'] ?? ICON_PATHS.book!;
 }
 
 export function CourseCover({
@@ -329,26 +408,29 @@ export function CourseCover({
         <circle cx={40 + (b2 % 60)} cy={150 + (b3 % 30)} r={26 + (b0 % 24)} opacity="0.08" />
         <circle cx={150 + (b3 % 120)} cy={90 + (b1 % 40)} r={14 + (b1 % 16)} opacity="0.07" />
       </g>
-      <text
-        x="22"
-        y="104"
-        fontFamily="Inter, ui-sans-serif, system-ui, sans-serif"
-        fontSize="58"
-        fontWeight="800"
-        fill="#ffffff"
+      {/* Topic glyph — drawn on a 24-grid, scaled up and stroked in white. */}
+      <g
+        transform="translate(28 26) scale(2.6)"
+        fill="none"
+        stroke="#ffffff"
+        strokeWidth={1.7}
+        strokeLinecap="round"
+        strokeLinejoin="round"
         opacity="0.96"
       >
-        {courseInitials(title)}
-      </text>
+        {categoryIcon(category).map((d, i) => (
+          <path key={i} d={d} />
+        ))}
+      </g>
       <text
-        x="24"
-        y="138"
+        x="30"
+        y="150"
         fontFamily="Inter, ui-sans-serif, system-ui, sans-serif"
         fontSize="12.5"
         fontWeight="700"
         letterSpacing="1.6"
         fill="#ffffff"
-        opacity="0.82"
+        opacity="0.85"
       >
         {category.toUpperCase()}
       </text>
