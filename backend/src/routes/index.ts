@@ -25,6 +25,7 @@ import { usersRouter } from './users.routes';
 import { adminUsersRouter } from './adminUsers.routes';
 import { glassdoorRouter } from './glassdoor.routes';
 import { activityRouter } from './activity.routes';
+import { recruiterGoalsRouter } from './recruiterGoals.routes';
 import { trainingRouter } from './training.routes';
 import { filesRouter } from './files.routes';
 
@@ -70,6 +71,7 @@ router.use('/users', usersRouter);
 router.use('/admin/users', adminUsersRouter);
 router.use('/glassdoor', glassdoorRouter);
 router.use('/activity', activityRouter);
+router.use('/recruiter-goals', recruiterGoalsRouter);
 
 // --- Feature-flag gated routers ---------------------------------------------
 // Each module that maps 1:1 to a feature flag mounts behind requireFeature().

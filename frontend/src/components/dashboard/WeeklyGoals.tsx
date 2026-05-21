@@ -1,4 +1,10 @@
+import { useEffect, useState } from 'react';
+import { api } from '../../services/api';
 import type { DashApplication, DashConsultant } from './types';
+
+type GoalType = 'submissions' | 'interviews' | 'offers' | 'bench_refresh';
+type Targets = Record<GoalType, number>;
+const DEFAULT_TARGETS: Targets = { submissions: 10, interviews: 4, offers: 2, bench_refresh: 100 };
 
 // ---------------------------------------------------------------------------
 // Internal types
@@ -42,7 +48,11 @@ function clampPct(value: number, max = 100): number {
   return Math.min(max, Math.max(0, value));
 }
 
-function computeGoals(consultants: DashConsultant[], apps: DashApplication[]): Goal[] {
+function computeGoals(
+  consultants: DashConsultant[],
+  apps: DashApplication[],
+  targets: Targets,
+): Goal[] {
   // 1. Submissions: apps submitted in the last 7 days
   const submissions = apps.filter(
     (a) => withinLast7Days(a.submitted_at) || withinLast7Days(a.created_at),
@@ -60,13 +70,18 @@ function computeGoals(consultants: DashConsultant[], apps: DashApplication[]): G
   const benchPct = total > 0 ? Math.round((refreshed / total) * 100) : 0;
 
   return [
-    { label: 'Submissions', current: submissions, target: 10, tone: 'accent' },
-    { label: 'Interviews scheduled', current: interviews, target: 4, tone: 'accent' },
-    { label: 'Offers received', current: offers, target: 2, tone: 'success' },
+    { label: 'Submissions', current: submissions, target: targets.submissions, tone: 'accent' },
+    {
+      label: 'Interviews scheduled',
+      current: interviews,
+      target: targets.interviews,
+      tone: 'accent',
+    },
+    { label: 'Offers received', current: offers, target: targets.offers, tone: 'success' },
     {
       label: 'Bench refresh',
       current: benchPct,
-      target: 100,
+      target: targets.bench_refresh,
       tone: 'warning',
       isPercent: true,
     },
@@ -116,7 +131,30 @@ export function WeeklyGoals({
   consultants: DashConsultant[];
   apps: DashApplication[];
 }): JSX.Element {
-  const goals = computeGoals(consultants, apps);
+  // Targets are configurable per recruiter (GET /recruiter-goals); fall back to
+  // the defaults if the endpoint/migration isn't available.
+  const [targets, setTargets] = useState<Targets>(DEFAULT_TARGETS);
+  useEffect(() => {
+    let alive = true;
+    api
+      .get<{ goal_type: GoalType; target: number }[]>('/recruiter-goals')
+      .then((r) => {
+        if (!alive || !Array.isArray(r.data)) return;
+        setTargets((prev) => {
+          const next = { ...prev };
+          for (const g of r.data) if (g.goal_type in next) next[g.goal_type] = g.target;
+          return next;
+        });
+      })
+      .catch(() => {
+        /* keep defaults */
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const goals = computeGoals(consultants, apps, targets);
 
   return (
     <div className="rounded-xl border border-border bg-surface p-4">
