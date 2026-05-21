@@ -43,6 +43,11 @@ jobsRouter.delete('/:id', requireRole(...MANAGER_TIER), c.remove);
 jobsRouter.post('/:id/like', c.like);
 jobsRouter.delete('/:id/like', c.unlike);
 
+// Recruiter note — internal, operator-tier and above (consultants must not see
+// or edit it). GET is gated too so the note stays staff-only.
+jobsRouter.get('/:id/note', requireRole(...OPERATOR_TIER), c.getNote);
+jobsRouter.patch('/:id/note', requireRole(...OPERATOR_TIER), c.setNote);
+
 jobsRouter.get('/:id/match-for-me', c.matchForMe);
 jobsRouter.get('/:id/requirements', c.requirementsFor);
 jobsRouter.get('/:id/skill-gap', c.skillGap);

@@ -65,8 +65,78 @@ export const list: RequestHandler = async (req, res) => {
 
   const { data, error } = await q;
   if (error) throw httpError(500, error.message);
+
+  // Bench matches: `?matchFor=:jobId` scores the (already role-scoped) list of
+  // consultants against a job's required skills and returns the strong matches.
+  // No extra IDOR surface — scoring is layered on top of the same scoped rows.
+  const matchFor = req.query.matchFor as string | undefined;
+  if (matchFor) {
+    res.json(await scoreConsultantsForJob(data ?? [], matchFor));
+    return;
+  }
+
   res.json(data);
 };
+
+/** Lowercase + trim a skills array; tolerates non-arrays. */
+function normalizeSkills(arr: unknown): string[] {
+  if (!Array.isArray(arr)) return [];
+  return arr.map((s) => String(s).trim().toLowerCase()).filter(Boolean);
+}
+
+/**
+ * Score consultants against a job by skill overlap (consultant skills ∩ job
+ * required skills), mirroring the recommended-feed baseline. Returns a flat
+ * shape the Job Search bench card consumes, filtered to >= 65% and capped.
+ */
+async function scoreConsultantsForJob(
+  rows: {
+    id: string;
+    skills?: unknown;
+    primary_skill?: string | null;
+    user?: { full_name?: string | null } | null;
+  }[],
+  jobId: string,
+) {
+  const { data: job } = await db
+    .from('jobs')
+    .select('id, required_skills, requirements')
+    .eq('id', jobId)
+    .maybeSingle();
+  const j = job as {
+    required_skills?: string[];
+    requirements?: { required_skills?: string[] };
+  } | null;
+  const need = normalizeSkills(
+    j?.requirements?.required_skills?.length
+      ? j.requirements.required_skills
+      : (j?.required_skills ?? []),
+  );
+  if (need.length === 0) return [];
+  const needSet = new Set(need);
+
+  return rows
+    .map((c) => {
+      const have = normalizeSkills(
+        Array.isArray(c.skills) && c.skills.length
+          ? c.skills
+          : c.primary_skill
+            ? String(c.primary_skill).split(/[,;]/)
+            : [],
+      );
+      const overlap = have.filter((s) => needSet.has(s)).length;
+      const match_score = Math.round((overlap / need.length) * 100);
+      return {
+        id: c.id,
+        full_name: c.user?.full_name ?? null,
+        title: c.primary_skill ?? null,
+        match_score,
+      };
+    })
+    .filter((m) => m.match_score >= 65)
+    .sort((a, b) => b.match_score - a.match_score)
+    .slice(0, 8);
+}
 
 export const get: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');

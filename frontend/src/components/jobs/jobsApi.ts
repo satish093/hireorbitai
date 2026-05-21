@@ -1,4 +1,9 @@
-// TODO: wire these to real backend endpoints — currently fall back to client-side stubs.
+// Bench matches (GET /consultants?matchFor=:jobId) and recruiter notes
+// (GET/PATCH /jobs/:id/note) are now backed by real endpoints; the client-side
+// fallbacks below stay as a safety net for the window before the note migration
+// (1700000000010_job_recruiter_note.sql) is applied.
+// TODO: POST /jobs/score (natural-language re-rank) is still a stub — returns
+// null so the caller falls back to the server-side `q` filter on /jobs/recommended.
 
 import { api } from '../../services/api';
 

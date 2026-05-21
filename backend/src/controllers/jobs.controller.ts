@@ -188,6 +188,66 @@ export const update: RequestHandler = async (req, res) => {
   res.json(data);
 };
 
+// ---------------------------------------------------------------------------
+// Recruiter note — a single pinned, editable note on a job, shown in the Job
+// Search detail pane. Global per job (latest editor + timestamp recorded for
+// attribution). OPERATOR_TIER+ only (gated in the router). Mass-assignment is
+// blocked by the .strict() schema. Until the migration is applied the columns
+// don't exist; we surface that so the client falls back to localStorage.
+// ---------------------------------------------------------------------------
+const noteSchema = z.object({ body: z.string().max(5000) }).strict();
+const NOTE_MISSING = /schema cache|column .* does not exist/i;
+
+export const getNote: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const { data, error } = await db
+    .from('jobs')
+    .select('recruiter_note, recruiter_note_by, recruiter_note_at')
+    .eq('id', req.params.id)
+    .maybeSingle();
+  if (error) {
+    if (NOTE_MISSING.test(error.message)) throw httpError(404, 'No note');
+    throw httpError(500, error.message);
+  }
+  if (!data) throw httpError(404, 'Job not found');
+  const row = data as {
+    recruiter_note: string | null;
+    recruiter_note_by: string | null;
+    recruiter_note_at: string | null;
+  };
+  let author: string | null = null;
+  if (row.recruiter_note_by) {
+    const { data: u } = await db
+      .from('users')
+      .select('full_name')
+      .eq('id', row.recruiter_note_by)
+      .maybeSingle();
+    author = (u as { full_name?: string } | null)?.full_name ?? null;
+  }
+  res.json({ body: row.recruiter_note ?? '', author, updated_at: row.recruiter_note_at });
+};
+
+export const setNote: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const parsed = noteSchema.safeParse(req.body);
+  if (!parsed.success) throw httpError(400, 'Invalid note', parsed.error.flatten());
+  const updated_at = new Date().toISOString();
+  const { error } = await db
+    .from('jobs')
+    .update({
+      recruiter_note: parsed.data.body,
+      recruiter_note_by: req.user.id,
+      recruiter_note_at: updated_at,
+    })
+    .eq('id', req.params.id);
+  if (error) {
+    if (NOTE_MISSING.test(error.message)) throw httpError(503, 'Note storage not migrated yet');
+    throw httpError(500, error.message);
+  }
+  const author = (req.user as { full_name?: string }).full_name ?? null;
+  res.json({ body: parsed.data.body, author, updated_at });
+};
+
 export const remove: RequestHandler = async (req, res) => {
   const { error } = await db.from('jobs').delete().eq('id', req.params.id);
   if (error) throw httpError(500, error.message);
