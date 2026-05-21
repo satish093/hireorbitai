@@ -29,6 +29,7 @@ interface UrgentFeed {
     expires_at: string | null;
   }[];
   screeningStuck: number;
+  unreadDms?: number;
 }
 
 /** Compact "in 2h 10m" / "in 45m" / "today 5pm" for a near-future timestamp. */
@@ -80,6 +81,15 @@ function buildServerItems(feed: UrgentFeed, navigate: NavigateFunction): UrgentI
       severity: 'warning',
       body: strongLine(`${n} submission${n === 1 ? '' : 's'}`, ' stuck in screening > 7 days'),
       action: { label: 'Review', onClick: () => navigate('/applications?status=SCREENING') },
+    });
+  }
+  if (feed.unreadDms && feed.unreadDms > 0) {
+    const n = feed.unreadDms;
+    items.push({
+      id: 'unread-dms',
+      severity: 'info',
+      body: strongLine(`${n} unread message${n === 1 ? '' : 's'}`, ' from consultants > 24h old'),
+      action: { label: 'Open inbox', onClick: () => navigate('/messages') },
     });
   }
   return items.slice(0, MAX_ITEMS);

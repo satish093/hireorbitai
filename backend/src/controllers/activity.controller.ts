@@ -181,15 +181,18 @@ interface OfferRow {
   consultant?: { user?: { full_name?: string | null } | null } | null;
 }
 
-const EMPTY = { interviews: [], offersExpiring: [], screeningStuck: 0 };
+const EMPTY = { interviews: [], offersExpiring: [], screeningStuck: 0, unreadDms: 0 };
 
 export const urgent: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   const role = req.user.role;
   const now = Date.now();
 
-  // Consultant ids the caller may see (null = all, for managers).
+  // Consultant ids the caller may see (null = all, for managers). For the
+  // unread-DM signal we also collect the user_ids of the caller's ACTIVE
+  // consultants (recruiter scope) so we can match message senders.
   let consultantIds: string[] | null = null;
+  let activeUserIds: string[] = [];
   if (isManagerTier(role)) {
     consultantIds = null;
   } else if (role === 'RECRUITER') {
@@ -198,8 +201,15 @@ export const urgent: RequestHandler = async (req, res) => {
       res.json(EMPTY);
       return;
     }
-    const { data } = await db.from('consultants').select('id').eq('recruiter_id', rec);
-    consultantIds = ((data ?? []) as { id: string }[]).map((c) => c.id);
+    const { data } = await db
+      .from('consultants')
+      .select('id, user_id, marketing_status')
+      .eq('recruiter_id', rec);
+    const rows = (data ?? []) as { id: string; user_id?: string; marketing_status?: string }[];
+    consultantIds = rows.map((c) => c.id);
+    activeUserIds = rows
+      .filter((c) => (c.marketing_status ?? '').toUpperCase() === 'ACTIVE' && c.user_id)
+      .map((c) => c.user_id as string);
   } else if (role === 'CONSULTANT') {
     const cons = await consultantRowId(req.user.id);
     consultantIds = cons ? [cons] : [];
@@ -268,5 +278,26 @@ export const urgent: RequestHandler = async (req, res) => {
   if (sRes.error && !MISSING.test(sRes.error.message)) throw httpError(500, sRes.error.message);
   const screeningStuck = (sRes.data ?? []).length;
 
-  res.json({ interviews, offersExpiring, screeningStuck });
+  // 4) Unread DMs to the caller, older than 24h. For recruiters, restricted to
+  // messages from their ACTIVE consultants; managers see any unread > 24h to
+  // them. (Consultants don't get this signal.) Degrades to 0 if the messages
+  // table/columns aren't present.
+  let unreadDms = 0;
+  const dmAllowed = isManagerTier(role) || role === 'RECRUITER';
+  if (dmAllowed && !(role === 'RECRUITER' && activeUserIds.length === 0)) {
+    let dq = db
+      .from('messages')
+      .select('id')
+      .eq('recipient_id', req.user.id)
+      .is('read_at', null)
+      .is('deleted_at', null)
+      .lt('created_at', new Date(now - 24 * HOUR).toISOString())
+      .limit(100);
+    if (role === 'RECRUITER') dq = dq.in('sender_id', activeUserIds);
+    const dRes = await dq;
+    if (dRes.error && !MISSING.test(dRes.error.message)) throw httpError(500, dRes.error.message);
+    unreadDms = (dRes.data ?? []).length;
+  }
+
+  res.json({ interviews, offersExpiring, screeningStuck, unreadDms });
 };
