@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Layout } from '../components/Layout';
 import { api } from '../services/api';
+import { SkeletonCard } from '../components/Skeleton';
 
 const CATEGORIES = [
   'Java',
@@ -103,7 +104,9 @@ export function EditTrainingCourse() {
   if (!form)
     return (
       <Layout title="Edit course">
-        <div className="text-sm text-slate-500">Loading…</div>
+        <div className="max-w-2xl">
+          <SkeletonCard lines={6} />
+        </div>
       </Layout>
     );
 

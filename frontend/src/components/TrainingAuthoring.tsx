@@ -2,6 +2,7 @@ import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { api } from '../services/api';
 import { Modal } from './Modal';
+import { Pill, PillTone } from './Pill';
 
 /**
  * Manager-only authoring widgets for AI-generated courses.
@@ -17,13 +18,13 @@ export interface GeneratedLessonStub {
   content_status: 'PENDING' | 'GENERATING' | 'READY' | 'FAILED';
 }
 
-const CONTENT_STATUS_TONE: Record<string, string> = {
-  PENDING: 'bg-slate-100 text-slate-600 border-slate-200',
-  GENERATING: 'bg-amber-50 text-amber-700 border-amber-200',
-  READY: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  FAILED: 'bg-rose-50 text-rose-700 border-rose-200',
-  NONE: 'bg-slate-100 text-slate-600 border-slate-200',
-  OUTLINE_READY: 'bg-sky-50 text-sky-700 border-sky-200',
+const CONTENT_STATUS_TONE: Record<string, PillTone> = {
+  PENDING: { bg: 'bg-slate-100', text: 'text-slate-600', dot: 'bg-slate-400' },
+  GENERATING: { bg: 'bg-amber-50', text: 'text-amber-700', dot: 'bg-amber-500' },
+  READY: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
+  FAILED: { bg: 'bg-rose-50', text: 'text-rose-700', dot: 'bg-rose-500' },
+  NONE: { bg: 'bg-slate-100', text: 'text-slate-600', dot: 'bg-slate-400' },
+  OUTLINE_READY: { bg: 'bg-sky-50', text: 'text-sky-700', dot: 'bg-sky-500' },
 };
 
 // Plain-language labels so authors don't have to decode the raw enum.
@@ -39,13 +40,33 @@ const CONTENT_STATUS_LABEL: Record<string, string> = {
 export function ContentStatusChip({ status }: { status?: string | null }) {
   const s = status ?? 'NONE';
   return (
-    <span
-      className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full border ${
-        CONTENT_STATUS_TONE[s] ?? CONTENT_STATUS_TONE.NONE
-      }`}
-    >
+    <Pill tone={CONTENT_STATUS_TONE[s] ?? CONTENT_STATUS_TONE.NONE} pulseDot={s === 'GENERATING'}>
       {CONTENT_STATUS_LABEL[s] ?? s.replace(/_/g, ' ')}
-    </span>
+    </Pill>
+  );
+}
+
+// Editorial lifecycle pill: DRAFT → GENERATED → REVIEWED → PUBLISHED → ARCHIVED.
+const REVIEW_STATUS_TONE: Record<string, PillTone> = {
+  DRAFT: { bg: 'bg-slate-100', text: 'text-slate-600', dot: 'bg-slate-400' },
+  GENERATED: { bg: 'bg-sky-50', text: 'text-sky-700', dot: 'bg-sky-500' },
+  REVIEWED: { bg: 'bg-indigo-50', text: 'text-indigo-700', dot: 'bg-indigo-500' },
+  PUBLISHED: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
+  ARCHIVED: { bg: 'bg-slate-100', text: 'text-slate-400', dot: 'bg-slate-300' },
+};
+const REVIEW_STATUS_LABEL: Record<string, string> = {
+  DRAFT: 'Draft',
+  GENERATED: 'Generated',
+  REVIEWED: 'Reviewed',
+  PUBLISHED: 'Published',
+  ARCHIVED: 'Archived',
+};
+export function ReviewStatusPill({ status }: { status?: string | null }) {
+  if (!status) return null;
+  return (
+    <Pill tone={REVIEW_STATUS_TONE[status] ?? REVIEW_STATUS_TONE.DRAFT}>
+      {REVIEW_STATUS_LABEL[status] ?? status.replace(/_/g, ' ')}
+    </Pill>
   );
 }
 

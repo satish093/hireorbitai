@@ -4,6 +4,7 @@ import { Layout } from '../components/Layout';
 import { api } from '../services/api';
 import { TrainingProgressBar } from '../components/Training';
 import { DashboardCard } from '../components/DashboardCard';
+import { SkeletonMetricGrid } from '../components/Skeleton';
 import { StemOptDisclaimer } from '../components/StemOptDisclaimer';
 
 export function TrainingReports() {
@@ -14,7 +15,9 @@ export function TrainingReports() {
     api
       .get('/training/reports')
       .then((r) => setData(r.data))
-      .catch((e) => toast.error(e?.response?.data?.error ?? 'Failed'))
+      .catch((e) =>
+        toast.error(e?.response?.data?.error ?? 'Something went wrong. Please try again.'),
+      )
       .finally(() => setLoading(false));
   }, []);
 
@@ -28,7 +31,7 @@ export function TrainingReports() {
       ]}
     >
       <h1 className="text-2xl font-semibold tracking-tight mb-5">Training effectiveness</h1>
-      {loading && <p className="text-sm text-slate-500">Loading…</p>}
+      {loading && <SkeletonMetricGrid count={4} />}
       {data && (
         <>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">

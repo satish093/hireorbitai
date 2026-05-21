@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Layout } from '../components/Layout';
+import { SkeletonCard } from '../components/Skeleton';
+import { EmptyState } from '../components/EmptyState';
 import { api } from '../services/api';
 import {
   PriorityBadge,
@@ -184,11 +186,13 @@ export function TasksAssignedToMe() {
 
       {/* Sections */}
       {loading ? (
-        <div className="text-sm text-slate-500">Loading…</div>
+        <SkeletonCard lines={5} />
       ) : active.length === 0 ? (
-        <div className="bg-white border border-slate-200 rounded-xl p-8 text-center text-slate-500">
-          🎉 You're all caught up. No tasks assigned to you right now.
-        </div>
+        <EmptyState
+          icon="🎉"
+          title="You're all caught up"
+          description="No tasks are assigned to you right now."
+        />
       ) : (
         <div className="space-y-6">
           {SECTION_ORDER.map((key) => {

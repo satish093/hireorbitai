@@ -521,7 +521,7 @@ function DailyActivity() {
       setOpen(false);
       load();
     } catch (e: any) {
-      toast.error(e?.response?.data?.error ?? 'Failed');
+      toast.error(e?.response?.data?.error ?? 'Something went wrong. Please try again.');
     } finally {
       setSaving(false);
     }

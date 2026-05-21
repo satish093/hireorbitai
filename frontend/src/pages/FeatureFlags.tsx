@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Layout } from '../components/Layout';
+import { SkeletonCard } from '../components/Skeleton';
 import { api } from '../services/api';
 import { useFeatureFlags } from '../hooks/useFeatureFlags';
 import { invalidate } from '../hooks/useInvalidate';
@@ -130,7 +131,7 @@ export function FeatureFlags() {
         </p>
 
         {loading ? (
-          <p className="text-sm text-slate-500">Loading…</p>
+          <SkeletonCard lines={5} />
         ) : rows.length === 0 ? (
           <div className="bg-white border border-amber-200 rounded-xl p-5 text-sm text-amber-900">
             No feature flags exist yet. Run{' '}

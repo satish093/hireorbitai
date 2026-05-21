@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Layout } from '../components/Layout';
+import { SkeletonCard } from '../components/Skeleton';
 import { Avatar } from '../components/TaskBits';
 import { PresencePill } from '../components/PresenceDot';
 import { useAuth } from '../context/AuthContext';
@@ -209,7 +210,9 @@ export function UserProfile() {
   if (loading)
     return (
       <Layout title="Profile">
-        <div className="text-sm text-slate-500">Loading…</div>
+        <div className="max-w-3xl">
+          <SkeletonCard lines={6} />
+        </div>
       </Layout>
     );
   if (!user)

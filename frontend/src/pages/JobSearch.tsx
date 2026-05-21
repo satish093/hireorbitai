@@ -2353,7 +2353,7 @@ function SourcesDrawer({ onClose, onAfterSync }: { onClose: () => void; onAfterS
       await api.patch(`/jobs/sources/${c.id}`, { is_active: !c.is_active });
       load();
     } catch (e: any) {
-      toast.error(e?.response?.data?.error ?? 'Failed');
+      toast.error(e?.response?.data?.error ?? 'Something went wrong. Please try again.');
     }
   }
 
@@ -2364,7 +2364,7 @@ function SourcesDrawer({ onClose, onAfterSync }: { onClose: () => void; onAfterS
       toast.success('Removed');
       load();
     } catch (e: any) {
-      toast.error(e?.response?.data?.error ?? 'Failed');
+      toast.error(e?.response?.data?.error ?? 'Something went wrong. Please try again.');
     }
   }
 
@@ -2490,7 +2490,9 @@ function SourcesDrawer({ onClose, onAfterSync }: { onClose: () => void; onAfterS
 
         {/* Existing sources */}
         {loading ? (
-          <div className="p-6 text-sm text-slate-500">Loading…</div>
+          <div className="p-4">
+            <SkeletonCard lines={4} />
+          </div>
         ) : (
           <div className="divide-y divide-slate-100">
             {rows.length === 0 && (

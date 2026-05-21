@@ -1,6 +1,7 @@
 import { ReactNode, useEffect, useRef, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
+import { SkeletonCard } from '../components/Skeleton';
 import {
   PriorityBadge,
   TaskStatusBadge,
@@ -64,7 +65,9 @@ export function TaskDetail() {
   if (!task) {
     return (
       <Layout title="Task">
-        <div className="text-sm text-slate-500">Loading…</div>
+        <div className="max-w-3xl">
+          <SkeletonCard lines={6} />
+        </div>
       </Layout>
     );
   }

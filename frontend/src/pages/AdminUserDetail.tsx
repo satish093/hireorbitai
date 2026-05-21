@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Layout } from '../components/Layout';
 import { PageHeader } from '../components/PageHeader';
+import { SkeletonCard } from '../components/Skeleton';
 import { Button } from '../components/Button';
 import { Modal } from '../components/Modal';
 import { SelectInput } from '../components/SelectInput';
@@ -207,7 +208,9 @@ export function AdminUserDetail() {
   if (loading) {
     return (
       <Layout title="Admin · User">
-        <div className="text-sm text-slate-500">Loading…</div>
+        <div className="max-w-3xl">
+          <SkeletonCard lines={6} />
+        </div>
       </Layout>
     );
   }

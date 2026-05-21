@@ -15,6 +15,7 @@ import {
   generateAllLessons,
   CapstoneEditor,
   LessonEditorModal,
+  ReviewStatusPill,
 } from '../components/TrainingAuthoring';
 import { SkeletonCard } from '../components/Skeleton';
 import { EmptyState } from '../components/EmptyState';
@@ -275,11 +276,7 @@ export function TrainingCourseDetails() {
               <div className="flex items-center gap-2 flex-wrap mb-2">
                 <CourseCategoryBadge category={course.category} />
                 <TrainingStatusBadge status={course.status} />
-                {course.review_status && (
-                  <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600">
-                    {course.review_status}
-                  </span>
-                )}
+                <ReviewStatusPill status={course.review_status} />
                 {course.content_status &&
                   course.content_status !== 'NONE' &&
                   course.content_status !== 'READY' && (

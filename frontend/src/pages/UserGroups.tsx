@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { Layout } from '../components/Layout';
+import { SkeletonCard } from '../components/Skeleton';
 import { api } from '../services/api';
 
 interface UserGroup {
@@ -101,7 +102,7 @@ export function UserGroups() {
       await api.patch(`/user-groups/${g.id}`, { is_active: !g.is_active });
       load();
     } catch (e: any) {
-      toast.error(e?.response?.data?.error ?? 'Failed');
+      toast.error(e?.response?.data?.error ?? 'Something went wrong. Please try again.');
     }
   }
 
@@ -112,7 +113,7 @@ export function UserGroups() {
       toast.success('Removed');
       load();
     } catch (e: any) {
-      toast.error(e?.response?.data?.error ?? 'Failed');
+      toast.error(e?.response?.data?.error ?? 'Something went wrong. Please try again.');
     }
   }
 
@@ -162,7 +163,7 @@ export function UserGroups() {
       </div>
 
       {loading ? (
-        <p className="text-sm text-slate-500">Loading…</p>
+        <SkeletonCard lines={5} />
       ) : groups.length === 0 ? (
         <div className="bg-white border border-slate-200 rounded-xl p-10 text-center text-slate-500">
           No groups yet. Apply{' '}

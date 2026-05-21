@@ -74,7 +74,7 @@ export function Interviews() {
       setForm(EMPTY_FORM);
       load();
     } catch (e: any) {
-      toast.error(e?.response?.data?.error ?? 'Failed');
+      toast.error(e?.response?.data?.error ?? 'Something went wrong. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -94,7 +94,7 @@ export function Interviews() {
       setFeedback(EMPTY_FEEDBACK);
       load();
     } catch (e: any) {
-      toast.error(e?.response?.data?.error ?? 'Failed');
+      toast.error(e?.response?.data?.error ?? 'Something went wrong. Please try again.');
     } finally {
       setSavingFeedback(false);
     }

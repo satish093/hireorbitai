@@ -4,6 +4,8 @@ import toast from 'react-hot-toast';
 import { Layout } from '../components/Layout';
 import { api } from '../services/api';
 import { QuizQuestionCard, QuizQuestion } from '../components/Training';
+import { SkeletonCard } from '../components/Skeleton';
+import { EmptyState } from '../components/EmptyState';
 
 interface AttemptResult {
   quiz_id: string;
@@ -97,7 +99,9 @@ export function QuizPage() {
   if (!assignment)
     return (
       <Layout title="Quiz">
-        <div className="text-sm text-slate-500">Loading…</div>
+        <div className="max-w-3xl">
+          <SkeletonCard lines={5} />
+        </div>
       </Layout>
     );
 
@@ -115,7 +119,12 @@ export function QuizPage() {
           Quiz · {assignment.course?.title}
         </h1>
         {quiz.length === 0 && (
-          <p className="text-sm text-slate-500">No quiz questions on this course yet.</p>
+          <EmptyState
+            compact
+            icon="📝"
+            title="No quiz for this lesson yet"
+            description="There's nothing to answer here right now — continue with the lessons."
+          />
         )}
 
         {score && (

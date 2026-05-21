@@ -5,6 +5,7 @@ import { Layout } from '../components/Layout';
 import { Modal } from '../components/Modal';
 import { api } from '../services/api';
 import { ComplianceReportButton } from '../components/TrainingCompliance';
+import { SkeletonCard } from '../components/Skeleton';
 import { useAuth } from '../context/AuthContext';
 import { MANAGER_TIER } from '../types';
 
@@ -60,7 +61,10 @@ export function TrainingPlanView() {
   if (!assignment || !course) {
     return (
       <Layout title="Training plan">
-        <div className="text-sm text-slate-500">Loading…</div>
+        <div className="space-y-4">
+          <SkeletonCard lines={4} />
+          <SkeletonCard lines={6} />
+        </div>
       </Layout>
     );
   }

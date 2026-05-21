@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
 import { Modal } from './Modal';
+import { Pill, PillTone } from './Pill';
 import { api } from '../services/api';
 
 /**
@@ -15,16 +16,35 @@ import { api } from '../services/api';
 // ---------------------------------------------------------------------------
 // Status badges
 // ---------------------------------------------------------------------------
-const STATUS_TONE: Record<string, string> = {
-  NOT_STARTED: 'bg-slate-100 text-slate-700 border-slate-200',
-  IN_PROGRESS: 'bg-sky-50 text-sky-700 border-sky-100',
-  COMPLETED: 'bg-emerald-50 text-emerald-700 border-emerald-100',
-  OVERDUE: 'bg-rose-50 text-rose-700 border-rose-100',
-  FAILED: 'bg-rose-50 text-rose-700 border-rose-100',
-  DRAFT: 'bg-slate-100 text-slate-500 border-slate-200',
-  ACTIVE: 'bg-emerald-50 text-emerald-700 border-emerald-100',
-  ARCHIVED: 'bg-slate-100 text-slate-400 border-slate-200',
+// Training status tones, expressed as shared PillTone objects so the badges
+// match every other status pill in the app (height, radius, dot, font).
+const STATUS_TONE: Record<string, PillTone> = {
+  NOT_STARTED: { bg: 'bg-slate-100', text: 'text-slate-700', dot: 'bg-slate-400' },
+  IN_PROGRESS: { bg: 'bg-sky-50', text: 'text-sky-700', dot: 'bg-sky-500' },
+  COMPLETED: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
+  OVERDUE: { bg: 'bg-rose-50', text: 'text-rose-700', dot: 'bg-rose-500' },
+  FAILED: { bg: 'bg-rose-50', text: 'text-rose-700', dot: 'bg-rose-500' },
+  QUIZ_PENDING: { bg: 'bg-amber-50', text: 'text-amber-700', dot: 'bg-amber-500' },
+  ASSIGNMENT_PENDING: { bg: 'bg-amber-50', text: 'text-amber-700', dot: 'bg-amber-500' },
+  FINAL_ASSESSMENT_PENDING: { bg: 'bg-amber-50', text: 'text-amber-700', dot: 'bg-amber-500' },
+  MANAGER_REVIEW_PENDING: { bg: 'bg-amber-50', text: 'text-amber-700', dot: 'bg-amber-500' },
+  DRAFT: { bg: 'bg-slate-100', text: 'text-slate-500', dot: 'bg-slate-400' },
+  ACTIVE: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
+  ARCHIVED: { bg: 'bg-slate-100', text: 'text-slate-400', dot: 'bg-slate-300' },
 };
+const STATUS_DEFAULT_TONE: PillTone = {
+  bg: 'bg-slate-100',
+  text: 'text-slate-700',
+  dot: 'bg-slate-400',
+};
+// Active/waiting states get a soft pulsing dot so they draw the eye.
+const STATUS_PULSING = new Set([
+  'IN_PROGRESS',
+  'QUIZ_PENDING',
+  'ASSIGNMENT_PENDING',
+  'FINAL_ASSESSMENT_PENDING',
+  'MANAGER_REVIEW_PENDING',
+]);
 // Plain-language labels for the assignment + course statuses learners and
 // managers see. Falls back to a de-underscored version for anything new.
 const STATUS_LABEL: Record<string, string> = {
@@ -42,16 +62,10 @@ const STATUS_LABEL: Record<string, string> = {
   ARCHIVED: 'Archived',
 };
 export function TrainingStatusBadge({ status }: { status: string }) {
-  const tone = STATUS_TONE[status] ?? 'bg-slate-100 text-slate-700 border-slate-200';
   return (
-    <span
-      className={clsx(
-        'text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded border',
-        tone,
-      )}
-    >
+    <Pill tone={STATUS_TONE[status] ?? STATUS_DEFAULT_TONE} pulseDot={STATUS_PULSING.has(status)}>
       {STATUS_LABEL[status] ?? status.replace(/_/g, ' ')}
-    </span>
+    </Pill>
   );
 }
 

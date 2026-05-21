@@ -66,7 +66,7 @@ export function ConsultantOnboarding() {
       await refreshProfile();
       nav('/dashboard', { replace: true });
     } catch (e: any) {
-      toast.error(e?.response?.data?.error ?? 'Failed');
+      toast.error(e?.response?.data?.error ?? 'Something went wrong. Please try again.');
     }
   }
 

@@ -267,7 +267,7 @@ function ManageManagersModal({
       toast.success('Primary supervisor set');
       onChanged();
     } catch (e: any) {
-      toast.error(e?.response?.data?.error ?? 'Failed');
+      toast.error(e?.response?.data?.error ?? 'Something went wrong. Please try again.');
     } finally {
       setBusy(null);
     }

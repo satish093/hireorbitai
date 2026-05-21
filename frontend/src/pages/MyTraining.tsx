@@ -4,6 +4,8 @@ import toast from 'react-hot-toast';
 import { Layout } from '../components/Layout';
 import { api } from '../services/api';
 import { StemOptDisclaimer } from '../components/StemOptDisclaimer';
+import { SkeletonCard } from '../components/Skeleton';
+import { EmptyState } from '../components/EmptyState';
 import {
   TrainingProgressBar,
   TrainingStatusBadge,
@@ -75,11 +77,16 @@ export function MyTraining() {
       </div>
 
       {loading ? (
-        <p className="text-sm text-slate-500">Loading…</p>
-      ) : rows.length === 0 ? (
-        <div className="bg-white border border-slate-200 rounded-xl p-10 text-center text-slate-500">
-          No training assigned to you yet. Your manager can assign courses from the Training page.
+        <div className="grid md:grid-cols-2 gap-4">
+          <SkeletonCard lines={4} />
+          <SkeletonCard lines={4} />
         </div>
+      ) : rows.length === 0 ? (
+        <EmptyState
+          icon="🎓"
+          title="No training assigned yet"
+          description="When your manager assigns a course, it'll show up here to start."
+        />
       ) : (
         <div className="grid md:grid-cols-2 gap-4">
           {rows.map((a) => (

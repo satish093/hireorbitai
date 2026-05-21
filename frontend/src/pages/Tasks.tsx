@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, DragEvent, ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { Modal } from '../components/Modal';
+import { SkeletonCard } from '../components/Skeleton';
 import { DateTimePicker } from '../components/DateTimePicker';
 import { SelectInput } from '../components/SelectInput';
 import {
@@ -255,7 +256,9 @@ export function Tasks() {
       </div>
 
       {loading ? (
-        <div className="text-sm text-slate-500 mt-6">Loading…</div>
+        <div className="mt-5">
+          <SkeletonCard lines={6} />
+        </div>
       ) : (
         <div className="mt-5">
           {view === 'board' ? (
