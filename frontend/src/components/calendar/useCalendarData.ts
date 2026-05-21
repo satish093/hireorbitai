@@ -29,10 +29,11 @@ const DAY = 86_400_000;
  * the anchor date (wide enough to cover day/week/month/agenda). Uses an
  * alive-flag so a StrictMode remount can't blank the initial load.
  */
-export function useCalendarData(anchor: Date) {
+export function useCalendarData(anchor: Date, reloadKey = 0) {
   const [events, setEvents] = useState<CalEvent[]>([]);
   const [loading, setLoading] = useState(true);
-  // Re-fetch when the anchor's month changes (covers paging across views).
+  // Re-fetch when the anchor's month changes (covers paging across views) or
+  // when reloadKey bumps (after scheduling / feedback).
   const monthKey = `${anchor.getFullYear()}-${anchor.getMonth()}`;
 
   useEffect(() => {
@@ -91,7 +92,7 @@ export function useCalendarData(anchor: Date) {
       alive = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [monthKey]);
+  }, [monthKey, reloadKey]);
 
   return { events, loading };
 }

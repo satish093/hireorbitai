@@ -64,16 +64,19 @@ export function EventDetailBar({
   event,
   onClose,
   onBrief,
+  onFeedback,
 }: {
   event: CalEvent;
   onClose: () => void;
   onBrief?: () => void;
+  onFeedback?: () => void;
 }): JSX.Element {
   const toneStyles = TONE_STYLES[event.tone];
 
   const timeRange = fmtRange(event.start, event.durationMin);
   const metaLine = [timeRange, event.attendee ? event.attendee : null].filter(Boolean).join(' · ');
 
+  const showFeedback = event.kind === 'interview' && typeof onFeedback === 'function';
   const showBrief = event.kind === 'interview' && typeof onBrief === 'function';
   const showMatch = event.kind === 'interview' && typeof event.matchScore === 'number';
   const showJoin = Boolean(event.meetingUrl);
@@ -99,6 +102,12 @@ export function EventDetailBar({
 
         {/* Action buttons */}
         <div className="flex items-center gap-1.5 shrink-0">
+          {showFeedback && (
+            <Button variant="outline" size="sm" onClick={onFeedback}>
+              Feedback
+            </Button>
+          )}
+
           {showBrief && (
             <Button variant="outline" size="sm" onClick={onBrief}>
               Brief

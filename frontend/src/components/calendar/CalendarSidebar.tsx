@@ -56,6 +56,7 @@ export function CalendarSidebar({
   visible,
   onToggleCalendar,
   onSelectEvent,
+  showCalendars = true,
 }: {
   anchor: Date;
   onAnchor: (d: Date) => void;
@@ -63,6 +64,9 @@ export function CalendarSidebar({
   visible: Set<CalendarKey>;
   onToggleCalendar: (k: CalendarKey) => void;
   onSelectEvent: (id: string) => void;
+  /** Hidden in restricted mode (e.g. Interviews wrapper) where the visible
+   *  set is fixed and the toggles would be inert. */
+  showCalendars?: boolean;
 }): JSX.Element {
   // Tick state for countdown recompute every 60s.
   const [tick, setTick] = useState(0);
@@ -246,55 +250,57 @@ export function CalendarSidebar({
       {/* ------------------------------------------------------------------ */}
       {/* 3. Calendars list                                                   */}
       {/* ------------------------------------------------------------------ */}
-      <div className="space-y-1">
-        <p className="text-[11px] font-mono uppercase tracking-wider text-muted px-1 mb-2">
-          Calendars
-        </p>
+      {showCalendars && (
+        <div className="space-y-1">
+          <p className="text-[11px] font-mono uppercase tracking-wider text-muted px-1 mb-2">
+            Calendars
+          </p>
 
-        {CALENDARS.map((cal) => {
-          const checked = visible.has(cal.key);
-          const dotClass = TONE_STYLES[cal.tone].dot;
+          {CALENDARS.map((cal) => {
+            const checked = visible.has(cal.key);
+            const dotClass = TONE_STYLES[cal.tone].dot;
 
-          return (
-            <div
-              key={cal.key}
-              className="flex items-center gap-2 text-[13px] text-ink-2 cursor-pointer px-1 py-0.5 rounded-md hover:bg-hover transition-colors"
-              role="checkbox"
-              aria-checked={checked}
-              tabIndex={0}
-              onClick={() => onToggleCalendar(cal.key)}
-              onKeyDown={(e) => {
-                if (e.key === ' ' || e.key === 'Enter') {
-                  e.preventDefault();
-                  onToggleCalendar(cal.key);
-                }
-              }}
-            >
-              {/* Custom checkbox */}
-              <span
-                className={[
-                  'w-3.5 h-3.5 rounded-[3px] border shrink-0 grid place-items-center transition-colors',
-                  checked ? `${dotClass} border-transparent` : 'border-border bg-surface',
-                ].join(' ')}
+            return (
+              <div
+                key={cal.key}
+                className="flex items-center gap-2 text-[13px] text-ink-2 cursor-pointer px-1 py-0.5 rounded-md hover:bg-hover transition-colors"
+                role="checkbox"
+                aria-checked={checked}
+                tabIndex={0}
+                onClick={() => onToggleCalendar(cal.key)}
+                onKeyDown={(e) => {
+                  if (e.key === ' ' || e.key === 'Enter') {
+                    e.preventDefault();
+                    onToggleCalendar(cal.key);
+                  }
+                }}
               >
-                {checked && (
-                  <svg width="9" height="7" viewBox="0 0 9 7" fill="none" aria-hidden>
-                    <path
-                      d="M1 3.5L3.5 6L8 1"
-                      stroke="white"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                )}
-              </span>
+                {/* Custom checkbox */}
+                <span
+                  className={[
+                    'w-3.5 h-3.5 rounded-[3px] border shrink-0 grid place-items-center transition-colors',
+                    checked ? `${dotClass} border-transparent` : 'border-border bg-surface',
+                  ].join(' ')}
+                >
+                  {checked && (
+                    <svg width="9" height="7" viewBox="0 0 9 7" fill="none" aria-hidden>
+                      <path
+                        d="M1 3.5L3.5 6L8 1"
+                        stroke="white"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  )}
+                </span>
 
-              {cal.label}
-            </div>
-          );
-        })}
-      </div>
+                {cal.label}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
