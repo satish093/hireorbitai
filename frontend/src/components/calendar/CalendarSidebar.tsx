@@ -191,7 +191,7 @@ export function CalendarSidebar({
                   className={[
                     'w-8 h-8 grid place-items-center rounded-full text-[12px] font-medium transition-colors',
                     isToday
-                      ? 'bg-ink text-bg'
+                      ? 'bg-accent text-white font-semibold'
                       : isSelected
                         ? 'ring-2 ring-accent text-accent'
                         : 'text-ink hover:bg-hover',

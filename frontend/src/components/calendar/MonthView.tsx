@@ -61,13 +61,15 @@ function EventChip({
         }
       }}
       className={clsx(
-        'relative flex items-center text-[11px] rounded pl-2 pr-1 py-0.5 mb-0.5 cursor-pointer overflow-hidden truncate',
-        isSelected ? 'ring-1 ring-accent bg-accent-soft' : tone.bg,
+        'relative flex items-center text-[11px] rounded-md border pl-2.5 pr-1 py-0.5 mb-0.5 cursor-pointer overflow-hidden truncate transition-shadow hover:shadow-sm',
+        isSelected
+          ? 'ring-2 ring-accent border-transparent bg-accent-soft'
+          : `${tone.bg} ${tone.border}`,
       )}
     >
       {/* Left tone strip — matches WeekView's absolute left bar */}
-      <span className={clsx('absolute left-0 top-0 bottom-0 w-0.5', tone.bar)} />
-      <span className="truncate text-ink ml-0.5">{ev.title}</span>
+      <span className={clsx('absolute left-0 top-0 bottom-0 w-1 rounded-l-md', tone.bar)} />
+      <span className="truncate text-ink">{ev.title}</span>
       <span className="ml-auto shrink-0 font-mono text-muted hidden sm:inline pl-1">
         {fmtTime(ev.start)}
       </span>
@@ -120,18 +122,22 @@ export function MonthView({
           const visible = dayEvents.slice(0, MAX_CHIPS);
           const overflow = dayEvents.length - visible.length;
 
+          const isWeekend = day.getDay() === 0 || day.getDay() === 6;
           return (
             <div
               key={idx}
-              className="min-h-[96px] border-t border-l border-border p-1 cursor-pointer"
+              className={clsx(
+                'min-h-[104px] border-t border-l border-border p-1.5 cursor-pointer transition-colors hover:bg-hover/50',
+                isWeekend && isCurrentMonth && 'bg-bg-sunken/40',
+              )}
               onClick={() => onAnchor(day)}
             >
               {/* Cell content — dimmed at 55% opacity for spillover days */}
               <div className={clsx(!isCurrentMonth && 'opacity-55')}>
                 {/* Day number */}
-                <div className="flex items-center justify-start mb-0.5">
+                <div className="flex items-center justify-start mb-1">
                   {isToday ? (
-                    <span className="font-mono text-[12px] bg-accent-soft text-accent rounded-full w-6 h-6 grid place-items-center select-none">
+                    <span className="font-mono text-[12px] font-semibold bg-accent text-white rounded-full w-6 h-6 grid place-items-center select-none">
                       {day.getDate()}
                     </span>
                   ) : (

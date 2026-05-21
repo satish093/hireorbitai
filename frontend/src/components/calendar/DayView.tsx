@@ -272,9 +272,11 @@ export function DayView({
                   type="button"
                   onClick={() => onSelect(ev.id)}
                   className={clsx(
-                    'absolute overflow-hidden rounded-md cursor-pointer text-left',
+                    'absolute overflow-hidden rounded-lg border cursor-pointer text-left transition-shadow',
                     tone.bg,
-                    isSelected && 'ring-2 ring-accent',
+                    isSelected
+                      ? 'ring-2 ring-accent border-transparent z-10 shadow-sm'
+                      : `${tone.border} hover:shadow-sm`,
                   )}
                   style={{
                     top: topPx,
@@ -285,7 +287,9 @@ export function DayView({
                   }}
                 >
                   {/* Left tone strip */}
-                  <div className={clsx('absolute left-0 top-0 bottom-0 w-[3px]', tone.bar)} />
+                  <div
+                    className={clsx('absolute left-0 top-0 bottom-0 w-1 rounded-l-lg', tone.bar)}
+                  />
 
                   {/* Content */}
                   <div className="pl-2 pr-1 pt-0.5 pb-0.5 h-full flex flex-col justify-start overflow-hidden">

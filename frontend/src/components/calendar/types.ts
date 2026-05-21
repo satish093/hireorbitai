@@ -26,24 +26,47 @@ export const CALENDARS: { key: CalendarKey; label: string; tone: CalTone }[] = [
   { key: 'personal', label: 'Personal', tone: 'team' },
 ];
 
-/** Token-based styles per event tone. Use these (no literal colors). */
-export const TONE_STYLES: Record<CalTone, { bar: string; bg: string; text: string; dot: string }> =
-  {
-    accent: { bar: 'bg-accent', bg: 'bg-accent-soft', text: 'text-accent', dot: 'bg-accent' },
-    mock: { bar: 'bg-danger', bg: 'bg-danger-soft', text: 'text-danger', dot: 'bg-danger' },
-    team: {
-      bar: 'bg-[color:var(--muted)]',
-      bg: 'bg-bg-sunken',
-      text: 'text-ink-2',
-      dot: 'bg-[color:var(--muted)]',
-    },
-    deadline: { bar: 'bg-warn', bg: 'bg-warn-soft', text: 'text-warn', dot: 'bg-warn' },
-  };
+/** Token-based styles per event tone. Use these (no literal colors). The
+ *  `border` is a soft, tone-matched hairline so chips read as solid objects on
+ *  any background (light or dark) instead of floating tints. */
+export const TONE_STYLES: Record<
+  CalTone,
+  { bar: string; bg: string; text: string; dot: string; border: string }
+> = {
+  accent: {
+    bar: 'bg-accent',
+    bg: 'bg-accent-soft',
+    text: 'text-accent',
+    dot: 'bg-accent',
+    border: 'border-accent/25',
+  },
+  mock: {
+    bar: 'bg-danger',
+    bg: 'bg-danger-soft',
+    text: 'text-danger',
+    dot: 'bg-danger',
+    border: 'border-danger/25',
+  },
+  team: {
+    bar: 'bg-[color:var(--muted)]',
+    bg: 'bg-bg-sunken',
+    text: 'text-ink-2',
+    dot: 'bg-[color:var(--muted)]',
+    border: 'border-border',
+  },
+  deadline: {
+    bar: 'bg-warn',
+    bg: 'bg-warn-soft',
+    text: 'text-warn',
+    dot: 'bg-warn',
+    border: 'border-warn/30',
+  },
+};
 
-export const HOUR_HEIGHT = 44;
+export const HOUR_HEIGHT = 48;
 export const DAY_START = 8; // 8 AM
 export const DAY_END = 18; // 6 PM
-export const GUTTER_W = 52;
+export const GUTTER_W = 56;
 
 export const sameDay = (a: Date, b: Date) =>
   a.getFullYear() === b.getFullYear() &&

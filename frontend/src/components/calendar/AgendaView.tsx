@@ -152,8 +152,10 @@ export function AgendaView({
                       if (e.key === 'Enter' || e.key === ' ') onSelect(ev.id);
                     }}
                     className={clsx(
-                      'flex items-stretch gap-3 px-4 py-2.5 border-t border-border cursor-pointer',
-                      isSelected ? 'bg-accent-soft' : 'hover:bg-hover',
+                      'flex items-stretch gap-3 px-4 py-2.5 border-t border-border border-l-2 cursor-pointer transition-colors',
+                      isSelected
+                        ? 'bg-accent-soft border-l-accent'
+                        : 'border-l-transparent hover:bg-hover',
                     )}
                   >
                     {/* LEFT — time + duration */}
