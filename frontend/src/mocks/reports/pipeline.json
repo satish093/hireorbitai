@@ -1,0 +1,72 @@
+{
+  "kpis": [
+    {
+      "label": "Time → first submission",
+      "value": "2.1d",
+      "prior": "2.6d",
+      "delta": "-0.5d",
+      "trend": "down",
+      "positive": true
+    },
+    {
+      "label": "Submission → interview",
+      "value": "32%",
+      "prior": "28%",
+      "delta": "+4 pts",
+      "trend": "up",
+      "positive": true
+    },
+    {
+      "label": "Interview → offer",
+      "value": "41%",
+      "prior": "45%",
+      "delta": "-4 pts",
+      "trend": "down",
+      "positive": false
+    },
+    {
+      "label": "Offer → accept",
+      "value": "78%",
+      "prior": "74%",
+      "delta": "+4 pts",
+      "trend": "up",
+      "positive": true
+    }
+  ],
+  "charts": {
+    "funnel": [
+      { "stage": "Sourced", "count": 1240, "pct": 100 },
+      { "stage": "Submitted", "count": 410, "pct": 33, "dropPct": 67 },
+      { "stage": "Screening", "count": 268, "pct": 22, "dropPct": 35 },
+      { "stage": "Interview", "count": 132, "pct": 11, "dropPct": 51 },
+      { "stage": "Offer", "count": 54, "pct": 4, "dropPct": 59 },
+      { "stage": "Placed", "count": 38, "pct": 3, "dropPct": 30 }
+    ],
+    "series": [
+      { "date": "2026-02-21", "submissions": 18, "interviews": 6, "offers": 2 },
+      { "date": "2026-02-28", "submissions": 22, "interviews": 8, "offers": 1 },
+      { "date": "2026-03-07", "submissions": 26, "interviews": 7, "offers": 3 },
+      { "date": "2026-03-14", "submissions": 31, "interviews": 11, "offers": 2 },
+      { "date": "2026-03-21", "submissions": 28, "interviews": 9, "offers": 4 },
+      { "date": "2026-03-28", "submissions": 35, "interviews": 13, "offers": 3 },
+      { "date": "2026-04-04", "submissions": 41, "interviews": 12, "offers": 5 },
+      { "date": "2026-04-11", "submissions": 38, "interviews": 14, "offers": 4 },
+      { "date": "2026-04-18", "submissions": 44, "interviews": 16, "offers": 6 },
+      { "date": "2026-04-25", "submissions": 39, "interviews": 13, "offers": 5 },
+      { "date": "2026-05-02", "submissions": 47, "interviews": 18, "offers": 7 },
+      { "date": "2026-05-09", "submissions": 43, "interviews": 15, "offers": 4 },
+      { "date": "2026-05-16", "submissions": 51, "interviews": 19, "offers": 8 },
+      { "date": "2026-05-22", "submissions": 36, "interviews": 12, "offers": 5 }
+    ],
+    "cohorts": [
+      { "week": "Mar 24", "size": 88, "cells": [0, 14, 31, 38, 42, 44, 45, 45] },
+      { "week": "Mar 31", "size": 76, "cells": [0, 12, 28, 35, 40, 43, 44, null] },
+      { "week": "Apr 7", "size": 92, "cells": [0, 16, 33, 41, 46, 48, null, null] },
+      { "week": "Apr 14", "size": 81, "cells": [0, 11, 26, 34, 39, null, null, null] },
+      { "week": "Apr 21", "size": 95, "cells": [0, 18, 35, 43, null, null, null, null] },
+      { "week": "Apr 28", "size": 73, "cells": [0, 13, 29, null, null, null, null, null] },
+      { "week": "May 5", "size": 87, "cells": [0, 15, null, null, null, null, null, null] },
+      { "week": "May 12", "size": 64, "cells": [0, null, null, null, null, null, null, null] }
+    ]
+  }
+}
