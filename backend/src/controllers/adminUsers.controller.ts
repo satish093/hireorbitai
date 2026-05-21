@@ -79,10 +79,22 @@ const STATUSES = ['active', 'inactive', 'suspended', 'pending_verification', 'ba
 // Server-side filtering + pagination — frontend never pulls more than one
 // page, so the table stays fast even for thousands of users.
 // ---------------------------------------------------------------------------
+const SEGMENTS = [
+  'all',
+  'recruiters',
+  'consultants',
+  'managers',
+  'pending',
+  'locked',
+  'forced_reset',
+  'no_login_30d',
+] as const;
+
 const listSchema = z.object({
   q: z.string().trim().max(120).optional(),
   role: z.enum(ALL_ROLES as unknown as [Role, ...Role[]]).optional(),
   status: z.enum(STATUSES).optional(),
+  segment: z.enum(SEGMENTS).optional(),
   page: z.coerce.number().int().min(1).max(10000).default(1),
   page_size: z.coerce.number().int().min(1).max(200).default(50),
   sort: z.enum(['created_at', 'last_login_at', 'email', 'full_name']).default('created_at'),
@@ -92,7 +104,7 @@ const listSchema = z.object({
 export const list: RequestHandler = async (req, res) => {
   const parsed = listSchema.safeParse(req.query);
   if (!parsed.success) throw httpError(400, parsed.error.issues[0]?.message ?? 'Invalid query');
-  const { q, role, status, page, page_size, sort, order } = parsed.data;
+  const { q, role, status, segment, page, page_size, sort, order } = parsed.data;
 
   const from = (page - 1) * page_size;
   const to = from + page_size - 1;
@@ -111,6 +123,43 @@ export const list: RequestHandler = async (req, res) => {
 
   if (role) query = query.eq('role', role);
   if (status) query = query.eq('status', status);
+  // Segment shortcuts from the UserSegments ribbon. Each maps to a server-side
+  // WHERE so the count + pagination stay correct across the whole dataset.
+  const MANAGER_ROLE_LIST = [
+    'SUPER_ADMIN',
+    'CEO',
+    'CTO',
+    'DIRECTOR',
+    'MANAGER',
+    'HR_MANAGER',
+    'DEVELOPER',
+  ];
+  switch (segment) {
+    case 'recruiters':
+      query = query.eq('role', 'RECRUITER');
+      break;
+    case 'consultants':
+      query = query.eq('role', 'CONSULTANT');
+      break;
+    case 'managers':
+      query = query.in('role', MANAGER_ROLE_LIST);
+      break;
+    case 'pending':
+      query = query.eq('status', 'pending_verification');
+      break;
+    case 'locked':
+      query = query.in('status', ['suspended', 'banned']);
+      break;
+    case 'forced_reset':
+      query = query.eq('must_change_password', true);
+      break;
+    case 'no_login_30d':
+      query = query.lt('last_login_at', new Date(Date.now() - 30 * 86_400_000).toISOString());
+      break;
+    case 'all':
+    default:
+      break;
+  }
   if (q) {
     // `or()` with ilike on email + full_name covers the common search cases.
     // We escape `%` and `_` so a literal "%" in the search string doesn't
@@ -161,21 +210,38 @@ export const list: RequestHandler = async (req, res) => {
 // scan with FILTER aggregates — much cheaper than five round-trips. Degrades
 // to zeros (rather than a 500) if a late-migration column isn't present yet.
 // ---------------------------------------------------------------------------
+// Role buckets shared by the KPI segment counts and the list `segment` filter.
+const MANAGER_ROLES = "('SUPER_ADMIN','CEO','CTO','DIRECTOR','MANAGER','HR_MANAGER','DEVELOPER')";
+
 export const kpi: RequestHandler = async (_req, res) => {
-  const empty = { active: 0, online: 0, pending: 0, locked: 0, inactive: 0 };
+  const empty = {
+    active: 0,
+    online: 0,
+    pending: 0,
+    locked: 0,
+    inactive: 0,
+    total: 0,
+    recruiters: 0,
+    consultants: 0,
+    managers: 0,
+    forced_reset: 0,
+    no_login_30d: 0,
+  };
   try {
-    const r = await pool.query<{
-      active: string;
-      online: string;
-      pending: string;
-      locked: string;
-      inactive: string;
-    }>(
+    const r = await pool.query<Record<keyof typeof empty, string>>(
       `SELECT
+         count(*)                                                                         AS total,
          count(*) FILTER (WHERE coalesce(status, 'active') = 'active')                    AS active,
          count(*) FILTER (WHERE last_seen_at > now() - interval '5 minutes')              AS online,
          count(*) FILTER (WHERE status = 'pending_verification')                          AS pending,
          count(*) FILTER (WHERE status IN ('suspended', 'banned'))                        AS locked,
+         count(*) FILTER (WHERE role = 'RECRUITER')                                       AS recruiters,
+         count(*) FILTER (WHERE role = 'CONSULTANT')                                      AS consultants,
+         count(*) FILTER (WHERE role IN ${MANAGER_ROLES})                                 AS managers,
+         count(*) FILTER (WHERE must_change_password = true)                              AS forced_reset,
+         count(*) FILTER (
+           WHERE coalesce(last_login_at, '-infinity'::timestamptz) < now() - interval '30 days'
+         )                                                                                AS no_login_30d,
          count(*) FILTER (
            WHERE coalesce(status, 'active') = 'active'
              AND coalesce(last_seen_at, last_login_at, '-infinity'::timestamptz)
@@ -185,13 +251,9 @@ export const kpi: RequestHandler = async (_req, res) => {
     );
     const row = r.rows[0];
     if (!row) return res.json(empty);
-    res.json({
-      active: Number(row.active),
-      online: Number(row.online),
-      pending: Number(row.pending),
-      locked: Number(row.locked),
-      inactive: Number(row.inactive),
-    });
+    const out = { ...empty };
+    for (const k of Object.keys(empty) as (keyof typeof empty)[]) out[k] = Number(row[k]) || 0;
+    res.json(out);
   } catch {
     res.json(empty);
   }

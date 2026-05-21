@@ -41,7 +41,25 @@ export interface UserKpi {
   pending: number;
   locked: number;
   inactive: number;
+  // Segment counts (also served by /admin/users/kpi so the ribbon is global,
+  // not page-scoped).
+  total: number;
+  recruiters: number;
+  consultants: number;
+  managers: number;
+  forced_reset: number;
+  no_login_30d: number;
 }
+
+export type SegmentKey =
+  | 'all'
+  | 'recruiters'
+  | 'consultants'
+  | 'managers'
+  | 'pending'
+  | 'locked'
+  | 'forced_reset'
+  | 'no_login_30d';
 
 export interface UserSession {
   id: string;
