@@ -6,6 +6,7 @@ import { Modal } from '../components/Modal';
 import { FormInput } from '../components/FormInput';
 import { SelectInput } from '../components/SelectInput';
 import { GroupBadge } from '../components/GroupBadge';
+import { Button } from '../components/Button';
 import { api } from '../services/api';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
@@ -533,12 +534,9 @@ function DailyActivity() {
   return (
     <div>
       <div className="flex justify-end mb-3">
-        <button
-          onClick={() => setOpen(true)}
-          className="bg-ink text-bg text-sm px-3 py-2 rounded-lg hover:opacity-90"
-        >
+        <Button variant="primary" onClick={() => setOpen(true)}>
           + Log activity
-        </button>
+        </Button>
       </div>
       <div className="bg-surface border border-border rounded-xl overflow-hidden">
         <table className="w-full text-sm">
@@ -587,13 +585,9 @@ function DailyActivity() {
         onClose={() => setOpen(false)}
         title="Log daily activity"
         footer={
-          <button
-            onClick={save}
-            disabled={saving}
-            className="bg-ink text-bg px-4 py-2 rounded-lg text-sm hover:opacity-90 disabled:opacity-50"
-          >
+          <Button variant="primary" onClick={save} disabled={saving} loading={saving}>
             {saving ? 'Saving…' : 'Save'}
-          </button>
+          </Button>
         }
       >
         <div className="space-y-3">

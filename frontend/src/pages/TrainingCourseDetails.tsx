@@ -22,6 +22,7 @@ import { SkeletonCard } from '../components/Skeleton';
 import { EmptyState } from '../components/EmptyState';
 import { useAuth } from '../context/AuthContext';
 import { MANAGER_TIER, ADMIN_TIER } from '../types';
+import { Button } from '../components/Button';
 
 interface Lesson {
   id: string;
@@ -324,42 +325,37 @@ export function TrainingCourseDetails() {
                   Edit
                 </Link>
                 {isAdmin && (
-                  <button
+                  <Button
+                    variant="accent"
                     onClick={enrich}
                     disabled={lifecycleBusy}
+                    loading={lifecycleBusy}
                     title="Use AI to fill in the overview, roadmap, resources, and final project. Lessons are left unchanged."
-                    className="border border-brand-200 text-brand-700 bg-brand-50 text-sm px-3 py-1.5 rounded-lg hover:bg-brand-100 disabled:opacity-50"
                   >
                     ✦ Fill in materials
-                  </button>
+                  </Button>
                 )}
                 {course.review_status !== 'REVIEWED' && course.review_status !== 'PUBLISHED' && (
-                  <button
-                    onClick={markReviewed}
-                    disabled={lifecycleBusy}
-                    className="border border-border text-ink text-sm px-3 py-1.5 rounded-lg hover:bg-hover disabled:opacity-50"
-                  >
+                  <Button variant="outline" onClick={markReviewed} disabled={lifecycleBusy}>
                     Mark reviewed
-                  </button>
+                  </Button>
                 )}
                 {course.status !== 'ACTIVE' && (
-                  <button
+                  <Button
+                    variant="primary"
                     onClick={publish}
                     disabled={publishing || !allReady}
+                    loading={publishing}
                     title={
                       allReady ? 'Publish course' : 'All lessons need content before publishing'
                     }
-                    className="border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 text-sm px-3 py-1.5 rounded-lg hover:bg-emerald-100 disabled:opacity-50"
                   >
                     {publishing ? 'Publishing…' : 'Publish'}
-                  </button>
+                  </Button>
                 )}
-                <button
-                  onClick={() => setAssignOpen(true)}
-                  className="bg-ink text-bg text-sm px-4 py-1.5 rounded-lg hover:opacity-90"
-                >
+                <Button variant="primary" onClick={() => setAssignOpen(true)}>
                   Assign
-                </button>
+                </Button>
               </div>
             )}
           </div>
@@ -509,20 +505,18 @@ export function TrainingCourseDetails() {
         {isManager && (
           <div className="flex items-center gap-2">
             {isAdmin && pendingLessonIds.length > 0 && (
-              <button
+              <Button
+                variant="accent"
                 onClick={() => runGeneration(pendingLessonIds)}
                 disabled={gen.running}
-                className="border border-brand-200 text-brand-700 bg-brand-50 text-sm px-3 py-1.5 rounded-lg hover:bg-brand-100 disabled:opacity-50"
+                loading={gen.running}
               >
                 {gen.running ? 'Writing…' : `✦ Write ${pendingLessonIds.length} lesson(s) with AI`}
-              </button>
+              </Button>
             )}
-            <button
-              onClick={() => setLessonOpen(true)}
-              className="bg-ink text-bg text-sm px-3 py-1.5 rounded-lg hover:opacity-90"
-            >
+            <Button variant="outline" onClick={() => setLessonOpen(true)}>
               + Add lesson
-            </button>
+            </Button>
           </div>
         )}
       </div>
@@ -555,25 +549,23 @@ export function TrainingCourseDetails() {
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   {isManager && (
-                    <button
-                      onClick={() => setEditingLesson(l)}
-                      className="text-xs border border-border text-ink px-2.5 py-1 rounded-lg hover:bg-hover"
-                    >
+                    <Button variant="ghost" size="sm" onClick={() => setEditingLesson(l)}>
                       Edit
-                    </button>
+                    </Button>
                   )}
                   {isAdmin && (
-                    <button
+                    <Button
+                      variant="accent"
+                      size="sm"
                       onClick={() => generateOneLesson(l.id)}
                       disabled={gen.running}
-                      className="text-xs border border-border text-ink px-2.5 py-1 rounded-lg hover:bg-hover disabled:opacity-50"
                     >
                       {status === 'READY'
                         ? '✦ Regenerate'
                         : status === 'FAILED'
                           ? 'Retry'
                           : '✦ Generate'}
-                    </button>
+                    </Button>
                   )}
                 </div>
               </div>
@@ -604,12 +596,9 @@ export function TrainingCourseDetails() {
           Quiz ({course.quizzes?.length ?? 0} questions)
         </h2>
         {isManager && (
-          <button
-            onClick={() => setAiOpen(true)}
-            className="border border-brand-200 text-brand-700 bg-brand-50 text-sm px-3 py-1.5 rounded-lg hover:bg-brand-100"
-          >
+          <Button variant="accent" onClick={() => setAiOpen(true)}>
             ✦ Generate with AI
-          </button>
+          </Button>
         )}
       </div>
       {(course.quizzes?.length ?? 0) === 0 ? (
@@ -652,12 +641,9 @@ export function TrainingCourseDetails() {
         onClose={() => setLessonOpen(false)}
         title="New lesson"
         footer={
-          <button
-            onClick={addLesson}
-            className="bg-ink text-bg text-sm px-4 py-2 rounded-lg hover:opacity-90"
-          >
+          <Button variant="primary" onClick={addLesson}>
             Add
-          </button>
+          </Button>
         }
       >
         <div className="space-y-3">
@@ -708,13 +694,14 @@ export function TrainingCourseDetails() {
         onClose={() => setAiOpen(false)}
         title="Generate quiz from lesson content"
         footer={
-          <button
+          <Button
+            variant="accent"
             onClick={generateQuizFromContent}
             disabled={aiBusy}
-            className="bg-ink text-bg text-sm px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-50"
+            loading={aiBusy}
           >
             {aiBusy ? 'Generating…' : '✦ Generate 5 questions'}
-          </button>
+          </Button>
         }
       >
         <label className="block">

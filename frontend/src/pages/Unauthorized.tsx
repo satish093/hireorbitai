@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Brand } from '../components/Brand';
+import { Button } from '../components/Button';
 import { useAuth } from '../context/AuthContext';
 
 /**
@@ -38,12 +39,9 @@ export function Unauthorized() {
             >
               Go to dashboard
             </Link>
-            <button
-              onClick={signOut}
-              className="bg-surface border border-border hover:bg-hover text-ink text-sm px-4 py-2 rounded-lg press"
-            >
+            <Button variant="outline" onClick={signOut}>
               Sign out
-            </button>
+            </Button>
           </div>
         </div>
       </div>

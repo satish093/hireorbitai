@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Layout } from '../components/Layout';
 import { SkeletonCard } from '../components/Skeleton';
+import { Button } from '../components/Button';
 import { api } from '../services/api';
 import { useFeatureFlags } from '../hooks/useFeatureFlags';
 import { invalidate } from '../hooks/useInvalidate';
@@ -238,17 +239,19 @@ function OverrideCell({
         : 'bg-hover text-muted border-border';
   const label = state === true ? 'On' : state === false ? 'Off' : 'Inherit';
   return (
-    <button
+    <Button
+      variant="ghost"
+      size="sm"
       onClick={onClick}
       disabled={disabled}
       className={clsx(
-        'inline-flex items-center justify-center text-[11px] font-semibold uppercase tracking-wide border rounded-full px-2 py-0.5 min-w-[60px] disabled:opacity-50 transition',
+        'inline-flex items-center justify-center text-[11px] font-semibold uppercase tracking-wide border rounded-full px-2 py-0.5 min-w-[60px] transition',
         tone,
       )}
       title="Click to cycle inherit → on → off"
     >
       {label}
-    </button>
+    </Button>
   );
 }
 

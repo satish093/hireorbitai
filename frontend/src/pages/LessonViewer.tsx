@@ -22,6 +22,7 @@ import {
 } from '../components/TrainingCompliance';
 import { useAuth } from '../context/AuthContext';
 import { MANAGER_TIER } from '../types';
+import { Button } from '../components/Button';
 
 /**
  * Student-facing training plan walkthrough.
@@ -236,12 +237,9 @@ export function LessonViewer() {
               View I-983 plan
             </Link>
             {isManager && (
-              <button
-                onClick={() => setFeedbackOpen(true)}
-                className="text-xs border border-border text-ink px-3 py-1.5 rounded-lg hover:bg-hover"
-              >
+              <Button variant="ghost" size="sm" onClick={() => setFeedbackOpen(true)}>
                 + Feedback
-              </button>
+              </Button>
             )}
           </div>
         </div>
@@ -352,12 +350,14 @@ export function LessonViewer() {
             </div>
 
             {course.quizzes?.length > 0 && (
-              <button
+              <Button
+                variant="primary"
+                block
+                className="mt-3"
                 onClick={() => nav(`/training/assignments/${id}/quiz`)}
-                className="mt-3 w-full bg-ink text-bg text-sm px-3 py-2 rounded-lg hover:opacity-90"
               >
                 Take quiz ({course.quizzes.length} Q)
-              </button>
+              </Button>
             )}
           </div>
 
@@ -459,43 +459,41 @@ export function LessonViewer() {
               )}
               {lessonQuizCounts[activeLesson.id] > 0 && (
                 <div className="mt-4">
-                  <button
+                  <Button
+                    variant="outline"
                     onClick={() =>
                       nav(`/training/assignments/${id}/quiz?lesson=${activeLesson.id}`)
                     }
-                    className="text-sm border border-brand-200 text-brand-700 bg-brand-50 px-4 py-2 rounded-lg hover:bg-brand-100"
                   >
                     Take knowledge check ({lessonQuizCounts[activeLesson.id]} Q)
-                  </button>
+                  </Button>
                 </div>
               )}
 
               <div className="mt-6 pt-4 border-t border-border flex items-center justify-between flex-wrap gap-2">
-                <button
+                <Button
+                  variant={progressById.get(activeLesson.id)?.completed ? 'outline' : 'primary'}
                   onClick={() => toggle(activeLesson)}
-                  className={`text-sm font-semibold px-4 py-2 rounded-lg ${
-                    progressById.get(activeLesson.id)?.completed
-                      ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30'
-                      : 'bg-ink text-bg hover:opacity-90'
-                  }`}
                 >
                   {progressById.get(activeLesson.id)?.completed ? '✓ Completed' : 'Mark complete'}
-                </button>
+                </Button>
                 <div className="flex items-center gap-2">
-                  <button
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     disabled={activeIdx <= 0}
                     onClick={() => setActiveLessonId(lessons[activeIdx - 1]?.id ?? null)}
-                    className="text-xs border border-border text-ink px-3 py-1.5 rounded-lg hover:bg-hover disabled:opacity-40 disabled:hover:bg-surface"
                   >
                     ← Previous
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     disabled={activeIdx >= lessons.length - 1}
                     onClick={() => setActiveLessonId(lessons[activeIdx + 1]?.id ?? null)}
-                    className="text-xs border border-border text-ink px-3 py-1.5 rounded-lg hover:bg-hover disabled:opacity-40 disabled:hover:bg-surface"
                   >
                     Next →
-                  </button>
+                  </Button>
                 </div>
               </div>
             </article>
@@ -510,12 +508,13 @@ export function LessonViewer() {
               <h2 className="text-lg font-semibold tracking-tight">Finishing this course</h2>
               <div className="flex items-center gap-2">
                 {course.quizzes?.length > 0 && (
-                  <button
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={() => nav(`/training/assignments/${id}/quiz`)}
-                    className="text-xs border border-border text-ink px-3 py-1.5 rounded-lg hover:bg-hover"
                   >
                     Take quiz
-                  </button>
+                  </Button>
                 )}
                 <Link
                   to={`/training/assignments/${id}/plan`}

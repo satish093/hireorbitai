@@ -6,6 +6,7 @@ import axios from 'axios';
 import { Brand } from '../components/Brand';
 import { config as appConfig } from '../config/env';
 import { PasswordField, PasswordStrengthHints } from '../components/PasswordField';
+import { Button } from '../components/Button';
 
 interface ResetForm {
   new_password: string;
@@ -91,12 +92,9 @@ export function ResetPassword() {
           error={form.formState.errors.confirm_password?.message}
         />
         {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
-        <button
-          disabled={busy}
-          className="w-full bg-ink hover:opacity-90 disabled:opacity-50 text-bg rounded-lg py-2.5 text-sm font-medium press"
-        >
-          {busy ? 'Saving…' : 'Set new password'}
-        </button>
+        <Button type="submit" variant="primary" size="lg" block loading={busy}>
+          Set new password
+        </Button>
       </form>
     </Shell>
   );

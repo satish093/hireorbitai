@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { Layout } from '../components/Layout';
 import { SkeletonCard } from '../components/Skeleton';
+import { Button } from '../components/Button';
 import { api } from '../services/api';
 
 interface UserGroup {
@@ -154,12 +155,9 @@ export function UserGroups() {
           placeholder="slug"
           className="border border-border rounded-lg px-3 py-1.5 text-sm font-mono"
         />
-        <button
-          onClick={create}
-          className="bg-ink text-bg text-sm px-4 py-1.5 rounded-lg hover:opacity-90"
-        >
+        <Button variant="primary" onClick={create}>
           + Create group
-        </button>
+        </Button>
       </div>
 
       {loading ? (
@@ -197,18 +195,12 @@ export function UserGroups() {
                       {g.member_count} member{g.member_count === 1 ? '' : 's'}
                     </p>
                   </div>
-                  <button
-                    onClick={() => toggle(g)}
-                    className="text-xs text-muted hover:text-ink px-2"
-                  >
+                  <Button variant="ghost" size="sm" onClick={() => toggle(g)}>
                     {g.is_active ? 'Pause' : 'Resume'}
-                  </button>
-                  <button
-                    onClick={() => remove(g)}
-                    className="text-xs text-red-600 dark:text-red-400 hover:underline px-2"
-                  >
+                  </Button>
+                  <Button variant="danger-ghost" size="sm" onClick={() => remove(g)}>
                     Delete
-                  </button>
+                  </Button>
                 </div>
 
                 <div className="px-5 py-3 max-h-64 overflow-y-auto">
@@ -219,12 +211,13 @@ export function UserGroups() {
                       {members.map((u) => (
                         <li key={u.id} className="flex items-center justify-between text-sm">
                           <span className="text-ink truncate">{u.full_name ?? u.email}</span>
-                          <button
+                          <Button
+                            variant="danger-ghost"
+                            size="sm"
                             onClick={() => assign(u.id, null)}
-                            className="text-[11px] text-red-500 hover:underline"
                           >
                             Remove
-                          </button>
+                          </Button>
                         </li>
                       ))}
                     </ul>
@@ -238,16 +231,18 @@ export function UserGroups() {
                         <p className="text-xs italic text-muted p-2">No more users to add.</p>
                       ) : (
                         candidates.map((u) => (
-                          <button
+                          <Button
                             key={u.id}
+                            variant="ghost"
+                            size="sm"
                             onClick={() => assign(u.id, g.id)}
-                            className="w-full text-left text-sm px-2 py-1.5 hover:bg-hover flex items-center justify-between"
+                            className="w-full text-left px-2 py-1.5 flex items-center justify-between"
                           >
                             <span className="truncate">{u.full_name ?? u.email}</span>
                             <span className="text-[10px] uppercase tracking-wider text-muted">
                               {u.role}
                             </span>
-                          </button>
+                          </Button>
                         ))
                       )}
                     </div>

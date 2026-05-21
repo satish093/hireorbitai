@@ -6,6 +6,7 @@ import { Brand } from '../components/Brand';
 import { PasswordField, PasswordStrengthHints } from '../components/PasswordField';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
+import { Button } from '../components/Button';
 
 interface ChangeForm {
   current_password: string;
@@ -101,23 +102,22 @@ export function ChangePassword() {
               error={form.formState.errors.confirm_password?.message}
             />
             {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
-            <button
-              disabled={busy}
-              className="w-full bg-ink hover:opacity-90 disabled:opacity-50 text-bg rounded-lg py-2.5 text-sm font-medium press"
-            >
-              {busy ? 'Saving…' : 'Update password'}
-            </button>
+            <Button type="submit" variant="primary" size="lg" block loading={busy}>
+              Update password
+            </Button>
             {forced && (
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="sm"
+                block
                 onClick={async () => {
                   await signOut();
                   nav('/login', { replace: true });
                 }}
-                className="w-full text-xs text-muted hover:text-ink py-1"
               >
                 Sign out instead
-              </button>
+              </Button>
             )}
           </form>
         </div>

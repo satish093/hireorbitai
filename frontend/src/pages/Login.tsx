@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import { FormInput } from '../components/FormInput';
 import { Brand } from '../components/Brand';
 import { useAuth } from '../context/AuthContext';
+import { Button } from '../components/Button';
 
 interface SigninForm {
   email: string;
@@ -67,12 +68,9 @@ export function Login() {
               error={signinForm.formState.errors.password?.message}
             />
 
-            <button
-              disabled={busy}
-              className="w-full bg-ink hover:opacity-90 disabled:opacity-50 text-bg rounded-lg py-2.5 text-sm font-medium press"
-            >
-              {busy ? 'Signing in…' : 'Sign in'}
-            </button>
+            <Button type="submit" variant="primary" size="lg" block loading={busy}>
+              Sign in
+            </Button>
 
             <div className="flex items-center justify-between text-xs">
               <Link to="/forgot-password" className="text-brand-700 hover:underline">

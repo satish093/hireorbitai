@@ -4,6 +4,7 @@ import { Layout } from '../components/Layout';
 import { Avatar } from '../components/TaskBits';
 import { PresenceDot, PresencePill } from '../components/PresenceDot';
 import { GroupBadge } from '../components/GroupBadge';
+import { Button } from '../components/Button';
 import { IconSearch, IconVideo, IconPhone, IconSend } from '../components/Icons';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -491,20 +492,22 @@ export function Messages() {
                     header. Call/video are placeholders (no telephony backend);
                     search toggles the chat-list search box focus. */}
                 <div className="ml-auto flex items-center gap-1 text-muted">
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="sm"
+                    iconOnly
+                    leftIcon={<IconVideo size={18} />}
                     title="Video call (coming soon)"
-                    className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-hover hover:text-ink transition-colors"
-                  >
-                    <IconVideo size={18} />
-                  </button>
-                  <button
+                  />
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="sm"
+                    iconOnly
+                    leftIcon={<IconPhone size={18} />}
                     title="Voice call (coming soon)"
-                    className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-hover hover:text-ink transition-colors"
-                  >
-                    <IconPhone size={18} />
-                  </button>
+                  />
                 </div>
               </header>
 
@@ -523,17 +526,18 @@ export function Messages() {
                       You no longer have access to this conversation — your team assignment may have
                       changed. Past messages are preserved; they'll come back if access is restored.
                     </p>
-                    <button
+                    <Button
                       type="button"
+                      variant="primary"
+                      className="mt-2"
                       onClick={() => {
                         const next = new URLSearchParams(params);
                         next.delete('with');
                         setParams(next, { replace: true });
                       }}
-                      className="mt-2 inline-flex items-center bg-ink text-bg text-sm px-4 py-2 rounded-lg hover:opacity-90"
                     >
                       ← Back to inbox
-                    </button>
+                    </Button>
                   </div>
                 </div>
               ) : (
@@ -636,14 +640,16 @@ export function Messages() {
                       placeholder="Write a message… (Shift+Enter for newline)"
                       className="flex-1 resize-none bg-hover/60 rounded-2xl px-4 py-2.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-brand-500/40 max-h-32"
                     />
-                    <button
+                    <Button
                       type="submit"
+                      variant="primary"
+                      iconOnly
+                      leftIcon={<IconSend size={18} />}
                       disabled={sending || !draft.trim()}
+                      loading={sending}
                       title="Send message"
-                      className="shrink-0 w-10 h-10 flex items-center justify-center rounded-full bg-brand-600 text-white disabled:opacity-40 hover:bg-brand-600/90 transition-colors"
-                    >
-                      <IconSend size={18} />
-                    </button>
+                      className="shrink-0 !rounded-full !w-10 !h-10"
+                    />
                   </form>
                 </>
               )}

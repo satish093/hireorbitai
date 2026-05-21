@@ -148,10 +148,15 @@ export function DeactivatedAccounts() {
             key: 'email',
             header: 'User',
             render: (r: DeactivatedRow) => (
-              <button onClick={() => nav(`/users/${r.id}`)} className="text-left hover:underline">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => nav(`/users/${r.id}`)}
+                className="text-left"
+              >
                 <div className="font-medium text-ink">{r.full_name || r.email}</div>
                 {r.full_name && <div className="text-xs text-muted">{r.email}</div>}
-              </button>
+              </Button>
             ),
           },
           {

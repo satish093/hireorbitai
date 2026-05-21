@@ -537,26 +537,24 @@ function RowActions({
 
   return (
     <div ref={ref} className="relative inline-block text-left">
-      <button
+      <Button
         type="button"
+        variant="ghost"
+        size="sm"
+        iconOnly
         onClick={() => setOpen((v) => !v)}
         disabled={busy}
-        className={clsx(
-          'inline-flex items-center justify-center w-8 h-8 rounded-md border border-border',
-          'text-muted hover:text-ink hover:bg-hover transition press',
-          busy && 'opacity-50 cursor-wait',
-        )}
         aria-label="Actions"
         aria-haspopup="menu"
         aria-expanded={open}
-      >
-        {/* 3-dot icon */}
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-          <circle cx="3" cy="8" r="1.5" />
-          <circle cx="8" cy="8" r="1.5" />
-          <circle cx="13" cy="8" r="1.5" />
-        </svg>
-      </button>
+        leftIcon={
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+            <circle cx="3" cy="8" r="1.5" />
+            <circle cx="8" cy="8" r="1.5" />
+            <circle cx="13" cy="8" r="1.5" />
+          </svg>
+        }
+      />
 
       {open && (
         <div
@@ -570,8 +568,10 @@ function RowActions({
           >
             View profile
           </Link>
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="sm"
             onClick={() => {
               setOpen(false);
               onSendReset();
@@ -579,14 +579,16 @@ function RowActions({
             className="block w-full text-left px-3 py-2 text-sm text-ink hover:bg-hover"
           >
             Send password reset
-          </button>
+          </Button>
 
           {!isSelf && <div className="h-px bg-hover" />}
 
           {!isSelf && isActive && (
             <>
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="sm"
                 onClick={() => {
                   setOpen(false);
                   onSuspend();
@@ -594,22 +596,26 @@ function RowActions({
                 className="block w-full text-left px-3 py-2 text-sm text-amber-700 dark:text-amber-300 hover:bg-amber-50"
               >
                 Suspend
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="danger-ghost"
+                size="sm"
                 onClick={() => {
                   setOpen(false);
                   onDeactivate();
                 }}
-                className="block w-full text-left px-3 py-2 text-sm text-red-700 dark:text-red-300 hover:bg-red-50"
+                className="block w-full text-left px-3 py-2 text-sm"
               >
                 Deactivate
-              </button>
+              </Button>
             </>
           )}
           {!isSelf && !isActive && (
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="sm"
               onClick={() => {
                 setOpen(false);
                 onReactivate();
@@ -617,7 +623,7 @@ function RowActions({
               className="block w-full text-left px-3 py-2 text-sm text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50"
             >
               Reactivate
-            </button>
+            </Button>
           )}
         </div>
       )}

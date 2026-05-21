@@ -139,23 +139,27 @@ export function Calendar() {
         description="Interviews and reminders across the month. Click a date to filter the list below."
         action={
           <div className="inline-flex items-center gap-1 bg-surface border border-border rounded-lg p-1 shadow-sm">
-            <button
+            <Button
+              size="sm"
+              variant="ghost"
+              iconOnly
               onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}
-              className="w-7 h-7 inline-flex items-center justify-center rounded-md text-muted hover:bg-hover"
               aria-label="Previous month"
             >
               ‹
-            </button>
+            </Button>
             <span className="text-sm font-medium text-ink min-w-[120px] text-center">
               {month.toLocaleString(undefined, { month: 'long', year: 'numeric' })}
             </span>
-            <button
+            <Button
+              size="sm"
+              variant="ghost"
+              iconOnly
               onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}
-              className="w-7 h-7 inline-flex items-center justify-center rounded-md text-muted hover:bg-hover"
               aria-label="Next month"
             >
               ›
-            </button>
+            </Button>
             <span className="w-px h-5 bg-hover mx-1" />
             <Button
               size="sm"
@@ -269,13 +273,9 @@ export function Calendar() {
             </span>
           </h2>
           {customSelected && (
-            <button
-              type="button"
-              onClick={() => setSelectedDate(null)}
-              className="text-xs text-muted hover:text-ink underline-offset-2 hover:underline"
-            >
+            <Button type="button" size="sm" variant="ghost" onClick={() => setSelectedDate(null)}>
               Clear ✕
-            </button>
+            </Button>
           )}
         </div>
         <div className="bg-surface border border-border rounded-xl divide-y divide-border">

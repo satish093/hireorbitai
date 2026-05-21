@@ -6,6 +6,7 @@ import { api } from '../services/api';
 import { QuizQuestionCard, QuizQuestion } from '../components/Training';
 import { SkeletonCard } from '../components/Skeleton';
 import { EmptyState } from '../components/EmptyState';
+import { Button } from '../components/Button';
 
 interface AttemptResult {
   quiz_id: string;
@@ -171,31 +172,21 @@ export function QuizPage() {
 
         {!score && quiz.length > 0 && (
           <div className="mt-5 flex justify-between">
-            <button
-              onClick={() => nav(-1)}
-              className="border border-border text-ink text-sm px-4 py-2 rounded-lg hover:bg-hover"
-            >
+            <Button variant="outline" onClick={() => nav(-1)}>
               Back
-            </button>
-            <button
-              onClick={submit}
-              disabled={submitting}
-              className="bg-ink text-bg text-sm font-semibold px-5 py-2 rounded-lg hover:opacity-90 disabled:opacity-50"
-            >
+            </Button>
+            <Button variant="primary" onClick={submit} disabled={submitting} loading={submitting}>
               {submitting
                 ? 'Submitting…'
                 : `Submit (${Object.keys(picks).length} / ${quiz.length})`}
-            </button>
+            </Button>
           </div>
         )}
         {score && (
           <div className="mt-5 flex justify-end">
-            <button
-              onClick={() => nav(`/training/assignments/${id}`)}
-              className="bg-ink text-bg text-sm font-semibold px-5 py-2 rounded-lg hover:opacity-90"
-            >
+            <Button variant="primary" onClick={() => nav(`/training/assignments/${id}`)}>
               Back to course
-            </button>
+            </Button>
           </div>
         )}
       </div>

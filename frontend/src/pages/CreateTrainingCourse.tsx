@@ -5,6 +5,8 @@ import { Layout } from '../components/Layout';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { ADMIN_TIER } from '../types';
+import { Button } from '../components/Button';
+import { ButtonGroup, ButtonGroupItem } from '../components/ButtonGroup';
 
 const CATEGORIES = [
   'Java',
@@ -160,23 +162,15 @@ export function CreateTrainingCourse() {
         {/* Mode toggle: AI-generate a full course from a title, or author
             manually. AI generation is admin-only — managers see manual only. */}
         {isAdmin && (
-          <div className="inline-flex rounded-lg border border-border bg-surface p-0.5 mb-5">
-            <button
-              onClick={() => setMode('ai')}
-              className={`text-sm px-4 py-1.5 rounded-md ${
-                mode === 'ai' ? 'bg-brand-600 text-white' : 'text-muted hover:bg-hover'
-              }`}
-            >
-              ✦ Generate with AI
-            </button>
-            <button
-              onClick={() => setMode('manual')}
-              className={`text-sm px-4 py-1.5 rounded-md ${
-                mode === 'manual' ? 'bg-ink text-bg' : 'text-muted hover:bg-hover'
-              }`}
-            >
-              Manual
-            </button>
+          <div className="mb-5">
+            <ButtonGroup>
+              <ButtonGroupItem pressed={mode === 'ai'} onClick={() => setMode('ai')}>
+                ✦ Generate with AI
+              </ButtonGroupItem>
+              <ButtonGroupItem pressed={mode === 'manual'} onClick={() => setMode('manual')}>
+                Manual
+              </ButtonGroupItem>
+            </ButtonGroup>
           </div>
         )}
 
@@ -229,19 +223,17 @@ export function CreateTrainingCourse() {
               />
             </div>
             <div className="flex justify-end gap-2 mt-4">
-              <button
-                onClick={() => nav(-1)}
-                className="border border-border text-ink text-sm px-4 py-2 rounded-lg hover:bg-hover"
-              >
+              <Button variant="outline" onClick={() => nav(-1)}>
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="accent"
                 onClick={generateWithAI}
                 disabled={genBusy}
-                className="bg-brand-600 text-white text-sm font-semibold px-5 py-2 rounded-lg hover:bg-brand-700 disabled:opacity-50"
+                loading={genBusy}
               >
                 {genBusy ? 'Generating outline…' : '✦ Generate course'}
-              </button>
+              </Button>
             </div>
           </>
         ) : (
@@ -361,19 +353,12 @@ export function CreateTrainingCourse() {
           />
         </div>
         <div className="flex justify-end gap-2 mt-4">
-          <button
-            onClick={() => nav(-1)}
-            className="border border-border text-ink text-sm px-4 py-2 rounded-lg hover:bg-hover"
-          >
+          <Button variant="outline" onClick={() => nav(-1)}>
             Cancel
-          </button>
-          <button
-            onClick={save}
-            disabled={saving}
-            className="bg-ink text-bg text-sm font-semibold px-5 py-2 rounded-lg hover:opacity-90 disabled:opacity-50"
-          >
+          </Button>
+          <Button variant="primary" onClick={save} disabled={saving} loading={saving}>
             {saving ? 'Saving…' : 'Create'}
-          </button>
+          </Button>
         </div>
       </>
     );

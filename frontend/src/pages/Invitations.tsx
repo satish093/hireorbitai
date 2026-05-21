@@ -94,7 +94,9 @@ export function Invitations() {
               <div className="text-xs text-muted">
                 {r.data?.email_error ?? 'Unknown email error'}
               </div>
-              <button
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => {
                   copyLink(r.data.invite_url);
                   toast.dismiss(t.id);
@@ -102,7 +104,7 @@ export function Invitations() {
                 className="text-xs text-brand-700 hover:underline"
               >
                 Copy invite link
-              </button>
+              </Button>
             </div>
           ),
           { duration: 12000 },

@@ -1,6 +1,7 @@
 import { ReactNode, useEffect, useRef, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
+import { Button } from '../components/Button';
 import { SkeletonCard } from '../components/Skeleton';
 import {
   PriorityBadge,
@@ -217,12 +218,9 @@ export function TaskDetail() {
                 )}
               </div>
               <div className="flex items-center gap-1.5">
-                <button
-                  onClick={copyLink}
-                  className="text-xs text-muted hover:text-ink border border-border px-2 py-1 rounded-md inline-flex items-center gap-1 hover:bg-hover"
-                >
-                  <span>⧉</span> Copy link
-                </button>
+                <Button variant="ghost" size="sm" leftIcon={<span>⧉</span>} onClick={copyLink}>
+                  Copy link
+                </Button>
               </div>
             </div>
 
@@ -296,12 +294,14 @@ export function TaskDetail() {
                     </div>
                     <p className="text-sm text-ink whitespace-pre-wrap mt-0.5">{c.body}</p>
                     {(c.author_id === profile?.id || isManager) && (
-                      <button
+                      <Button
+                        variant="danger-ghost"
+                        size="sm"
                         onClick={() => deleteComment(c.id)}
-                        className="text-[11px] text-muted hover:text-red-600 mt-1"
+                        className="mt-1"
                       >
                         Delete
-                      </button>
+                      </Button>
                     )}
                   </div>
                 </div>
@@ -316,13 +316,9 @@ export function TaskDetail() {
                 placeholder="Add a comment…"
                 className="flex-1 border border-border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40"
               />
-              <button
-                onClick={postComment}
-                disabled={posting}
-                className="bg-ink text-bg text-sm px-3 py-2 rounded-lg disabled:opacity-50"
-              >
+              <Button variant="primary" size="sm" onClick={postComment} loading={posting}>
                 {posting ? 'Posting…' : 'Post'}
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -342,12 +338,14 @@ export function TaskDetail() {
                   if (fileRef.current) fileRef.current.value = '';
                 }}
               />
-              <button
+              <Button
+                variant="ghost"
+                size="sm"
+                leftIcon={<span>📎</span>}
                 onClick={() => fileRef.current?.click()}
-                className="text-xs text-muted hover:text-ink border border-border px-2 py-1 rounded-md inline-flex items-center gap-1 hover:bg-hover"
               >
-                <span>📎</span> Upload
-              </button>
+                Upload
+              </Button>
             </div>
             <div className="space-y-1">
               {attachments.length === 0 && (
@@ -370,12 +368,13 @@ export function TaskDetail() {
                   <div className="flex items-center gap-2 text-xs text-muted">
                     <span>{a.uploader?.full_name ?? a.uploader?.email ?? '—'}</span>
                     {(a.uploaded_by === profile?.id || isManager) && (
-                      <button
+                      <Button
+                        variant="danger-ghost"
+                        size="sm"
                         onClick={() => deleteAttachment(a.id)}
-                        className="text-red-600 dark:text-red-400 hover:underline"
                       >
                         Delete
-                      </button>
+                      </Button>
                     )}
                   </div>
                 </div>
@@ -474,13 +473,16 @@ export function TaskDetail() {
                     >
                       {t}
                       {canEdit && (
-                        <button
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          iconOnly
                           onClick={() => removeTag(t)}
-                          className="text-brand-400 hover:text-brand-700"
                           aria-label={`Remove ${t}`}
+                          className="!h-auto !px-0 !rounded-none text-brand-400 hover:text-brand-700"
                         >
                           ×
-                        </button>
+                        </Button>
                       )}
                     </span>
                   ))}
@@ -542,12 +544,9 @@ export function TaskDetail() {
           )}
 
           {canEdit && (
-            <button
-              onClick={deleteTask}
-              className="w-full bg-surface border border-red-200 dark:border-red-500/30 text-red-700 dark:text-red-300 text-sm px-3 py-2 rounded-lg hover:bg-red-50"
-            >
+            <Button variant="danger" block onClick={deleteTask}>
               Delete task
-            </button>
+            </Button>
           )}
         </div>
       </div>

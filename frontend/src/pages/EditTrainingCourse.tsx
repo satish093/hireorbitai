@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { Layout } from '../components/Layout';
 import { api } from '../services/api';
 import { SkeletonCard } from '../components/Skeleton';
+import { Button } from '../components/Button';
 
 const CATEGORIES = [
   'Java',
@@ -217,19 +218,12 @@ export function EditTrainingCourse() {
           />
         </div>
         <div className="flex justify-end gap-2 mt-4">
-          <button
-            onClick={() => nav(-1)}
-            className="border border-border text-ink text-sm px-4 py-2 rounded-lg hover:bg-hover"
-          >
+          <Button variant="outline" onClick={() => nav(-1)}>
             Cancel
-          </button>
-          <button
-            onClick={save}
-            disabled={saving}
-            className="bg-ink text-bg text-sm font-semibold px-5 py-2 rounded-lg hover:opacity-90 disabled:opacity-50"
-          >
+          </Button>
+          <Button variant="primary" onClick={save} disabled={saving} loading={saving}>
             {saving ? 'Saving…' : 'Save'}
-          </button>
+          </Button>
         </div>
       </div>
     </Layout>

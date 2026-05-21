@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Layout } from '../components/Layout';
 import { SkeletonCard } from '../components/Skeleton';
+import { Button } from '../components/Button';
 import { Avatar } from '../components/TaskBits';
 import { PresencePill } from '../components/PresenceDot';
 import { useAuth } from '../context/AuthContext';
@@ -232,9 +233,9 @@ export function UserProfile() {
       title={displayName}
       crumbs={[{ label: 'Workspace', to: '/dashboard' }, { label: 'Profile' }]}
     >
-      <button onClick={() => navigate(-1)} className="text-xs text-muted hover:text-ink mb-3">
+      <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="mb-3">
         ← Back
-      </button>
+      </Button>
 
       <div className="bg-surface border border-border rounded-2xl overflow-hidden">
         {/* Header */}
@@ -264,69 +265,54 @@ export function UserProfile() {
               {isAdmin && !isSelf && (
                 <>
                   {user.is_active ? (
-                    <button
+                    <Button
+                      variant="outline"
                       onClick={() => setShowDeactivate(true)}
                       disabled={actBusy}
-                      className="border border-amber-300 text-amber-700 dark:text-amber-300 text-sm px-3 py-1.5 rounded-lg hover:bg-amber-50 disabled:opacity-50 press transition-colors"
                     >
                       Deactivate
-                    </button>
+                    </Button>
                   ) : (
-                    <button
-                      onClick={reactivate}
-                      disabled={actBusy}
-                      className="border border-emerald-300 text-emerald-700 dark:text-emerald-300 text-sm px-3 py-1.5 rounded-lg hover:bg-emerald-50 disabled:opacity-50 press transition-colors"
-                    >
+                    <Button variant="outline" onClick={reactivate} disabled={actBusy}>
                       Reactivate
-                    </button>
+                    </Button>
                   )}
-                  <button
+                  <Button
+                    variant="danger"
                     onClick={() => {
                       setShowDelete(true);
                       setDeleteConfirmText('');
                     }}
                     disabled={actBusy}
-                    className="border border-red-300 text-red-700 dark:text-red-300 text-sm px-3 py-1.5 rounded-lg hover:bg-red-50 disabled:opacity-50 press transition-colors"
                   >
                     Delete
-                  </button>
+                  </Button>
                 </>
               )}
               {isSelf && (
-                <button
-                  onClick={replayTour}
-                  className="border border-border text-ink text-sm px-3 py-1.5 rounded-lg hover:bg-hover press transition-colors"
-                  title="Replay the product tour"
-                >
+                <Button variant="ghost" onClick={replayTour} title="Replay the product tour">
                   Replay tour
-                </button>
+                </Button>
               )}
-              <button
-                onClick={() => setEditing(true)}
-                className="bg-ink text-bg text-sm px-4 py-1.5 rounded-lg hover:opacity-90"
-              >
+              <Button variant="primary" onClick={() => setEditing(true)}>
                 Edit
-              </button>
+              </Button>
             </div>
           )}
           {editing && (
             <div className="flex items-center gap-2">
-              <button
+              <Button
+                variant="outline"
                 onClick={() => {
                   setEditing(false);
                   setForm(user);
                 }}
-                className="border border-border text-ink text-sm px-3 py-1.5 rounded-lg hover:bg-hover"
               >
                 Cancel
-              </button>
-              <button
-                onClick={save}
-                disabled={saving}
-                className="bg-ink text-bg text-sm px-4 py-1.5 rounded-lg hover:opacity-90 disabled:opacity-50"
-              >
+              </Button>
+              <Button variant="primary" onClick={save} disabled={saving} loading={saving}>
                 {saving ? 'Saving…' : 'Save'}
-              </button>
+              </Button>
             </div>
           )}
         </div>
@@ -509,20 +495,12 @@ export function UserProfile() {
               session and unable to log in until you reactivate them. Their data is preserved.
             </p>
             <div className="flex items-center justify-end gap-2 mt-5">
-              <button
-                onClick={() => setShowDeactivate(false)}
-                disabled={actBusy}
-                className="border border-border text-ink text-sm px-3 py-1.5 rounded-lg hover:bg-hover disabled:opacity-50 press"
-              >
+              <Button variant="outline" onClick={() => setShowDeactivate(false)} disabled={actBusy}>
                 Cancel
-              </button>
-              <button
-                onClick={deactivate}
-                disabled={actBusy}
-                className="bg-amber-600 text-white text-sm px-3 py-1.5 rounded-lg hover:bg-amber-700 disabled:opacity-50 press"
-              >
+              </Button>
+              <Button variant="danger" onClick={deactivate} disabled={actBusy} loading={actBusy}>
                 {actBusy ? 'Deactivating…' : 'Deactivate'}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -547,8 +525,10 @@ export function UserProfile() {
             </p>
             <p className="text-xs text-muted mt-3">
               Prefer{' '}
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="sm"
                 onClick={() => {
                   setShowDelete(false);
                   setShowDeactivate(true);
@@ -556,7 +536,7 @@ export function UserProfile() {
                 className="text-amber-700 dark:text-amber-300 hover:underline"
               >
                 deactivate
-              </button>{' '}
+              </Button>{' '}
               if you want to keep the audit trail.
             </p>
             <label className="block mt-4">
@@ -572,22 +552,19 @@ export function UserProfile() {
               />
             </label>
             <div className="flex items-center justify-end gap-2 mt-5">
-              <button
-                onClick={() => setShowDelete(false)}
-                disabled={actBusy}
-                className="border border-border text-ink text-sm px-3 py-1.5 rounded-lg hover:bg-hover disabled:opacity-50"
-              >
+              <Button variant="outline" onClick={() => setShowDelete(false)} disabled={actBusy}>
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="danger"
                 onClick={remove}
                 disabled={
                   actBusy || deleteConfirmText.trim().toLowerCase() !== user.email.toLowerCase()
                 }
-                className="bg-red-600 text-white text-sm px-3 py-1.5 rounded-lg hover:bg-red-700 disabled:opacity-50"
+                loading={actBusy}
               >
                 {actBusy ? 'Deleting…' : 'Delete permanently'}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

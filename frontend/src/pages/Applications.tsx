@@ -96,7 +96,11 @@ export function Applications() {
       <PageHeader
         title="Applications"
         description="Submissions tied to a consultant + job + vendor. Duplicate detection runs before each submit."
-        action={<Button onClick={() => setOpen(true)}>+ New submission</Button>}
+        action={
+          <Button variant="primary" onClick={() => setOpen(true)}>
+            + New submission
+          </Button>
+        }
       />
       <DataTable
         loading={loading}
@@ -136,7 +140,7 @@ export function Applications() {
         footer={
           <>
             <Button
-              variant="secondary"
+              variant="outline"
               onClick={() => {
                 setOpen(false);
                 setForm(EMPTY);
@@ -144,7 +148,7 @@ export function Applications() {
             >
               Cancel
             </Button>
-            <Button onClick={submit} loading={submitting}>
+            <Button variant="primary" onClick={submit} loading={submitting}>
               {submitting ? 'Submitting' : 'Submit'}
             </Button>
           </>

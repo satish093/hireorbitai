@@ -8,6 +8,7 @@ import { ComplianceReportButton } from '../components/TrainingCompliance';
 import { SkeletonCard } from '../components/Skeleton';
 import { useAuth } from '../context/AuthContext';
 import { MANAGER_TIER } from '../types';
+import { Button } from '../components/Button';
 
 /**
  * I-983 STEM-OPT "Training Plan for STEM OPT Students" view.
@@ -99,20 +100,14 @@ export function TrainingPlanView() {
             >
               ← Back to course
             </Link>
-            <button
-              onClick={() => window.print()}
-              className="border border-border text-ink text-sm px-3 py-1.5 rounded-lg hover:bg-hover"
-            >
+            <Button variant="outline" onClick={() => window.print()}>
               Print / save PDF
-            </button>
+            </Button>
             {id && <ComplianceReportButton assignmentId={id} />}
             {isManager && (
-              <button
-                onClick={() => setEditOpen(true)}
-                className="bg-ink text-bg text-sm px-4 py-1.5 rounded-lg hover:opacity-90"
-              >
+              <Button variant="primary" onClick={() => setEditOpen(true)}>
                 Edit attestation
-              </button>
+              </Button>
             )}
           </div>
         </div>
@@ -279,25 +274,16 @@ export function TrainingPlanView() {
             </div>
 
             <div className="flex flex-wrap gap-2 mt-4 print:hidden">
-              <button
-                onClick={() => setEvalOpen('SELF_12_MONTH')}
-                className="text-xs border border-border text-ink px-3 py-1.5 rounded-lg hover:bg-hover"
-              >
+              <Button variant="ghost" size="sm" onClick={() => setEvalOpen('SELF_12_MONTH')}>
                 + 12-month self-evaluation
-              </button>
-              <button
-                onClick={() => setEvalOpen('FINAL')}
-                className="text-xs border border-border text-ink px-3 py-1.5 rounded-lg hover:bg-hover"
-              >
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setEvalOpen('FINAL')}>
                 + Final evaluation
-              </button>
+              </Button>
               {isManager && (
-                <button
-                  onClick={() => setEvalOpen('SUPERVISOR_INTERIM')}
-                  className="text-xs border border-border text-ink px-3 py-1.5 rounded-lg hover:bg-hover"
-                >
+                <Button variant="ghost" size="sm" onClick={() => setEvalOpen('SUPERVISOR_INTERIM')}>
                   + Supervisor interim note
-                </button>
+                </Button>
               )}
             </div>
           </Section>
@@ -443,13 +429,9 @@ function EditAttestationModal({
       onClose={onClose}
       title="Edit I-983 attestation"
       footer={
-        <button
-          onClick={save}
-          disabled={saving}
-          className="bg-ink text-bg text-sm px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-50"
-        >
+        <Button variant="primary" onClick={save} disabled={saving} loading={saving}>
           {saving ? 'Saving…' : 'Save'}
-        </button>
+        </Button>
       }
     >
       <div className="grid grid-cols-2 gap-3">
@@ -615,13 +597,9 @@ function EvaluationModal({
       onClose={onClose}
       title={titleMap[kind]}
       footer={
-        <button
-          onClick={save}
-          disabled={saving}
-          className="bg-ink text-bg text-sm px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-50"
-        >
+        <Button variant="primary" onClick={save} disabled={saving} loading={saving}>
           {saving ? 'Submitting…' : 'Submit'}
-        </button>
+        </Button>
       }
     >
       <div className="space-y-3">

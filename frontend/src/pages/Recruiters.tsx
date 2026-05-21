@@ -310,21 +310,25 @@ function ManageManagersModal({
                     </div>
                   </div>
                   {!m.is_primary && (
-                    <button
+                    <Button
+                      size="sm"
+                      variant="ghost"
                       onClick={() => makePrimary(m.manager!.id)}
                       disabled={busy === 'primary-' + m.manager!.id}
-                      className="text-xs text-brand-700 hover:underline disabled:opacity-50"
+                      loading={busy === 'primary-' + m.manager!.id}
                     >
                       Make primary
-                    </button>
+                    </Button>
                   )}
-                  <button
+                  <Button
+                    size="sm"
+                    variant="danger-ghost"
                     onClick={() => remove(m.manager!.id)}
                     disabled={busy === 'remove-' + m.manager!.id}
-                    className="text-xs text-red-600 dark:text-red-400 hover:underline disabled:opacity-50"
+                    loading={busy === 'remove-' + m.manager!.id}
                   >
                     Remove
-                  </button>
+                  </Button>
                 </div>
               ))}
             </div>

@@ -7,7 +7,7 @@ import { FormInput } from '../components/FormInput';
 import { SelectInput } from '../components/SelectInput';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import clsx from 'clsx';
+import { Button } from '../components/Button';
 
 interface FormData {
   visa_status: string;
@@ -143,20 +143,17 @@ export function ConsultantOnboarding() {
             {POSITION_OPTIONS.map((p) => {
               const active = desired.includes(p);
               return (
-                <button
+                <Button
                   key={p}
                   type="button"
+                  variant={active ? 'primary' : 'outline'}
+                  size="sm"
+                  pill
                   onClick={() => toggle(p)}
-                  className={clsx(
-                    'rounded-full border px-3 py-1 text-xs font-medium transition',
-                    active
-                      ? 'bg-ink border-ink text-bg'
-                      : 'bg-surface border-border text-ink hover:bg-hover hover:border-border',
-                  )}
                 >
                   {active ? '✓ ' : ''}
                   {p}
-                </button>
+                </Button>
               );
             })}
           </div>
@@ -173,12 +170,9 @@ export function ConsultantOnboarding() {
         </div>
 
         <div className="mt-6 flex justify-end">
-          <button
-            disabled={isSubmitting}
-            className="h-10 bg-ink text-bg px-5 rounded-lg text-sm font-medium shadow-sm disabled:opacity-50 hover:opacity-90 transition"
-          >
-            {isSubmitting ? 'Saving…' : 'Save and continue'}
-          </button>
+          <Button type="submit" variant="primary" size="lg" loading={isSubmitting}>
+            Save and continue
+          </Button>
         </div>
       </form>
     </Layout>

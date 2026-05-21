@@ -6,6 +6,7 @@ import axios from 'axios';
 import { FormInput } from '../components/FormInput';
 import { Brand } from '../components/Brand';
 import { config as appConfig } from '../config/env';
+import { Button } from '../components/Button';
 
 interface ForgotForm {
   email: string;
@@ -72,12 +73,9 @@ export function ForgotPassword() {
                 {...form.register('email', { required: 'Required' })}
                 error={form.formState.errors.email?.message}
               />
-              <button
-                disabled={busy}
-                className="w-full bg-ink hover:opacity-90 disabled:opacity-50 text-bg rounded-lg py-2.5 text-sm font-medium press"
-              >
-                {busy ? 'Sending…' : 'Send reset link'}
-              </button>
+              <Button type="submit" variant="primary" size="lg" block loading={busy}>
+                Send reset link
+              </Button>
             </form>
           ) : (
             <div className="space-y-3 text-center">

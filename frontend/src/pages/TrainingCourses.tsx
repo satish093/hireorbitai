@@ -8,6 +8,7 @@ import { SkeletonCard } from '../components/Skeleton';
 import { EmptyState } from '../components/EmptyState';
 import { useAuth } from '../context/AuthContext';
 import { MANAGER_TIER, ADMIN_TIER } from '../types';
+import { Button } from '../components/Button';
 
 const CATEGORIES = [
   '',
@@ -114,14 +115,15 @@ export function TrainingCourses() {
             ))}
           </select>
           {isAdmin && (
-            <button
+            <Button
+              variant="accent"
               onClick={backfillAll}
               disabled={backfilling}
+              loading={backfilling}
               title="Use AI to fill in missing course materials (overview, roadmap, resources, final project). Lessons are left unchanged."
-              className="border border-brand-200 text-brand-700 bg-brand-50 text-sm px-3 py-2 rounded-lg hover:bg-brand-100 disabled:opacity-50"
             >
               {backfilling ? 'Filling in…' : '✦ Fill in missing materials'}
-            </button>
+            </Button>
           )}
           {isManager && (
             <Link

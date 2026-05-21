@@ -8,6 +8,7 @@ import { Brand } from '../components/Brand';
 import { PasswordField, PasswordStrengthHints } from '../components/PasswordField';
 import { FormInput } from '../components/FormInput';
 import { config as appConfig } from '../config/env';
+import { Button } from '../components/Button';
 
 const API_URL = appConfig.apiBaseUrl;
 
@@ -173,12 +174,9 @@ export function AcceptInvitation() {
               <p className="text-sm text-muted">
                 This invitation has been used. Sign in to continue.
               </p>
-              <button
-                onClick={() => nav('/login')}
-                className="bg-ink text-bg text-sm px-4 py-2 rounded-lg press"
-              >
+              <Button onClick={() => nav('/login')} variant="primary">
                 Go to sign in
-              </button>
+              </Button>
             </div>
           ) : (
             <form onSubmit={submit} className="space-y-4">
@@ -228,12 +226,9 @@ export function AcceptInvitation() {
                 </p>
               )}
 
-              <button
-                disabled={submitting}
-                className="w-full bg-ink hover:opacity-90 disabled:opacity-50 text-bg rounded-lg py-2.5 text-sm font-medium press"
-              >
-                {submitting ? 'Creating account…' : 'Create account & continue'}
-              </button>
+              <Button type="submit" variant="primary" size="lg" block loading={submitting}>
+                Create account &amp; continue
+              </Button>
 
               <p className="text-xs text-muted text-center">
                 Expires {new Date(preview.expires_at).toLocaleString()}
@@ -252,9 +247,9 @@ function ErrorState({ message }: { message: string }) {
     <div className="text-center space-y-3">
       <h1 className="text-xl font-semibold tracking-tight text-ink">Can't open this invitation</h1>
       <p className="text-sm text-muted">{message}</p>
-      <button onClick={() => nav('/login')} className="text-sm text-brand-700 hover:underline">
+      <Button onClick={() => nav('/login')} variant="ghost" size="sm">
         Back to sign in
-      </button>
+      </Button>
     </div>
   );
 }

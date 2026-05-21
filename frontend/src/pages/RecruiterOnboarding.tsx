@@ -5,6 +5,7 @@ import { Layout } from '../components/Layout';
 import { FormInput } from '../components/FormInput';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { Button } from '../components/Button';
 
 interface FormData {
   full_name: string;
@@ -103,12 +104,9 @@ export function RecruiterOnboarding() {
         </section>
 
         <div className="flex justify-end">
-          <button
-            disabled={isSubmitting}
-            className="h-10 bg-ink text-bg px-5 rounded-lg text-sm font-medium shadow-sm disabled:opacity-50 hover:opacity-90 transition"
-          >
-            {isSubmitting ? 'Saving…' : 'Save and continue'}
-          </button>
+          <Button type="submit" variant="primary" size="lg" loading={isSubmitting}>
+            Save and continue
+          </Button>
         </div>
       </form>
     </Layout>

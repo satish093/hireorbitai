@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useState, DragEvent, ReactNode } from 'react';
+import { useEffect, useMemo, useState, DragEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { Modal } from '../components/Modal';
 import { SkeletonCard } from '../components/Skeleton';
 import { DateTimePicker } from '../components/DateTimePicker';
 import { SelectInput } from '../components/SelectInput';
+import { Button } from '../components/Button';
+import { ButtonGroup, ButtonGroupItem } from '../components/ButtonGroup';
 import {
   PriorityBadge,
   TaskStatusBadge,
@@ -206,14 +208,14 @@ export function Tasks() {
             {tasks.length} total
           </span>
         </div>
-        <div className="inline-flex rounded-lg bg-hover p-0.5 text-sm">
-          <ViewToggleBtn active={view === 'board'} onClick={() => setParams({ view: 'board' })}>
+        <ButtonGroup>
+          <ButtonGroupItem pressed={view === 'board'} onClick={() => setParams({ view: 'board' })}>
             Board
-          </ViewToggleBtn>
-          <ViewToggleBtn active={view === 'list'} onClick={() => setParams({ view: 'list' })}>
+          </ButtonGroupItem>
+          <ButtonGroupItem pressed={view === 'list'} onClick={() => setParams({ view: 'list' })}>
             List
-          </ViewToggleBtn>
-        </div>
+          </ButtonGroupItem>
+        </ButtonGroup>
 
         <div className="ml-auto flex items-center gap-2">
           <Link
@@ -225,14 +227,11 @@ export function Tasks() {
             <span>→</span>
           </Link>
           {isManager && (
-            <button
-              onClick={() => setCreateOpen(true)}
-              className="bg-ink text-bg text-sm px-3 py-1.5 rounded-lg hover:opacity-90 inline-flex items-center gap-1.5 whitespace-nowrap"
-            >
+            <Button variant="primary" size="sm" onClick={() => setCreateOpen(true)}>
               <span>+</span>
               <span className="hidden sm:inline">New task</span>
               <span className="sm:hidden">New</span>
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -280,28 +279,6 @@ export function Tasks() {
         />
       )}
     </Layout>
-  );
-}
-
-function ViewToggleBtn({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={clsx(
-        'px-3 py-1 rounded-md transition',
-        active ? 'bg-surface text-ink shadow-sm font-medium' : 'text-muted hover:text-ink',
-      )}
-    >
-      {children}
-    </button>
   );
 }
 
@@ -363,17 +340,19 @@ function FilterBar({
           ]}
         />
       )}
-      <button
+      <Button
+        variant="ghost"
+        size="sm"
+        pill
         onClick={() => setFilters({ ...filters, overdue: !filters.overdue })}
         className={clsx(
-          'rounded-full border px-3 py-1 text-sm',
           filters.overdue
-            ? 'bg-red-50 dark:bg-red-500/15 border-red-200 dark:border-red-500/30 text-red-700 dark:text-red-300'
-            : 'bg-surface border-border text-muted hover:bg-hover',
+            ? 'bg-red-50 dark:bg-red-500/15 border border-red-200 dark:border-red-500/30 text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-500/15'
+            : '',
         )}
       >
         {filters.overdue ? '⚠ Overdue only' : 'Overdue'}
-      </button>
+      </Button>
     </div>
   );
 }
@@ -670,13 +649,9 @@ function CreateTaskModal({
       onClose={onClose}
       title="Create task"
       footer={
-        <button
-          onClick={save}
-          disabled={saving}
-          className="bg-ink text-bg px-4 py-2 rounded-lg text-sm disabled:opacity-50"
-        >
+        <Button variant="primary" onClick={save} loading={saving}>
           {saving ? 'Saving…' : '+ Create task'}
-        </button>
+        </Button>
       }
     >
       <div className="space-y-3">
@@ -734,9 +709,15 @@ function CreateTaskModal({
                 className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-hover text-ink"
               >
                 {t}
-                <button onClick={() => removeTag(t)} className="text-muted hover:text-ink">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  iconOnly
+                  onClick={() => removeTag(t)}
+                  className="!h-auto !px-0 !rounded-none text-muted hover:text-ink"
+                >
                   ×
-                </button>
+                </Button>
               </span>
             ))}
             <input

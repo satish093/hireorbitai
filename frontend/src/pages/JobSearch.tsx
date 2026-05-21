@@ -11,6 +11,8 @@ import { invalidate } from '../hooks/useInvalidate';
 import { useFeatureFlag } from '../hooks/useFeatureFlags';
 import { SkillGap } from '../components/SkillGap';
 import { SkeletonCard } from '../components/Skeleton';
+import { Button } from '../components/Button';
+import { ButtonGroup, ButtonGroupItem } from '../components/ButtonGroup';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
 
@@ -552,12 +554,14 @@ export function JobSearch() {
                 className="w-full h-10 pl-9 pr-3 rounded-lg text-sm text-ink placeholder:text-muted focus:outline-none"
               />
             </div>
-            <button
+            <Button
+              variant="primary"
+              size="md"
               onClick={() => load()}
-              className="h-10 px-6 rounded-lg bg-ink text-bg text-sm font-medium hover:opacity-90 press shrink-0"
+              className="h-10 px-6 shrink-0"
             >
               Search
-            </button>
+            </Button>
           </div>
           {isConsultant && (
             <div className="mt-3">
@@ -569,48 +573,46 @@ export function JobSearch() {
 
       {/* Tabs + (staff) actions */}
       <div className="flex items-center gap-4 mb-5">
-        <nav className="flex items-end gap-5">
+        <ButtonGroup>
           {TABS.map((t) => (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              className={clsx(
-                'pb-1.5 text-sm border-b-2 transition',
-                tab === t.key
-                  ? 'border-ink text-ink font-semibold'
-                  : 'border-transparent text-muted hover:text-ink',
-              )}
-            >
+            <ButtonGroupItem key={t.key} pressed={tab === t.key} onClick={() => setTab(t.key)}>
               {t.label}
-            </button>
+            </ButtonGroupItem>
           ))}
-        </nav>
+        </ButtonGroup>
         {isManager && (
           <div className="ml-auto flex items-center gap-2">
-            <button
+            <Button
+              variant="outline"
+              size="sm"
+              pill
               onClick={() => setSourcesOpen(true)}
-              className="border border-border bg-surface rounded-full px-3 py-1.5 text-sm hover:bg-hover"
               title="Manage live job sources"
             >
               Sources
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              pill
               onClick={enrichNow}
               disabled={syncing}
-              className="border border-brand-200 bg-brand-50 text-brand-700 rounded-full px-3 py-1.5 text-sm hover:bg-brand-100 disabled:opacity-50 inline-flex items-center gap-1.5"
               title="Run AI to extract requirements, seniority, work model, etc."
             >
               ✦ Enrich
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              pill
               onClick={syncNow}
               disabled={syncing}
-              className="bg-ink text-bg rounded-full px-3 py-1.5 text-sm hover:opacity-90 disabled:opacity-50 inline-flex items-center gap-1.5"
+              loading={syncing}
               title="Pull fresh jobs from all sources"
+              leftIcon={<span className={syncing ? 'inline-block animate-spin' : ''}>↻</span>}
             >
-              <span className={syncing ? 'inline-block animate-spin' : ''}>↻</span>
               {syncing ? 'Working…' : 'Sync now'}
-            </button>
+            </Button>
           </div>
         )}
       </div>
@@ -742,13 +744,12 @@ export function JobSearch() {
               { value: 'manual', label: 'Manual import' },
             ]}
           />
-          <button
-            onClick={() => load()}
-            className="ml-1 bg-ink text-bg text-sm px-4 py-1.5 rounded-full hover:opacity-90"
-          >
+          <Button variant="ghost" size="sm" pill onClick={() => load()} className="ml-1">
             Apply
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => {
               setQ('');
               setLocation('');
@@ -759,10 +760,10 @@ export function JobSearch() {
               setPublisherFilter('');
               setJobFunction('');
             }}
-            className="text-xs text-muted hover:text-ink ml-1"
+            className="ml-1"
           >
             Reset
-          </button>
+          </Button>
         </div>
       )}
 
@@ -1011,12 +1012,9 @@ function EmptyState({ tab, onSync }: { tab: TabKey; onSync?: () => void }) {
     <div className="bg-surface border border-border rounded-xl p-10 text-center text-muted">
       <div className="mb-3">{map[tab]}</div>
       {tab === 'recommended' && onSync && (
-        <button
-          onClick={onSync}
-          className="bg-ink text-bg text-sm px-4 py-2 rounded-full hover:opacity-90 inline-flex items-center gap-1.5"
-        >
-          <span>↻</span> Sync jobs now
-        </button>
+        <Button variant="primary" size="sm" pill onClick={onSync} leftIcon={<span>↻</span>}>
+          Sync jobs now
+        </Button>
       )}
     </div>
   );
@@ -1121,16 +1119,17 @@ function JobCard({
                 </span>
               )}
             </div>
-            <button
+            <Button
               type="button"
+              variant="ghost"
               onClick={onOpenInsight}
-              className="text-left group"
+              className="text-left !justify-start !h-auto !px-0 !bg-transparent group"
               title="View full requirements + match insight"
             >
               <h3 className="text-lg font-semibold text-ink leading-tight group-hover:text-brand-700 transition-colors">
                 {job.title}
               </h3>
-            </button>
+            </Button>
             <div className="text-sm text-muted mt-0.5">
               <span className="font-medium">{companyName}</span>
               {job.client && job.client.company_name !== companyName && (
@@ -1138,7 +1137,12 @@ function JobCard({
               )}
             </div>
           </div>
-          <button
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
+            pill
+            leftIcon={<span>🔖</span>}
             onClick={(e) => {
               e.stopPropagation();
               onToggleLike();
@@ -1146,14 +1150,12 @@ function JobCard({
             title={job.liked ? 'Saved — click to remove' : 'Save job'}
             aria-label={job.liked ? 'Remove from saved' : 'Save job'}
             className={clsx(
-              'shrink-0 w-9 h-9 rounded-full border flex items-center justify-center',
+              'shrink-0 border',
               job.liked
                 ? 'bg-brand-50 border-brand-200 text-brand-600'
                 : 'bg-surface border-border text-muted hover:text-brand-600 hover:border-brand-200',
             )}
-          >
-            {job.liked ? '🔖' : '🔖'}
-          </button>
+          />
         </div>
 
         {/* Meta strip — Jobright-style key facts */}
@@ -1314,28 +1316,32 @@ function JobCard({
               <StatusDropdown current={job.application_status} onChange={onChangeStatus} />
             </div>
           ) : (
-            <button
+            <Button
+              variant="accent"
+              size="md"
               onClick={(e) => {
                 e.stopPropagation();
                 onApply();
               }}
-              className="inline-flex items-center gap-1.5 bg-ink text-bg text-sm px-4 py-2 rounded-lg hover:opacity-90"
+              rightIcon={<span>↗</span>}
             >
-              Apply on company site <span>↗</span>
-            </button>
+              Apply on company site
+            </Button>
           )}
           <div className="flex items-center gap-3">
             {isConsultant && (
-              <button
+              <Button
+                variant="outline"
+                size="sm"
+                pill
                 onClick={(e) => {
                   e.stopPropagation();
                   onOpenInsight();
                 }}
-                className="text-xs font-medium text-brand-700 bg-brand-50 border border-brand-200 px-3 py-1.5 rounded-full hover:bg-brand-100"
                 title="Score your resume against this job's requirements"
               >
                 ✦ Match Insight
-              </button>
+              </Button>
             )}
             {!enriched && (
               <span className="text-[10px] font-medium text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-500/15 border border-amber-100 dark:border-amber-500/20 px-2 py-0.5 rounded">
@@ -1343,15 +1349,16 @@ function JobCard({
               </span>
             )}
             {enriched && (responsibilities.length > 0 || skillSummaries.length > 0) && (
-              <button
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={(e) => {
                   e.stopPropagation();
                   setExpanded((v) => !v);
                 }}
-                className="text-xs text-muted hover:text-ink"
               >
                 {expanded ? 'Show less ▴' : 'Show details ▾'}
-              </button>
+              </Button>
             )}
           </div>
         </div>
@@ -1904,20 +1911,24 @@ function SkillsPicker({
             key={s}
             className="inline-flex items-center gap-1 bg-hover text-ink text-xs font-medium px-2 py-0.5 rounded-full"
           >
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => startEdit(i)}
-              className="hover:text-brand-600"
+              className="!h-auto !px-0 !bg-transparent hover:text-brand-600"
               title="Click to edit"
             >
               {s}
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              iconOnly
+              leftIcon={<span>×</span>}
               onClick={() => remove(s)}
-              className="text-muted hover:text-red-500 text-sm leading-none"
+              className="!h-auto !px-0 !bg-transparent text-muted hover:text-red-500 text-sm leading-none"
               title="Remove"
-            >
-              ×
-            </button>
+            />
           </span>
         ),
       )}
@@ -1931,19 +1942,18 @@ function SkillsPicker({
           placeholder="Add skill…"
           className="text-xs bg-hover border border-border rounded-full px-2.5 py-1 placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-brand-500/40"
         />
-        <button
-          onClick={add}
-          className="text-xs bg-ink text-bg px-2.5 py-1 rounded-full hover:opacity-90"
-        >
+        <Button variant="primary" size="sm" pill onClick={add}>
           +
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={onRecompute}
-          className="text-xs text-muted hover:text-ink ml-1"
+          className="ml-1"
           title="Re-run AI ranking with these skills"
         >
           Recompute ⟳
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -2024,19 +2034,22 @@ function SourceBreakdown({
         By source
       </span>
       {ordered.map(([source, n]) => (
-        <button
+        <Button
           key={source}
+          variant="ghost"
+          size="sm"
+          pill
           onClick={() => onClick(source)}
           className={clsx(
-            'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs transition',
+            'border',
             active === source
-              ? 'bg-ink text-bg border-ink'
+              ? 'bg-ink text-bg border-ink hover:bg-ink'
               : (SOURCE_TONE[source] ?? 'bg-hover text-ink border-border') + ' hover:opacity-80',
           )}
         >
           <span className="font-medium">{SOURCE_LABEL[source] ?? source}</span>
-          <span className="tabular-nums opacity-90">{n}</span>
-        </button>
+          <span className="tabular-nums opacity-90 ml-1">{n}</span>
+        </Button>
       ))}
       <span className="ml-auto text-xs text-muted tabular-nums">{rows.length} total</span>
     </div>
@@ -2197,12 +2210,14 @@ function RecruiterTargetingBar({
           <span className="text-xs text-muted">
             {value.skills.length} skill{value.skills.length === 1 ? '' : 's'} on file
           </span>
-          <button
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => pickConsultant(null)}
-            className="ml-auto text-xs text-muted hover:text-ink"
+            className="ml-auto"
           >
             Clear ×
-          </button>
+          </Button>
         </>
       )}
     </div>
@@ -2243,18 +2258,12 @@ function ApplyConfirmModal({
           . Confirm Yes to record this submission against the consultant.
         </p>
         <div className="flex justify-end gap-2">
-          <button
-            onClick={() => onConfirm(false)}
-            className="border border-border text-ink text-sm px-4 py-2 rounded-lg hover:bg-hover"
-          >
+          <Button variant="outline" size="md" onClick={() => onConfirm(false)}>
             No, not yet
-          </button>
-          <button
-            onClick={() => onConfirm(true)}
-            className="bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold px-4 py-2 rounded-lg"
-          >
+          </Button>
+          <Button variant="accent" size="md" onClick={() => onConfirm(true)}>
             Yes, applied
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -2409,9 +2418,13 @@ function SourcesDrawer({ onClose, onAfterSync }: { onClose: () => void; onAfterS
               Pull real-time listings from legitimate public APIs.
             </p>
           </div>
-          <button onClick={onClose} className="text-muted hover:text-ink text-xl leading-none">
-            ×
-          </button>
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
+            leftIcon={<span className="text-xl leading-none">×</span>}
+            onClick={onClose}
+          />
         </div>
 
         {/* Add new source */}
@@ -2464,12 +2477,9 @@ function SourcesDrawer({ onClose, onAfterSync }: { onClose: () => void; onAfterS
               }
               className="border border-border rounded-lg px-2 py-1.5 text-sm col-span-1 disabled:bg-hover"
             />
-            <button
-              onClick={add}
-              className="bg-ink text-bg text-sm px-3 py-1.5 rounded-lg hover:opacity-90"
-            >
+            <Button variant="primary" size="sm" onClick={add}>
               + Add
-            </button>
+            </Button>
           </div>
           <p className="text-[11px] text-muted mt-2">
             Greenhouse / Lever slugs come from the careers URL — e.g.{' '}
@@ -2559,25 +2569,21 @@ function SourcesDrawer({ onClose, onAfterSync }: { onClose: () => void; onAfterS
                   )}
                 </div>
                 <div className="flex items-center gap-1">
-                  <button
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={() => syncOne(c.id)}
                     disabled={busy === c.id}
-                    className="text-xs border border-border rounded-md px-2 py-1 hover:bg-hover disabled:opacity-50"
+                    loading={busy === c.id}
                   >
                     {busy === c.id ? '…' : 'Sync'}
-                  </button>
-                  <button
-                    onClick={() => toggle(c)}
-                    className="text-xs text-muted hover:text-ink px-1"
-                  >
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => toggle(c)}>
                     {c.is_active ? 'Pause' : 'Resume'}
-                  </button>
-                  <button
-                    onClick={() => remove(c)}
-                    className="text-xs text-red-600 dark:text-red-400 hover:underline px-1"
-                  >
+                  </Button>
+                  <Button variant="danger-ghost" size="sm" onClick={() => remove(c)}>
                     Remove
-                  </button>
+                  </Button>
                 </div>
               </div>
             ))}
