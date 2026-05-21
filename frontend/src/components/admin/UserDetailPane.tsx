@@ -12,7 +12,15 @@ import { EmptyState } from '../EmptyState';
 import { GroupBadge, RoleChip, StatusPill } from './UserBits';
 import { ConfirmDialog, type ConfirmSpec } from './ConfirmDialog';
 import { useUserDetail } from './useUserDetail';
-import { AUDIT_DOT, auditTone, relativeTime, statusOf, type GroupLite, type Status } from './types';
+import {
+  AUDIT_DOT,
+  auditTone,
+  deviceLabel,
+  relativeTime,
+  statusOf,
+  type GroupLite,
+  type Status,
+} from './types';
 
 function Field({ label, value }: { label: string; value: ReactNode }) {
   return (
@@ -68,7 +76,7 @@ export function UserDetailPane({
   me: { id: string } | null;
   onChanged: () => void;
 }) {
-  const { user, audit, loading, error, reload, setUser } = useUserDetail(userId);
+  const { user, audit, sessions, loading, error, reload, setUser } = useUserDetail(userId);
   const [confirm, setConfirm] = useState<ConfirmSpec | null>(null);
 
   const groupsById = useMemo(() => {
@@ -196,6 +204,24 @@ export function UserDetailPane({
         });
         toast.success(`Now impersonating ${name}`);
         window.location.assign('/dashboard');
+      },
+    });
+  }
+
+  function revokeOne(sessionId: string, ua: string | null) {
+    setConfirm({
+      title: `Revoke this session?`,
+      message: (
+        <>
+          End the session on <strong className="text-ink">{deviceLabel(ua)}</strong> for {name}.
+        </>
+      ),
+      confirmLabel: 'Revoke',
+      tone: 'danger',
+      run: async () => {
+        await api.delete(`/admin/users/${userId}/sessions/${sessionId}`);
+        toast.success('Session revoked');
+        afterMutation();
       },
     });
   }
@@ -366,6 +392,50 @@ export function UserDetailPane({
                   </div>
                 </div>
               </div>
+            </div>
+
+            {/* Active sessions */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <SectionLabel>Active sessions · {sessions.length}</SectionLabel>
+                {sessions.length > 0 && !isSelf && (
+                  <button
+                    onClick={quickEndSessions}
+                    className="text-[11px] text-danger hover:underline"
+                  >
+                    Revoke all
+                  </button>
+                )}
+              </div>
+              {sessions.length === 0 ? (
+                <EmptyState compact icon="🔌" title="No active sessions" />
+              ) : (
+                <div className="space-y-2">
+                  {sessions.map((sess) => (
+                    <div
+                      key={sess.id}
+                      className="flex items-center gap-3 rounded-lg border border-border bg-surface px-3 py-2"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm text-ink truncate">
+                          {deviceLabel(sess.user_agent)}
+                        </div>
+                        <div className="text-[11px] text-muted font-mono truncate">
+                          {sess.ip_address ?? 'IP unknown'} · started {relativeTime(sess.issued_at)}
+                        </div>
+                      </div>
+                      {!isSelf && (
+                        <button
+                          onClick={() => revokeOne(sess.id, sess.user_agent)}
+                          className="text-[11px] text-danger hover:bg-danger-soft rounded px-2 py-1 press shrink-0"
+                        >
+                          Revoke
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Audit timeline */}
