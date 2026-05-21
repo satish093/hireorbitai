@@ -26,11 +26,25 @@ export const courses = {
     return qb;
   },
   async get(id: string) {
-    return db
-      .from('training_courses')
-      .select('*, lessons:training_lessons!course_id(*), quizzes:training_quizzes!course_id(*)')
-      .eq('id', id)
-      .single();
+    // Lessons + quizzes are fetched as separate queries rather than embedded.
+    // The shim treats `lessons:training_lessons!course_id(*)` as a to-ONE embed
+    // (explicit FK), which generates `WHERE training_lessons.id =
+    // training_courses.course_id` — a column that doesn't exist on the parent —
+    // and errors, surfacing as a 404. Separate queries sidestep that entirely.
+    const courseRes = await db.from('training_courses').select('*').eq('id', id).maybeSingle();
+    if (courseRes.error || !courseRes.data) return courseRes;
+    const [lessonsRes, quizzesRes] = await Promise.all([
+      db.from('training_lessons').select(LESSON_SELECT).eq('course_id', id).order('lesson_order'),
+      db.from('training_quizzes').select('*').eq('course_id', id).order('question_order'),
+    ]);
+    return {
+      data: {
+        ...(courseRes.data as Record<string, unknown>),
+        lessons: lessonsRes.data ?? [],
+        quizzes: quizzesRes.data ?? [],
+      },
+      error: null,
+    };
   },
   async create(row: any) {
     return db.from('training_courses').insert(row).select(COURSE_SELECT).single();
