@@ -146,6 +146,25 @@ export function relativeTime(iso: string | null): string {
 export const isOnline = (u: { last_seen_at: string | null }): boolean =>
   !!u.last_seen_at && Date.now() - new Date(u.last_seen_at).getTime() < 5 * 60_000;
 
+export type AuditTone = 'success' | 'warn' | 'danger' | 'accent' | 'neutral';
+
+/** Map an audit action verb to a timeline dot tone. */
+export function auditTone(action: string): AuditTone {
+  if (/placement|offer|reactivat|unlock|reset_completed/.test(action)) return 'success';
+  if (/role_changed|group_user|account_locked|must_change|suspend/.test(action)) return 'warn';
+  if (/failed|deactivat|deleted|banned|blocked|invalid|disabled/.test(action)) return 'danger';
+  if (/login_success|logout|password|impersonat|created/.test(action)) return 'accent';
+  return 'neutral';
+}
+
+export const AUDIT_DOT: Record<AuditTone, string> = {
+  success: 'bg-success',
+  warn: 'bg-warn',
+  danger: 'bg-danger',
+  accent: 'bg-accent',
+  neutral: 'bg-[color:var(--muted)]',
+};
+
 /** Best-effort device label from a user-agent string. */
 export function deviceLabel(ua: string | null): string {
   if (!ua) return 'Unknown device';
