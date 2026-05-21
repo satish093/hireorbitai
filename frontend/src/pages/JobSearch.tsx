@@ -9,13 +9,10 @@ import { DuplicateSubmissionModal } from '../components/DuplicateSubmissionModal
 import { invalidate } from '../hooks/useInvalidate';
 import { SkeletonCard } from '../components/Skeleton';
 import { Button } from '../components/Button';
-import { ButtonGroup, ButtonGroupItem } from '../components/ButtonGroup';
 import toast from 'react-hot-toast';
-import { TABS } from '../components/jobs/types';
 import type { AppliedSubTab, ApplyTarget, JobRow, TabKey } from '../components/jobs/types';
 import { daysAgoISO, filteredRows, resolveApplyUrl } from '../components/jobs/helpers';
 import { JobCard } from '../components/jobs/JobCard';
-import { PillSelect } from '../components/jobs/PillSelect';
 import { EmptyState } from '../components/jobs/EmptyState';
 import { MatchModeChip } from '../components/jobs/MatchModeChip';
 import { AppliedSubTabs } from '../components/jobs/AppliedSubTabs';
@@ -25,6 +22,25 @@ import { SourceBreakdown } from '../components/jobs/SourceBreakdown';
 import { RecruiterTargetingBar } from '../components/jobs/RecruiterTargetingBar';
 import { ApplyConfirmModal } from '../components/jobs/ApplyConfirmModal';
 import { SourcesDrawer } from '../components/jobs/SourcesDrawer';
+import { JobSearchHero } from '../components/jobs/JobSearchHero';
+import { JobTabsBar, type JobSortKey } from '../components/jobs/JobTabsBar';
+import { JobFilterBar, type JobFilterState } from '../components/jobs/JobFilterBar';
+import { JobDetailPane } from '../components/jobs/JobDetailPane';
+
+/** Client-side sort of the loaded rows for the list column. */
+function sortRows(list: JobRow[], sort: JobSortKey): JobRow[] {
+  const a = [...list];
+  if (sort === 'match') {
+    a.sort((x, y) => (y.match_score ?? -1) - (x.match_score ?? -1));
+  } else if (sort === 'recent') {
+    a.sort(
+      (x, y) => +new Date(y.posted_at ?? y.created_at) - +new Date(x.posted_at ?? x.created_at),
+    );
+  } else if (sort === 'comp') {
+    a.sort((x, y) => (y.rate_max ?? y.rate_min ?? -1) - (x.rate_max ?? x.rate_min ?? -1));
+  }
+  return a;
+}
 
 export function JobSearch() {
   const { profile } = useAuth();
@@ -87,6 +103,11 @@ export function JobSearch() {
   // Sentinel for infinite scroll — when it enters the viewport we load the
   // next page (which the reload effect appends).
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
+
+  // Master-detail selection + list sort + AI-search focus target (⌘K).
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [sort, setSort] = useState<JobSortKey>('match');
+  const searchRef = useRef<HTMLInputElement>(null);
 
   // Load the consultant's profile (skills + consultant row id) and their
   // current resume id. Used by the recommended ranker AND the apply flow so
@@ -430,331 +451,253 @@ export function JobSearch() {
     }
   }
 
+  // The list the user actually sees: source/sub-tab filtered, then sorted.
+  const visible = sortRows(filteredRows(rows, tab, sourceFilter, appliedSub), sort);
+  const selectedJob = visible.find((j) => j.id === selectedId) ?? null;
+  const visibleIdsKey = visible.map((j) => j.id).join(',');
+
+  // Keep the selected job across tab/filter/sort changes when it's still in the
+  // list; otherwise default to the first row (desktop master-detail).
+  useEffect(() => {
+    if (visible.length === 0) {
+      if (selectedId !== null) setSelectedId(null);
+      return;
+    }
+    if (!visible.some((j) => j.id === selectedId)) setSelectedId(visible[0]!.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleIdsKey]);
+
+  // Keyboard: ↑/↓ moves selection, Enter opens (mobile routes to /jobs/:id),
+  // ⌘K / Ctrl-K focuses the AI search. Bound once; reads latest via a ref.
+  const navState = useRef({ visible, selectedId });
+  navState.current = { visible, selectedId };
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        searchRef.current?.focus();
+        return;
+      }
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      const { visible: list, selectedId: cur } = navState.current;
+      if (list.length === 0) return;
+      const idx = list.findIndex((j) => j.id === cur);
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedId(list[Math.min(list.length - 1, idx + 1)]!.id);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedId(list[Math.max(0, idx - 1)]!.id);
+      } else if (e.key === 'Enter' && idx >= 0) {
+        const j = list[idx]!;
+        if (!window.matchMedia('(min-width: 1280px)').matches) navigate(`/jobs/${j.id}`);
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /** Select on desktop (master-detail); navigate to the full page on mobile. */
+  function openJob(j: JobRow) {
+    if (window.matchMedia('(min-width: 1280px)').matches) setSelectedId(j.id);
+    else navigate(`/jobs/${j.id}`);
+  }
+
+  const filterState: JobFilterState = {
+    location,
+    remote,
+    postedAfter,
+    yearsMin,
+    jobFunction,
+    publisher: publisherFilter,
+    source: sourceFilter,
+  };
+  function patchFilters(p: Partial<JobFilterState>) {
+    if (p.location !== undefined) setLocation(p.location);
+    if (p.remote !== undefined) setRemote(p.remote);
+    if (p.postedAfter !== undefined) setPostedAfter(p.postedAfter);
+    if (p.yearsMin !== undefined) setYearsMin(p.yearsMin);
+    if (p.jobFunction !== undefined) setJobFunction(p.jobFunction);
+    if (p.publisher !== undefined) setPublisherFilter(p.publisher);
+    if (p.source !== undefined) setSourceFilter(p.source);
+  }
+  function resetFilters() {
+    setQ('');
+    setLocation('');
+    setRemote('');
+    setPostedAfter('');
+    setYearsMin('');
+    setSourceFilter('');
+    setPublisherFilter('');
+    setJobFunction('');
+  }
+
+  const counts: Partial<Record<TabKey, number>> = {
+    [tab]: tab === 'recommended' ? totalRows : visible.length,
+  };
+
+  const staffActions = isManager ? (
+    <>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => setSourcesOpen(true)}
+        title="Manage live job sources"
+      >
+        Sources
+      </Button>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={enrichNow}
+        disabled={syncing}
+        title="Run AI to extract requirements, seniority, work model, etc."
+      >
+        ✦ Enrich
+      </Button>
+      <Button
+        variant="primary"
+        size="sm"
+        onClick={syncNow}
+        disabled={syncing}
+        loading={syncing}
+        title="Pull fresh jobs from all sources"
+      >
+        {syncing ? 'Working…' : 'Sync now'}
+      </Button>
+    </>
+  ) : null;
+
   return (
     <Layout title="Jobs" crumbs={[{ label: 'Workspace', to: '/dashboard' }, { label: 'Jobs' }]}>
-      {/* Consumer hero — search-forward, shown on the main feed */}
-      {tab === 'recommended' && (
-        <div className="rounded-2xl bg-gradient-to-br from-brand-600 to-indigo-600 text-white p-6 sm:p-8 mb-6 shadow-sm">
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Find your next role</h1>
-          <p className="text-white/85 text-sm mt-1">
-            {totalRows > 0
-              ? `${totalRows.toLocaleString()} live openings`
-              : 'Search thousands of live openings'}
-          </p>
-          <div className="mt-4 flex flex-col sm:flex-row gap-2 bg-surface rounded-xl p-2 shadow-lg max-w-2xl">
-            <div className="relative flex-1 min-w-0">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted">⌕</span>
-              <input
-                type="text"
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') load();
-                }}
-                placeholder="Job title, company, or skill"
-                className="w-full h-10 pl-9 pr-3 rounded-lg text-sm text-ink placeholder:text-muted focus:outline-none"
-              />
-            </div>
-            <Button
-              variant="primary"
-              size="md"
-              onClick={() => load()}
-              className="h-10 px-6 shrink-0"
-            >
-              Search
-            </Button>
-          </div>
-          {isConsultant && (
-            <div className="mt-3">
-              <AlertsToggle />
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Tabs + (staff) actions */}
-      <div className="flex items-center gap-4 mb-5">
-        <ButtonGroup>
-          {TABS.map((t) => (
-            <ButtonGroupItem key={t.key} pressed={tab === t.key} onClick={() => setTab(t.key)}>
-              {t.label}
-            </ButtonGroupItem>
-          ))}
-        </ButtonGroup>
-        {isManager && (
-          <div className="ml-auto flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              pill
-              onClick={() => setSourcesOpen(true)}
-              title="Manage live job sources"
-            >
-              Sources
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              pill
-              onClick={enrichNow}
-              disabled={syncing}
-              title="Run AI to extract requirements, seniority, work model, etc."
-            >
-              ✦ Enrich
-            </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              pill
-              onClick={syncNow}
-              disabled={syncing}
-              loading={syncing}
-              title="Pull fresh jobs from all sources"
-              leftIcon={<span className={syncing ? 'inline-block animate-spin' : ''}>↻</span>}
-            >
-              {syncing ? 'Working…' : 'Sync now'}
-            </Button>
-          </div>
-        )}
-      </div>
-
-      {/* Recruiter targeting — pick a consultant + resume to apply on behalf of. */}
-      {isRecruiterMode && tab === 'recommended' && (
-        <RecruiterTargetingBar value={target} onChange={setTarget} />
-      )}
-
-      {/* Skills picker — consultants tune the recommender by adding their skills */}
-      {isConsultant && skillsLoaded && tab === 'recommended' && (
-        <SkillsPicker skills={skills} onChange={saveSkills} onRecompute={() => load()} />
-      )}
-
-      {/* Filter chips */}
-      {tab === 'recommended' && (
-        <div className="flex flex-wrap items-center gap-2 mb-5">
-          <PillSelect
-            label="Location"
-            value={location}
-            placeholder="Pick a location"
-            onChange={(v) => {
-              setLocation(v);
-            }}
-            options={[
-              { value: 'United States', label: 'United States' },
-              { value: 'Remote', label: 'Remote' },
-              { value: 'New York', label: 'New York' },
-              { value: 'San Francisco', label: 'San Francisco' },
-              { value: 'Seattle', label: 'Seattle' },
-              { value: 'Austin', label: 'Austin' },
-              { value: 'Los Angeles', label: 'Los Angeles' },
-              { value: 'Boston', label: 'Boston' },
-              { value: 'Chicago', label: 'Chicago' },
-              { value: 'London', label: 'London' },
-              { value: 'Europe', label: 'Europe' },
-            ]}
-          />
-          <PillSelect
-            label="Onsite"
-            value={remote}
-            onChange={(v) => setRemote(v as any)}
-            options={[
-              { value: '', label: 'Any' },
-              { value: 'true', label: 'Remote' },
-              { value: 'false', label: 'Onsite' },
-            ]}
-          />
-          <PillSelect
-            label="Posted"
-            value={postedAfter}
-            onChange={(v) => setPostedAfter(v)}
-            options={[
-              { value: '', label: 'Any time' },
-              { value: '1', label: 'Past 24 hours' },
-              { value: '7', label: 'Past week' },
-              { value: '30', label: 'Past month' },
-            ]}
-          />
-          <PillSelect
-            label="Years"
-            value={yearsMin}
-            onChange={(v) => setYearsMin(v)}
-            options={[
-              { value: '', label: 'Any' },
-              { value: '0', label: 'Entry (0+)' },
-              { value: '3', label: 'Mid (3+)' },
-              { value: '5', label: 'Senior (5+)' },
-              { value: '8', label: 'Lead (8+)' },
-            ]}
-          />
-          <PillSelect
-            label="Job function"
-            value={jobFunction}
-            onChange={(v) => setJobFunction(v)}
-            options={[
-              { value: '', label: 'Any role' },
-              { value: 'Software Engineer', label: 'Software Engineer' },
-              { value: 'Java Engineer', label: 'Java Engineer' },
-              { value: 'Frontend Engineer', label: 'Frontend Engineer' },
-              { value: 'Backend Engineer', label: 'Backend Engineer' },
-              { value: 'Full Stack Engineer', label: 'Full Stack' },
-              { value: 'Data Engineer', label: 'Data Engineer' },
-              { value: 'Data Scientist', label: 'Data Scientist' },
-              { value: 'DevOps / SRE', label: 'DevOps / SRE' },
-              { value: 'Cloud Engineer', label: 'Cloud Engineer' },
-              { value: 'QA Engineer', label: 'QA Engineer' },
-              { value: 'Salesforce Developer', label: 'Salesforce Developer' },
-              { value: 'Business Analyst', label: 'Business Analyst' },
-              { value: 'Project Manager', label: 'Project Manager' },
-              { value: 'Product Manager', label: 'Product Manager' },
-            ]}
-          />
-          <PillSelect
-            label="Job board"
-            value={publisherFilter}
-            onChange={(v) => setPublisherFilter(v)}
-            options={[
-              { value: '', label: 'All boards' },
-              { value: 'LinkedIn', label: 'LinkedIn' },
-              { value: 'Dice', label: 'Dice' },
-              { value: 'Monster', label: 'Monster' },
-              { value: 'CareerBuilder', label: 'CareerBuilder' },
-              { value: 'Indeed', label: 'Indeed' },
-              { value: 'Glassdoor', label: 'Glassdoor' },
-              { value: 'ZipRecruiter', label: 'ZipRecruiter' },
-            ]}
-          />
-          <PillSelect
-            label="Source"
-            value={sourceFilter}
-            onChange={(v) => setSourceFilter(v)}
-            options={[
-              { value: '', label: 'All sources' },
-              { value: 'greenhouse', label: 'Greenhouse' },
-              { value: 'lever', label: 'Lever' },
-              { value: 'remoteok', label: 'RemoteOK' },
-              { value: 'remotive', label: 'Remotive' },
-              { value: 'arbeitnow', label: 'Arbeitnow' },
-              { value: 'adzuna', label: 'Adzuna' },
-              { value: 'jsearch', label: 'JSearch (Indeed / LinkedIn)' },
-              { value: 'ashby', label: 'Ashby' },
-              { value: 'jooble', label: 'Jooble' },
-              { value: 'usajobs', label: 'USAJobs' },
-              { value: 'serpapi', label: 'SerpAPI Google Jobs' },
-              { value: 'searchapi', label: 'SearchApi.io Google Jobs' },
-              { value: 'linkedin', label: 'LinkedIn (Fantastic Jobs)' },
-              { value: 'monster', label: 'Monster (RapidAPI)' },
-              { value: 'manual', label: 'Manual import' },
-            ]}
-          />
-          <Button variant="ghost" size="sm" pill onClick={() => load()} className="ml-1">
-            Apply
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setQ('');
-              setLocation('');
-              setRemote('');
-              setPostedAfter('');
-              setYearsMin('');
-              setSourceFilter('');
-              setPublisherFilter('');
-              setJobFunction('');
-            }}
-            className="ml-1"
-          >
-            Reset
-          </Button>
-        </div>
-      )}
-
-      {/* Match-mode chip — single-line, replaces the two verbose banners
-          we used to render. The match-mode header set by /jobs/recommended
-          tells us why scores are partial / missing. */}
-      {!loading && tab === 'recommended' && matchMode && matchMode !== 'resume+skills' && (
-        <div className="mb-3">
-          <MatchModeChip mode={matchMode} isRecruiterMode={isRecruiterMode} />
-        </div>
-      )}
-
-      {/* Source breakdown stats */}
-      {!loading && rows.length > 0 && tab === 'recommended' && (
-        <SourceBreakdown
-          rows={rows}
-          active={sourceFilter}
-          onClick={(s) => setSourceFilter(s === sourceFilter ? '' : s)}
+      <div className="space-y-4">
+        <JobSearchHero
+          totalRows={totalRows}
+          query={q}
+          onQueryChange={setQ}
+          onSubmitQuery={() => load()}
+          searchRef={searchRef}
+          rightSlot={staffActions}
         />
-      )}
 
-      {/* Applied sub-tabs — Jobright-style pipeline view. */}
-      {tab === 'applied' && (
-        <AppliedSubTabs rows={rows} active={appliedSub} onChange={setAppliedSub} />
-      )}
+        {isRecruiterMode && tab === 'recommended' && (
+          <RecruiterTargetingBar value={target} onChange={setTarget} />
+        )}
+        {isConsultant && skillsLoaded && tab === 'recommended' && (
+          <SkillsPicker skills={skills} onChange={saveSkills} onRecompute={() => load()} />
+        )}
+        {isConsultant && tab === 'recommended' && <AlertsToggle />}
 
-      {/* Results — apply source filter (Recommended/Liked) and sub-tab filter (Applied). */}
-      {(() => {
-        const filtered = filteredRows(rows, tab, sourceFilter, appliedSub);
-        if (loading) {
-          // Skeleton cards mimic the job-card layout so the loading state feels
-          // intentional rather than a blank screen with a stray "Loading…".
-          return (
-            <div className="space-y-3" aria-label="Loading jobs">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <SkeletonCard key={i} lines={4} />
-              ))}
-            </div>
-          );
-        }
-        if (filtered.length === 0)
-          return <EmptyState tab={tab} onSync={isManager ? syncNow : undefined} />;
-        return (
-          <div className="space-y-3">
-            {tab === 'recommended' && totalRows > 0 && (
-              <div className="text-xs text-muted px-1">
-                Showing {filtered.length} of {totalRows.toLocaleString()} jobs
+        <JobTabsBar tab={tab} counts={counts} onTab={setTab} sort={sort} onSort={setSort} />
+
+        {tab === 'recommended' && (
+          <JobFilterBar
+            value={filterState}
+            onChange={patchFilters}
+            onApply={() => load()}
+            onReset={resetFilters}
+          />
+        )}
+
+        {!loading && tab === 'recommended' && matchMode && matchMode !== 'resume+skills' && (
+          <MatchModeChip mode={matchMode} isRecruiterMode={isRecruiterMode} />
+        )}
+        {!loading && rows.length > 0 && tab === 'recommended' && (
+          <SourceBreakdown
+            rows={rows}
+            active={sourceFilter}
+            onClick={(s) => setSourceFilter(s === sourceFilter ? '' : s)}
+          />
+        )}
+        {tab === 'applied' && (
+          <AppliedSubTabs rows={rows} active={appliedSub} onChange={setAppliedSub} />
+        )}
+
+        {/* Master-detail: list column (left) + sticky detail pane (right, xl+). */}
+        <div className="flex gap-5 items-start">
+          <div className="w-full xl:w-[440px] xl:shrink-0 space-y-3">
+            {loading ? (
+              <div className="space-y-3" aria-label="Loading jobs">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <SkeletonCard key={i} lines={3} />
+                ))}
               </div>
-            )}
-            {filtered.map((j) => (
-              <JobCard
-                key={j.id}
-                job={j}
-                isConsultant={isConsultant}
-                onToggleLike={() => toggleLike(j)}
-                onOpenInsight={() => navigate(`/jobs/${j.id}`)}
-                onApply={() => handleApplyClick(j)}
-                // Only supply the dropdown handler when this row IS an application
-                // (the Applied tab). Recommended/Liked rows keep the Apply button.
-                onChangeStatus={
-                  j.application_id
-                    ? async (next) => {
-                        const appId = j.application_id;
-                        if (!appId) return;
-                        // Optimistic.
-                        setRows((rs) =>
-                          rs.map((r) => (r.id === j.id ? { ...r, application_status: next } : r)),
-                        );
-                        try {
-                          await api.patch(`/applications/${appId}`, { status: next });
-                          invalidate('applications');
-                        } catch (e: any) {
-                          toast.error(e?.response?.data?.error ?? 'Failed to update status');
-                          // Roll back by reloading.
-                          load(tab);
-                        }
-                      }
-                    : undefined
-                }
-              />
-            ))}
-            {/* Infinite scroll sentinel — entering view loads the next page. */}
-            {tab === 'recommended' && page < totalPages && (
-              <div ref={loadMoreRef} className="py-6 text-center text-xs text-muted">
-                {loading ? 'Loading more…' : 'Scroll for more'}
-              </div>
+            ) : visible.length === 0 ? (
+              <EmptyState tab={tab} onSync={isManager ? syncNow : undefined} />
+            ) : (
+              <>
+                {tab === 'recommended' && totalRows > 0 && (
+                  <div className="text-xs text-muted px-1">
+                    Showing {visible.length} of {totalRows.toLocaleString()} jobs
+                  </div>
+                )}
+                {visible.map((j) => (
+                  <JobCard
+                    key={j.id}
+                    job={j}
+                    selected={selectedJob?.id === j.id}
+                    onSelect={() => openJob(j)}
+                    onToggleLike={() => toggleLike(j)}
+                    onApply={() => handleApplyClick(j)}
+                    onChangeStatus={
+                      j.application_id
+                        ? async (next) => {
+                            const appId = j.application_id;
+                            if (!appId) return;
+                            setRows((rs) =>
+                              rs.map((r) =>
+                                r.id === j.id ? { ...r, application_status: next } : r,
+                              ),
+                            );
+                            try {
+                              await api.patch(`/applications/${appId}`, { status: next });
+                              invalidate('applications');
+                            } catch (e: any) {
+                              toast.error(e?.response?.data?.error ?? 'Failed to update status');
+                              load(tab);
+                            }
+                          }
+                        : undefined
+                    }
+                  />
+                ))}
+                {tab === 'recommended' && page < totalPages && (
+                  <div ref={loadMoreRef} className="py-6 text-center text-xs text-muted">
+                    {loading ? 'Loading more…' : 'Scroll for more'}
+                  </div>
+                )}
+              </>
             )}
           </div>
-        );
-      })()}
+
+          <div className="hidden xl:block flex-1 min-w-0">
+            <div className="sticky top-4 h-[calc(100dvh-7rem)] overflow-hidden rounded-xl border border-border">
+              {selectedJob ? (
+                <JobDetailPane
+                  job={selectedJob}
+                  isConsultant={isConsultant}
+                  isRecruiterMode={isRecruiterMode}
+                  selectedConsultantId={
+                    isRecruiterMode ? (target?.consultantId ?? null) : myConsultantId
+                  }
+                  applyUrl={resolveApplyUrl(selectedJob)}
+                  onSave={() => toggleLike(selectedJob)}
+                  onPitch={() => navigate(`/ai-email?job=${selectedJob.id}`)}
+                  onApply={() => handleApplyClick(selectedJob)}
+                  onViewApplication={() => navigate('/applications')}
+                  onSeeBench={() => navigate('/consultants')}
+                />
+              ) : (
+                <div className="grid h-full place-items-center bg-bg-elev text-sm text-muted">
+                  Select a job to see details
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
 
       {sourcesOpen && (
         <SourcesDrawer onClose={() => setSourcesOpen(false)} onAfterSync={() => load(tab)} />
