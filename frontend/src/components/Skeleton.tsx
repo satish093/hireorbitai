@@ -31,7 +31,7 @@ export function Skeleton({ className, width, height }: SkeletonProps) {
  *  structure of the loaded UI, not a blank box. */
 export function SkeletonCard({ lines = 3, className }: { lines?: number; className?: string }) {
   return (
-    <div className={clsx('bg-card border border-border rounded-xl p-5 space-y-3', className)}>
+    <div className={clsx('bg-surface border border-border rounded-xl p-5 space-y-3', className)}>
       <Skeleton className="h-4 w-1/3" />
       <div className="space-y-2 pt-1">
         {Array.from({ length: lines }).map((_, i) => (
@@ -47,7 +47,7 @@ export function SkeletonMetricGrid({ count = 4 }: { count?: number }) {
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
       {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="bg-card border border-border rounded-xl p-5 space-y-3">
+        <div key={i} className="bg-surface border border-border rounded-xl p-5 space-y-3">
           <Skeleton className="h-2.5 w-1/2" />
           <Skeleton className="h-7 w-1/3" />
           <Skeleton className="h-2.5 w-2/3" />

@@ -32,13 +32,13 @@ export function DataTable<T extends { id?: string }>({
     a === 'right' ? 'text-right' : a === 'center' ? 'text-center' : 'text-left';
 
   return (
-    <div className="bg-card rounded-xl border border-border overflow-hidden animate-fade-in">
+    <div className="bg-surface rounded-xl border border-border overflow-hidden animate-fade-in">
       {/* `overflow-x-auto` scrolls the table on narrow viewports instead of
           squashing every column. A min-width keeps the columns from collapsing
           before the scroller engages. */}
       <div className="overflow-x-auto">
         <table className="w-full text-sm min-w-[560px]">
-          <thead className="bg-muted text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">
+          <thead className="bg-hover text-[10px] font-semibold tracking-widest text-muted uppercase">
             <tr>
               {columns.map((c) => (
                 <th
@@ -74,9 +74,9 @@ export function DataTable<T extends { id?: string }>({
               <tr>
                 <td
                   colSpan={columns.length}
-                  className="px-4 py-12 text-center text-muted-foreground text-sm animate-fade-in-up"
+                  className="px-4 py-12 text-center text-muted text-sm animate-fade-in-up"
                 >
-                  {empty ?? <span className="italic text-muted-foreground">No records yet</span>}
+                  {empty ?? <span className="italic text-muted">No records yet</span>}
                 </td>
               </tr>
             ) : (
@@ -87,21 +87,21 @@ export function DataTable<T extends { id?: string }>({
                   style={{ animationDelay: `${Math.min(i, STAGGER_MAX) * 25}ms` }}
                   className={clsx(
                     'border-t border-border transition animate-fade-in-up',
-                    onRowClick ? 'cursor-pointer hover:bg-muted' : 'hover:bg-slate-50/50',
+                    onRowClick ? 'cursor-pointer hover:bg-hover' : 'hover:bg-slate-50/50',
                   )}
                 >
                   {columns.map((c) => (
                     <td
                       key={c.key}
                       className={clsx(
-                        'px-3 sm:px-4 py-3 text-foreground align-middle',
+                        'px-3 sm:px-4 py-3 text-ink align-middle',
                         alignClass(c.align),
                         c.className,
                       )}
                     >
                       {c.render
                         ? c.render(row)
-                        : ((row as any)[c.key] ?? <span className="text-muted-foreground">—</span>)}
+                        : ((row as any)[c.key] ?? <span className="text-muted">—</span>)}
                     </td>
                   ))}
                 </tr>

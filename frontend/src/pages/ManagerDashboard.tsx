@@ -35,13 +35,13 @@ interface TaskMetrics {
 }
 
 const STATUS_BAR_COLOR: Record<TaskStatus, string> = {
-  BACKLOG: 'bg-muted-foreground',
+  BACKLOG: 'bg-muted',
   TODO: 'bg-blue-500',
   IN_PROGRESS: 'bg-indigo-500',
   BLOCKED: 'bg-red-500',
   REVIEW: 'bg-purple-500',
   COMPLETED: 'bg-emerald-500',
-  CANCELLED: 'bg-muted-foreground',
+  CANCELLED: 'bg-muted',
 };
 
 const STATUS_DOT_COLOR: Record<TaskStatus, string> = STATUS_BAR_COLOR;
@@ -111,21 +111,18 @@ export function ManagerDashboard() {
       {/* Greeting */}
       <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <div className="text-[11px] font-semibold tracking-widest text-muted-foreground mb-2">
-            {dateStr}
-          </div>
-          <h1 className="text-3xl font-semibold tracking-tight text-foreground">
+          <div className="text-[11px] font-semibold tracking-widest text-muted mb-2">{dateStr}</div>
+          <h1 className="text-3xl font-semibold tracking-tight text-ink">
             {greeting()}, {firstName(profile)}.
           </h1>
           {tasks ? (
-            <p className="text-sm text-muted-foreground mt-2">
-              Your team has{' '}
-              <span className="font-semibold text-foreground">{tasks.open} open tasks</span>,{' '}
+            <p className="text-sm text-muted mt-2">
+              Your team has <span className="font-semibold text-ink">{tasks.open} open tasks</span>,{' '}
               <span
                 className={
                   tasks.overdue > 0
                     ? 'font-semibold text-red-600 dark:text-red-400'
-                    : 'font-semibold text-foreground'
+                    : 'font-semibold text-ink'
                 }
               >
                 {tasks.overdue} overdue
@@ -135,7 +132,7 @@ export function ManagerDashboard() {
                 className={
                   tasks.due_today > 0
                     ? 'font-semibold text-amber-700 dark:text-amber-300'
-                    : 'font-semibold text-foreground'
+                    : 'font-semibold text-ink'
                 }
               >
                 {tasks.due_today} due today
@@ -143,19 +140,19 @@ export function ManagerDashboard() {
               .
             </p>
           ) : (
-            <p className="text-sm text-muted-foreground mt-2">Welcome to your control center.</p>
+            <p className="text-sm text-muted mt-2">Welcome to your control center.</p>
           )}
         </div>
         <div className="flex items-center gap-2">
           <Link
             to="/jobs"
-            className="bg-card border border-border rounded-lg px-3 py-1.5 text-sm hover:bg-muted inline-flex items-center gap-1.5"
+            className="bg-surface border border-border rounded-lg px-3 py-1.5 text-sm hover:bg-hover inline-flex items-center gap-1.5"
           >
-            <span className="text-muted-foreground">↻</span> Manage jobs
+            <span className="text-muted">↻</span> Manage jobs
           </Link>
           <Link
             to="/tasks"
-            className="bg-foreground text-background rounded-lg px-3 py-1.5 text-sm hover:opacity-90 inline-flex items-center gap-1.5"
+            className="bg-ink text-bg rounded-lg px-3 py-1.5 text-sm hover:opacity-90 inline-flex items-center gap-1.5"
           >
             <span>+</span> New task
           </Link>
@@ -211,9 +208,9 @@ export function ManagerDashboard() {
             accent="slate"
             hint={
               tasks ? (
-                <span className="text-muted-foreground">{tasks.total} total</span>
+                <span className="text-muted">{tasks.total} total</span>
               ) : (
-                <span className="text-muted-foreground">Run tasks migration</span>
+                <span className="text-muted">Run tasks migration</span>
               )
             }
           />
@@ -239,9 +236,7 @@ export function ManagerDashboard() {
             accent="amber"
             hint={
               summary ? (
-                <span className="text-muted-foreground">
-                  across {summary.recruiters_count} recruiters
-                </span>
+                <span className="text-muted">across {summary.recruiters_count} recruiters</span>
               ) : null
             }
           />
@@ -257,23 +252,23 @@ export function ManagerDashboard() {
       {/* Tasks by status + by priority */}
       {tasks && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-          <div className="lg:col-span-2 bg-card border border-border rounded-xl p-5">
+          <div className="lg:col-span-2 bg-surface border border-border rounded-xl p-5">
             <div className="flex items-center justify-between mb-1">
-              <h3 className="font-semibold text-foreground">Tasks by status</h3>
-              <span className="text-xs text-muted-foreground">across team</span>
+              <h3 className="font-semibold text-ink">Tasks by status</h3>
+              <span className="text-xs text-muted">across team</span>
             </div>
-            <p className="text-xs text-muted-foreground mb-4">Last 30 days</p>
+            <p className="text-xs text-muted mb-4">Last 30 days</p>
             <StackedBar metrics={tasks} />
             <div className="grid grid-cols-3 md:grid-cols-7 gap-3 mt-4">
               {TASK_STATUSES.map((s) => (
                 <div key={s} className="text-sm">
                   <div className="flex items-center gap-1.5">
                     <span className={`w-2 h-2 rounded-full ${STATUS_DOT_COLOR[s]}`} />
-                    <span className="text-[11px] text-muted-foreground uppercase tracking-wide">
+                    <span className="text-[11px] text-muted uppercase tracking-wide">
                       {TASK_STATUS_LABEL[s]}
                     </span>
                   </div>
-                  <div className="text-lg font-semibold mt-0.5 tabular-nums text-foreground">
+                  <div className="text-lg font-semibold mt-0.5 tabular-nums text-ink">
                     {tasks.by_status[s] ?? 0}
                   </div>
                 </div>
@@ -281,10 +276,10 @@ export function ManagerDashboard() {
             </div>
           </div>
 
-          <div className="bg-card border border-border rounded-xl p-5">
+          <div className="bg-surface border border-border rounded-xl p-5">
             <div>
-              <h3 className="font-semibold text-foreground">By priority</h3>
-              <p className="text-xs text-muted-foreground mb-4">All tasks</p>
+              <h3 className="font-semibold text-ink">By priority</h3>
+              <p className="text-xs text-muted mb-4">All tasks</p>
             </div>
             <div className="space-y-3">
               {TASK_PRIORITIES.slice()
@@ -298,13 +293,11 @@ export function ManagerDashboard() {
                       <div className="flex items-center justify-between text-sm mb-1">
                         <span className="inline-flex items-center gap-1.5">
                           <span className={`w-2 h-2 rounded-full ${PRIORITY_COLOR[p]}`} />
-                          <span className="text-foreground">
-                            {p.charAt(0) + p.slice(1).toLowerCase()}
-                          </span>
+                          <span className="text-ink">{p.charAt(0) + p.slice(1).toLowerCase()}</span>
                         </span>
-                        <span className="text-foreground font-medium tabular-nums">{count}</span>
+                        <span className="text-ink font-medium tabular-nums">{count}</span>
                       </div>
-                      <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                      <div className="h-1.5 bg-hover rounded-full overflow-hidden">
                         <div
                           className={`h-full ${PRIORITY_COLOR[p]}`}
                           style={{ width: `${pct}%` }}
@@ -341,25 +334,21 @@ export function ManagerDashboard() {
       )}
 
       {summary && (
-        <div className="bg-card border border-border rounded-xl p-5">
+        <div className="bg-surface border border-border rounded-xl p-5">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold text-foreground">Applications by status</h3>
-            <span className="text-xs text-muted-foreground">last 7 days</span>
+            <h3 className="font-semibold text-ink">Applications by status</h3>
+            <span className="text-xs text-muted">last 7 days</span>
           </div>
           {Object.keys(summary.applications_by_status).length === 0 ? (
-            <p className="text-sm text-muted-foreground italic">
-              No applications in the last 7 days.
-            </p>
+            <p className="text-sm text-muted italic">No applications in the last 7 days.</p>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
               {Object.entries(summary.applications_by_status).map(([k, v]) => (
                 <div key={k} className="border border-border rounded-lg px-3 py-2.5">
-                  <div className="text-muted-foreground text-[10px] uppercase tracking-widest font-semibold">
+                  <div className="text-muted text-[10px] uppercase tracking-widest font-semibold">
                     {k.replace(/_/g, ' ')}
                   </div>
-                  <div className="text-2xl font-semibold tabular-nums text-foreground mt-0.5">
-                    {v}
-                  </div>
+                  <div className="text-2xl font-semibold tabular-nums text-ink mt-0.5">{v}</div>
                 </div>
               ))}
             </div>
@@ -380,8 +369,8 @@ function QuickActions({ hasJobs, hasTasks }: { hasJobs: boolean; hasTasks: boole
       <div className="text-[10px] font-semibold tracking-widest text-brand-700 uppercase mb-1">
         First steps
       </div>
-      <h3 className="text-lg font-semibold text-foreground">Set up your workspace</h3>
-      <p className="text-sm text-muted-foreground mt-1 mb-4">
+      <h3 className="text-lg font-semibold text-ink">Set up your workspace</h3>
+      <p className="text-sm text-muted mt-1 mb-4">
         A few one-click actions to get the rest of the portal populated.
       </p>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -429,17 +418,17 @@ function QuickActionCard({
   return (
     <Link
       to={to}
-      className="block bg-card rounded-lg border border-border p-3 hover:border-border hover:shadow-sm transition"
+      className="block bg-surface rounded-lg border border-border p-3 hover:border-border hover:shadow-sm transition"
     >
       <div className="flex items-start justify-between">
-        <div className="font-medium text-foreground text-sm">{title}</div>
+        <div className="font-medium text-ink text-sm">{title}</div>
         {done && (
           <span className="text-[10px] text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-100 dark:border-emerald-500/20 px-1.5 py-0.5 rounded">
             Done
           </span>
         )}
       </div>
-      <p className="text-xs text-muted-foreground mt-1">{desc}</p>
+      <p className="text-xs text-muted mt-1">{desc}</p>
       <div className="text-xs text-brand-700 hover:underline mt-2">{cta}</div>
     </Link>
   );
@@ -447,9 +436,9 @@ function QuickActionCard({
 
 function StackedBar({ metrics }: { metrics: TaskMetrics }) {
   const total = TASK_STATUSES.reduce((s, k) => s + (metrics.by_status[k] ?? 0), 0);
-  if (total === 0) return <div className="h-2 bg-muted rounded-full" />;
+  if (total === 0) return <div className="h-2 bg-hover rounded-full" />;
   return (
-    <div className="h-2 rounded-full bg-muted overflow-hidden flex">
+    <div className="h-2 rounded-full bg-hover overflow-hidden flex">
       {TASK_STATUSES.map((s) => {
         const n = metrics.by_status[s] ?? 0;
         if (n === 0) return null;

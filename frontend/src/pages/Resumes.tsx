@@ -108,7 +108,7 @@ export function Resumes() {
         title="Resumes"
         description="Upload, version, and score consultant resumes. The 'current' version is what gets submitted."
       />
-      <div className="bg-card border border-border rounded-xl p-4 mb-4 flex flex-wrap items-end gap-3">
+      <div className="bg-surface border border-border rounded-xl p-4 mb-4 flex flex-wrap items-end gap-3">
         <div className="flex-1 min-w-[220px]">
           <SelectInput
             label="Consultant"
@@ -141,7 +141,7 @@ export function Resumes() {
             key: 'version',
             header: 'V',
             render: (r: any) => (
-              <span className="text-[11px] font-mono bg-muted text-foreground px-1.5 py-0.5 rounded">
+              <span className="text-[11px] font-mono bg-hover text-ink px-1.5 py-0.5 rounded">
                 v{r.version}
               </span>
             ),
@@ -162,7 +162,7 @@ export function Resumes() {
                   Current
                 </span>
               ) : (
-                <span className="text-muted-foreground text-xs">—</span>
+                <span className="text-muted text-xs">—</span>
               ),
           },
           {

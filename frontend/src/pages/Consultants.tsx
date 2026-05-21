@@ -148,15 +148,15 @@ export function Consultants() {
               c.user?.id ? (
                 <Link
                   to={`/users/${c.user.id}`}
-                  className="inline-flex items-center gap-2 hover:bg-muted rounded-md -mx-1 px-1 py-0.5"
+                  className="inline-flex items-center gap-2 hover:bg-hover rounded-md -mx-1 px-1 py-0.5"
                 >
                   <Avatar name={c.user?.full_name} email={c.user?.email} size={26} />
                   <div className="leading-tight">
-                    <div className="text-sm font-medium text-foreground hover:underline">
+                    <div className="text-sm font-medium text-ink hover:underline">
                       {c.user?.full_name ?? c.user?.email ?? '—'}
                     </div>
                     {c.current_location && (
-                      <div className="text-[11px] text-muted-foreground">{c.current_location}</div>
+                      <div className="text-[11px] text-muted">{c.current_location}</div>
                     )}
                   </div>
                 </Link>
@@ -164,11 +164,11 @@ export function Consultants() {
                 <div className="inline-flex items-center gap-2">
                   <Avatar name={c.user?.full_name} email={c.user?.email} size={26} />
                   <div className="leading-tight">
-                    <div className="text-sm font-medium text-foreground">
+                    <div className="text-sm font-medium text-ink">
                       {c.user?.full_name ?? c.user?.email ?? '—'}
                     </div>
                     {c.current_location && (
-                      <div className="text-[11px] text-muted-foreground">{c.current_location}</div>
+                      <div className="text-[11px] text-muted">{c.current_location}</div>
                     )}
                   </div>
                 </div>
@@ -198,16 +198,16 @@ export function Consultants() {
                     size={20}
                   />
                   <div className="leading-tight">
-                    <div className="text-sm text-foreground">
+                    <div className="text-sm text-ink">
                       {c.recruiter.user?.full_name ?? c.recruiter.user?.email ?? '—'}
                     </div>
                     {c.recruiter.team && (
-                      <div className="text-[11px] text-muted-foreground">{c.recruiter.team}</div>
+                      <div className="text-[11px] text-muted">{c.recruiter.team}</div>
                     )}
                   </div>
                 </div>
               ) : (
-                <span className="text-xs italic text-muted-foreground">Unassigned</span>
+                <span className="text-xs italic text-muted">Unassigned</span>
               ),
           },
           {
@@ -271,9 +271,9 @@ export function Consultants() {
       >
         <div className="space-y-3">
           {picked?.recruiter && (
-            <div className="text-xs text-muted-foreground">
+            <div className="text-xs text-muted">
               Currently assigned to{' '}
-              <span className="font-medium text-foreground">
+              <span className="font-medium text-ink">
                 {picked.recruiter.user?.full_name ?? picked.recruiter.user?.email}
               </span>
               .

@@ -38,19 +38,17 @@ export function Login() {
   }
 
   return (
-    <div className="min-h-dvh bg-muted flex items-center justify-center p-4 sm:p-6">
+    <div className="min-h-dvh bg-hover flex items-center justify-center p-4 sm:p-6">
       <div className="w-full max-w-sm animate-fade-in-up">
         <div className="flex justify-center mb-6">
           <Brand size="lg" />
         </div>
 
-        <div className="bg-card rounded-2xl border border-border shadow-sm p-7">
+        <div className="bg-surface rounded-2xl border border-border shadow-sm p-7">
           <form onSubmit={signinForm.handleSubmit(onSignIn)} className="space-y-4">
             <div>
-              <h1 className="text-xl font-semibold tracking-tight text-foreground">Sign in</h1>
-              <p className="text-sm text-muted-foreground mt-1">
-                Use your work email and password.
-              </p>
+              <h1 className="text-xl font-semibold tracking-tight text-ink">Sign in</h1>
+              <p className="text-sm text-muted mt-1">Use your work email and password.</p>
             </div>
 
             <FormInput
@@ -71,7 +69,7 @@ export function Login() {
 
             <button
               disabled={busy}
-              className="w-full bg-foreground hover:opacity-90 disabled:opacity-50 text-background rounded-lg py-2.5 text-sm font-medium press"
+              className="w-full bg-ink hover:opacity-90 disabled:opacity-50 text-bg rounded-lg py-2.5 text-sm font-medium press"
             >
               {busy ? 'Signing in…' : 'Sign in'}
             </button>
@@ -80,7 +78,7 @@ export function Login() {
               <Link to="/forgot-password" className="text-brand-700 hover:underline">
                 Forgot password?
               </Link>
-              <span className="text-muted-foreground">Need an account? Ask an admin.</span>
+              <span className="text-muted">Need an account? Ask an admin.</span>
             </div>
           </form>
         </div>

@@ -123,10 +123,8 @@ export function FeatureFlags() {
       crumbs={[{ label: 'Workspace', to: '/dashboard' }, { label: 'Admin' }, { label: 'Features' }]}
     >
       <div className="max-w-5xl">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground mb-1">
-          Feature flags
-        </h1>
-        <p className="text-sm text-muted-foreground mb-6">
+        <h1 className="text-2xl font-semibold tracking-tight text-ink mb-1">Feature flags</h1>
+        <p className="text-sm text-muted mb-6">
           Toggle modules across the entire workspace. Changes apply on next page load for users
           (sidebar refreshes automatically). Per-group overrides below let you enable or disable a
           feature for a specific user group without affecting everyone else.
@@ -135,21 +133,21 @@ export function FeatureFlags() {
         {loading ? (
           <SkeletonCard lines={5} />
         ) : rows.length === 0 ? (
-          <div className="bg-card border border-amber-200 dark:border-amber-500/30 rounded-xl p-5 text-sm text-amber-900">
+          <div className="bg-surface border border-amber-200 dark:border-amber-500/30 rounded-xl p-5 text-sm text-amber-900">
             No feature flags exist yet. Run{' '}
             <span className="font-mono">database/feature-flags.sql</span> against your database to
             seed the table.
           </div>
         ) : (
-          <div className="bg-card border border-border rounded-xl divide-y divide-border">
+          <div className="bg-surface border border-border rounded-xl divide-y divide-border">
             {rows.map((r) => (
               <div key={r.key} className="px-5 py-4 flex items-start justify-between gap-4">
                 <div className="min-w-0">
-                  <div className="text-sm font-medium text-foreground">{prettyKey(r.key)}</div>
+                  <div className="text-sm font-medium text-ink">{prettyKey(r.key)}</div>
                   {r.description && (
-                    <div className="text-xs text-muted-foreground mt-0.5">{r.description}</div>
+                    <div className="text-xs text-muted mt-0.5">{r.description}</div>
                   )}
-                  <div className="text-[10px] text-muted-foreground mt-1 font-mono">{r.key}</div>
+                  <div className="text-[10px] text-muted mt-1 font-mono">{r.key}</div>
                 </div>
                 <Toggle
                   on={r.enabled}
@@ -165,25 +163,25 @@ export function FeatureFlags() {
         {/* Per-group override matrix */}
         {!loading && rows.length > 0 && groups.length > 0 && (
           <div className="mt-10">
-            <h2 className="text-lg font-semibold tracking-tight text-foreground mb-1">
+            <h2 className="text-lg font-semibold tracking-tight text-ink mb-1">
               Per-group overrides
             </h2>
-            <p className="text-sm text-muted-foreground mb-3">
+            <p className="text-sm text-muted mb-3">
               Click a cell to cycle through <strong>inherit → enabled → disabled → inherit</strong>.
               "Inherit" means the cell follows whatever the global flag above is set to.
             </p>
-            <div className="bg-card border border-border rounded-xl overflow-hidden">
+            <div className="bg-surface border border-border rounded-xl overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="bg-muted border-b border-border">
+                  <thead className="bg-hover border-b border-border">
                     <tr>
-                      <th className="text-left text-[11px] uppercase tracking-widest text-muted-foreground font-semibold px-4 py-2.5">
+                      <th className="text-left text-[11px] uppercase tracking-widest text-muted font-semibold px-4 py-2.5">
                         Feature
                       </th>
                       {groups.map((g) => (
                         <th
                           key={g.id}
-                          className="text-center text-[11px] uppercase tracking-widest text-muted-foreground font-semibold px-3 py-2.5 whitespace-nowrap"
+                          className="text-center text-[11px] uppercase tracking-widest text-muted font-semibold px-3 py-2.5 whitespace-nowrap"
                         >
                           {g.name}
                         </th>
@@ -194,10 +192,8 @@ export function FeatureFlags() {
                     {rows.map((r) => (
                       <tr key={r.key}>
                         <td className="px-4 py-2.5">
-                          <div className="text-sm font-medium text-foreground">
-                            {prettyKey(r.key)}
-                          </div>
-                          <div className="text-[10px] font-mono text-muted-foreground">{r.key}</div>
+                          <div className="text-sm font-medium text-ink">{prettyKey(r.key)}</div>
+                          <div className="text-[10px] font-mono text-muted">{r.key}</div>
                         </td>
                         {groups.map((g) => {
                           const state = overrideFor(g.id, r.key);
@@ -239,7 +235,7 @@ function OverrideCell({
       ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30'
       : state === false
         ? 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300 border-red-200 dark:border-red-500/30'
-        : 'bg-muted text-muted-foreground border-border';
+        : 'bg-hover text-muted border-border';
   const label = state === true ? 'On' : state === false ? 'Off' : 'Inherit';
   return (
     <button
@@ -280,14 +276,14 @@ function Toggle({
       disabled={disabled}
       className={clsx(
         'inline-flex items-center gap-2 px-1 py-1 rounded-full transition disabled:opacity-50',
-        on ? 'bg-emerald-500' : 'bg-muted-foreground',
+        on ? 'bg-emerald-500' : 'bg-muted',
       )}
       style={{ width: 44 }}
       aria-label={label}
     >
       <span
         className={clsx(
-          'w-4 h-4 rounded-full bg-card shadow transition',
+          'w-4 h-4 rounded-full bg-surface shadow transition',
           on ? 'translate-x-5' : 'translate-x-0',
         )}
       />

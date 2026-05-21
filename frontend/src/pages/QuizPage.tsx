@@ -134,11 +134,9 @@ export function QuizPage() {
             </div>
             <div className="text-3xl font-bold mt-1">
               {score.correct} / {score.total}{' '}
-              <span className="text-base font-normal text-muted-foreground">
-                · {score.points} points
-              </span>
+              <span className="text-base font-normal text-muted">· {score.points} points</span>
             </div>
-            <div className="text-sm text-muted-foreground mt-1">
+            <div className="text-sm text-muted mt-1">
               {score.correct === score.total
                 ? 'Perfect score 🎉'
                 : score.correct / score.total >= 0.7
@@ -175,14 +173,14 @@ export function QuizPage() {
           <div className="mt-5 flex justify-between">
             <button
               onClick={() => nav(-1)}
-              className="border border-border text-foreground text-sm px-4 py-2 rounded-lg hover:bg-muted"
+              className="border border-border text-ink text-sm px-4 py-2 rounded-lg hover:bg-hover"
             >
               Back
             </button>
             <button
               onClick={submit}
               disabled={submitting}
-              className="bg-foreground text-background text-sm font-semibold px-5 py-2 rounded-lg hover:opacity-90 disabled:opacity-50"
+              className="bg-ink text-bg text-sm font-semibold px-5 py-2 rounded-lg hover:opacity-90 disabled:opacity-50"
             >
               {submitting
                 ? 'Submitting…'
@@ -194,7 +192,7 @@ export function QuizPage() {
           <div className="mt-5 flex justify-end">
             <button
               onClick={() => nav(`/training/assignments/${id}`)}
-              className="bg-foreground text-background text-sm font-semibold px-5 py-2 rounded-lg hover:opacity-90"
+              className="bg-ink text-bg text-sm font-semibold px-5 py-2 rounded-lg hover:opacity-90"
             >
               Back to course
             </button>

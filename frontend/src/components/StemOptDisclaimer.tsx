@@ -8,10 +8,10 @@
  */
 export function StemOptDisclaimer() {
   return (
-    <div className="mt-8 border border-border bg-muted rounded-xl px-4 py-3 text-xs text-muted-foreground">
-      <span className="font-semibold text-foreground">Disclaimer:</span> This training record is
-      intended to support internal training documentation. Please consult immigration counsel for
-      official STEM OPT compliance requirements.
+    <div className="mt-8 border border-border bg-hover rounded-xl px-4 py-3 text-xs text-muted">
+      <span className="font-semibold text-ink">Disclaimer:</span> This training record is intended
+      to support internal training documentation. Please consult immigration counsel for official
+      STEM OPT compliance requirements.
     </div>
   );
 }

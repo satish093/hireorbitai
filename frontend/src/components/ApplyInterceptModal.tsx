@@ -91,17 +91,12 @@ export function ApplyInterceptModal({
       onClick={onClose}
     >
       <div
-        className="bg-card rounded-2xl shadow-xl w-full max-w-md overflow-hidden"
+        className="bg-surface rounded-2xl shadow-xl w-full max-w-md overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-5 py-4 flex items-center justify-between border-b border-border">
-          <h2 className="text-base font-semibold text-foreground">
-            Customize Your Resume in 10 seconds
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-muted-foreground hover:text-foreground text-xl leading-none"
-          >
+          <h2 className="text-base font-semibold text-ink">Customize Your Resume in 10 seconds</h2>
+          <button onClick={onClose} className="text-muted hover:text-ink text-xl leading-none">
             ×
           </button>
         </div>
@@ -112,7 +107,7 @@ export function ApplyInterceptModal({
             <span className="text-lg leading-none">
               {score10 >= 7 ? '🙂' : score10 >= 5 ? '😐' : '😕'}
             </span>
-            <p className="text-sm font-semibold text-foreground leading-snug">
+            <p className="text-sm font-semibold text-ink leading-snug">
               {score10 >= 7
                 ? 'Your resume is on the right track, but a few keywords are still missing'
                 : score10 >= 5
@@ -125,8 +120,8 @@ export function ApplyInterceptModal({
           <div className="border border-border rounded-xl p-4 flex items-start gap-3">
             <Avatar name={company} size={40} />
             <div className="flex-1 min-w-0">
-              <div className="text-xs text-muted-foreground truncate">{company}</div>
-              <div className="text-sm font-semibold text-foreground leading-snug truncate">
+              <div className="text-xs text-muted truncate">{company}</div>
+              <div className="text-sm font-semibold text-ink leading-snug truncate">
                 {job.title}
               </div>
             </div>
@@ -136,7 +131,7 @@ export function ApplyInterceptModal({
           {/* Missing skills */}
           {missing.length > 0 ? (
             <div>
-              <p className="text-sm text-foreground mb-2">
+              <p className="text-sm text-ink mb-2">
                 Missing <span className="font-semibold">{missing.length}</span> key skill
                 {missing.length === 1 ? '' : 's'}
                 {missing.length >= 5 ? ' & bullet point alignment' : ''}
@@ -151,7 +146,7 @@ export function ApplyInterceptModal({
                   </span>
                 ))}
                 {missing.length > 8 && (
-                  <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-muted text-foreground">
+                  <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-hover text-ink">
                     +{missing.length - 8}
                   </span>
                 )}
@@ -167,19 +162,19 @@ export function ApplyInterceptModal({
           {/* CTAs */}
           <button
             onClick={handleCustomize}
-            className="w-full bg-emerald-400 hover:bg-emerald-500 text-foreground font-semibold text-sm py-3 rounded-xl transition"
+            className="w-full bg-emerald-400 hover:bg-emerald-500 text-ink font-semibold text-sm py-3 rounded-xl transition"
           >
             ✦ Fix My Resume &amp; Apply
           </button>
 
           <button
             onClick={handleApply}
-            className="w-full text-sm text-foreground hover:text-foreground underline underline-offset-2"
+            className="w-full text-sm text-ink hover:text-ink underline underline-offset-2"
           >
             Apply Without Customizing
           </button>
 
-          <label className="flex items-center justify-center gap-2 text-xs text-muted-foreground select-none cursor-pointer">
+          <label className="flex items-center justify-center gap-2 text-xs text-muted select-none cursor-pointer">
             <input
               type="checkbox"
               checked={dontRemind}
@@ -259,9 +254,7 @@ function ScoreGauge({ value, tone }: { value: number; tone: 'good' | 'fair' | 'w
           {value.toFixed(1)}
         </text>
       </svg>
-      <div className="text-[10px] font-semibold tracking-wider uppercase text-muted-foreground">
-        {label}
-      </div>
+      <div className="text-[10px] font-semibold tracking-wider uppercase text-muted">{label}</div>
     </div>
   );
 }

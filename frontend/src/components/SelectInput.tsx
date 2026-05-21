@@ -49,7 +49,7 @@ export const SelectInput = forwardRef<HTMLSelectElement, Props>(function SelectI
         </select>
         <svg
           aria-hidden="true"
-          className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground"
+          className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted"
           viewBox="0 0 20 20"
           fill="currentColor"
         >

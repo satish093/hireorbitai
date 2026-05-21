@@ -43,7 +43,7 @@ export function PriorityBadge({ priority }: { priority: TaskPriority }) {
 // ---- Status ----------------------------------------------------------------
 
 const STATUS_TONE: Record<TaskStatus, PillTone> = {
-  BACKLOG: { bg: 'bg-muted', text: 'text-foreground', dot: 'bg-muted-foreground' },
+  BACKLOG: { bg: 'bg-hover', text: 'text-ink', dot: 'bg-muted' },
   TODO: {
     bg: 'bg-blue-50 dark:bg-blue-500/15',
     text: 'text-blue-700 dark:text-blue-300',
@@ -69,7 +69,7 @@ const STATUS_TONE: Record<TaskStatus, PillTone> = {
     text: 'text-emerald-700 dark:text-emerald-300',
     dot: 'bg-emerald-500',
   },
-  CANCELLED: { bg: 'bg-muted', text: 'text-muted-foreground', dot: 'bg-muted-foreground' },
+  CANCELLED: { bg: 'bg-hover', text: 'text-muted', dot: 'bg-muted' },
 };
 
 const STATUS_LABELS: Record<TaskStatus, string> = {
@@ -115,14 +115,14 @@ const DUE_OVERDUE: PillTone = {
   dot: 'bg-red-500',
 };
 const DUE_NORMAL: PillTone = {
-  bg: 'bg-muted',
-  text: 'text-foreground',
-  dot: 'bg-muted-foreground',
+  bg: 'bg-hover',
+  text: 'text-ink',
+  dot: 'bg-muted',
 };
 
 export function DuePill({ task }: { task: Task }) {
   if (!task.due_at) {
-    return <span className="text-xs text-muted-foreground">No due date</span>;
+    return <span className="text-xs text-muted">No due date</span>;
   }
   const overdue = isOverdue(task);
   const due = new Date(task.due_at);
@@ -187,10 +187,10 @@ export function Avatar({
 
 export function AssigneeChip({ task }: { task: Task }) {
   if (!task.assignee) {
-    return <span className="text-xs text-muted-foreground italic">Unassigned</span>;
+    return <span className="text-xs text-muted italic">Unassigned</span>;
   }
   return (
-    <span className="inline-flex items-center gap-1.5 text-xs text-foreground">
+    <span className="inline-flex items-center gap-1.5 text-xs text-ink">
       <GroupBadge groupId={task.assignee.group_id ?? null} compact hideEmpty />
       <Avatar name={task.assignee.full_name} email={task.assignee.email} size={20} />
       <span className="truncate max-w-[110px]">

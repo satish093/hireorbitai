@@ -538,11 +538,9 @@ export function JobSearch() {
               ? `${totalRows.toLocaleString()} live openings`
               : 'Search thousands of live openings'}
           </p>
-          <div className="mt-4 flex flex-col sm:flex-row gap-2 bg-card rounded-xl p-2 shadow-lg max-w-2xl">
+          <div className="mt-4 flex flex-col sm:flex-row gap-2 bg-surface rounded-xl p-2 shadow-lg max-w-2xl">
             <div className="relative flex-1 min-w-0">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                ⌕
-              </span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted">⌕</span>
               <input
                 type="text"
                 value={q}
@@ -551,12 +549,12 @@ export function JobSearch() {
                   if (e.key === 'Enter') load();
                 }}
                 placeholder="Job title, company, or skill"
-                className="w-full h-10 pl-9 pr-3 rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
+                className="w-full h-10 pl-9 pr-3 rounded-lg text-sm text-ink placeholder:text-muted focus:outline-none"
               />
             </div>
             <button
               onClick={() => load()}
-              className="h-10 px-6 rounded-lg bg-foreground text-background text-sm font-medium hover:opacity-90 press shrink-0"
+              className="h-10 px-6 rounded-lg bg-ink text-bg text-sm font-medium hover:opacity-90 press shrink-0"
             >
               Search
             </button>
@@ -579,8 +577,8 @@ export function JobSearch() {
               className={clsx(
                 'pb-1.5 text-sm border-b-2 transition',
                 tab === t.key
-                  ? 'border-foreground text-foreground font-semibold'
-                  : 'border-transparent text-muted-foreground hover:text-foreground',
+                  ? 'border-ink text-ink font-semibold'
+                  : 'border-transparent text-muted hover:text-ink',
               )}
             >
               {t.label}
@@ -591,7 +589,7 @@ export function JobSearch() {
           <div className="ml-auto flex items-center gap-2">
             <button
               onClick={() => setSourcesOpen(true)}
-              className="border border-border bg-card rounded-full px-3 py-1.5 text-sm hover:bg-muted"
+              className="border border-border bg-surface rounded-full px-3 py-1.5 text-sm hover:bg-hover"
               title="Manage live job sources"
             >
               Sources
@@ -607,7 +605,7 @@ export function JobSearch() {
             <button
               onClick={syncNow}
               disabled={syncing}
-              className="bg-foreground text-background rounded-full px-3 py-1.5 text-sm hover:opacity-90 disabled:opacity-50 inline-flex items-center gap-1.5"
+              className="bg-ink text-bg rounded-full px-3 py-1.5 text-sm hover:opacity-90 disabled:opacity-50 inline-flex items-center gap-1.5"
               title="Pull fresh jobs from all sources"
             >
               <span className={syncing ? 'inline-block animate-spin' : ''}>↻</span>
@@ -746,7 +744,7 @@ export function JobSearch() {
           />
           <button
             onClick={() => load()}
-            className="ml-1 bg-foreground text-background text-sm px-4 py-1.5 rounded-full hover:opacity-90"
+            className="ml-1 bg-ink text-bg text-sm px-4 py-1.5 rounded-full hover:opacity-90"
           >
             Apply
           </button>
@@ -761,7 +759,7 @@ export function JobSearch() {
               setPublisherFilter('');
               setJobFunction('');
             }}
-            className="text-xs text-muted-foreground hover:text-foreground ml-1"
+            className="text-xs text-muted hover:text-ink ml-1"
           >
             Reset
           </button>
@@ -810,7 +808,7 @@ export function JobSearch() {
         return (
           <div className="space-y-3">
             {tab === 'recommended' && totalRows > 0 && (
-              <div className="text-xs text-muted-foreground px-1">
+              <div className="text-xs text-muted px-1">
                 Showing {filtered.length} of {totalRows.toLocaleString()} jobs
               </div>
             )}
@@ -848,7 +846,7 @@ export function JobSearch() {
             ))}
             {/* Infinite scroll sentinel — entering view loads the next page. */}
             {tab === 'recommended' && page < totalPages && (
-              <div ref={loadMoreRef} className="py-6 text-center text-xs text-muted-foreground">
+              <div ref={loadMoreRef} className="py-6 text-center text-xs text-muted">
                 {loading ? 'Loading more…' : 'Scroll for more'}
               </div>
             )}
@@ -983,12 +981,12 @@ function PillSelect({
   placeholder?: string;
 }) {
   return (
-    <label className="inline-flex items-center gap-1.5 border border-border bg-card rounded-full pl-3 pr-1 py-1 text-sm text-foreground hover:bg-muted">
-      <span className="text-muted-foreground">{label}:</span>
+    <label className="inline-flex items-center gap-1.5 border border-border bg-surface rounded-full pl-3 pr-1 py-1 text-sm text-ink hover:bg-hover">
+      <span className="text-muted">{label}:</span>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="bg-transparent text-sm font-medium text-foreground outline-none pr-1"
+        className="bg-transparent text-sm font-medium text-ink outline-none pr-1"
       >
         {placeholder && !options.find((o) => o.value === '') && (
           <option value="">{placeholder}</option>
@@ -1010,12 +1008,12 @@ function EmptyState({ tab, onSync }: { tab: TabKey; onSync?: () => void }) {
     applied: "You haven't submitted to any jobs yet.",
   };
   return (
-    <div className="bg-card border border-border rounded-xl p-10 text-center text-muted-foreground">
+    <div className="bg-surface border border-border rounded-xl p-10 text-center text-muted">
       <div className="mb-3">{map[tab]}</div>
       {tab === 'recommended' && onSync && (
         <button
           onClick={onSync}
-          className="bg-foreground text-background text-sm px-4 py-2 rounded-full hover:opacity-90 inline-flex items-center gap-1.5"
+          className="bg-ink text-bg text-sm px-4 py-2 rounded-full hover:opacity-90 inline-flex items-center gap-1.5"
         >
           <span>↻</span> Sync jobs now
         </button>
@@ -1084,7 +1082,7 @@ function JobCard({
           onOpenInsight();
         }
       }}
-      className="bg-card border border-border rounded-xl flex overflow-hidden hover:border-border hover:shadow-md transition cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"
+      className="bg-surface border border-border rounded-xl flex overflow-hidden hover:border-border hover:shadow-md transition cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"
     >
       {/* Left: job content */}
       <div className="flex-1 p-5 min-w-0">
@@ -1092,7 +1090,7 @@ function JobCard({
           <Avatar name={companyName} size={44} />
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1 flex-wrap">
-              <span className="text-xs text-muted-foreground">
+              <span className="text-xs text-muted">
                 {relative(job.posted_at ?? job.created_at)}
               </span>
               {isEarly(job.posted_at ?? job.created_at) && (
@@ -1129,14 +1127,14 @@ function JobCard({
               className="text-left group"
               title="View full requirements + match insight"
             >
-              <h3 className="text-lg font-semibold text-foreground leading-tight group-hover:text-brand-700 transition-colors">
+              <h3 className="text-lg font-semibold text-ink leading-tight group-hover:text-brand-700 transition-colors">
                 {job.title}
               </h3>
             </button>
-            <div className="text-sm text-muted-foreground mt-0.5">
+            <div className="text-sm text-muted mt-0.5">
               <span className="font-medium">{companyName}</span>
               {job.client && job.client.company_name !== companyName && (
-                <span className="text-muted-foreground"> · {job.client.company_name}</span>
+                <span className="text-muted"> · {job.client.company_name}</span>
               )}
             </div>
           </div>
@@ -1151,7 +1149,7 @@ function JobCard({
               'shrink-0 w-9 h-9 rounded-full border flex items-center justify-center',
               job.liked
                 ? 'bg-brand-50 border-brand-200 text-brand-600'
-                : 'bg-card border-border text-muted-foreground hover:text-brand-600 hover:border-brand-200',
+                : 'bg-surface border-border text-muted hover:text-brand-600 hover:border-brand-200',
             )}
           >
             {job.liked ? '🔖' : '🔖'}
@@ -1189,7 +1187,7 @@ function JobCard({
             Strips HTML tags, caps at 200 chars. Hidden when expanded so the
             expanded responsibilities + skills sections take over. */}
         {!expanded && job.description && (
-          <p className="mt-3 text-sm text-muted-foreground leading-snug line-clamp-2">
+          <p className="mt-3 text-sm text-muted leading-snug line-clamp-2">
             {job.description
               .replace(/<[^>]+>/g, ' ')
               .replace(/\s+/g, ' ')
@@ -1210,13 +1208,13 @@ function JobCard({
             {requiredSkills.slice(0, 6).map((s) => (
               <span
                 key={s}
-                className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-muted text-foreground"
+                className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-hover text-ink"
               >
                 {s}
               </span>
             ))}
             {requiredSkills.length > 6 && (
-              <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">
+              <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-hover text-muted border border-border">
                 +{requiredSkills.length - 6} more
               </span>
             )}
@@ -1235,13 +1233,13 @@ function JobCard({
           <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-5">
             {responsibilities.length > 0 && (
               <div>
-                <div className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase mb-1.5">
+                <div className="text-[10px] font-semibold tracking-widest text-muted uppercase mb-1.5">
                   Core responsibilities
                 </div>
-                <ul className="space-y-1 text-sm text-foreground">
+                <ul className="space-y-1 text-sm text-ink">
                   {responsibilities.slice(0, 6).map((b, i) => (
                     <li key={i} className="flex items-start gap-1.5">
-                      <span className="text-muted-foreground">•</span>
+                      <span className="text-muted">•</span>
                       <span>{b}</span>
                     </li>
                   ))}
@@ -1250,13 +1248,13 @@ function JobCard({
             )}
             {skillSummaries.length > 0 && (
               <div>
-                <div className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase mb-1.5">
+                <div className="text-[10px] font-semibold tracking-widest text-muted uppercase mb-1.5">
                   Skill requirements
                 </div>
-                <ul className="space-y-1 text-sm text-foreground">
+                <ul className="space-y-1 text-sm text-ink">
                   {skillSummaries.slice(0, 6).map((b, i) => (
                     <li key={i} className="flex items-start gap-1.5">
-                      <span className="text-muted-foreground">•</span>
+                      <span className="text-muted">•</span>
                       <span>{b}</span>
                     </li>
                   ))}
@@ -1265,10 +1263,10 @@ function JobCard({
             )}
             {highlights.length > 0 && (
               <div>
-                <div className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase mb-1.5">
+                <div className="text-[10px] font-semibold tracking-widest text-muted uppercase mb-1.5">
                   Why it might fit
                 </div>
-                <ul className="space-y-1 text-sm text-foreground">
+                <ul className="space-y-1 text-sm text-ink">
                   {highlights.slice(0, 4).map((b, i) => (
                     <li key={i} className="flex items-start gap-1.5">
                       <span className="text-sky-500">★</span>
@@ -1280,10 +1278,10 @@ function JobCard({
             )}
             {benefits.length > 0 && (
               <div>
-                <div className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase mb-1.5">
+                <div className="text-[10px] font-semibold tracking-widest text-muted uppercase mb-1.5">
                   Benefits
                 </div>
-                <ul className="space-y-1 text-sm text-foreground">
+                <ul className="space-y-1 text-sm text-ink">
                   {benefits.slice(0, 4).map((b, i) => (
                     <li key={i} className="flex items-start gap-1.5">
                       <span className="text-emerald-500">+</span>
@@ -1298,7 +1296,7 @@ function JobCard({
 
         {/* Applied-on caption (only on the Applied tab). */}
         {job.applied_at && (
-          <div className="mt-3 text-xs text-muted-foreground">
+          <div className="mt-3 text-xs text-muted">
             Applied on{' '}
             {new Date(job.applied_at).toLocaleDateString(undefined, {
               year: 'numeric',
@@ -1321,7 +1319,7 @@ function JobCard({
                 e.stopPropagation();
                 onApply();
               }}
-              className="inline-flex items-center gap-1.5 bg-foreground text-background text-sm px-4 py-2 rounded-lg hover:opacity-90"
+              className="inline-flex items-center gap-1.5 bg-ink text-bg text-sm px-4 py-2 rounded-lg hover:opacity-90"
             >
               Apply on company site <span>↗</span>
             </button>
@@ -1350,7 +1348,7 @@ function JobCard({
                   e.stopPropagation();
                   setExpanded((v) => !v);
                 }}
-                className="text-xs text-muted-foreground hover:text-foreground"
+                className="text-xs text-muted hover:text-ink"
               >
                 {expanded ? 'Show less ▴' : 'Show details ▾'}
               </button>
@@ -1407,8 +1405,8 @@ function JobCard({
 
 function MetaItem({ icon, label }: { icon: string; label: string }) {
   return (
-    <div className="inline-flex items-center gap-2 text-muted-foreground">
-      <span className="text-muted-foreground">{icon}</span>
+    <div className="inline-flex items-center gap-2 text-muted">
+      <span className="text-muted">{icon}</span>
       <span className="truncate">{label}</span>
     </div>
   );
@@ -1483,7 +1481,7 @@ function MatchModeChip({ mode, isRecruiterMode }: { mode: string; isRecruiterMod
   }
   if (mode === 'no-signal') {
     return (
-      <span className="inline-flex items-center gap-2 bg-muted border border-border text-foreground rounded-full px-3 py-1 text-xs font-medium">
+      <span className="inline-flex items-center gap-2 bg-hover border border-border text-ink rounded-full px-3 py-1 text-xs font-medium">
         <span aria-hidden="true">ℹ️</span>
         <span>Add skills to your profile for personalised matches.</span>
       </span>
@@ -1520,7 +1518,7 @@ function SalaryPill({ min, max }: { min?: number | null; max?: number | null }) 
  */
 function HighlightTagChip({ tag }: { tag: string }) {
   const t = tag.toLowerCase();
-  let tone = 'bg-muted text-foreground border-border';
+  let tone = 'bg-hover text-ink border-border';
   let label = tag;
   if (/(no sponsor|no h1b)/.test(t)) {
     tone =
@@ -1652,15 +1650,15 @@ function AppliedSubTabs({
           className={clsx(
             'pb-2 text-sm flex items-center gap-1.5 border-b-2 transition -mb-px',
             active === t.key
-              ? 'border-foreground text-foreground font-semibold'
-              : 'border-transparent text-muted-foreground hover:text-foreground',
+              ? 'border-ink text-ink font-semibold'
+              : 'border-transparent text-muted hover:text-ink',
           )}
         >
           {t.label}
           <span
             className={clsx(
               'text-[10px] font-semibold tabular-nums rounded-full px-1.5 py-0.5',
-              active === t.key ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground',
+              active === t.key ? 'bg-ink text-bg' : 'bg-hover text-muted',
             )}
           >
             {counts[t.key]}
@@ -1688,7 +1686,7 @@ function StatusDropdown({
         : status === 'REJECTED'
           ? 'bg-rose-50 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-500/30'
           : status === 'ARCHIVED' || status === 'WITHDRAWN'
-            ? 'bg-muted text-muted-foreground border-border'
+            ? 'bg-hover text-muted border-border'
             : 'bg-amber-50 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-500/30';
   return (
     <select
@@ -1814,7 +1812,7 @@ function AlertsToggle() {
           className={clsx(
             // Fixed dark knob: this toggle lives on the always-indigo hero with
             // an always-white track, so the knob must stay dark in both themes
-            // (a token like bg-foreground would invert to light and vanish).
+            // (a token like bg-ink would invert to light and vanish).
             'block w-4 h-4 rounded-full bg-slate-900 transition-transform',
             on ? 'translate-x-4' : '',
           )}
@@ -1878,12 +1876,12 @@ function SkillsPicker({
   }
 
   return (
-    <div className="bg-card border border-border rounded-xl px-4 py-3 mb-3 flex items-center gap-2 flex-wrap">
-      <span className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">
+    <div className="bg-surface border border-border rounded-xl px-4 py-3 mb-3 flex items-center gap-2 flex-wrap">
+      <span className="text-[10px] font-semibold tracking-widest text-muted uppercase">
         My skills
       </span>
       {skills.length === 0 && (
-        <span className="text-xs text-muted-foreground italic">
+        <span className="text-xs text-muted italic">
           Add skills (React, Java, AWS, Python…) to tune recommendations.
         </span>
       )}
@@ -1899,12 +1897,12 @@ function SkillsPicker({
               if (e.key === 'Enter') commitEdit();
               else if (e.key === 'Escape') cancelEdit();
             }}
-            className="text-xs bg-card border border-brand-400 text-foreground font-medium rounded-full px-2.5 py-0.5 focus:outline-none focus:ring-2 focus:ring-brand-500/40 w-28"
+            className="text-xs bg-surface border border-brand-400 text-ink font-medium rounded-full px-2.5 py-0.5 focus:outline-none focus:ring-2 focus:ring-brand-500/40 w-28"
           />
         ) : (
           <span
             key={s}
-            className="inline-flex items-center gap-1 bg-muted text-foreground text-xs font-medium px-2 py-0.5 rounded-full"
+            className="inline-flex items-center gap-1 bg-hover text-ink text-xs font-medium px-2 py-0.5 rounded-full"
           >
             <button
               onClick={() => startEdit(i)}
@@ -1915,7 +1913,7 @@ function SkillsPicker({
             </button>
             <button
               onClick={() => remove(s)}
-              className="text-muted-foreground hover:text-red-500 text-sm leading-none"
+              className="text-muted hover:text-red-500 text-sm leading-none"
               title="Remove"
             >
               ×
@@ -1931,17 +1929,17 @@ function SkillsPicker({
             if (e.key === 'Enter') add();
           }}
           placeholder="Add skill…"
-          className="text-xs bg-muted border border-border rounded-full px-2.5 py-1 placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+          className="text-xs bg-hover border border-border rounded-full px-2.5 py-1 placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-brand-500/40"
         />
         <button
           onClick={add}
-          className="text-xs bg-foreground text-background px-2.5 py-1 rounded-full hover:opacity-90"
+          className="text-xs bg-ink text-bg px-2.5 py-1 rounded-full hover:opacity-90"
         >
           +
         </button>
         <button
           onClick={onRecompute}
-          className="text-xs text-muted-foreground hover:text-foreground ml-1"
+          className="text-xs text-muted hover:text-ink ml-1"
           title="Re-run AI ranking with these skills"
         >
           Recompute ⟳
@@ -1984,7 +1982,7 @@ const SOURCE_TONE: Record<string, string> = {
     'bg-sky-100 dark:bg-sky-500/20 text-sky-800 dark:text-sky-300 border-sky-200 dark:border-sky-500/30',
   monster:
     'bg-violet-100 dark:bg-violet-500/20 text-violet-800 dark:text-violet-300 border-violet-200 dark:border-violet-500/30',
-  manual: 'bg-muted text-foreground border-border',
+  manual: 'bg-hover text-ink border-border',
 };
 const SOURCE_LABEL: Record<string, string> = {
   remoteok: 'RemoteOK',
@@ -2021,8 +2019,8 @@ function SourceBreakdown({
   if (counts.size === 0) return null;
   const ordered = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
   return (
-    <div className="bg-card border border-border rounded-xl px-4 py-3 mb-4 flex items-center gap-2 flex-wrap">
-      <span className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">
+    <div className="bg-surface border border-border rounded-xl px-4 py-3 mb-4 flex items-center gap-2 flex-wrap">
+      <span className="text-[10px] font-semibold tracking-widest text-muted uppercase">
         By source
       </span>
       {ordered.map(([source, n]) => (
@@ -2032,24 +2030,21 @@ function SourceBreakdown({
           className={clsx(
             'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs transition',
             active === source
-              ? 'bg-foreground text-background border-foreground'
-              : (SOURCE_TONE[source] ?? 'bg-muted text-foreground border-border') +
-                  ' hover:opacity-80',
+              ? 'bg-ink text-bg border-ink'
+              : (SOURCE_TONE[source] ?? 'bg-hover text-ink border-border') + ' hover:opacity-80',
           )}
         >
           <span className="font-medium">{SOURCE_LABEL[source] ?? source}</span>
           <span className="tabular-nums opacity-90">{n}</span>
         </button>
       ))}
-      <span className="ml-auto text-xs text-muted-foreground tabular-nums">
-        {rows.length} total
-      </span>
+      <span className="ml-auto text-xs text-muted tabular-nums">{rows.length} total</span>
     </div>
   );
 }
 
 function SourceBadge({ source }: { source: string }) {
-  const tone = SOURCE_TONE[source] ?? 'bg-muted text-foreground border-border';
+  const tone = SOURCE_TONE[source] ?? 'bg-hover text-ink border-border';
   return (
     <span
       className={clsx(
@@ -2174,7 +2169,7 @@ function RecruiterTargetingBar({
           const c = consultants.find((x) => x.id === e.target.value) ?? null;
           pickConsultant(c);
         }}
-        className="text-sm bg-card border border-border rounded-md px-2 py-1 min-w-[200px]"
+        className="text-sm bg-surface border border-border rounded-md px-2 py-1 min-w-[200px]"
       >
         <option value="">— Select consultant —</option>
         {consultants.map((c) => (
@@ -2189,7 +2184,7 @@ function RecruiterTargetingBar({
           <select
             value={value.resumeId ?? ''}
             onChange={(e) => pickResume(e.target.value)}
-            className="text-sm bg-card border border-border rounded-md px-2 py-1 min-w-[180px]"
+            className="text-sm bg-surface border border-border rounded-md px-2 py-1 min-w-[180px]"
           >
             <option value="">— Select resume —</option>
             {resumes.map((r) => (
@@ -2199,12 +2194,12 @@ function RecruiterTargetingBar({
               </option>
             ))}
           </select>
-          <span className="text-xs text-muted-foreground">
+          <span className="text-xs text-muted">
             {value.skills.length} skill{value.skills.length === 1 ? '' : 's'} on file
           </span>
           <button
             onClick={() => pickConsultant(null)}
-            className="ml-auto text-xs text-muted-foreground hover:text-foreground"
+            className="ml-auto text-xs text-muted hover:text-ink"
           >
             Clear ×
           </button>
@@ -2233,11 +2228,11 @@ function ApplyConfirmModal({
       onClick={onClose}
     >
       <div
-        className="bg-card rounded-2xl shadow-xl w-full max-w-md p-6"
+        className="bg-surface rounded-2xl shadow-xl w-full max-w-md p-6"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="text-base font-semibold text-foreground mb-1">Did you apply?</h2>
-        <p className="text-sm text-muted-foreground mb-4">
+        <h2 className="text-base font-semibold text-ink mb-1">Did you apply?</h2>
+        <p className="text-sm text-muted mb-4">
           We just opened the apply page for <strong>{job.title}</strong>
           {job.company_name ? (
             <>
@@ -2250,7 +2245,7 @@ function ApplyConfirmModal({
         <div className="flex justify-end gap-2">
           <button
             onClick={() => onConfirm(false)}
-            className="border border-border text-foreground text-sm px-4 py-2 rounded-lg hover:bg-muted"
+            className="border border-border text-ink text-sm px-4 py-2 rounded-lg hover:bg-hover"
           >
             No, not yet
           </button>
@@ -2267,7 +2262,7 @@ function ApplyConfirmModal({
 }
 
 function PublisherBadge({ publisher }: { publisher: string }) {
-  const tone = PUBLISHER_TONE[publisher] ?? 'bg-muted text-foreground border-border';
+  const tone = PUBLISHER_TONE[publisher] ?? 'bg-hover text-ink border-border';
   return (
     <span
       className={clsx(
@@ -2404,32 +2399,29 @@ function SourcesDrawer({ onClose, onAfterSync }: { onClose: () => void; onAfterS
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/30 flex justify-end" onClick={onClose}>
       <div
-        className="bg-card w-full max-w-md h-full overflow-y-auto shadow-xl"
+        className="bg-surface w-full max-w-md h-full overflow-y-auto shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-5 py-4 border-b border-border flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-foreground">Live job sources</h2>
-            <p className="text-xs text-muted-foreground">
+            <h2 className="text-lg font-semibold text-ink">Live job sources</h2>
+            <p className="text-xs text-muted">
               Pull real-time listings from legitimate public APIs.
             </p>
           </div>
-          <button
-            onClick={onClose}
-            className="text-muted-foreground hover:text-foreground text-xl leading-none"
-          >
+          <button onClick={onClose} className="text-muted hover:text-ink text-xl leading-none">
             ×
           </button>
         </div>
 
         {/* Add new source */}
-        <div className="p-5 border-b border-border bg-muted">
-          <h3 className="text-sm font-semibold text-foreground mb-2">Add a company / feed</h3>
+        <div className="p-5 border-b border-border bg-hover">
+          <h3 className="text-sm font-semibold text-ink mb-2">Add a company / feed</h3>
           <div className="grid grid-cols-3 gap-2">
             <select
               value={newSource}
               onChange={(e) => setNewSource(e.target.value as any)}
-              className="border border-border rounded-lg px-2 py-1.5 text-sm bg-card"
+              className="border border-border rounded-lg px-2 py-1.5 text-sm bg-surface"
             >
               <option value="greenhouse">Greenhouse</option>
               <option value="lever">Lever</option>
@@ -2470,16 +2462,16 @@ function SourcesDrawer({ onClose, onAfterSync }: { onClose: () => void; onAfterS
                 newSource === 'remotive' ||
                 newSource === 'arbeitnow'
               }
-              className="border border-border rounded-lg px-2 py-1.5 text-sm col-span-1 disabled:bg-muted"
+              className="border border-border rounded-lg px-2 py-1.5 text-sm col-span-1 disabled:bg-hover"
             />
             <button
               onClick={add}
-              className="bg-foreground text-background text-sm px-3 py-1.5 rounded-lg hover:opacity-90"
+              className="bg-ink text-bg text-sm px-3 py-1.5 rounded-lg hover:opacity-90"
             >
               + Add
             </button>
           </div>
-          <p className="text-[11px] text-muted-foreground mt-2">
+          <p className="text-[11px] text-muted mt-2">
             Greenhouse / Lever slugs come from the careers URL — e.g.{' '}
             <span className="font-mono">boards.greenhouse.io/stripe</span> → slug{' '}
             <span className="font-mono">stripe</span>.
@@ -2489,7 +2481,7 @@ function SourcesDrawer({ onClose, onAfterSync }: { onClose: () => void; onAfterS
         {/* Per-driver health summary */}
         {!loading && health.length > 0 && (
           <div className="p-5 border-b border-border">
-            <div className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase mb-2">
+            <div className="text-[10px] font-semibold tracking-widest text-muted uppercase mb-2">
               Driver health
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
@@ -2503,12 +2495,12 @@ function SourcesDrawer({ onClose, onAfterSync }: { onClose: () => void; onAfterS
                         : h.status === 'missing_key'
                           ? 'bg-amber-500'
                           : h.status === 'no_rows'
-                            ? 'bg-muted-foreground'
+                            ? 'bg-muted'
                             : 'bg-rose-500',
                     )}
                   />
-                  <span className="font-medium text-foreground w-20 truncate">{h.source}</span>
-                  <span className="text-muted-foreground">
+                  <span className="font-medium text-ink w-20 truncate">{h.source}</span>
+                  <span className="text-muted">
                     {h.status === 'missing_key' && '⚠ API key missing'}
                     {h.status === 'no_rows' && 'no rows seeded'}
                     {h.status === 'error' && (h.last_error?.slice(0, 60) ?? 'error')}
@@ -2529,7 +2521,7 @@ function SourcesDrawer({ onClose, onAfterSync }: { onClose: () => void; onAfterS
         ) : (
           <div className="divide-y divide-border">
             {rows.length === 0 && (
-              <div className="p-6 text-sm text-muted-foreground italic text-center">
+              <div className="p-6 text-sm text-muted italic text-center">
                 No sources configured yet.
               </div>
             )}
@@ -2538,16 +2530,14 @@ function SourcesDrawer({ onClose, onAfterSync }: { onClose: () => void; onAfterS
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <SourceBadge source={c.source} />
-                    <span className="text-sm font-medium text-foreground truncate">
+                    <span className="text-sm font-medium text-ink truncate">
                       {c.display_name ?? c.slug ?? c.source}
                     </span>
                     {!c.is_active && (
-                      <span className="text-[10px] text-muted-foreground uppercase tracking-wide">
-                        Paused
-                      </span>
+                      <span className="text-[10px] text-muted uppercase tracking-wide">Paused</span>
                     )}
                   </div>
-                  <div className="text-xs text-muted-foreground mt-0.5">
+                  <div className="text-xs text-muted mt-0.5">
                     {c.slug && <span className="font-mono">{c.slug}</span>}
                     {c.last_synced_at ? (
                       <>
@@ -2572,13 +2562,13 @@ function SourcesDrawer({ onClose, onAfterSync }: { onClose: () => void; onAfterS
                   <button
                     onClick={() => syncOne(c.id)}
                     disabled={busy === c.id}
-                    className="text-xs border border-border rounded-md px-2 py-1 hover:bg-muted disabled:opacity-50"
+                    className="text-xs border border-border rounded-md px-2 py-1 hover:bg-hover disabled:opacity-50"
                   >
                     {busy === c.id ? '…' : 'Sync'}
                   </button>
                   <button
                     onClick={() => toggle(c)}
-                    className="text-xs text-muted-foreground hover:text-foreground px-1"
+                    className="text-xs text-muted hover:text-ink px-1"
                   >
                     {c.is_active ? 'Pause' : 'Resume'}
                   </button>

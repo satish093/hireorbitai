@@ -57,7 +57,7 @@ const STATUS_FILTERS: { value: Status | ''; label: string }[] = [
 const STATUS_PILL: Record<Status, string> = {
   active:
     'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30',
-  inactive: 'bg-muted  text-muted-foreground  border-border',
+  inactive: 'bg-hover  text-muted  border-border',
   suspended:
     'bg-amber-50 dark:bg-amber-500/15   text-amber-800 dark:text-amber-300  border-amber-200 dark:border-amber-500/30',
   pending_verification:
@@ -68,7 +68,7 @@ const STATUS_PILL: Record<Status, string> = {
 
 const STATUS_DOT: Record<Status, string> = {
   active: 'bg-emerald-500',
-  inactive: 'bg-muted-foreground',
+  inactive: 'bg-muted',
   suspended: 'bg-amber-500',
   pending_verification: 'bg-sky-500',
   banned: 'bg-red-500',
@@ -248,14 +248,14 @@ export function AdminUsers() {
         title="All users"
         description="Manage every account in the workspace. Filter by role, status, or search by name/email."
         action={
-          <span className="text-sm text-muted-foreground">
+          <span className="text-sm text-muted">
             {loading ? 'Loading…' : `${total.toLocaleString()} ${total === 1 ? 'user' : 'users'}`}
           </span>
         }
       />
 
       {/* Filters */}
-      <div className="bg-card border border-border rounded-xl p-3 mb-4 flex flex-wrap items-end gap-3">
+      <div className="bg-surface border border-border rounded-xl p-3 mb-4 flex flex-wrap items-end gap-3">
         <div className="flex-1 min-w-[220px]">
           <FormInput
             label="Search"
@@ -315,14 +315,14 @@ export function AdminUsers() {
             render: (u: AdminUserRow) => (
               <Link
                 to={`/admin/users/${u.id}`}
-                className="inline-flex items-center gap-2 hover:bg-muted rounded -mx-1 px-1 py-0.5"
+                className="inline-flex items-center gap-2 hover:bg-hover rounded -mx-1 px-1 py-0.5"
               >
                 <Avatar name={u.full_name} email={u.email} size={28} />
                 <div className="leading-tight">
-                  <div className="text-sm font-medium text-foreground hover:underline">
+                  <div className="text-sm font-medium text-ink hover:underline">
                     {u.full_name ?? u.email}
                   </div>
-                  <div className="text-[11px] text-muted-foreground">{u.email}</div>
+                  <div className="text-[11px] text-muted">{u.email}</div>
                 </div>
               </Link>
             ),
@@ -331,7 +331,7 @@ export function AdminUsers() {
             key: 'role',
             header: 'Role',
             render: (u: AdminUserRow) => (
-              <span className="text-[11px] font-medium bg-muted text-foreground px-1.5 py-0.5 rounded">
+              <span className="text-[11px] font-medium bg-hover text-ink px-1.5 py-0.5 rounded">
                 {ROLE_LABEL[u.role] ?? u.role}
               </span>
             ),
@@ -342,7 +342,7 @@ export function AdminUsers() {
             render: (u: AdminUserRow) => {
               const g = u.group_id ? groupsById[u.group_id] : undefined;
               if (!g) {
-                return <span className="text-[11px] text-muted-foreground italic">No Group</span>;
+                return <span className="text-[11px] text-muted italic">No Group</span>;
               }
               return (
                 <span
@@ -401,20 +401,20 @@ export function AdminUsers() {
             render: (u: AdminUserRow) =>
               u.last_login_at ? (
                 <span
-                  className="text-xs text-foreground"
+                  className="text-xs text-ink"
                   title={new Date(u.last_login_at).toLocaleString()}
                 >
                   {relative(u.last_login_at)}
                 </span>
               ) : (
-                <span className="text-xs text-muted-foreground italic">Never</span>
+                <span className="text-xs text-muted italic">Never</span>
               ),
           },
           {
             key: 'created_at',
             header: 'Joined',
             render: (u: AdminUserRow) => (
-              <span className="text-xs text-muted-foreground">
+              <span className="text-xs text-muted">
                 {new Date(u.created_at).toLocaleDateString()}
               </span>
             ),
@@ -444,7 +444,7 @@ export function AdminUsers() {
       {/* Pagination */}
       {!loading && totalPages > 1 && (
         <div className="flex items-center justify-between mt-4 text-sm">
-          <div className="text-muted-foreground">
+          <div className="text-muted">
             Page {page} of {totalPages} · showing {data?.rows.length ?? 0} of{' '}
             {total.toLocaleString()}
           </div>
@@ -543,7 +543,7 @@ function RowActions({
         disabled={busy}
         className={clsx(
           'inline-flex items-center justify-center w-8 h-8 rounded-md border border-border',
-          'text-muted-foreground hover:text-foreground hover:bg-muted transition press',
+          'text-muted hover:text-ink hover:bg-hover transition press',
           busy && 'opacity-50 cursor-wait',
         )}
         aria-label="Actions"
@@ -561,12 +561,12 @@ function RowActions({
       {open && (
         <div
           role="menu"
-          className="absolute right-0 z-20 mt-1 w-52 rounded-lg border border-border bg-card shadow-lg ring-1 ring-slate-900/5 overflow-hidden animate-fade-in-up"
+          className="absolute right-0 z-20 mt-1 w-52 rounded-lg border border-border bg-surface shadow-lg ring-1 ring-slate-900/5 overflow-hidden animate-fade-in-up"
         >
           <Link
             to={`/admin/users/${row.id}`}
             onClick={() => setOpen(false)}
-            className="block px-3 py-2 text-sm text-foreground hover:bg-muted"
+            className="block px-3 py-2 text-sm text-ink hover:bg-hover"
           >
             View profile
           </Link>
@@ -576,12 +576,12 @@ function RowActions({
               setOpen(false);
               onSendReset();
             }}
-            className="block w-full text-left px-3 py-2 text-sm text-foreground hover:bg-muted"
+            className="block w-full text-left px-3 py-2 text-sm text-ink hover:bg-hover"
           >
             Send password reset
           </button>
 
-          {!isSelf && <div className="h-px bg-muted" />}
+          {!isSelf && <div className="h-px bg-hover" />}
 
           {!isSelf && isActive && (
             <>

@@ -27,7 +27,7 @@ export function Header({ title, crumbs, onMenuClick }: Props) {
         type="button"
         onClick={onMenuClick}
         aria-label="Open navigation"
-        className="md:hidden -ml-1 w-9 h-9 inline-flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted"
+        className="md:hidden -ml-1 w-9 h-9 inline-flex items-center justify-center rounded-lg text-muted hover:text-ink hover:bg-hover"
       >
         <svg
           width="20"
@@ -46,25 +46,23 @@ export function Header({ title, crumbs, onMenuClick }: Props) {
 
       <nav
         aria-label="Breadcrumb"
-        className="flex items-center gap-2 text-sm text-muted-foreground min-w-0 flex-1"
+        className="flex items-center gap-2 text-sm text-muted min-w-0 flex-1"
       >
         {resolved.map((c, i) => (
           <span key={i} className="flex items-center gap-2 min-w-0">
             {c.to ? (
-              <Link to={c.to} className="hover:text-foreground truncate">
+              <Link to={c.to} className="hover:text-ink truncate">
                 {c.label}
               </Link>
             ) : (
               <span
-                className={
-                  i === resolved.length - 1 ? 'text-foreground font-medium truncate' : 'truncate'
-                }
+                className={i === resolved.length - 1 ? 'text-ink font-medium truncate' : 'truncate'}
               >
                 {c.label}
               </span>
             )}
             {i < resolved.length - 1 && (
-              <span className="text-muted-foreground opacity-50 hidden sm:inline">›</span>
+              <span className="text-muted opacity-50 hidden sm:inline">›</span>
             )}
           </span>
         ))}

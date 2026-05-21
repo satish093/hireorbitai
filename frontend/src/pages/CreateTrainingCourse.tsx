@@ -160,11 +160,11 @@ export function CreateTrainingCourse() {
         {/* Mode toggle: AI-generate a full course from a title, or author
             manually. AI generation is admin-only — managers see manual only. */}
         {isAdmin && (
-          <div className="inline-flex rounded-lg border border-border bg-card p-0.5 mb-5">
+          <div className="inline-flex rounded-lg border border-border bg-surface p-0.5 mb-5">
             <button
               onClick={() => setMode('ai')}
               className={`text-sm px-4 py-1.5 rounded-md ${
-                mode === 'ai' ? 'bg-brand-600 text-white' : 'text-muted-foreground hover:bg-muted'
+                mode === 'ai' ? 'bg-brand-600 text-white' : 'text-muted hover:bg-hover'
               }`}
             >
               ✦ Generate with AI
@@ -172,9 +172,7 @@ export function CreateTrainingCourse() {
             <button
               onClick={() => setMode('manual')}
               className={`text-sm px-4 py-1.5 rounded-md ${
-                mode === 'manual'
-                  ? 'bg-foreground text-background'
-                  : 'text-muted-foreground hover:bg-muted'
+                mode === 'manual' ? 'bg-ink text-bg' : 'text-muted hover:bg-hover'
               }`}
             >
               Manual
@@ -184,8 +182,8 @@ export function CreateTrainingCourse() {
 
         {mode === 'ai' && isAdmin ? (
           <>
-            <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
-              <p className="text-sm text-muted-foreground">
+            <div className="bg-surface border border-border rounded-2xl p-6 space-y-4">
+              <p className="text-sm text-muted">
                 Enter a title and a few details. We'll generate an overview, lesson outline,
                 per-lesson content, quizzes, exercises, and completion criteria. You can review and
                 edit everything before publishing.
@@ -233,7 +231,7 @@ export function CreateTrainingCourse() {
             <div className="flex justify-end gap-2 mt-4">
               <button
                 onClick={() => nav(-1)}
-                className="border border-border text-foreground text-sm px-4 py-2 rounded-lg hover:bg-muted"
+                className="border border-border text-ink text-sm px-4 py-2 rounded-lg hover:bg-hover"
               >
                 Cancel
               </button>
@@ -257,7 +255,7 @@ export function CreateTrainingCourse() {
   function ManualForm() {
     return (
       <>
-        <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
+        <div className="bg-surface border border-border rounded-2xl p-6 space-y-4">
           <Field
             label="Title"
             value={form.title}
@@ -265,7 +263,7 @@ export function CreateTrainingCourse() {
             required
           />
           <label className="block">
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted">
               Description
             </span>
             <textarea
@@ -317,14 +315,14 @@ export function CreateTrainingCourse() {
         {/* I-983 STEM-OPT Training Plan metadata. Filling these in turns the
             course into an audit-ready training module the supervisor can
             attach to the I-983 Section 5 + 6. */}
-        <div className="bg-card border border-border rounded-2xl p-6 space-y-4 mt-4">
+        <div className="bg-surface border border-border rounded-2xl p-6 space-y-4 mt-4">
           <div className="flex items-center gap-2">
             <span className="text-[10px] font-semibold uppercase tracking-widest text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/30 px-2 py-0.5 rounded-full">
               I-983
             </span>
             <h2 className="text-sm font-semibold tracking-tight">STEM-OPT Training Plan fields</h2>
           </div>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-muted">
             These map directly to the DHS I-983 Section 5 + 6 attestation. Fill them in for any
             course you'll list on a STEM-OPT training plan.
           </p>
@@ -365,14 +363,14 @@ export function CreateTrainingCourse() {
         <div className="flex justify-end gap-2 mt-4">
           <button
             onClick={() => nav(-1)}
-            className="border border-border text-foreground text-sm px-4 py-2 rounded-lg hover:bg-muted"
+            className="border border-border text-ink text-sm px-4 py-2 rounded-lg hover:bg-hover"
           >
             Cancel
           </button>
           <button
             onClick={save}
             disabled={saving}
-            className="bg-foreground text-background text-sm font-semibold px-5 py-2 rounded-lg hover:opacity-90 disabled:opacity-50"
+            className="bg-ink text-bg text-sm font-semibold px-5 py-2 rounded-lg hover:opacity-90 disabled:opacity-50"
           >
             {saving ? 'Saving…' : 'Create'}
           </button>
@@ -399,7 +397,7 @@ function Field({
 }) {
   return (
     <label className="block">
-      <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+      <span className="text-[10px] font-semibold uppercase tracking-widest text-muted">
         {label}
         {required && <span className="text-rose-500 ml-0.5">*</span>}
       </span>
@@ -409,7 +407,7 @@ function Field({
         onChange={(e) => onChange(e.target.value)}
         className="mt-1 w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
       />
-      {hint && <p className="text-[10px] text-muted-foreground mt-0.5">{hint}</p>}
+      {hint && <p className="text-[10px] text-muted mt-0.5">{hint}</p>}
     </label>
   );
 }
@@ -428,7 +426,7 @@ function TextArea({
 }) {
   return (
     <label className="block">
-      <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+      <span className="text-[10px] font-semibold uppercase tracking-widest text-muted">
         {label}
       </span>
       <textarea
@@ -437,7 +435,7 @@ function TextArea({
         onChange={(e) => onChange(e.target.value)}
         className="mt-1 w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
       />
-      {hint && <p className="text-[10px] text-muted-foreground mt-0.5">{hint}</p>}
+      {hint && <p className="text-[10px] text-muted mt-0.5">{hint}</p>}
     </label>
   );
 }
@@ -454,13 +452,13 @@ function Selector({
 }) {
   return (
     <label className="block">
-      <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+      <span className="text-[10px] font-semibold uppercase tracking-widest text-muted">
         {label}
       </span>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="mt-1 w-full text-sm border border-border rounded-md px-2 py-1.5 bg-card"
+        className="mt-1 w-full text-sm border border-border rounded-md px-2 py-1.5 bg-surface"
       >
         {options.map((o) => (
           <option key={o} value={o}>

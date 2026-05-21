@@ -142,12 +142,12 @@ export function Reminders() {
             }
           />
           <label className="block">
-            <span className="block text-xs font-medium text-foreground mb-1.5">Description</span>
+            <span className="block text-xs font-medium text-ink mb-1.5">Description</span>
             <textarea
               placeholder="Notes"
               value={form.description ?? ''}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
-              className="w-full rounded-lg border border-border hover:border-muted-foreground bg-card px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500"
+              className="w-full rounded-lg border border-border hover:border-muted bg-surface px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500"
               rows={3}
             />
           </label>

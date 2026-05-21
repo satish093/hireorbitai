@@ -50,8 +50,8 @@ export function ResetPassword() {
   if (!token) {
     return (
       <Shell>
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">Invalid reset link</h1>
-        <p className="text-sm text-muted-foreground mt-2">
+        <h1 className="text-xl font-semibold tracking-tight text-ink">Invalid reset link</h1>
+        <p className="text-sm text-muted mt-2">
           The link is missing a token. Request a new one from the sign-in page.
         </p>
         <Link
@@ -68,10 +68,8 @@ export function ResetPassword() {
 
   return (
     <Shell>
-      <h1 className="text-xl font-semibold tracking-tight text-foreground">
-        Choose a new password
-      </h1>
-      <p className="text-sm text-muted-foreground mt-1 mb-4">
+      <h1 className="text-xl font-semibold tracking-tight text-ink">Choose a new password</h1>
+      <p className="text-sm text-muted mt-1 mb-4">
         Pick something strong — you'll use this to sign in next time.
       </p>
       <form onSubmit={form.handleSubmit(submit)} className="space-y-4">
@@ -95,7 +93,7 @@ export function ResetPassword() {
         {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
         <button
           disabled={busy}
-          className="w-full bg-foreground hover:opacity-90 disabled:opacity-50 text-background rounded-lg py-2.5 text-sm font-medium press"
+          className="w-full bg-ink hover:opacity-90 disabled:opacity-50 text-bg rounded-lg py-2.5 text-sm font-medium press"
         >
           {busy ? 'Saving…' : 'Set new password'}
         </button>
@@ -106,12 +104,12 @@ export function ResetPassword() {
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-dvh bg-muted flex items-center justify-center p-4 sm:p-6">
+    <div className="min-h-dvh bg-hover flex items-center justify-center p-4 sm:p-6">
       <div className="w-full max-w-sm animate-fade-in-up">
         <div className="flex justify-center mb-6">
           <Brand size="lg" />
         </div>
-        <div className="bg-card rounded-2xl border border-border shadow-sm p-7">{children}</div>
+        <div className="bg-surface rounded-2xl border border-border shadow-sm p-7">{children}</div>
       </div>
     </div>
   );

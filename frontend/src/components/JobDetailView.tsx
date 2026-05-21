@@ -38,9 +38,9 @@ interface AtsResp {
 
 function Section({ title, children }: { title?: string; children: ReactNode }) {
   return (
-    <div className="bg-card border border-border rounded-2xl p-5 shadow-sm min-w-0">
+    <div className="bg-surface border border-border rounded-2xl p-5 shadow-sm min-w-0">
       {title && (
-        <div className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase mb-2.5">
+        <div className="text-[10px] font-semibold tracking-widest text-muted uppercase mb-2.5">
           {title}
         </div>
       )}
@@ -51,11 +51,9 @@ function Section({ title, children }: { title?: string; children: ReactNode }) {
 
 function FactTile({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-0 bg-muted border border-border rounded-xl px-3 py-2.5">
-      <div className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">
-        {label}
-      </div>
-      <div className="text-sm font-medium text-foreground mt-0.5 break-words" title={value}>
+    <div className="min-w-0 bg-hover border border-border rounded-xl px-3 py-2.5">
+      <div className="text-[10px] font-semibold tracking-widest text-muted uppercase">{label}</div>
+      <div className="text-sm font-medium text-ink mt-0.5 break-words" title={value}>
         {value}
       </div>
     </div>
@@ -83,13 +81,13 @@ function ScoreCard({
         : 'from-emerald-50 to-white border-emerald-100 dark:border-emerald-500/20';
   return (
     <div className={`min-w-0 rounded-xl border bg-gradient-to-br ${toneClass} p-4`}>
-      <div className="text-[10px] font-semibold tracking-widest uppercase mb-1 text-muted-foreground">
+      <div className="text-[10px] font-semibold tracking-widest uppercase mb-1 text-muted">
         {label}
       </div>
-      <div className="text-2xl font-semibold tabular-nums text-foreground">
+      <div className="text-2xl font-semibold tabular-nums text-ink">
         {value == null ? '—' : `${value}${suffix}`}
       </div>
-      {sub && <div className="text-[11px] text-muted-foreground mt-0.5 break-words">{sub}</div>}
+      {sub && <div className="text-[11px] text-muted mt-0.5 break-words">{sub}</div>}
     </div>
   );
 }
@@ -104,7 +102,7 @@ function TagChip({ tag }: { tag: string }) {
         ? 'bg-amber-50 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-100 dark:border-amber-500/20'
         : /(remote)/.test(t)
           ? 'bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border-indigo-100 dark:border-indigo-500/20'
-          : 'bg-muted text-foreground border-border';
+          : 'bg-hover text-ink border-border';
   return (
     <span
       className={clsx(
@@ -120,14 +118,14 @@ function TagChip({ tag }: { tag: string }) {
 function Bullets({
   items,
   marker = '•',
-  tone = 'text-muted-foreground',
+  tone = 'text-muted',
 }: {
   items: string[];
   marker?: string;
   tone?: string;
 }) {
   return (
-    <ul className="space-y-1 text-sm text-foreground">
+    <ul className="space-y-1 text-sm text-ink">
       {items.map((b, i) => (
         <li key={i} className="flex items-start gap-1.5">
           <span className={tone}>{marker}</span>
@@ -183,7 +181,7 @@ function JobCopilot({ jobId, isConsultant }: { jobId: string; isConsultant: bool
   return (
     <Section title="AI Copilot">
       {messages.length === 0 ? (
-        <p className="text-sm text-muted-foreground mb-3">
+        <p className="text-sm text-muted mb-3">
           Ask anything about this job — fit, requirements, or outreach.
         </p>
       ) : (
@@ -194,14 +192,14 @@ function JobCopilot({ jobId, isConsultant }: { jobId: string; isConsultant: bool
               className={clsx(
                 'text-sm rounded-xl px-3 py-2 max-w-[90%] whitespace-pre-wrap break-words',
                 m.role === 'user'
-                  ? 'ml-auto bg-foreground text-background'
-                  : 'mr-auto bg-muted border border-border text-foreground',
+                  ? 'ml-auto bg-ink text-bg'
+                  : 'mr-auto bg-hover border border-border text-ink',
               )}
             >
               {m.text}
             </div>
           ))}
-          {busy && <div className="text-xs text-muted-foreground">Thinking…</div>}
+          {busy && <div className="text-xs text-muted">Thinking…</div>}
         </div>
       )}
 
@@ -212,7 +210,7 @@ function JobCopilot({ jobId, isConsultant }: { jobId: string; isConsultant: bool
               key={s}
               onClick={() => ask(s)}
               disabled={busy}
-              className="text-[11px] px-2 py-1 rounded-full border border-border text-muted-foreground hover:bg-muted disabled:opacity-50"
+              className="text-[11px] px-2 py-1 rounded-full border border-border text-muted hover:bg-hover disabled:opacity-50"
             >
               {s}
             </button>
@@ -233,7 +231,7 @@ function JobCopilot({ jobId, isConsultant }: { jobId: string; isConsultant: bool
         <button
           onClick={() => ask(input)}
           disabled={busy || !input.trim()}
-          className="h-9 px-4 rounded-lg bg-foreground text-background text-sm font-medium hover:opacity-90 disabled:opacity-50 press"
+          className="h-9 px-4 rounded-lg bg-ink text-bg text-sm font-medium hover:opacity-90 disabled:opacity-50 press"
         >
           Ask
         </button>
@@ -326,7 +324,7 @@ export function JobDetailView({ job, isConsultant }: { job: Job; isConsultant: b
       target="_blank"
       rel="noopener noreferrer"
       className={clsx(
-        'inline-flex items-center justify-center gap-1.5 bg-foreground text-background text-sm font-medium px-4 py-2 rounded-lg hover:opacity-90 press',
+        'inline-flex items-center justify-center gap-1.5 bg-ink text-bg text-sm font-medium px-4 py-2 rounded-lg hover:opacity-90 press',
         extra,
       )}
     >
@@ -338,7 +336,7 @@ export function JobDetailView({ job, isConsultant }: { job: Job; isConsultant: b
       href={googleUrl}
       target="_blank"
       rel="noopener noreferrer"
-      className="block text-xs text-muted-foreground hover:text-foreground mt-1.5"
+      className="block text-xs text-muted hover:text-ink mt-1.5"
     >
       Link not working? Search on Google ↗
     </a>
@@ -347,25 +345,23 @@ export function JobDetailView({ job, isConsultant }: { job: Job; isConsultant: b
   return (
     <div className="max-w-5xl mx-auto w-full min-w-0">
       {/* Company-first header */}
-      <div className="bg-card border border-border rounded-2xl p-5 sm:p-6 shadow-sm min-w-0">
+      <div className="bg-surface border border-border rounded-2xl p-5 sm:p-6 shadow-sm min-w-0">
         <div className="flex items-start gap-4 min-w-0">
           <Avatar name={company} size={56} />
           <div className="flex-1 min-w-0">
             <div className="flex items-center flex-wrap gap-2 mb-1">
-              <span className="text-xs text-muted-foreground">
+              <span className="text-xs text-muted">
                 {relative(job.posted_at ?? job.created_at)}
               </span>
               {job.source && (
-                <span className="text-[10px] font-semibold uppercase tracking-wide bg-muted text-muted-foreground px-1.5 py-0.5 rounded">
+                <span className="text-[10px] font-semibold uppercase tracking-wide bg-hover text-muted px-1.5 py-0.5 rounded">
                   {job.publisher ?? job.source}
                 </span>
               )}
             </div>
-            <h1 className="text-2xl font-semibold text-foreground leading-tight break-words">
-              {company}
-            </h1>
-            <div className="text-base text-foreground mt-0.5 break-words">{job.title}</div>
-            <div className="text-sm text-muted-foreground mt-1 break-words">
+            <h1 className="text-2xl font-semibold text-ink leading-tight break-words">{company}</h1>
+            <div className="text-base text-ink mt-0.5 break-words">{job.title}</div>
+            <div className="text-sm text-muted mt-1 break-words">
               {job.location ?? 'Location N/A'} · {workModel}
             </div>
             <div className="mt-3 hidden sm:block">
@@ -382,7 +378,7 @@ export function JobDetailView({ job, isConsultant }: { job: Job; isConsultant: b
       </div>
 
       {enriching && (
-        <div className="mt-4 text-xs text-muted-foreground flex items-center gap-2">
+        <div className="mt-4 text-xs text-muted flex items-center gap-2">
           <span className="inline-block w-3 h-3 border-2 border-border border-t-border rounded-full animate-spin" />
           Analyzing job…
         </div>
@@ -421,7 +417,7 @@ export function JobDetailView({ job, isConsultant }: { job: Job; isConsultant: b
                 {skills.map((s) => (
                   <span
                     key={s}
-                    className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-muted text-foreground"
+                    className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-hover text-ink"
                   >
                     {s}
                   </span>
@@ -449,11 +445,11 @@ export function JobDetailView({ job, isConsultant }: { job: Job; isConsultant: b
                 <Section title="Job description">
                   {useHtml && html ? (
                     <div
-                      className="jd-prose text-sm text-foreground"
+                      className="jd-prose text-sm text-ink"
                       dangerouslySetInnerHTML={{ __html: html }}
                     />
                   ) : (
-                    <div className="text-sm text-foreground whitespace-pre-wrap leading-relaxed break-words">
+                    <div className="text-sm text-ink whitespace-pre-wrap leading-relaxed break-words">
                       {jdToText(job.description!)}
                     </div>
                   )}
@@ -462,9 +458,7 @@ export function JobDetailView({ job, isConsultant }: { job: Job; isConsultant: b
             })()}
 
           {/* Consultant resume scoring */}
-          {loading && (
-            <div className="text-sm text-muted-foreground">Scoring against your resume…</div>
-          )}
+          {loading && <div className="text-sm text-muted">Scoring against your resume…</div>}
           {error && !loading && (
             <div className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-500/15 border border-red-200 dark:border-red-500/30 rounded-lg p-3">
               {error}
@@ -472,7 +466,7 @@ export function JobDetailView({ job, isConsultant }: { job: Job; isConsultant: b
           )}
           {needsResume && !loading && (
             <Section title="No resume on file yet">
-              <p className="text-xs text-muted-foreground mb-2">
+              <p className="text-xs text-muted mb-2">
                 Upload a resume on the Resumes page, or paste the text below to score this job now.
               </p>
               <textarea
@@ -485,7 +479,7 @@ export function JobDetailView({ job, isConsultant }: { job: Job; isConsultant: b
               <button
                 onClick={() => run(resumePaste)}
                 disabled={!resumePaste.trim()}
-                className="mt-2 bg-foreground text-background text-sm px-4 py-1.5 rounded-lg hover:opacity-90 disabled:opacity-50"
+                className="mt-2 bg-ink text-bg text-sm px-4 py-1.5 rounded-lg hover:opacity-90 disabled:opacity-50"
               >
                 Score this resume
               </button>
@@ -521,17 +515,15 @@ export function JobDetailView({ job, isConsultant }: { job: Job; isConsultant: b
               {atsScore != null && (
                 <Section title="ATS score">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm font-semibold text-foreground tabular-nums">
-                      {atsScore}%
-                    </span>
+                    <span className="text-sm font-semibold text-ink tabular-nums">{atsScore}%</span>
                   </div>
-                  <div className="h-1.5 bg-muted rounded overflow-hidden mb-2">
+                  <div className="h-1.5 bg-hover rounded overflow-hidden mb-2">
                     <div className="h-full bg-emerald-500" style={{ width: `${atsScore}%` }} />
                   </div>
-                  {ats && <p className="text-xs text-foreground break-words">{ats.summary}</p>}
+                  {ats && <p className="text-xs text-ink break-words">{ats.summary}</p>}
                   {ats?.missing_keywords && ats.missing_keywords.length > 0 && (
                     <div className="mt-2">
-                      <div className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase mb-1">
+                      <div className="text-[10px] font-semibold tracking-widest text-muted uppercase mb-1">
                         Missing keywords
                       </div>
                       <div className="flex flex-wrap gap-1">
@@ -565,18 +557,18 @@ export function JobDetailView({ job, isConsultant }: { job: Job; isConsultant: b
                       return (
                         <div key={s.skill} className="py-2.5 min-w-0">
                           <div className="flex items-center justify-between gap-3 min-w-0">
-                            <span className="text-sm font-medium text-foreground truncate min-w-0">
+                            <span className="text-sm font-medium text-ink truncate min-w-0">
                               {s.skill}
                             </span>
-                            <span className="text-xs tabular-nums font-semibold text-foreground shrink-0">
+                            <span className="text-xs tabular-nums font-semibold text-ink shrink-0">
                               {pct}%
                             </span>
                           </div>
-                          <div className="mt-1.5 h-1.5 bg-muted rounded overflow-hidden">
+                          <div className="mt-1.5 h-1.5 bg-hover rounded overflow-hidden">
                             <div className={`h-full ${tone}`} style={{ width: `${pct}%` }} />
                           </div>
                           {s.evidence && (
-                            <div className="mt-1 text-[11px] text-muted-foreground italic break-words">
+                            <div className="mt-1 text-[11px] text-muted italic break-words">
                               “{s.evidence}”
                             </div>
                           )}
@@ -597,7 +589,7 @@ export function JobDetailView({ job, isConsultant }: { job: Job; isConsultant: b
             (reqs?.core_responsibilities ?? []).length === 0 &&
             (reqs?.skill_summaries ?? []).length === 0 && (
               <Section>
-                <p className="text-sm text-muted-foreground text-center">
+                <p className="text-sm text-muted text-center">
                   This listing hasn't been enriched yet — only the basic facts are available. Open
                   the original posting for the full description.
                 </p>

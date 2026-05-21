@@ -19,7 +19,7 @@ import { api } from '../services/api';
 // Training status tones, expressed as shared PillTone objects so the badges
 // match every other status pill in the app (height, radius, dot, font).
 const STATUS_TONE: Record<string, PillTone> = {
-  NOT_STARTED: { bg: 'bg-muted', text: 'text-foreground', dot: 'bg-muted-foreground' },
+  NOT_STARTED: { bg: 'bg-hover', text: 'text-ink', dot: 'bg-muted' },
   IN_PROGRESS: {
     bg: 'bg-sky-50 dark:bg-sky-500/15',
     text: 'text-sky-700 dark:text-sky-300',
@@ -60,18 +60,18 @@ const STATUS_TONE: Record<string, PillTone> = {
     text: 'text-amber-700 dark:text-amber-300',
     dot: 'bg-amber-500',
   },
-  DRAFT: { bg: 'bg-muted', text: 'text-muted-foreground', dot: 'bg-muted-foreground' },
+  DRAFT: { bg: 'bg-hover', text: 'text-muted', dot: 'bg-muted' },
   ACTIVE: {
     bg: 'bg-emerald-50 dark:bg-emerald-500/15',
     text: 'text-emerald-700 dark:text-emerald-300',
     dot: 'bg-emerald-500',
   },
-  ARCHIVED: { bg: 'bg-muted', text: 'text-muted-foreground', dot: 'bg-muted-foreground' },
+  ARCHIVED: { bg: 'bg-hover', text: 'text-muted', dot: 'bg-muted' },
 };
 const STATUS_DEFAULT_TONE: PillTone = {
-  bg: 'bg-muted',
-  text: 'text-foreground',
-  dot: 'bg-muted-foreground',
+  bg: 'bg-hover',
+  text: 'text-ink',
+  dot: 'bg-muted',
 };
 // Active/waiting states get a soft pulsing dot so they draw the eye.
 const STATUS_PULSING = new Set([
@@ -150,12 +150,12 @@ const CATEGORY_TONE: Record<string, string> = {
     'bg-pink-50 dark:bg-pink-500/15 text-pink-700 dark:text-pink-300 border-pink-100 dark:border-pink-500/20',
   'Resume Building':
     'bg-pink-50 dark:bg-pink-500/15 text-pink-700 dark:text-pink-300 border-pink-100 dark:border-pink-500/20',
-  'Banking Domain': 'bg-muted text-foreground border-border',
-  'Insurance Domain': 'bg-muted text-foreground border-border',
-  'Healthcare Domain': 'bg-muted text-foreground border-border',
+  'Banking Domain': 'bg-hover text-ink border-border',
+  'Insurance Domain': 'bg-hover text-ink border-border',
+  'Healthcare Domain': 'bg-hover text-ink border-border',
 };
 export function CourseCategoryBadge({ category }: { category: string }) {
-  const tone = CATEGORY_TONE[category] ?? 'bg-muted text-foreground border-border';
+  const tone = CATEGORY_TONE[category] ?? 'bg-hover text-ink border-border';
   return (
     <span
       className={clsx(
@@ -180,16 +180,16 @@ export function TrainingProgressBar({ value, label }: { value: number; label?: s
         ? 'bg-brand-500'
         : pct > 0
           ? 'bg-amber-400'
-          : 'bg-muted-foreground';
+          : 'bg-muted';
   return (
     <div>
       {label && (
-        <div className="flex justify-between text-[11px] text-muted-foreground mb-1">
+        <div className="flex justify-between text-[11px] text-muted mb-1">
           <span>{label}</span>
           <span className="tabular-nums">{Math.round(pct)}%</span>
         </div>
       )}
-      <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+      <div className="h-1.5 bg-hover rounded-full overflow-hidden">
         <div className={`h-full ${tone} transition-all`} style={{ width: `${pct}%` }} />
       </div>
     </div>
@@ -448,8 +448,8 @@ export function TrainingCourseCard({
   action?: ReactNode;
 }) {
   const inner = (
-    <div className="bg-card border border-border rounded-xl overflow-hidden hover:border-brand-300 hover:shadow-sm transition flex flex-col h-full">
-      <div className="aspect-video bg-muted overflow-hidden">
+    <div className="bg-surface border border-border rounded-xl overflow-hidden hover:border-brand-300 hover:shadow-sm transition flex flex-col h-full">
+      <div className="aspect-video bg-hover overflow-hidden">
         {course.thumbnail_url ? (
           <img
             src={course.thumbnail_url}
@@ -473,15 +473,15 @@ export function TrainingCourseCard({
                   : course.content_status}
               </span>
             )}
-          <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+          <span className="text-[10px] font-semibold text-muted uppercase tracking-wider">
             {course.difficulty}
           </span>
         </div>
-        <h3 className="text-base font-semibold text-foreground leading-tight">{course.title}</h3>
+        <h3 className="text-base font-semibold text-ink leading-tight">{course.title}</h3>
         {course.description && (
-          <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{course.description}</p>
+          <p className="text-sm text-muted mt-1 line-clamp-2">{course.description}</p>
         )}
-        <div className="mt-auto pt-3 flex items-center justify-between text-xs text-muted-foreground">
+        <div className="mt-auto pt-3 flex items-center justify-between text-xs text-muted">
           <span>
             {course.lessons?.[0]?.count ?? 0} lessons · {course.assignments?.[0]?.count ?? 0}{' '}
             assigned
@@ -525,7 +525,7 @@ export function LessonCard({
   onToggle?: () => void;
 }) {
   return (
-    <div className="bg-card border border-border rounded-lg p-3 flex items-start gap-3">
+    <div className="bg-surface border border-border rounded-lg p-3 flex items-start gap-3">
       <button
         onClick={onToggle}
         className={clsx(
@@ -540,22 +540,22 @@ export function LessonCard({
       </button>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <span className="text-[10px] font-semibold text-muted-foreground tabular-nums">
+          <span className="text-[10px] font-semibold text-muted tabular-nums">
             #{lesson.lesson_order + 1}
           </span>
           <h4
             className={clsx(
               'text-sm font-semibold leading-tight',
-              completed && 'line-through text-muted-foreground',
+              completed && 'line-through text-muted',
             )}
           >
             {lesson.title}
           </h4>
         </div>
         {lesson.description && (
-          <p className="text-xs text-muted-foreground mt-0.5 truncate">{lesson.description}</p>
+          <p className="text-xs text-muted mt-0.5 truncate">{lesson.description}</p>
         )}
-        <div className="flex items-center gap-2 mt-1 text-[11px] text-muted-foreground">
+        <div className="flex items-center gap-2 mt-1 text-[11px] text-muted">
           {lesson.video_url && <span>🎬 video</span>}
           {lesson.document_url && <span>📄 doc</span>}
           {typeof lesson.estimated_minutes === 'number' && (
@@ -588,8 +588,8 @@ export function QuizQuestionCard({
   result?: { is_correct: boolean; correct_answer: string; explanation?: string };
 }) {
   return (
-    <div className="bg-card border border-border rounded-xl p-4">
-      <div className="text-sm font-semibold text-foreground mb-3">{question.question}</div>
+    <div className="bg-surface border border-border rounded-xl p-4">
+      <div className="text-sm font-semibold text-ink mb-3">{question.question}</div>
       <div className="space-y-2">
         {question.options.map((opt) => {
           const isPicked = selected === opt;
@@ -601,12 +601,12 @@ export function QuizQuestionCard({
               className={clsx(
                 'flex items-center gap-2 px-3 py-2 rounded-lg border text-sm cursor-pointer transition',
                 isPicked && !result && 'border-brand-400 bg-brand-50',
-                !isPicked && !result && 'border-border hover:bg-muted',
+                !isPicked && !result && 'border-border hover:bg-hover',
                 result &&
                   isCorrect &&
                   'border-emerald-300 bg-emerald-50 dark:bg-emerald-500/15 text-emerald-900',
                 isWrongPick && 'border-rose-300 bg-rose-50 dark:bg-rose-500/15 text-rose-900',
-                result && !isCorrect && !isWrongPick && 'border-border text-muted-foreground',
+                result && !isCorrect && !isWrongPick && 'border-border text-muted',
               )}
             >
               <input
@@ -632,8 +632,8 @@ export function QuizQuestionCard({
         })}
       </div>
       {result?.explanation && (
-        <div className="mt-3 text-xs text-muted-foreground bg-muted border border-border rounded-lg p-3">
-          <strong className="text-foreground">Explanation:</strong> {result.explanation}
+        <div className="mt-3 text-xs text-muted bg-hover border border-border rounded-lg p-3">
+          <strong className="text-ink">Explanation:</strong> {result.explanation}
         </div>
       )}
     </div>
@@ -663,15 +663,15 @@ export function AssignmentTable({
 }) {
   if (rows.length === 0) {
     return (
-      <div className="bg-card border border-border rounded-xl p-10 text-center text-muted-foreground italic">
+      <div className="bg-surface border border-border rounded-xl p-10 text-center text-muted italic">
         No assignments.
       </div>
     );
   }
   return (
-    <div className="bg-card border border-border rounded-xl overflow-hidden">
+    <div className="bg-surface border border-border rounded-xl overflow-hidden">
       <table className="w-full text-sm">
-        <thead className="bg-muted text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+        <thead className="bg-hover text-[10px] font-semibold uppercase tracking-widest text-muted">
           <tr>
             <th className="text-left px-4 py-2.5">Course</th>
             {includeAssignee && <th className="text-left px-3 py-2.5">Assignee</th>}
@@ -683,11 +683,11 @@ export function AssignmentTable({
         </thead>
         <tbody className="divide-y divide-border">
           {rows.map((a) => (
-            <tr key={a.id} className="hover:bg-muted">
+            <tr key={a.id} className="hover:bg-hover">
               <td className="px-4 py-2.5">
                 <Link
                   to={`${viewBase}/${a.id}`}
-                  className="font-medium text-foreground hover:text-brand-700"
+                  className="font-medium text-ink hover:text-brand-700"
                 >
                   {a.course?.title ?? '—'}
                 </Link>
@@ -699,11 +699,11 @@ export function AssignmentTable({
               </td>
               {includeAssignee && (
                 <td className="px-3 py-2.5">
-                  <div className="text-sm text-foreground truncate">
+                  <div className="text-sm text-ink truncate">
                     {a.assignee?.full_name ?? a.assignee?.email ?? '—'}
                   </div>
                   {a.assignee?.role && (
-                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                    <div className="text-[10px] uppercase tracking-wider text-muted">
                       {a.assignee.role}
                     </div>
                   )}
@@ -825,14 +825,14 @@ export function AssignTrainingModal({
         <button
           onClick={save}
           disabled={busy}
-          className="bg-foreground text-background text-sm px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-50"
+          className="bg-ink text-bg text-sm px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-50"
         >
           {busy ? 'Assigning…' : `Assign ${picked.size || ''}`.trim()}
         </button>
       }
     >
       <label className="block mb-3">
-        <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+        <span className="text-[10px] font-semibold uppercase tracking-widest text-muted">
           Due date (optional)
         </span>
         <input
@@ -842,24 +842,22 @@ export function AssignTrainingModal({
           className="mt-1 w-full text-sm border border-border rounded-md px-2 py-1.5"
         />
       </label>
-      <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1">
+      <div className="text-[10px] font-semibold uppercase tracking-widest text-muted mb-1">
         Select users
       </div>
       <div className="max-h-72 overflow-y-auto border border-border rounded-lg divide-y divide-border">
         {users.length === 0 && (
-          <div className="p-3 text-xs italic text-muted-foreground">No users loaded.</div>
+          <div className="p-3 text-xs italic text-muted">No users loaded.</div>
         )}
         {users.map((u) => (
           <label
             key={u.id}
-            className="flex items-center gap-2 px-3 py-2 hover:bg-muted cursor-pointer"
+            className="flex items-center gap-2 px-3 py-2 hover:bg-hover cursor-pointer"
           >
             <input type="checkbox" checked={picked.has(u.id)} onChange={() => toggle(u.id)} />
             <div className="flex-1 min-w-0">
-              <div className="text-sm text-foreground truncate">{u.full_name ?? u.email}</div>
-              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                {u.role}
-              </div>
+              <div className="text-sm text-ink truncate">{u.full_name ?? u.email}</div>
+              <div className="text-[10px] uppercase tracking-wider text-muted">{u.role}</div>
             </div>
           </label>
         ))}
@@ -915,7 +913,7 @@ export function FeedbackModal({
         <button
           onClick={save}
           disabled={busy}
-          className="bg-foreground text-background text-sm px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-50"
+          className="bg-ink text-bg text-sm px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-50"
         >
           Save
         </button>
@@ -923,7 +921,7 @@ export function FeedbackModal({
     >
       <div className="space-y-3">
         <div>
-          <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1">
+          <div className="text-[10px] font-semibold uppercase tracking-widest text-muted mb-1">
             Rating
           </div>
           <div className="flex gap-1">
@@ -935,7 +933,7 @@ export function FeedbackModal({
                   'w-9 h-9 rounded-md border text-base',
                   n <= rating
                     ? 'bg-amber-100 dark:bg-amber-500/20 border-amber-200 dark:border-amber-500/30 text-amber-700 dark:text-amber-300'
-                    : 'border-border text-muted-foreground',
+                    : 'border-border text-muted',
                 )}
               >
                 ★
@@ -944,7 +942,7 @@ export function FeedbackModal({
           </div>
         </div>
         <label className="block">
-          <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+          <span className="text-[10px] font-semibold uppercase tracking-widest text-muted">
             Feedback
           </span>
           <textarea
@@ -988,7 +986,7 @@ export function DocumentViewer({ url }: { url: string }) {
   return (
     <div className="border border-border rounded-xl overflow-hidden">
       <iframe src={url} className="w-full h-[70dvh]" title="Document" />
-      <div className="px-3 py-2 text-xs text-muted-foreground bg-muted border-t border-border">
+      <div className="px-3 py-2 text-xs text-muted bg-hover border-t border-border">
         <a href={url} target="_blank" rel="noreferrer" className="text-brand-600 hover:underline">
           Open in new tab ↗
         </a>

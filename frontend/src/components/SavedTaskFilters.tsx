@@ -162,9 +162,7 @@ export function SavedTaskFilters({ current, onApply, onLoadDefault }: Props) {
         onClick={() => setOpen((v) => !v)}
         className={clsx(
           'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm',
-          open
-            ? 'bg-foreground border-foreground text-background'
-            : 'bg-card border-border text-foreground hover:bg-muted',
+          open ? 'bg-ink border-ink text-bg' : 'bg-surface border-border text-ink hover:bg-hover',
         )}
         aria-haspopup="menu"
         aria-expanded={open}
@@ -174,12 +172,12 @@ export function SavedTaskFilters({ current, onApply, onLoadDefault }: Props) {
           <span
             className={clsx(
               'text-[10px] font-semibold px-1.5 py-0.5 rounded-full tabular-nums',
-              // On the open button (bg-foreground, which inverts per theme) use
+              // On the open button (bg-ink, which inverts per theme) use
               // literal black/white with opacity — semantic tokens can't take an
               // opacity modifier (var() colors have no <alpha-value> channel).
               open
                 ? 'bg-white/20 text-white dark:bg-black/20 dark:text-black'
-                : 'bg-muted text-muted-foreground',
+                : 'bg-hover text-muted',
             )}
           >
             {filters.length}
@@ -190,10 +188,10 @@ export function SavedTaskFilters({ current, onApply, onLoadDefault }: Props) {
       {open && (
         <div
           role="menu"
-          className="absolute z-30 mt-2 right-0 w-80 bg-card border border-border rounded-xl shadow-lg overflow-hidden"
+          className="absolute z-30 mt-2 right-0 w-80 bg-surface border border-border rounded-xl shadow-lg overflow-hidden"
         >
           <div className="px-3 py-2 border-b border-border flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted">
               My saved filters
             </span>
             <button
@@ -202,7 +200,7 @@ export function SavedTaskFilters({ current, onApply, onLoadDefault }: Props) {
                 setSaveName('');
               }}
               disabled={activeCount === 0}
-              className="text-xs text-brand-600 hover:text-brand-700 disabled:text-muted-foreground"
+              className="text-xs text-brand-600 hover:text-brand-700 disabled:text-muted"
               title={activeCount === 0 ? 'Set some filters first' : 'Save current filters'}
             >
               + Save current
@@ -210,7 +208,7 @@ export function SavedTaskFilters({ current, onApply, onLoadDefault }: Props) {
           </div>
 
           {saveMode && (
-            <div className="px-3 py-2 border-b border-border bg-muted">
+            <div className="px-3 py-2 border-b border-border bg-hover">
               <input
                 autoFocus
                 value={saveName}
@@ -223,7 +221,7 @@ export function SavedTaskFilters({ current, onApply, onLoadDefault }: Props) {
                   }
                 }}
                 placeholder="Filter name (e.g. My open critical)"
-                className="w-full border border-border rounded-md px-2 py-1 text-sm bg-card outline-none focus:ring-2 focus:ring-brand-500/30"
+                className="w-full border border-border rounded-md px-2 py-1 text-sm bg-surface outline-none focus:ring-2 focus:ring-brand-500/30"
               />
               <div className="mt-1.5 flex items-center justify-end gap-2">
                 <button
@@ -231,14 +229,14 @@ export function SavedTaskFilters({ current, onApply, onLoadDefault }: Props) {
                     setSaveMode(false);
                     setSaveName('');
                   }}
-                  className="text-xs text-muted-foreground hover:text-foreground"
+                  className="text-xs text-muted hover:text-ink"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={save}
                   disabled={loading || !saveName.trim()}
-                  className="text-xs bg-foreground text-background px-2.5 py-1 rounded-md disabled:opacity-50"
+                  className="text-xs bg-ink text-bg px-2.5 py-1 rounded-md disabled:opacity-50"
                 >
                   Save
                 </button>
@@ -248,12 +246,12 @@ export function SavedTaskFilters({ current, onApply, onLoadDefault }: Props) {
 
           <div className="max-h-64 overflow-y-auto">
             {filters.length === 0 && !saveMode && (
-              <div className="px-3 py-4 text-sm text-muted-foreground italic">
+              <div className="px-3 py-4 text-sm text-muted italic">
                 No saved filters yet. Set your filters then click “Save current”.
               </div>
             )}
             {filters.map((f) => (
-              <div key={f.id} className="group px-3 py-2 hover:bg-muted flex items-center gap-2">
+              <div key={f.id} className="group px-3 py-2 hover:bg-hover flex items-center gap-2">
                 {renameId === f.id ? (
                   <>
                     <input
@@ -264,7 +262,7 @@ export function SavedTaskFilters({ current, onApply, onLoadDefault }: Props) {
                         if (e.key === 'Enter') rename(f.id);
                         if (e.key === 'Escape') setRenameId(null);
                       }}
-                      className="flex-1 border border-border rounded-md px-2 py-1 text-sm bg-card outline-none focus:ring-2 focus:ring-brand-500/30"
+                      className="flex-1 border border-border rounded-md px-2 py-1 text-sm bg-surface outline-none focus:ring-2 focus:ring-brand-500/30"
                     />
                     <button
                       onClick={() => rename(f.id)}
@@ -280,7 +278,7 @@ export function SavedTaskFilters({ current, onApply, onLoadDefault }: Props) {
                         onApply(f.criteria);
                         setOpen(false);
                       }}
-                      className="flex-1 text-left text-sm text-foreground truncate"
+                      className="flex-1 text-left text-sm text-ink truncate"
                     >
                       <span className="inline-flex items-center gap-1.5">
                         {f.is_default && (
@@ -290,15 +288,13 @@ export function SavedTaskFilters({ current, onApply, onLoadDefault }: Props) {
                         )}
                         <span>{f.name}</span>
                       </span>
-                      <div className="text-[11px] text-muted-foreground truncate">
-                        {summarize(f.criteria)}
-                      </div>
+                      <div className="text-[11px] text-muted truncate">{summarize(f.criteria)}</div>
                     </button>
                     <div className="opacity-0 group-hover:opacity-100 transition flex items-center gap-1">
                       <button
                         onClick={() => setDefault(f.id, !f.is_default)}
                         title={f.is_default ? 'Unset as default' : 'Set as default'}
-                        className="text-xs text-muted-foreground hover:text-amber-500"
+                        className="text-xs text-muted hover:text-amber-500"
                       >
                         {f.is_default ? '★' : '☆'}
                       </button>
@@ -308,14 +304,14 @@ export function SavedTaskFilters({ current, onApply, onLoadDefault }: Props) {
                           setRenameValue(f.name);
                         }}
                         title="Rename"
-                        className="text-xs text-muted-foreground hover:text-foreground"
+                        className="text-xs text-muted hover:text-ink"
                       >
                         ✎
                       </button>
                       <button
                         onClick={() => remove(f.id)}
                         title="Delete"
-                        className="text-xs text-muted-foreground hover:text-red-600"
+                        className="text-xs text-muted hover:text-red-600"
                       >
                         ×
                       </button>

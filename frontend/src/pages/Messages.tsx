@@ -334,12 +334,12 @@ export function Messages() {
       title="Messages"
       crumbs={[{ label: 'Workspace', to: '/dashboard' }, { label: 'Messages' }]}
     >
-      <div className="bg-card border border-border rounded-xl overflow-hidden h-[calc(100dvh-180px)] min-h-[480px] flex flex-col sm:flex-row">
+      <div className="bg-surface border border-border rounded-xl overflow-hidden h-[calc(100dvh-180px)] min-h-[480px] flex flex-col sm:flex-row">
         {/* Left: conversation list. Becomes a full-width column on phones
             (stacked above the chat pane); fixed 20rem rail on tablet+. */}
-        <aside className="w-full sm:w-80 shrink-0 border-b sm:border-b-0 sm:border-r border-border flex flex-col bg-card max-h-72 sm:max-h-none">
+        <aside className="w-full sm:w-80 shrink-0 border-b sm:border-b-0 sm:border-r border-border flex flex-col bg-surface max-h-72 sm:max-h-none">
           <div className="px-4 pt-3.5 pb-2 flex items-center justify-between">
-            <h2 className="text-base font-semibold text-foreground">Chats</h2>
+            <h2 className="text-base font-semibold text-ink">Chats</h2>
           </div>
 
           {/* Persistent search bar — filters chats and, once you type, also
@@ -348,20 +348,20 @@ export function Messages() {
             <div className="relative">
               <IconSearch
                 size={16}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none"
               />
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search or start a new chat"
-                className="w-full text-sm bg-muted/60 rounded-full pl-9 pr-3 py-2 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+                className="w-full text-sm bg-hover/60 rounded-full pl-9 pr-3 py-2 text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-brand-500/40"
               />
             </div>
           </div>
 
           <div className="flex-1 overflow-y-auto">
             {filteredConversations.length === 0 && filteredDirectory.length === 0 ? (
-              <p className="text-xs text-muted-foreground italic px-4 py-6 text-center">
+              <p className="text-xs text-muted italic px-4 py-6 text-center">
                 {conversations.length === 0
                   ? 'No messages yet. Search a name above to start a chat.'
                   : 'No matches.'}
@@ -375,8 +375,8 @@ export function Messages() {
                       key={c.peer.id}
                       onClick={() => setParams({ with: c.peer.id })}
                       className={clsx(
-                        'w-full flex items-start gap-3 px-3 py-3 text-left transition-colors hover:bg-muted/60',
-                        active && 'bg-muted',
+                        'w-full flex items-start gap-3 px-3 py-3 text-left transition-colors hover:bg-hover/60',
+                        active && 'bg-hover',
                       )}
                     >
                       <div className="relative shrink-0">
@@ -388,7 +388,7 @@ export function Messages() {
                       </div>
                       <div className="flex-1 min-w-0 border-b border-border/60 pb-2.5 -mt-0.5">
                         <div className="flex items-baseline justify-between gap-2">
-                          <span className="text-sm font-medium truncate inline-flex items-center gap-1.5 text-foreground">
+                          <span className="text-sm font-medium truncate inline-flex items-center gap-1.5 text-ink">
                             <GroupBadge groupId={c.peer.group_id ?? null} compact hideEmpty />
                             {c.peer.full_name ?? c.peer.email}
                           </span>
@@ -397,7 +397,7 @@ export function Messages() {
                               'text-[11px] shrink-0',
                               c.unread_count > 0
                                 ? 'text-brand-600 dark:text-brand-400 font-semibold'
-                                : 'text-muted-foreground',
+                                : 'text-muted',
                             )}
                           >
                             {relative(c.last_message.created_at)}
@@ -407,9 +407,7 @@ export function Messages() {
                           <p
                             className={clsx(
                               'text-xs truncate',
-                              c.unread_count > 0
-                                ? 'text-foreground font-medium'
-                                : 'text-muted-foreground',
+                              c.unread_count > 0 ? 'text-ink font-medium' : 'text-muted',
                             )}
                           >
                             {c.last_message.sender_id === profile?.id ? 'You: ' : ''}
@@ -428,7 +426,7 @@ export function Messages() {
 
                 {filteredDirectory.length > 0 && (
                   <>
-                    <div className="px-4 pt-3 pb-1 text-[10px] uppercase tracking-widest text-muted-foreground">
+                    <div className="px-4 pt-3 pb-1 text-[10px] uppercase tracking-widest text-muted">
                       People
                     </div>
                     {filteredDirectory.map((p) => (
@@ -438,7 +436,7 @@ export function Messages() {
                           setParams({ with: p.id });
                           setSearch('');
                         }}
-                        className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-muted/60 text-left transition-colors"
+                        className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-hover/60 text-left transition-colors"
                       >
                         <div className="relative shrink-0">
                           <Avatar name={p.full_name} email={p.email} size={40} />
@@ -449,10 +447,8 @@ export function Messages() {
                           />
                         </div>
                         <div className="min-w-0">
-                          <div className="text-sm text-foreground truncate">
-                            {p.full_name ?? p.email}
-                          </div>
-                          <div className="text-[10px] uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                          <div className="text-sm text-ink truncate">{p.full_name ?? p.email}</div>
+                          <div className="text-[10px] uppercase tracking-wider text-muted flex items-center gap-1.5">
                             <span>{p.role && ROLE_LABEL[p.role]}</span>
                             <GroupBadge groupId={p.group_id ?? null} compact hideEmpty />
                           </div>
@@ -469,12 +465,12 @@ export function Messages() {
         {/* Right: active thread */}
         <main className="flex-1 flex flex-col min-w-0">
           {!activePeer ? (
-            <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm bg-muted/30">
+            <div className="flex-1 flex items-center justify-center text-muted text-sm bg-hover/30">
               Select a conversation, or search a name to start a new one.
             </div>
           ) : (
             <>
-              <header className="px-5 py-3 border-b border-border flex items-center gap-3 bg-card">
+              <header className="px-5 py-3 border-b border-border flex items-center gap-3 bg-surface">
                 <div className="relative shrink-0">
                   <Avatar name={activePeer.full_name} email={activePeer.email} size={40} />
                   <PresenceDot
@@ -483,29 +479,29 @@ export function Messages() {
                   />
                 </div>
                 <div className="leading-tight min-w-0">
-                  <div className="text-sm font-semibold text-foreground flex items-center gap-2">
+                  <div className="text-sm font-semibold text-ink flex items-center gap-2">
                     <span className="truncate">{activePeer.full_name ?? activePeer.email}</span>
                     <PresencePill lastSeenAt={activePeer.last_seen_at} />
                   </div>
-                  <div className="text-[11px] text-muted-foreground truncate">
+                  <div className="text-[11px] text-muted truncate">
                     {activePeer.role && ROLE_LABEL[activePeer.role]} · {activePeer.email}
                   </div>
                 </div>
                 {/* Header actions — visual affordances matching a standard chat
                     header. Call/video are placeholders (no telephony backend);
                     search toggles the chat-list search box focus. */}
-                <div className="ml-auto flex items-center gap-1 text-muted-foreground">
+                <div className="ml-auto flex items-center gap-1 text-muted">
                   <button
                     type="button"
                     title="Video call (coming soon)"
-                    className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-muted hover:text-foreground transition-colors"
+                    className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-hover hover:text-ink transition-colors"
                   >
                     <IconVideo size={18} />
                   </button>
                   <button
                     type="button"
                     title="Voice call (coming soon)"
-                    className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-muted hover:text-foreground transition-colors"
+                    className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-hover hover:text-ink transition-colors"
                   >
                     <IconPhone size={18} />
                   </button>
@@ -517,13 +513,13 @@ export function Messages() {
                 // instead of the messages + composer. The user can pick a
                 // different conversation from the sidebar, or hit the "Back
                 // to inbox" button to clear the ?with= URL param.
-                <div className="flex-1 flex items-center justify-center px-6 py-8 bg-muted/30">
+                <div className="flex-1 flex items-center justify-center px-6 py-8 bg-hover/30">
                   <div className="max-w-sm text-center space-y-3">
-                    <div className="text-4xl text-muted-foreground">🔒</div>
-                    <h3 className="text-base font-semibold text-foreground">
+                    <div className="text-4xl text-muted">🔒</div>
+                    <h3 className="text-base font-semibold text-ink">
                       Conversation no longer available
                     </h3>
-                    <p className="text-sm text-muted-foreground leading-snug">
+                    <p className="text-sm text-muted leading-snug">
                       You no longer have access to this conversation — your team assignment may have
                       changed. Past messages are preserved; they'll come back if access is restored.
                     </p>
@@ -534,7 +530,7 @@ export function Messages() {
                         next.delete('with');
                         setParams(next, { replace: true });
                       }}
-                      className="mt-2 inline-flex items-center bg-foreground text-background text-sm px-4 py-2 rounded-lg hover:opacity-90"
+                      className="mt-2 inline-flex items-center bg-ink text-bg text-sm px-4 py-2 rounded-lg hover:opacity-90"
                     >
                       ← Back to inbox
                     </button>
@@ -545,17 +541,17 @@ export function Messages() {
                   <div
                     ref={scrollContainerRef}
                     onScroll={onScrollMessages}
-                    className="flex-1 overflow-y-auto px-5 py-4 space-y-3 bg-muted/30"
+                    className="flex-1 overflow-y-auto px-5 py-4 space-y-3 bg-hover/30"
                   >
                     {messages.length === 0 ? (
-                      <p className="text-center text-sm text-muted-foreground italic mt-6">
+                      <p className="text-center text-sm text-muted italic mt-6">
                         No messages yet — say hello!
                       </p>
                     ) : (
                       groupByDay(messages).map(({ day, items }) => (
                         <div key={day}>
                           <div className="text-center my-2">
-                            <span className="text-[10px] uppercase tracking-widest text-muted-foreground bg-card border border-border px-2 py-0.5 rounded-full">
+                            <span className="text-[10px] uppercase tracking-widest text-muted bg-surface border border-border px-2 py-0.5 rounded-full">
                               {day}
                             </span>
                           </div>
@@ -625,7 +621,7 @@ export function Messages() {
                       e.preventDefault();
                       send();
                     }}
-                    className="border-t border-border px-3 py-3 flex items-end gap-2 bg-card"
+                    className="border-t border-border px-3 py-3 flex items-end gap-2 bg-surface"
                   >
                     <textarea
                       value={draft}
@@ -638,7 +634,7 @@ export function Messages() {
                       }}
                       rows={1}
                       placeholder="Write a message… (Shift+Enter for newline)"
-                      className="flex-1 resize-none bg-muted/60 rounded-2xl px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-brand-500/40 max-h-32"
+                      className="flex-1 resize-none bg-hover/60 rounded-2xl px-4 py-2.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-brand-500/40 max-h-32"
                     />
                     <button
                       type="submit"
@@ -709,12 +705,12 @@ function Bubble({
       {/* Sender-side action menu — only renders for own messages, only when
           hovered. Edit/Delete callbacks come from the parent. */}
       {mine && (onEdit || onDelete) && hovered && !editing && (
-        <div className="absolute -top-3 right-1 inline-flex gap-1 bg-card border border-border rounded-full shadow-sm px-1 py-0.5 text-[11px] z-10">
+        <div className="absolute -top-3 right-1 inline-flex gap-1 bg-surface border border-border rounded-full shadow-sm px-1 py-0.5 text-[11px] z-10">
           {onEdit && (
             <button
               type="button"
               onClick={() => setEditing(true)}
-              className="px-1.5 text-muted-foreground hover:text-foreground"
+              className="px-1.5 text-muted hover:text-ink"
               title="Edit message"
             >
               ✎
@@ -738,7 +734,7 @@ function Bubble({
           'max-w-[70%] px-3 py-2 rounded-2xl text-sm whitespace-pre-wrap break-words shadow-sm',
           mine
             ? 'bg-brand-600 text-white rounded-br-sm'
-            : 'bg-card border border-border text-foreground rounded-bl-sm',
+            : 'bg-surface border border-border text-ink rounded-bl-sm',
         )}
       >
         {editing ? (
@@ -759,9 +755,7 @@ function Bubble({
               rows={Math.max(1, Math.min(6, draft.split('\n').length))}
               className={clsx(
                 'w-full resize-none rounded text-sm px-1.5 py-1 focus:outline-none',
-                mine
-                  ? 'bg-brand-700/40 text-white placeholder:text-white/60'
-                  : 'bg-muted text-foreground',
+                mine ? 'bg-brand-700/40 text-white placeholder:text-white/60' : 'bg-hover text-ink',
               )}
             />
             <div className="flex justify-end gap-1 text-[11px]">
@@ -770,9 +764,7 @@ function Bubble({
                 onClick={cancelEdit}
                 className={clsx(
                   'px-2 py-0.5 rounded',
-                  mine
-                    ? 'text-white/70 hover:text-white'
-                    : 'text-muted-foreground hover:text-foreground',
+                  mine ? 'text-white/70 hover:text-white' : 'text-muted hover:text-ink',
                 )}
               >
                 Cancel
@@ -785,7 +777,7 @@ function Bubble({
                   'px-2 py-0.5 rounded font-semibold disabled:opacity-50',
                   mine
                     ? 'bg-white/15 text-white hover:bg-white/25'
-                    : 'bg-foreground text-background hover:opacity-90',
+                    : 'bg-ink text-bg hover:opacity-90',
                 )}
               >
                 Save
@@ -798,7 +790,7 @@ function Bubble({
             <div
               className={clsx(
                 'text-[10px] mt-1 inline-flex items-center gap-1',
-                mine ? 'text-white/70' : 'text-muted-foreground',
+                mine ? 'text-white/70' : 'text-muted',
               )}
             >
               {new Date(message.created_at).toLocaleTimeString([], {
@@ -806,7 +798,7 @@ function Bubble({
                 minute: '2-digit',
               })}
               {message.edited_at && (
-                <span className={mine ? 'text-white/60' : 'text-muted-foreground'}>· edited</span>
+                <span className={mine ? 'text-white/60' : 'text-muted'}>· edited</span>
               )}
             </div>
           </>

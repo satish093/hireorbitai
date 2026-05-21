@@ -46,7 +46,7 @@ export function JobDetail() {
   return (
     <Layout title="Job detail" crumbs={[{ label: 'Jobs', to: '/jobs' }, { label: 'Detail' }]}>
       <div className="mb-4">
-        <Link to="/jobs" className="text-sm text-muted-foreground hover:text-foreground">
+        <Link to="/jobs" className="text-sm text-muted hover:text-ink">
           ← Back to jobs
         </Link>
       </div>
@@ -64,7 +64,7 @@ export function JobDetail() {
             action={
               <Link
                 to="/jobs"
-                className="text-sm px-4 py-2 rounded-lg bg-foreground text-background hover:opacity-90"
+                className="text-sm px-4 py-2 rounded-lg bg-ink text-bg hover:opacity-90"
               >
                 Browse jobs
               </Link>

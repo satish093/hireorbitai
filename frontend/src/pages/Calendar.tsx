@@ -138,25 +138,25 @@ export function Calendar() {
         title="Calendar"
         description="Interviews and reminders across the month. Click a date to filter the list below."
         action={
-          <div className="inline-flex items-center gap-1 bg-card border border-border rounded-lg p-1 shadow-sm">
+          <div className="inline-flex items-center gap-1 bg-surface border border-border rounded-lg p-1 shadow-sm">
             <button
               onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}
-              className="w-7 h-7 inline-flex items-center justify-center rounded-md text-muted-foreground hover:bg-muted"
+              className="w-7 h-7 inline-flex items-center justify-center rounded-md text-muted hover:bg-hover"
               aria-label="Previous month"
             >
               ‹
             </button>
-            <span className="text-sm font-medium text-foreground min-w-[120px] text-center">
+            <span className="text-sm font-medium text-ink min-w-[120px] text-center">
               {month.toLocaleString(undefined, { month: 'long', year: 'numeric' })}
             </span>
             <button
               onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}
-              className="w-7 h-7 inline-flex items-center justify-center rounded-md text-muted-foreground hover:bg-muted"
+              className="w-7 h-7 inline-flex items-center justify-center rounded-md text-muted hover:bg-hover"
               aria-label="Next month"
             >
               ›
             </button>
-            <span className="w-px h-5 bg-muted mx-1" />
+            <span className="w-px h-5 bg-hover mx-1" />
             <Button
               size="sm"
               variant="ghost"
@@ -171,12 +171,12 @@ export function Calendar() {
         }
       />
 
-      <div className="bg-card border border-border rounded-xl overflow-hidden">
-        <div className="grid grid-cols-7 border-b border-border bg-muted">
+      <div className="bg-surface border border-border rounded-xl overflow-hidden">
+        <div className="grid grid-cols-7 border-b border-border bg-hover">
           {DOW.map((d) => (
             <div
               key={d}
-              className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground px-3 py-2"
+              className="text-[10px] font-semibold uppercase tracking-widest text-muted px-3 py-2"
             >
               {d}
             </div>
@@ -211,17 +211,13 @@ export function Calendar() {
                   'cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40',
                   (idx + 1) % 7 === 0 && 'border-r-0',
                   idx >= cells.length - 7 && 'border-b-0',
-                  sel ? 'bg-brand-50 ring-1 ring-inset ring-brand-300' : 'hover:bg-muted',
+                  sel ? 'bg-brand-50 ring-1 ring-inset ring-brand-300' : 'hover:bg-hover',
                 )}
               >
                 <div
                   className={clsx(
                     'text-xs font-semibold mb-1.5 inline-flex items-center justify-center w-6 h-6 rounded-full',
-                    today_
-                      ? 'bg-foreground text-background'
-                      : sel
-                        ? 'bg-brand-600 text-white'
-                        : 'text-foreground',
+                    today_ ? 'bg-ink text-bg' : sel ? 'bg-brand-600 text-white' : 'text-ink',
                   )}
                 >
                   {d.getDate()}
@@ -249,9 +245,7 @@ export function Calendar() {
                     </div>
                   ))}
                 {dayEvents.length > 3 && (
-                  <div className="text-[10px] text-muted-foreground mt-0.5">
-                    +{dayEvents.length - 3} more
-                  </div>
+                  <div className="text-[10px] text-muted mt-0.5">+{dayEvents.length - 3} more</div>
                 )}
               </button>
             );
@@ -262,7 +256,7 @@ export function Calendar() {
       {/* Detail list — defaults to today, follows the user's day selection. */}
       <div className="mt-5">
         <div className="flex items-center justify-between mb-2">
-          <h2 className="text-sm font-semibold text-foreground">
+          <h2 className="text-sm font-semibold text-ink">
             {customSelected
               ? focusDate.toLocaleDateString(undefined, {
                   weekday: 'long',
@@ -270,7 +264,7 @@ export function Calendar() {
                   day: 'numeric',
                 })
               : 'Today'}
-            <span className="ml-2 text-xs font-normal text-muted-foreground">
+            <span className="ml-2 text-xs font-normal text-muted">
               {focusEvents.length} event{focusEvents.length === 1 ? '' : 's'}
             </span>
           </h2>
@@ -278,24 +272,24 @@ export function Calendar() {
             <button
               type="button"
               onClick={() => setSelectedDate(null)}
-              className="text-xs text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
+              className="text-xs text-muted hover:text-ink underline-offset-2 hover:underline"
             >
               Clear ✕
             </button>
           )}
         </div>
-        <div className="bg-card border border-border rounded-xl divide-y divide-border">
+        <div className="bg-surface border border-border rounded-xl divide-y divide-border">
           {focusEvents.length === 0 ? (
-            <div className="px-4 py-6 text-sm text-muted-foreground italic text-center">
+            <div className="px-4 py-6 text-sm text-muted italic text-center">
               {customSelected ? 'Nothing scheduled this day.' : 'Nothing scheduled today.'}
             </div>
           ) : (
             focusEvents.map((e) => (
               <div key={e.id} className="px-4 py-3 flex items-center gap-3">
-                <div className="w-16 text-xs font-mono text-muted-foreground">
+                <div className="w-16 text-xs font-mono text-muted">
                   {new Date(e.when).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
                 </div>
-                <div className="flex-1 min-w-0 text-sm text-foreground truncate">{e.title}</div>
+                <div className="flex-1 min-w-0 text-sm text-ink truncate">{e.title}</div>
                 <span
                   className={clsx(
                     'text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded',

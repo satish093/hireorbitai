@@ -51,8 +51,11 @@
   --card-foreground: var(--ink);
   --popover: var(--bg-elev);
   --popover-foreground: var(--ink);
-  --primary: var(--ink); /* legacy "primary" CTA → near-black per new system */
-  --primary-foreground: var(--bg);
+  /* Old indigo "primary" was the brand color (badges, active states, links).
+   * The new brand color is the purple accent; actual CTA buttons now go
+   * through <Button variant="primary"> (ink), so map the token to accent. */
+  --primary: var(--accent);
+  --primary-foreground: var(--accent-fg);
   --secondary: var(--ink);
   --secondary-foreground: var(--bg);
   --muted-foreground: var(--muted);

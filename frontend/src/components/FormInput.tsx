@@ -40,7 +40,7 @@ export const FormInput = forwardRef<HTMLInputElement, Props>(function FormInput(
       {error ? (
         <span className="block text-xs text-red-600 dark:text-red-400 mt-1">{error}</span>
       ) : (
-        hint && <span className="block text-[11px] text-muted-foreground mt-1">{hint}</span>
+        hint && <span className="block text-[11px] text-muted mt-1">{hint}</span>
       )}
     </label>
   );

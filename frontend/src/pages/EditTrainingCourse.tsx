@@ -122,14 +122,14 @@ export function EditTrainingCourse() {
     >
       <div className="max-w-2xl">
         <h1 className="text-2xl font-semibold tracking-tight mb-5">Edit course</h1>
-        <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
+        <div className="bg-surface border border-border rounded-2xl p-6 space-y-4">
           <Field
             label="Title"
             value={form.title}
             onChange={(v) => setForm({ ...form, title: v })}
           />
           <label className="block">
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted">
               Description
             </span>
             <textarea
@@ -178,7 +178,7 @@ export function EditTrainingCourse() {
         </div>
 
         {/* I-983 STEM-OPT Training Plan metadata. */}
-        <div className="bg-card border border-border rounded-2xl p-6 space-y-4 mt-4">
+        <div className="bg-surface border border-border rounded-2xl p-6 space-y-4 mt-4">
           <div className="flex items-center gap-2">
             <span className="text-[10px] font-semibold uppercase tracking-widest text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/30 px-2 py-0.5 rounded-full">
               I-983
@@ -219,14 +219,14 @@ export function EditTrainingCourse() {
         <div className="flex justify-end gap-2 mt-4">
           <button
             onClick={() => nav(-1)}
-            className="border border-border text-foreground text-sm px-4 py-2 rounded-lg hover:bg-muted"
+            className="border border-border text-ink text-sm px-4 py-2 rounded-lg hover:bg-hover"
           >
             Cancel
           </button>
           <button
             onClick={save}
             disabled={saving}
-            className="bg-foreground text-background text-sm font-semibold px-5 py-2 rounded-lg hover:opacity-90 disabled:opacity-50"
+            className="bg-ink text-bg text-sm font-semibold px-5 py-2 rounded-lg hover:opacity-90 disabled:opacity-50"
           >
             {saving ? 'Saving…' : 'Save'}
           </button>
@@ -249,7 +249,7 @@ function Field({
 }) {
   return (
     <label className="block">
-      <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+      <span className="text-[10px] font-semibold uppercase tracking-widest text-muted">
         {label}
       </span>
       <input
@@ -274,7 +274,7 @@ function TextArea({
 }) {
   return (
     <label className="block">
-      <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+      <span className="text-[10px] font-semibold uppercase tracking-widest text-muted">
         {label}
       </span>
       <textarea
@@ -299,13 +299,13 @@ function Selector({
 }) {
   return (
     <label className="block">
-      <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+      <span className="text-[10px] font-semibold uppercase tracking-widest text-muted">
         {label}
       </span>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="mt-1 w-full text-sm border border-border rounded-md px-2 py-1.5 bg-card"
+        className="mt-1 w-full text-sm border border-border rounded-md px-2 py-1.5 bg-surface"
       >
         {options.map((o) => (
           <option key={o} value={o}>

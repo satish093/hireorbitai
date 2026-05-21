@@ -150,15 +150,15 @@ export function AcceptInvitation() {
   }
 
   return (
-    <div className="min-h-dvh bg-muted flex items-center justify-center p-4 sm:p-6">
+    <div className="min-h-dvh bg-hover flex items-center justify-center p-4 sm:p-6">
       <div className="w-full max-w-md animate-fade-in-up">
         <div className="flex justify-center mb-6">
           <Brand size="lg" />
         </div>
 
-        <div className="bg-card rounded-2xl border border-border shadow-sm p-8">
+        <div className="bg-surface rounded-2xl border border-border shadow-sm p-8">
           {loading ? (
-            <p className="text-sm text-muted-foreground text-center">Loading invitation…</p>
+            <p className="text-sm text-muted text-center">Loading invitation…</p>
           ) : error ? (
             <ErrorState message={error} />
           ) : !preview ? (
@@ -169,15 +169,13 @@ export function AcceptInvitation() {
             <ErrorState message="This invitation has been revoked." />
           ) : preview.status === 'ACCEPTED' ? (
             <div className="text-center space-y-3">
-              <h1 className="text-xl font-semibold tracking-tight text-foreground">
-                Already accepted
-              </h1>
-              <p className="text-sm text-muted-foreground">
+              <h1 className="text-xl font-semibold tracking-tight text-ink">Already accepted</h1>
+              <p className="text-sm text-muted">
                 This invitation has been used. Sign in to continue.
               </p>
               <button
                 onClick={() => nav('/login')}
-                className="bg-foreground text-background text-sm px-4 py-2 rounded-lg press"
+                className="bg-ink text-bg text-sm px-4 py-2 rounded-lg press"
               >
                 Go to sign in
               </button>
@@ -188,13 +186,12 @@ export function AcceptInvitation() {
                 <div className="text-[10px] font-semibold tracking-widest text-brand-700 uppercase mb-1">
                   You've been invited
                 </div>
-                <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+                <h1 className="text-2xl font-semibold tracking-tight text-ink">
                   Set up your account
                 </h1>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Joining as{' '}
-                  <span className="font-medium text-foreground">{roleLabel(preview.role)}</span> ·{' '}
-                  <span className="text-foreground">{preview.email}</span>
+                <p className="text-sm text-muted mt-1">
+                  Joining as <span className="font-medium text-ink">{roleLabel(preview.role)}</span>{' '}
+                  · <span className="text-ink">{preview.email}</span>
                 </p>
               </div>
 
@@ -233,12 +230,12 @@ export function AcceptInvitation() {
 
               <button
                 disabled={submitting}
-                className="w-full bg-foreground hover:opacity-90 disabled:opacity-50 text-background rounded-lg py-2.5 text-sm font-medium press"
+                className="w-full bg-ink hover:opacity-90 disabled:opacity-50 text-bg rounded-lg py-2.5 text-sm font-medium press"
               >
                 {submitting ? 'Creating account…' : 'Create account & continue'}
               </button>
 
-              <p className="text-xs text-muted-foreground text-center">
+              <p className="text-xs text-muted text-center">
                 Expires {new Date(preview.expires_at).toLocaleString()}
               </p>
             </form>
@@ -253,10 +250,8 @@ function ErrorState({ message }: { message: string }) {
   const nav = useNavigate();
   return (
     <div className="text-center space-y-3">
-      <h1 className="text-xl font-semibold tracking-tight text-foreground">
-        Can't open this invitation
-      </h1>
-      <p className="text-sm text-muted-foreground">{message}</p>
+      <h1 className="text-xl font-semibold tracking-tight text-ink">Can't open this invitation</h1>
+      <p className="text-sm text-muted">{message}</p>
       <button onClick={() => nav('/login')} className="text-sm text-brand-700 hover:underline">
         Back to sign in
       </button>

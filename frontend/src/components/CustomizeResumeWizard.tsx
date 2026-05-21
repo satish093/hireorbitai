@@ -172,7 +172,7 @@ export function CustomizeResumeWizard({
       onClick={onClose}
     >
       <div
-        className="bg-card rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden"
+        className="bg-surface rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <header className="px-6 py-5 border-b border-border bg-gradient-to-br from-slate-50 to-white">
@@ -181,16 +181,12 @@ export function CustomizeResumeWizard({
               <div className="inline-flex items-center gap-1.5 text-[10px] font-semibold tracking-widest uppercase mb-1.5 text-brand-700 bg-brand-50 border border-brand-100 px-2 py-0.5 rounded-full">
                 <span>✦</span> Fix My Resume · Targeting 85%+ ATS
               </div>
-              <h2 className="text-xl font-semibold text-foreground leading-tight truncate">
-                {job.title}
-              </h2>
-              <div className="text-sm text-muted-foreground">
-                {job.company_name ?? 'Unknown company'}
-              </div>
+              <h2 className="text-xl font-semibold text-ink leading-tight truncate">{job.title}</h2>
+              <div className="text-sm text-muted">{job.company_name ?? 'Unknown company'}</div>
             </div>
             <button
               onClick={onClose}
-              className="text-muted-foreground hover:text-foreground hover:bg-muted rounded-md w-8 h-8 flex items-center justify-center text-xl leading-none shrink-0"
+              className="text-muted hover:text-ink hover:bg-hover rounded-md w-8 h-8 flex items-center justify-center text-xl leading-none shrink-0"
             >
               ×
             </button>
@@ -255,9 +251,7 @@ export function CustomizeResumeWizard({
             >
               <div className="flex flex-wrap gap-1.5">
                 {missingFromJob.length === 0 ? (
-                  <span className="text-xs text-muted-foreground italic">
-                    No missing keywords detected.
-                  </span>
+                  <span className="text-xs text-muted italic">No missing keywords detected.</span>
                 ) : (
                   missingFromJob.map((k) => (
                     <Chip
@@ -273,7 +267,7 @@ export function CustomizeResumeWizard({
               </div>
             </Section>
 
-            <div className="bg-muted border border-border rounded-xl p-3 text-xs text-muted-foreground">
+            <div className="bg-hover border border-border rounded-xl p-3 text-xs text-muted">
               The AI rewrites only the sections you select and only weaves in keywords you've
               checked. It never invents credentials or jobs that aren't already on your resume.
             </div>
@@ -300,7 +294,7 @@ export function CustomizeResumeWizard({
 
             {result.changes_summary?.length > 0 && (
               <Section title="What changed">
-                <ul className="space-y-1 text-sm text-foreground">
+                <ul className="space-y-1 text-sm text-ink">
                   {result.changes_summary.map((c, i) => (
                     <li key={i} className="flex items-start gap-1.5">
                       <span className="text-emerald-500">+</span>
@@ -327,7 +321,7 @@ export function CustomizeResumeWizard({
             )}
 
             <Section title="Tailored resume (markdown preview)">
-              <pre className="max-h-72 overflow-y-auto text-xs bg-muted border border-border rounded-lg p-3 whitespace-pre-wrap text-foreground">
+              <pre className="max-h-72 overflow-y-auto text-xs bg-hover border border-border rounded-lg p-3 whitespace-pre-wrap text-ink">
                 {result.tailored_markdown}
               </pre>
             </Section>
@@ -338,17 +332,17 @@ export function CustomizeResumeWizard({
         {result && confirming && (
           <div className="flex-1 overflow-y-auto px-6 py-8">
             <div className="text-center">
-              <div className="text-base font-semibold text-foreground mb-2">
+              <div className="text-base font-semibold text-ink mb-2">
                 Did you submit the application?
               </div>
-              <p className="text-sm text-muted-foreground max-w-md mx-auto mb-5">
+              <p className="text-sm text-muted max-w-md mx-auto mb-5">
                 We just opened the company's apply page in a new tab. Confirm "Yes" to record this
                 submission against the consultant. We'll attach the tailored resume.
               </p>
               <div className="flex justify-center gap-3">
                 <button
                   onClick={() => confirmApplied(false)}
-                  className="border border-border text-foreground text-sm px-5 py-2 rounded-lg hover:bg-muted"
+                  className="border border-border text-ink text-sm px-5 py-2 rounded-lg hover:bg-hover"
                 >
                   No, not yet
                 </button>
@@ -364,7 +358,7 @@ export function CustomizeResumeWizard({
         )}
 
         {/* Footer actions */}
-        <footer className="px-6 py-3 border-t border-border bg-muted flex items-center justify-end gap-3">
+        <footer className="px-6 py-3 border-t border-border bg-hover flex items-center justify-end gap-3">
           {!result && !confirming && (
             <button
               onClick={generate}
@@ -378,13 +372,13 @@ export function CustomizeResumeWizard({
             <>
               <button
                 onClick={download}
-                className="text-sm text-muted-foreground hover:text-foreground px-3 py-2 underline underline-offset-2"
+                className="text-sm text-muted hover:text-ink px-3 py-2 underline underline-offset-2"
               >
                 ⬇ Download .md
               </button>
               <button
                 onClick={openApplyPage}
-                className="bg-foreground hover:opacity-90 text-background text-sm font-semibold px-5 py-2 rounded-lg"
+                className="bg-ink hover:opacity-90 text-bg text-sm font-semibold px-5 py-2 rounded-lg"
               >
                 Open apply page ↗
               </button>
@@ -399,10 +393,10 @@ export function CustomizeResumeWizard({
 function Section({ title, sub, children }: { title: string; sub?: string; children: any }) {
   return (
     <div>
-      <div className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase mb-1.5">
+      <div className="text-[10px] font-semibold tracking-widest text-muted uppercase mb-1.5">
         {title}
       </div>
-      {sub && <p className="text-xs text-muted-foreground mb-2">{sub}</p>}
+      {sub && <p className="text-xs text-muted mb-2">{sub}</p>}
       {children}
     </div>
   );
@@ -420,13 +414,11 @@ function Chip({
   tone?: 'slate' | 'rose';
 }) {
   const onStyles =
-    tone === 'rose'
-      ? 'bg-rose-500 text-white border-rose-500'
-      : 'bg-foreground text-background border-foreground';
+    tone === 'rose' ? 'bg-rose-500 text-white border-rose-500' : 'bg-ink text-bg border-ink';
   const offStyles =
     tone === 'rose'
       ? 'bg-rose-50 dark:bg-rose-500/15 text-rose-800 dark:text-rose-300 border-rose-100 dark:border-rose-500/20 hover:bg-rose-100'
-      : 'bg-card text-foreground border-border hover:bg-muted';
+      : 'bg-surface text-ink border-border hover:bg-hover';
   return (
     <button
       onClick={onClick}
@@ -454,15 +446,13 @@ function ScoreCard({
 }) {
   const cls =
     tone === 'emerald'
-      ? 'from-emerald-50 to-card dark:from-emerald-500/10 border-emerald-100 dark:border-emerald-500/20'
-      : 'from-muted to-card border-border';
+      ? 'from-emerald-50 to-surface dark:from-emerald-500/10 border-emerald-100 dark:border-emerald-500/20'
+      : 'from-muted to-surface border-border';
   return (
     <div className={`rounded-xl border bg-gradient-to-br p-4 ${cls}`}>
-      <div className="text-[10px] font-semibold tracking-widest uppercase text-muted-foreground">
-        {label}
-      </div>
-      <div className="text-3xl font-semibold tabular-nums text-foreground">{value}%</div>
-      {sub && <div className="text-xs text-muted-foreground mt-0.5">{sub}</div>}
+      <div className="text-[10px] font-semibold tracking-widest uppercase text-muted">{label}</div>
+      <div className="text-3xl font-semibold tabular-nums text-ink">{value}%</div>
+      {sub && <div className="text-xs text-muted mt-0.5">{sub}</div>}
     </div>
   );
 }
@@ -484,7 +474,7 @@ function Step({
         'flex items-center gap-1.5',
         active && 'text-brand-700',
         done && 'text-emerald-700 dark:text-emerald-300',
-        !active && !done && 'text-muted-foreground',
+        !active && !done && 'text-muted',
       )}
     >
       <span
@@ -494,7 +484,7 @@ function Step({
             ? 'bg-brand-100 text-brand-700 ring-2 ring-brand-300'
             : done
               ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
-              : 'bg-muted text-muted-foreground',
+              : 'bg-hover text-muted',
         )}
       >
         {done ? '✓' : n}
@@ -504,7 +494,7 @@ function Step({
   );
 }
 function Sep() {
-  return <span className="text-muted-foreground">—</span>;
+  return <span className="text-muted">—</span>;
 }
 
 // Mark the second use of useEffect for future expansion (keeps the

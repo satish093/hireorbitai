@@ -317,7 +317,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps = {}
       )}
       <aside
         className={clsx(
-          'w-60 shrink-0 bg-card border-r border-border flex flex-col',
+          'w-60 shrink-0 bg-surface border-r border-border flex flex-col',
           // Desktop: static column inside the flex shell.
           'md:static md:min-h-dvh md:translate-x-0',
           // Mobile: fixed slide-over with a translate transition. Uses dvh so
@@ -335,7 +335,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps = {}
             type="button"
             onClick={onMobileClose}
             aria-label="Close navigation"
-            className="md:hidden -mr-1 w-8 h-8 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted"
+            className="md:hidden -mr-1 w-8 h-8 inline-flex items-center justify-center rounded-md text-muted hover:text-ink hover:bg-hover"
           >
             ✕
           </button>
@@ -352,7 +352,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps = {}
             if (visible.length === 0) return null;
             return (
               <div key={section.heading}>
-                <div className="px-2 mb-1.5 text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">
+                <div className="px-2 mb-1.5 text-[10px] font-semibold tracking-widest text-muted uppercase">
                   {section.heading}
                 </div>
                 <div className="space-y-0.5">
@@ -369,7 +369,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps = {}
                             'group relative flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-sm transition-all duration-200 ease-out',
                             isActive
                               ? 'bg-brand-50 text-brand-700 font-medium'
-                              : 'text-foreground hover:bg-muted hover:text-foreground hover:translate-x-0.5',
+                              : 'text-ink hover:bg-hover hover:text-ink hover:translate-x-0.5',
                           )
                         }
                       >
@@ -389,9 +389,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps = {}
                               size={17}
                               className={clsx(
                                 'shrink-0 transition-colors',
-                                isActive
-                                  ? 'text-brand-600'
-                                  : 'text-muted-foreground group-hover:text-foreground',
+                                isActive ? 'text-brand-600' : 'text-muted group-hover:text-ink',
                               )}
                             />
                             <span className="flex-1 truncate">{i.label}</span>
@@ -400,7 +398,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps = {}
                                 key={badge}
                                 className={clsx(
                                   'text-[10px] font-semibold px-1.5 py-0.5 rounded-full tabular-nums animate-pop',
-                                  isActive ? 'bg-brand-600 text-white' : 'bg-muted text-foreground',
+                                  isActive ? 'bg-brand-600 text-white' : 'bg-hover text-ink',
                                 )}
                               >
                                 {badge}
@@ -419,26 +417,26 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps = {}
 
         {/* User card pinned to bottom */}
         <div className="border-t border-border p-3">
-          <div className="flex items-center gap-2.5 px-1.5 py-1.5 rounded-md hover:bg-muted">
+          <div className="flex items-center gap-2.5 px-1.5 py-1.5 rounded-md hover:bg-hover">
             <NavLink
               to={profile?.id ? `/users/${profile.id}` : '#'}
               data-tour="nav-profile"
-              className="flex items-center gap-2.5 flex-1 min-w-0 hover:bg-muted rounded-md -mx-1 px-1 py-0.5"
+              className="flex items-center gap-2.5 flex-1 min-w-0 hover:bg-hover rounded-md -mx-1 px-1 py-0.5"
               title="View your profile"
             >
               <div className="relative">
                 <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 flex items-center justify-center text-xs font-semibold">
                   {initials(profile?.full_name, profile?.email)}
                 </div>
-                <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-card rounded-full">
+                <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-surface rounded-full">
                   <span className="absolute inset-0 rounded-full bg-emerald-500 animate-ping opacity-60" />
                 </span>
               </div>
               <div className="flex-1 min-w-0 leading-tight">
-                <div className="text-[13px] font-medium text-foreground truncate">
+                <div className="text-[13px] font-medium text-ink truncate">
                   {profile?.full_name ?? profile?.email}
                 </div>
-                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                <div className="text-[10px] uppercase tracking-wider text-muted">
                   {role && ROLE_LABEL[role]}
                 </div>
               </div>
@@ -446,7 +444,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps = {}
             <button
               onClick={signOut}
               title="Sign out"
-              className="text-muted-foreground hover:text-foreground p-1.5 rounded-md hover:bg-muted transition-colors"
+              className="text-muted hover:text-ink p-1.5 rounded-md hover:bg-hover transition-colors"
             >
               <IconLogOut size={16} />
             </button>

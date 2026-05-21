@@ -34,19 +34,19 @@ export function TrainingDashboard() {
         <div className="flex items-center gap-2">
           <Link
             to="/training/courses"
-            className="border border-border text-foreground text-sm px-3 py-1.5 rounded-lg hover:bg-muted"
+            className="border border-border text-ink text-sm px-3 py-1.5 rounded-lg hover:bg-hover"
           >
             Courses
           </Link>
           <Link
             to="/training/assignments"
-            className="border border-border text-foreground text-sm px-3 py-1.5 rounded-lg hover:bg-muted"
+            className="border border-border text-ink text-sm px-3 py-1.5 rounded-lg hover:bg-hover"
           >
             Assignments
           </Link>
           <Link
             to="/training/reports"
-            className="bg-foreground text-background text-sm px-3 py-1.5 rounded-lg hover:opacity-90"
+            className="bg-ink text-bg text-sm px-3 py-1.5 rounded-lg hover:opacity-90"
           >
             Reports →
           </Link>
@@ -87,8 +87,8 @@ export function TrainingDashboard() {
             <DashboardCard label="Failed" value={data.failed_assignments ?? 0} accent="amber" />
           </div>
 
-          <div className="bg-card border border-border rounded-xl p-4 mb-5">
-            <div className="text-[10px] font-semibold tracking-widest uppercase text-muted-foreground mb-2">
+          <div className="bg-surface border border-border rounded-xl p-4 mb-5">
+            <div className="text-[10px] font-semibold tracking-widest uppercase text-muted mb-2">
               Overall completion rate
             </div>
             <TrainingProgressBar
@@ -100,20 +100,18 @@ export function TrainingDashboard() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <Section title="Top consultants (by completed)">
               {data.top_consultants.length === 0 ? (
-                <p className="text-xs italic text-muted-foreground">No completions yet.</p>
+                <p className="text-xs italic text-muted">No completions yet.</p>
               ) : (
                 <ul className="space-y-1.5 text-sm">
                   {data.top_consultants.map((t: any) => (
                     <li key={t.user_id} className="flex justify-between">
                       <Link
                         to={`/users/${t.user_id}`}
-                        className="text-foreground hover:text-brand-700 truncate font-mono text-xs"
+                        className="text-ink hover:text-brand-700 truncate font-mono text-xs"
                       >
                         {t.user_id.slice(0, 8)}…
                       </Link>
-                      <span className="text-foreground font-semibold tabular-nums">
-                        {t.completed}
-                      </span>
+                      <span className="text-ink font-semibold tabular-nums">{t.completed}</span>
                     </li>
                   ))}
                 </ul>
@@ -123,8 +121,8 @@ export function TrainingDashboard() {
               <ul className="space-y-1.5 text-sm">
                 {data.by_category.map((c: any) => (
                   <li key={c.category} className="flex justify-between">
-                    <span className="text-foreground">{c.category}</span>
-                    <span className="text-foreground font-semibold tabular-nums">{c.courses}</span>
+                    <span className="text-ink">{c.category}</span>
+                    <span className="text-ink font-semibold tabular-nums">{c.courses}</span>
                   </li>
                 ))}
               </ul>
@@ -136,27 +134,23 @@ export function TrainingDashboard() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
               <Section title="Courses by compliance category (admin)">
                 {(data.by_compliance_category ?? []).length === 0 ? (
-                  <p className="text-xs italic text-muted-foreground">
-                    No compliance categories set.
-                  </p>
+                  <p className="text-xs italic text-muted">No compliance categories set.</p>
                 ) : (
                   <ul className="space-y-1.5 text-sm">
                     {data.by_compliance_category.map((c: any) => (
                       <li key={c.compliance_category} className="flex justify-between">
-                        <span className="text-foreground">{c.compliance_category}</span>
-                        <span className="text-foreground font-semibold tabular-nums">
-                          {c.courses}
-                        </span>
+                        <span className="text-ink">{c.compliance_category}</span>
+                        <span className="text-ink font-semibold tabular-nums">{c.courses}</span>
                       </li>
                     ))}
                   </ul>
                 )}
               </Section>
               <Section title="Cumulative study time (admin)">
-                <div className="text-3xl font-bold text-foreground">
+                <div className="text-3xl font-bold text-ink">
                   {Math.round((data.total_time_spent_minutes ?? 0) / 60)}h
                 </div>
-                <div className="text-xs text-muted-foreground mt-1">
+                <div className="text-xs text-muted mt-1">
                   {data.total_time_spent_minutes ?? 0} minutes logged across all assignments
                 </div>
               </Section>
@@ -171,8 +165,8 @@ export function TrainingDashboard() {
 
 function Section({ title, children }: { title: string; children: any }) {
   return (
-    <div className="bg-card border border-border rounded-xl p-4">
-      <div className="text-[10px] font-semibold tracking-widest uppercase text-muted-foreground mb-3">
+    <div className="bg-surface border border-border rounded-xl p-4">
+      <div className="text-[10px] font-semibold tracking-widest uppercase text-muted mb-3">
         {title}
       </div>
       {children}

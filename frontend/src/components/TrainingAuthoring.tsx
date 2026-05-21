@@ -19,7 +19,7 @@ export interface GeneratedLessonStub {
 }
 
 const CONTENT_STATUS_TONE: Record<string, PillTone> = {
-  PENDING: { bg: 'bg-muted', text: 'text-muted-foreground', dot: 'bg-muted-foreground' },
+  PENDING: { bg: 'bg-hover', text: 'text-muted', dot: 'bg-muted' },
   GENERATING: {
     bg: 'bg-amber-50 dark:bg-amber-500/15',
     text: 'text-amber-700 dark:text-amber-300',
@@ -35,7 +35,7 @@ const CONTENT_STATUS_TONE: Record<string, PillTone> = {
     text: 'text-rose-700 dark:text-rose-300',
     dot: 'bg-rose-500',
   },
-  NONE: { bg: 'bg-muted', text: 'text-muted-foreground', dot: 'bg-muted-foreground' },
+  NONE: { bg: 'bg-hover', text: 'text-muted', dot: 'bg-muted' },
   OUTLINE_READY: {
     bg: 'bg-sky-50 dark:bg-sky-500/15',
     text: 'text-sky-700 dark:text-sky-300',
@@ -64,7 +64,7 @@ export function ContentStatusChip({ status }: { status?: string | null }) {
 
 // Editorial lifecycle pill: DRAFT → GENERATED → REVIEWED → PUBLISHED → ARCHIVED.
 const REVIEW_STATUS_TONE: Record<string, PillTone> = {
-  DRAFT: { bg: 'bg-muted', text: 'text-muted-foreground', dot: 'bg-muted-foreground' },
+  DRAFT: { bg: 'bg-hover', text: 'text-muted', dot: 'bg-muted' },
   GENERATED: {
     bg: 'bg-sky-50 dark:bg-sky-500/15',
     text: 'text-sky-700 dark:text-sky-300',
@@ -80,7 +80,7 @@ const REVIEW_STATUS_TONE: Record<string, PillTone> = {
     text: 'text-emerald-700 dark:text-emerald-300',
     dot: 'bg-emerald-500',
   },
-  ARCHIVED: { bg: 'bg-muted', text: 'text-muted-foreground', dot: 'bg-muted-foreground' },
+  ARCHIVED: { bg: 'bg-hover', text: 'text-muted', dot: 'bg-muted' },
 };
 const REVIEW_STATUS_LABEL: Record<string, string> = {
   DRAFT: 'Draft',
@@ -133,14 +133,14 @@ export function GenerationProgress({
 }) {
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
   return (
-    <div className="bg-card border border-border rounded-xl p-3">
-      <div className="flex items-center justify-between text-xs text-muted-foreground mb-1.5">
+    <div className="bg-surface border border-border rounded-xl p-3">
+      <div className="flex items-center justify-between text-xs text-muted mb-1.5">
         <span>{label ?? 'Generating lessons…'}</span>
         <span>
           {done}/{total}
         </span>
       </div>
-      <div className="h-2 rounded-full bg-muted overflow-hidden">
+      <div className="h-2 rounded-full bg-hover overflow-hidden">
         <div
           className="h-full bg-brand-500 transition-all"
           style={{ width: `${pct}%` }}
@@ -183,7 +183,7 @@ export function CapstoneEditor({
   }
 
   return (
-    <div className="bg-card border border-border rounded-2xl p-6">
+    <div className="bg-surface border border-border rounded-2xl p-6">
       <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
         <h2 className="text-lg font-semibold tracking-tight">Final project (capstone)</h2>
         <button
@@ -195,20 +195,20 @@ export function CapstoneEditor({
         </button>
       </div>
       {!capstone ? (
-        <p className="text-sm text-muted-foreground italic">
+        <p className="text-sm text-muted italic">
           No final project yet. Generate one — it becomes each learner's final assessment when the
           course is assigned to them.
         </p>
       ) : (
         <div className="space-y-3">
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-muted">
             {capstone.assessment_type}
           </div>
           {capstone.instructions && (
-            <p className="text-sm text-foreground whitespace-pre-wrap">{capstone.instructions}</p>
+            <p className="text-sm text-ink whitespace-pre-wrap">{capstone.instructions}</p>
           )}
           {Array.isArray(capstone.questions) && capstone.questions.length > 0 && (
-            <ol className="list-decimal list-outside pl-5 space-y-1 text-sm text-foreground">
+            <ol className="list-decimal list-outside pl-5 space-y-1 text-sm text-ink">
               {capstone.questions.map((q: any, i: number) => (
                 <li key={i}>{q.prompt ?? q.question ?? String(q)}</li>
               ))}
@@ -217,10 +217,7 @@ export function CapstoneEditor({
           {Array.isArray(capstone.rubric) && capstone.rubric.length > 0 && (
             <div className="flex flex-wrap gap-1.5 pt-1">
               {capstone.rubric.map((r: any, i: number) => (
-                <span
-                  key={i}
-                  className="text-[11px] bg-muted text-foreground px-2 py-0.5 rounded-full"
-                >
+                <span key={i} className="text-[11px] bg-hover text-ink px-2 py-0.5 rounded-full">
                   {r.criterion} · {r.weight}
                 </span>
               ))}
@@ -345,7 +342,7 @@ export function LessonEditorModal({
         <button
           onClick={saveLesson}
           disabled={saving}
-          className="bg-foreground text-background text-sm px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-50"
+          className="bg-ink text-bg text-sm px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-50"
         >
           {saving ? 'Saving…' : 'Save lesson'}
         </button>
@@ -370,13 +367,13 @@ export function LessonEditorModal({
             onChange={(v) => setForm({ ...form, estimated_minutes: v })}
           />
           <label className="block">
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted">
               Status
             </span>
             <select
               value={form.content_status}
               onChange={(e) => setForm({ ...form, content_status: e.target.value })}
-              className="mt-1 w-full text-sm border border-border rounded-md px-2 py-1.5 bg-card"
+              className="mt-1 w-full text-sm border border-border rounded-md px-2 py-1.5 bg-surface"
             >
               {LESSON_STATUSES.map((s) => (
                 <option key={s} value={s}>
@@ -411,7 +408,7 @@ export function LessonEditorModal({
 
         <div>
           <div className="flex items-center justify-between mb-1">
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted">
               Exercises
             </span>
             <button
@@ -461,7 +458,7 @@ export function LessonEditorModal({
 
         <div className="border-t border-border pt-3">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted">
               Knowledge-check questions ({qs.length})
             </span>
             <button onClick={addQuestion} className="text-xs text-brand-700 hover:underline">
@@ -542,7 +539,7 @@ function QuizQuestionEditor({
         </button>
         <button
           onClick={onSave}
-          className="text-xs border border-border px-2.5 py-1 rounded-lg hover:bg-muted"
+          className="text-xs border border-border px-2.5 py-1 rounded-lg hover:bg-hover"
         >
           Save question
         </button>
@@ -564,7 +561,7 @@ function EditField({
 }) {
   return (
     <label className="block">
-      <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+      <span className="text-[10px] font-semibold uppercase tracking-widest text-muted">
         {label}
       </span>
       <input
@@ -590,7 +587,7 @@ function EditArea({
 }) {
   return (
     <label className="block">
-      <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+      <span className="text-[10px] font-semibold uppercase tracking-widest text-muted">
         {label}
       </span>
       <textarea

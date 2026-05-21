@@ -99,7 +99,7 @@ body {
   .skeleton {
     position: relative;
     overflow: hidden;
-    background-color: var(--muted);
+    background-color: var(--bg-sunken);
     border-radius: 0.5rem;
   }
   .skeleton::after {

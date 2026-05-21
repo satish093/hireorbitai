@@ -37,9 +37,7 @@ export function ProtectedRoute({ children, allow, bypassOnboarding, bypassPasswo
 
   if (loading) {
     return (
-      <div className="min-h-dvh flex items-center justify-center text-muted-foreground text-sm">
-        Loading…
-      </div>
+      <div className="min-h-dvh flex items-center justify-center text-muted text-sm">Loading…</div>
     );
   }
   if (!session) return <Navigate to="/login" replace state={{ from: loc.pathname }} />;

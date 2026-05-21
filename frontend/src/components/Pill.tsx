@@ -73,7 +73,7 @@ export function TagPillBase({ children, className }: { children: ReactNode; clas
   return (
     <span
       className={clsx(
-        'inline-flex items-center text-[10px] font-medium uppercase tracking-wide px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-mono',
+        'inline-flex items-center text-[10px] font-medium uppercase tracking-wide px-1.5 py-0.5 rounded bg-hover text-muted font-mono',
         className,
       )}
     >

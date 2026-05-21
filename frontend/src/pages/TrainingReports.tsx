@@ -48,8 +48,8 @@ export function TrainingReports() {
             <DashboardCard label="Completed" value={data.completed_assignments} accent="green" />
             <DashboardCard label="Overdue" value={data.overdue_assignments} accent="amber" />
           </div>
-          <div className="bg-card border border-border rounded-xl p-4 mb-5">
-            <div className="text-[10px] font-semibold tracking-widest uppercase text-muted-foreground mb-2">
+          <div className="bg-surface border border-border rounded-xl p-4 mb-5">
+            <div className="text-[10px] font-semibold tracking-widest uppercase text-muted mb-2">
               Completion rate
             </div>
             <TrainingProgressBar
@@ -61,14 +61,12 @@ export function TrainingReports() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <Panel title="Top consultants">
               {data.top_consultants.length === 0 ? (
-                <p className="text-xs italic text-muted-foreground">No completions yet.</p>
+                <p className="text-xs italic text-muted">No completions yet.</p>
               ) : (
                 <ul className="space-y-1.5 text-sm">
                   {data.top_consultants.map((t: any) => (
                     <li key={t.user_id} className="flex justify-between">
-                      <span className="font-mono text-xs text-muted-foreground">
-                        {t.user_id.slice(0, 8)}…
-                      </span>
+                      <span className="font-mono text-xs text-muted">{t.user_id.slice(0, 8)}…</span>
                       <span className="font-semibold tabular-nums">{t.completed}</span>
                     </li>
                   ))}
@@ -79,7 +77,7 @@ export function TrainingReports() {
               <ul className="space-y-1.5 text-sm">
                 {data.by_category.map((c: any) => (
                   <li key={c.category} className="flex justify-between">
-                    <span className="text-foreground">{c.category}</span>
+                    <span className="text-ink">{c.category}</span>
                     <span className="font-semibold tabular-nums">{c.courses}</span>
                   </li>
                 ))}
@@ -95,8 +93,8 @@ export function TrainingReports() {
 
 function Panel({ title, children }: { title: string; children: any }) {
   return (
-    <div className="bg-card border border-border rounded-xl p-4">
-      <div className="text-[10px] font-semibold tracking-widest uppercase text-muted-foreground mb-3">
+    <div className="bg-surface border border-border rounded-xl p-4">
+      <div className="text-[10px] font-semibold tracking-widest uppercase text-muted mb-3">
         {title}
       </div>
       {children}

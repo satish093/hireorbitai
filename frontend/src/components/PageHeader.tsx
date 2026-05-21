@@ -20,12 +20,10 @@ export function PageHeader({
   return (
     <div className="flex flex-wrap items-end justify-between gap-3 mb-5 animate-fade-in-down">
       <div className="min-w-0 flex-1">
-        <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-foreground break-words">
+        <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-ink break-words">
           {title}
         </h1>
-        {description && (
-          <p className="text-sm text-muted-foreground mt-1 break-words">{description}</p>
-        )}
+        {description && <p className="text-sm text-muted mt-1 break-words">{description}</p>}
       </div>
       {action && <div className="flex flex-wrap items-center gap-2 shrink-0">{action}</div>}
     </div>

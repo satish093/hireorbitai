@@ -17,19 +17,19 @@ export const PasswordField = forwardRef<HTMLInputElement, Props>(function Passwo
   const [show, setShow] = useState(false);
   return (
     <label className="block">
-      {label && <span className="block text-xs font-medium text-foreground mb-1.5">{label}</span>}
+      {label && <span className="block text-xs font-medium text-ink mb-1.5">{label}</span>}
       <div className="relative">
         <input
           ref={ref}
           type={show ? 'text' : 'password'}
           {...rest}
           className={clsx(
-            'w-full rounded-lg border bg-card pl-3 pr-10 py-2 text-sm shadow-sm transition',
-            'placeholder:text-muted-foreground',
+            'w-full rounded-lg border bg-surface pl-3 pr-10 py-2 text-sm shadow-sm transition',
+            'placeholder:text-muted',
             'focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500',
             error
               ? 'border-red-300 focus:ring-red-200 focus:border-red-500'
-              : 'border-border hover:border-muted-foreground',
+              : 'border-border hover:border-muted',
             className,
           )}
         />
@@ -38,7 +38,7 @@ export const PasswordField = forwardRef<HTMLInputElement, Props>(function Passwo
           tabIndex={-1}
           onClick={() => setShow((s) => !s)}
           aria-label={show ? 'Hide password' : 'Show password'}
-          className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground px-1.5 py-1 rounded text-xs"
+          className="absolute right-2 top-1/2 -translate-y-1/2 text-muted hover:text-ink px-1.5 py-1 rounded text-xs"
         >
           {show ? '🙈' : '👁'}
         </button>
@@ -67,7 +67,7 @@ const RULES: Rule[] = [
 export function PasswordStrengthHints({ password }: { password: string }) {
   const pw = password ?? '';
   return (
-    <ul className="text-[11px] text-muted-foreground space-y-0.5 -mt-1">
+    <ul className="text-[11px] text-muted space-y-0.5 -mt-1">
       {RULES.map((r) => {
         const ok = r.check(pw);
         return (
@@ -75,13 +75,13 @@ export function PasswordStrengthHints({ password }: { password: string }) {
             key={r.label}
             className={clsx(
               'flex items-center gap-1.5',
-              ok ? 'text-emerald-700 dark:text-emerald-300' : 'text-muted-foreground',
+              ok ? 'text-emerald-700 dark:text-emerald-300' : 'text-muted',
             )}
           >
             <span
               className={clsx(
                 'w-3 inline-flex justify-center',
-                ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground',
+                ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted',
               )}
             >
               {ok ? '✓' : '○'}

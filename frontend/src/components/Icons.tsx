@@ -2,7 +2,7 @@
  * Lucide-style inline SVG icons. No npm dependency.
  *
  * Each icon accepts {size, className, strokeWidth} and inherits color via
- * `currentColor` so we can tint with Tailwind utilities (text-muted-foreground).
+ * `currentColor` so we can tint with Tailwind utilities (text-muted).
  */
 import { SVGProps } from 'react';
 

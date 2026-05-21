@@ -23,7 +23,7 @@ export function presenceLabel(s: PresenceStatus): string {
 const COLOR: Record<PresenceStatus, string> = {
   online: 'bg-emerald-500',
   idle: 'bg-amber-400',
-  offline: 'bg-muted-foreground',
+  offline: 'bg-muted',
 };
 
 /**
@@ -50,7 +50,7 @@ export function PresenceDot({
   return (
     <span
       className={clsx(
-        'relative inline-block rounded-full ring-2 ring-card',
+        'relative inline-block rounded-full ring-2 ring-surface',
         COLOR[status],
         className,
       )}
@@ -76,7 +76,7 @@ export function PresencePill({ lastSeenAt }: { lastSeenAt: string | null | undef
       ? 'text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-500/15 border-emerald-100 dark:border-emerald-500/20'
       : status === 'idle'
         ? 'text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-500/15 border-amber-100 dark:border-amber-500/20'
-        : 'text-muted-foreground bg-muted border-border';
+        : 'text-muted bg-hover border-border';
   return (
     <span
       className={clsx(

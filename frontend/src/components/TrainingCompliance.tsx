@@ -147,10 +147,10 @@ export function CompletionGatesPanel({ evaluation }: { evaluation: CompletionEva
   ];
 
   return (
-    <div className="bg-card border border-border rounded-2xl p-5">
+    <div className="bg-surface border border-border rounded-2xl p-5">
       <div className="flex items-center justify-between mb-3">
         <div>
-          <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+          <div className="text-[10px] font-semibold uppercase tracking-widest text-muted">
             What's left to finish
           </div>
           <h3 className="text-base font-semibold tracking-tight">
@@ -161,7 +161,7 @@ export function CompletionGatesPanel({ evaluation }: { evaluation: CompletionEva
                   ? 'text-emerald-700 dark:text-emerald-300'
                   : evaluation.status === 'FAILED'
                     ? 'text-red-700 dark:text-red-300'
-                    : 'text-foreground'
+                    : 'text-ink'
               }
             >
               {STATUS_LABEL[evaluation.status] ?? evaluation.status.replace(/_/g, ' ')}
@@ -169,7 +169,7 @@ export function CompletionGatesPanel({ evaluation }: { evaluation: CompletionEva
           </h3>
         </div>
         <div className="text-right">
-          <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+          <div className="text-[10px] font-semibold uppercase tracking-widest text-muted">
             Progress
           </div>
           <div className="text-lg font-semibold tabular-nums">
@@ -183,9 +183,9 @@ export function CompletionGatesPanel({ evaluation }: { evaluation: CompletionEva
           <li key={r.label} className="flex items-center justify-between py-2">
             <div className="flex items-center gap-2">
               <Pip ok={r.ok} />
-              <span className="text-sm text-foreground">{r.label}</span>
+              <span className="text-sm text-ink">{r.label}</span>
             </div>
-            <span className="text-xs text-muted-foreground">{r.detail}</span>
+            <span className="text-xs text-muted">{r.detail}</span>
           </li>
         ))}
       </ul>
@@ -204,7 +204,7 @@ function Pip({ ok }: { ok: boolean }) {
   return (
     <span
       className={`inline-flex w-4 h-4 rounded-full items-center justify-center text-[10px] font-bold ${
-        ok ? 'bg-emerald-500 text-white' : 'bg-muted text-muted-foreground'
+        ok ? 'bg-emerald-500 text-white' : 'bg-hover text-muted'
       }`}
     >
       {ok ? '✓' : '·'}
@@ -276,7 +276,7 @@ export function AcknowledgementCard({
 
   if (!isConsultant) {
     return (
-      <div className="bg-card border border-border rounded-2xl p-4 text-sm text-muted-foreground">
+      <div className="bg-surface border border-border rounded-2xl p-4 text-sm text-muted">
         Acknowledgement not yet submitted by the consultant.
       </div>
     );
@@ -284,18 +284,18 @@ export function AcknowledgementCard({
 
   return (
     <>
-      <div className="bg-card border border-border rounded-2xl p-4 flex items-center justify-between gap-3">
+      <div className="bg-surface border border-border rounded-2xl p-4 flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+          <div className="text-[10px] font-semibold uppercase tracking-widest text-muted">
             Acknowledgement required
           </div>
-          <p className="text-sm text-foreground mt-0.5">
+          <p className="text-sm text-ink mt-0.5">
             Confirm you've completed the training and understand the material.
           </p>
         </div>
         <button
           onClick={() => setOpen(true)}
-          className="bg-foreground text-background text-sm px-4 py-1.5 rounded-lg hover:opacity-90"
+          className="bg-ink text-bg text-sm px-4 py-1.5 rounded-lg hover:opacity-90"
         >
           Sign acknowledgement
         </button>
@@ -308,20 +308,20 @@ export function AcknowledgementCard({
           <button
             onClick={submit}
             disabled={submitting}
-            className="bg-foreground text-background text-sm px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-50"
+            className="bg-ink text-bg text-sm px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-50"
           >
             {submitting ? 'Recording…' : 'I confirm'}
           </button>
         }
       >
-        <p className="text-sm text-foreground">
+        <p className="text-sm text-ink">
           By clicking <span className="font-semibold">I confirm</span> you are signing the following
           statement, which becomes part of your training record:
         </p>
-        <blockquote className="mt-3 border-l-4 border-border pl-4 italic text-sm text-foreground">
+        <blockquote className="mt-3 border-l-4 border-border pl-4 italic text-sm text-ink">
           {REQUIRED_ACK_TEXT}
         </blockquote>
-        <p className="text-xs text-muted-foreground mt-3">
+        <p className="text-xs text-muted mt-3">
           Your IP address and user agent are recorded alongside the timestamp for audit purposes.
         </p>
       </Modal>
@@ -387,7 +387,7 @@ export function FinalAssessmentCard({
 
   if (loading) {
     return (
-      <div className="bg-card border border-border rounded-2xl p-4 text-xs text-muted-foreground">
+      <div className="bg-surface border border-border rounded-2xl p-4 text-xs text-muted">
         Loading final assessment…
       </div>
     );
@@ -398,18 +398,18 @@ export function FinalAssessmentCard({
     if (isManager) {
       return (
         <>
-          <div className="bg-card border border-dashed border-border rounded-2xl p-4 flex items-center justify-between">
+          <div className="bg-surface border border-dashed border-border rounded-2xl p-4 flex items-center justify-between">
             <div>
-              <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+              <div className="text-[10px] font-semibold uppercase tracking-widest text-muted">
                 Final assessment
               </div>
-              <p className="text-sm text-foreground mt-0.5">
+              <p className="text-sm text-ink mt-0.5">
                 Set the final task this consultant must complete to finish the course.
               </p>
             </div>
             <button
               onClick={() => setAuthorOpen(true)}
-              className="bg-foreground text-background text-sm px-4 py-1.5 rounded-lg hover:opacity-90"
+              className="bg-ink text-bg text-sm px-4 py-1.5 rounded-lg hover:opacity-90"
             >
               + Create assessment
             </button>
@@ -427,7 +427,7 @@ export function FinalAssessmentCard({
       );
     }
     return (
-      <div className="bg-card border border-border rounded-2xl p-4 text-sm text-muted-foreground">
+      <div className="bg-surface border border-border rounded-2xl p-4 text-sm text-muted">
         No final assessment has been set for this course yet.
       </div>
     );
@@ -436,17 +436,17 @@ export function FinalAssessmentCard({
   // ----- Assessment exists -----
   return (
     <>
-      <div className="bg-card border border-border rounded-2xl p-4">
+      <div className="bg-surface border border-border rounded-2xl p-4">
         <div className="flex items-start justify-between gap-3 mb-3">
           <div>
-            <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+            <div className="text-[10px] font-semibold uppercase tracking-widest text-muted">
               Final assessment ({fa.assessment_type.replace(/_/g, ' ').toLowerCase()})
             </div>
             <h3 className="text-base font-semibold tracking-tight">
               Status: <ApprovalBadge status={fa.approval_status} />
             </h3>
             {fa.score != null && (
-              <div className="text-xs text-muted-foreground mt-1">
+              <div className="text-xs text-muted mt-1">
                 Score: <span className="font-semibold tabular-nums">{fa.score}%</span>
                 {fa.passed === true && (
                   <span className="ml-2 text-emerald-700 dark:text-emerald-300 font-semibold">
@@ -466,7 +466,7 @@ export function FinalAssessmentCard({
             {isConsultant && fa.approval_status === 'PENDING' && (
               <button
                 onClick={() => setSubmitOpen(true)}
-                className="bg-foreground text-background text-sm px-3 py-1.5 rounded-lg hover:opacity-90"
+                className="bg-ink text-bg text-sm px-3 py-1.5 rounded-lg hover:opacity-90"
               >
                 Submit answers
               </button>
@@ -474,7 +474,7 @@ export function FinalAssessmentCard({
             {isConsultant && fa.approval_status === 'REJECTED' && (
               <button
                 onClick={() => setSubmitOpen(true)}
-                className="border border-border text-foreground text-sm px-3 py-1.5 rounded-lg hover:bg-muted"
+                className="border border-border text-ink text-sm px-3 py-1.5 rounded-lg hover:bg-hover"
               >
                 Resubmit
               </button>
@@ -491,7 +491,7 @@ export function FinalAssessmentCard({
             {isManager && (
               <button
                 onClick={() => setAuthorOpen(true)}
-                className="border border-border text-foreground text-sm px-3 py-1.5 rounded-lg hover:bg-muted"
+                className="border border-border text-ink text-sm px-3 py-1.5 rounded-lg hover:bg-hover"
               >
                 Edit questions
               </button>
@@ -500,20 +500,20 @@ export function FinalAssessmentCard({
         </div>
 
         {fa.questions ? (
-          <details className="text-xs text-muted-foreground">
-            <summary className="cursor-pointer text-foreground font-medium">View questions</summary>
-            <pre className="mt-2 bg-muted border border-border rounded-md p-2 overflow-x-auto whitespace-pre-wrap">
+          <details className="text-xs text-muted">
+            <summary className="cursor-pointer text-ink font-medium">View questions</summary>
+            <pre className="mt-2 bg-hover border border-border rounded-md p-2 overflow-x-auto whitespace-pre-wrap">
               {JSON.stringify(fa.questions, null, 2)}
             </pre>
           </details>
         ) : null}
 
         {fa.manager_feedback && (
-          <div className="mt-3 text-sm bg-muted border border-border rounded-lg p-3">
-            <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1">
+          <div className="mt-3 text-sm bg-hover border border-border rounded-lg p-3">
+            <div className="text-[10px] font-semibold uppercase tracking-widest text-muted mb-1">
               Manager feedback
             </div>
-            <p className="text-foreground whitespace-pre-wrap">{fa.manager_feedback}</p>
+            <p className="text-ink whitespace-pre-wrap">{fa.manager_feedback}</p>
           </div>
         )}
       </div>
@@ -560,7 +560,7 @@ function ApprovalBadge({ status }: { status: AssessmentStatus }) {
         ? 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300 border-red-200 dark:border-red-500/30'
         : status === 'SUBMITTED'
           ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-500/30'
-          : 'bg-muted text-foreground border-border';
+          : 'bg-hover text-ink border-border';
   return (
     <span
       className={`inline-block text-[11px] font-semibold border rounded-full px-2 py-0.5 ${cls}`}
@@ -632,14 +632,14 @@ function FinalAssessmentAuthorModal({
         <button
           onClick={save}
           disabled={saving}
-          className="bg-foreground text-background text-sm px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-50"
+          className="bg-ink text-bg text-sm px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-50"
         >
           {saving ? 'Saving…' : 'Save'}
         </button>
       }
     >
       <label className="block">
-        <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+        <span className="text-[10px] font-semibold uppercase tracking-widest text-muted">
           Assessment type
         </span>
         <select
@@ -654,7 +654,7 @@ function FinalAssessmentAuthorModal({
         </select>
       </label>
       <label className="block mt-3">
-        <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+        <span className="text-[10px] font-semibold uppercase tracking-widest text-muted">
           Questions (JSON — optional)
         </span>
         <textarea
@@ -665,7 +665,7 @@ function FinalAssessmentAuthorModal({
           className="mt-1 w-full text-sm font-mono border border-border rounded-md px-2 py-1.5"
         />
       </label>
-      <p className="text-xs text-muted-foreground mt-2">
+      <p className="text-xs text-muted mt-2">
         For MANAGER_REVIEW you can leave questions empty — you'll grade based on the consultant's
         overall work.
       </p>
@@ -742,7 +742,7 @@ function FinalAssessmentSubmitModal({
         <button
           onClick={submit}
           disabled={saving}
-          className="bg-foreground text-background text-sm px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-50"
+          className="bg-ink text-bg text-sm px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-50"
         >
           {saving ? 'Submitting…' : 'Submit'}
         </button>
@@ -750,16 +750,16 @@ function FinalAssessmentSubmitModal({
     >
       {questions && (
         <div className="mb-3">
-          <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1">
+          <div className="text-[10px] font-semibold uppercase tracking-widest text-muted mb-1">
             Questions
           </div>
-          <pre className="text-xs bg-muted border border-border rounded-md p-2 whitespace-pre-wrap">
+          <pre className="text-xs bg-hover border border-border rounded-md p-2 whitespace-pre-wrap">
             {questions}
           </pre>
         </div>
       )}
       <label className="block">
-        <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+        <span className="text-[10px] font-semibold uppercase tracking-widest text-muted">
           Your answers
         </span>
         <textarea
@@ -849,7 +849,7 @@ function FinalAssessmentGradeModal({
         <button
           onClick={save}
           disabled={saving}
-          className="bg-foreground text-background text-sm px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-50"
+          className="bg-ink text-bg text-sm px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-50"
         >
           {saving ? 'Saving…' : 'Save grade'}
         </button>
@@ -857,17 +857,17 @@ function FinalAssessmentGradeModal({
     >
       {answersBlock && (
         <div className="mb-3">
-          <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1">
+          <div className="text-[10px] font-semibold uppercase tracking-widest text-muted mb-1">
             Consultant submission
           </div>
-          <pre className="text-xs bg-muted border border-border rounded-md p-2 max-h-40 overflow-auto whitespace-pre-wrap">
+          <pre className="text-xs bg-hover border border-border rounded-md p-2 max-h-40 overflow-auto whitespace-pre-wrap">
             {answersBlock}
           </pre>
         </div>
       )}
       <div className="grid grid-cols-2 gap-3">
         <label className="block">
-          <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+          <span className="text-[10px] font-semibold uppercase tracking-widest text-muted">
             Score (0–100)
           </span>
           <input
@@ -880,7 +880,7 @@ function FinalAssessmentGradeModal({
           />
         </label>
         <label className="block">
-          <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+          <span className="text-[10px] font-semibold uppercase tracking-widest text-muted">
             Pass / fail
           </span>
           <select
@@ -894,7 +894,7 @@ function FinalAssessmentGradeModal({
         </label>
       </div>
       <label className="block mt-3">
-        <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+        <span className="text-[10px] font-semibold uppercase tracking-widest text-muted">
           Manager feedback
         </span>
         <textarea
@@ -905,7 +905,7 @@ function FinalAssessmentGradeModal({
         />
       </label>
       <label className="block mt-3">
-        <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+        <span className="text-[10px] font-semibold uppercase tracking-widest text-muted">
           Decision
         </span>
         <select
@@ -952,10 +952,10 @@ export function SupervisionNotesPanel({
 
   return (
     <>
-      <div className="bg-card border border-border rounded-2xl p-5">
+      <div className="bg-surface border border-border rounded-2xl p-5">
         <div className="flex items-center justify-between mb-3">
           <div>
-            <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+            <div className="text-[10px] font-semibold uppercase tracking-widest text-muted">
               Supervision notes
             </div>
             <h3 className="text-base font-semibold tracking-tight">
@@ -965,7 +965,7 @@ export function SupervisionNotesPanel({
           {isManager && (
             <button
               onClick={() => setOpen(true)}
-              className="bg-foreground text-background text-sm px-3 py-1.5 rounded-lg hover:opacity-90"
+              className="bg-ink text-bg text-sm px-3 py-1.5 rounded-lg hover:opacity-90"
             >
               + Add note
             </button>
@@ -973,18 +973,18 @@ export function SupervisionNotesPanel({
         </div>
 
         {loading ? (
-          <p className="text-sm text-muted-foreground">Loading…</p>
+          <p className="text-sm text-muted">Loading…</p>
         ) : notes.length === 0 ? (
-          <p className="text-sm text-muted-foreground italic">No supervision notes recorded yet.</p>
+          <p className="text-sm text-muted italic">No supervision notes recorded yet.</p>
         ) : (
           <ol className="space-y-3">
             {notes.map((n) => (
               <li key={n.id} className="border-l-2 border-border pl-3">
-                <div className="text-xs text-muted-foreground">
+                <div className="text-xs text-muted">
                   {new Date(n.observed_on).toLocaleDateString()} ·{' '}
                   {n.trainer?.full_name ?? 'Trainer'}
                 </div>
-                <p className="text-sm text-foreground whitespace-pre-wrap">{n.note}</p>
+                <p className="text-sm text-ink whitespace-pre-wrap">{n.note}</p>
                 {(n.skill_progress || n.areas_for_improvement || n.next_steps) && (
                   <dl className="mt-2 grid sm:grid-cols-3 gap-2 text-xs">
                     {n.skill_progress && (
@@ -1014,11 +1014,11 @@ export function SupervisionNotesPanel({
 
 function NoteBlock({ label, value }: { label: string; value: string }) {
   return (
-    <div className="bg-muted border border-border rounded-md p-2">
-      <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-0.5">
+    <div className="bg-hover border border-border rounded-md p-2">
+      <div className="text-[10px] font-semibold uppercase tracking-widest text-muted mb-0.5">
         {label}
       </div>
-      <p className="text-foreground whitespace-pre-wrap">{value}</p>
+      <p className="text-ink whitespace-pre-wrap">{value}</p>
     </div>
   );
 }
@@ -1088,7 +1088,7 @@ function SupervisionNoteModal({
         <button
           onClick={save}
           disabled={saving}
-          className="bg-foreground text-background text-sm px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-50"
+          className="bg-ink text-bg text-sm px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-50"
         >
           {saving ? 'Saving…' : 'Save'}
         </button>
@@ -1096,7 +1096,7 @@ function SupervisionNoteModal({
     >
       <div className="space-y-3">
         <label className="block">
-          <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+          <span className="text-[10px] font-semibold uppercase tracking-widest text-muted">
             Observed on
           </span>
           <input
@@ -1107,7 +1107,7 @@ function SupervisionNoteModal({
           />
         </label>
         <label className="block">
-          <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+          <span className="text-[10px] font-semibold uppercase tracking-widest text-muted">
             Note (required)
           </span>
           <textarea
@@ -1119,7 +1119,7 @@ function SupervisionNoteModal({
         </label>
         <div className="grid sm:grid-cols-3 gap-3">
           <label className="block">
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted">
               Skill progress
             </span>
             <textarea
@@ -1130,7 +1130,7 @@ function SupervisionNoteModal({
             />
           </label>
           <label className="block">
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted">
               Areas for improvement
             </span>
             <textarea
@@ -1141,7 +1141,7 @@ function SupervisionNoteModal({
             />
           </label>
           <label className="block">
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted">
               Next steps
             </span>
             <textarea
@@ -1189,7 +1189,7 @@ export function ComplianceReportButton({ assignmentId }: { assignmentId: string 
     <button
       onClick={download}
       disabled={busy}
-      className="border border-border text-foreground text-sm px-3 py-1.5 rounded-lg hover:bg-muted disabled:opacity-50"
+      className="border border-border text-ink text-sm px-3 py-1.5 rounded-lg hover:bg-hover disabled:opacity-50"
     >
       {busy ? 'Building…' : '⤓ Compliance report (CSV)'}
     </button>

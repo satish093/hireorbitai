@@ -201,25 +201,25 @@ export function TaskDetail() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 max-w-6xl">
         {/* Main column */}
         <div className="lg:col-span-2 space-y-4">
-          <div className="bg-card rounded-xl border border-border p-4 sm:p-6">
+          <div className="bg-surface rounded-xl border border-border p-4 sm:p-6">
             {/* ID row — flex-wrap so the Copy-link button doesn't crowd the
                 short-id pill on narrow viewports. */}
             <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
               <div className="flex items-center gap-2">
-                <span className="text-xs font-mono text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                <span className="text-xs font-mono text-muted bg-hover px-1.5 py-0.5 rounded">
                   {sid}
                 </span>
-                <span className="text-muted-foreground">›</span>
+                <span className="text-muted">›</span>
                 {task.tags && task.tags.length > 0 ? (
                   <TagPill tag={task.tags[0]!} />
                 ) : (
-                  <span className="text-xs text-muted-foreground">No tag</span>
+                  <span className="text-xs text-muted">No tag</span>
                 )}
               </div>
               <div className="flex items-center gap-1.5">
                 <button
                   onClick={copyLink}
-                  className="text-xs text-muted-foreground hover:text-foreground border border-border px-2 py-1 rounded-md inline-flex items-center gap-1 hover:bg-muted"
+                  className="text-xs text-muted hover:text-ink border border-border px-2 py-1 rounded-md inline-flex items-center gap-1 hover:bg-hover"
                 >
                   <span>⧉</span> Copy link
                 </button>
@@ -232,18 +232,16 @@ export function TaskDetail() {
                 value={task.title}
                 onChange={(e) => setTask({ ...task, title: e.target.value })}
                 onBlur={(e) => patch({ title: e.target.value })}
-                className="w-full text-2xl font-semibold tracking-tight text-foreground border-b border-transparent hover:border-border focus:border-brand-500 focus:outline-none pb-1"
+                className="w-full text-2xl font-semibold tracking-tight text-ink border-b border-transparent hover:border-border focus:border-brand-500 focus:outline-none pb-1"
               />
             ) : (
-              <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-                {task.title}
-              </h1>
+              <h1 className="text-2xl font-semibold tracking-tight text-ink">{task.title}</h1>
             )}
 
             {/* Meta row */}
-            <p className="text-xs text-muted-foreground mt-3">
+            <p className="text-xs text-muted mt-3">
               Created by{' '}
-              <span className="text-foreground font-medium">
+              <span className="text-ink font-medium">
                 {task.creator?.full_name ?? task.creator?.email ?? '—'}
               </span>
               {' · '}
@@ -252,12 +250,12 @@ export function TaskDetail() {
                 day: 'numeric',
               })}
               {' · '}
-              Updated <span className="text-foreground">{relative(task.updated_at)}</span>
+              Updated <span className="text-ink">{relative(task.updated_at)}</span>
             </p>
 
             {/* Description */}
             <div className="mt-5">
-              <div className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase mb-1.5">
+              <div className="text-[10px] font-semibold tracking-widest text-muted uppercase mb-1.5">
                 Description
               </div>
               {canEdit ? (
@@ -266,44 +264,41 @@ export function TaskDetail() {
                   value={task.description ?? ''}
                   onChange={(e) => setTask({ ...task, description: e.target.value })}
                   onBlur={(e) => patch({ description: e.target.value })}
-                  className="w-full bg-muted border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:bg-card"
+                  className="w-full bg-hover border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:bg-surface"
                   placeholder="Add a description…"
                 />
               ) : (
-                <p className="text-sm text-foreground whitespace-pre-wrap">
-                  {task.description || (
-                    <span className="text-muted-foreground italic">No description</span>
-                  )}
+                <p className="text-sm text-ink whitespace-pre-wrap">
+                  {task.description || <span className="text-muted italic">No description</span>}
                 </p>
               )}
             </div>
           </div>
 
           {/* Comments */}
-          <div className="bg-card rounded-xl border border-border p-5">
-            <h3 className="text-sm font-semibold text-foreground mb-3">
-              Comments{' '}
-              <span className="text-muted-foreground font-normal">({comments.length})</span>
+          <div className="bg-surface rounded-xl border border-border p-5">
+            <h3 className="text-sm font-semibold text-ink mb-3">
+              Comments <span className="text-muted font-normal">({comments.length})</span>
             </h3>
             <div className="space-y-3 mb-3">
               {comments.length === 0 && (
-                <p className="text-sm text-muted-foreground italic">No comments yet</p>
+                <p className="text-sm text-muted italic">No comments yet</p>
               )}
               {comments.map((c) => (
                 <div key={c.id} className="flex items-start gap-2.5">
                   <Avatar name={c.author?.full_name} email={c.author?.email} size={28} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 text-xs">
-                      <span className="font-medium text-foreground">
+                      <span className="font-medium text-ink">
                         {c.author?.full_name ?? c.author?.email ?? 'Unknown'}
                       </span>
-                      <span className="text-muted-foreground">{relative(c.created_at)}</span>
+                      <span className="text-muted">{relative(c.created_at)}</span>
                     </div>
-                    <p className="text-sm text-foreground whitespace-pre-wrap mt-0.5">{c.body}</p>
+                    <p className="text-sm text-ink whitespace-pre-wrap mt-0.5">{c.body}</p>
                     {(c.author_id === profile?.id || isManager) && (
                       <button
                         onClick={() => deleteComment(c.id)}
-                        className="text-[11px] text-muted-foreground hover:text-red-600 mt-1"
+                        className="text-[11px] text-muted hover:text-red-600 mt-1"
                       >
                         Delete
                       </button>
@@ -324,7 +319,7 @@ export function TaskDetail() {
               <button
                 onClick={postComment}
                 disabled={posting}
-                className="bg-foreground text-background text-sm px-3 py-2 rounded-lg disabled:opacity-50"
+                className="bg-ink text-bg text-sm px-3 py-2 rounded-lg disabled:opacity-50"
               >
                 {posting ? 'Posting…' : 'Post'}
               </button>
@@ -332,11 +327,10 @@ export function TaskDetail() {
           </div>
 
           {/* Attachments */}
-          <div className="bg-card rounded-xl border border-border p-5">
+          <div className="bg-surface rounded-xl border border-border p-5">
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-semibold text-foreground">
-                Attachments{' '}
-                <span className="text-muted-foreground font-normal">({attachments.length})</span>
+              <h3 className="text-sm font-semibold text-ink">
+                Attachments <span className="text-muted font-normal">({attachments.length})</span>
               </h3>
               <input
                 ref={fileRef}
@@ -350,14 +344,14 @@ export function TaskDetail() {
               />
               <button
                 onClick={() => fileRef.current?.click()}
-                className="text-xs text-muted-foreground hover:text-foreground border border-border px-2 py-1 rounded-md inline-flex items-center gap-1 hover:bg-muted"
+                className="text-xs text-muted hover:text-ink border border-border px-2 py-1 rounded-md inline-flex items-center gap-1 hover:bg-hover"
               >
                 <span>📎</span> Upload
               </button>
             </div>
             <div className="space-y-1">
               {attachments.length === 0 && (
-                <p className="text-sm text-muted-foreground italic">No attachments</p>
+                <p className="text-sm text-muted italic">No attachments</p>
               )}
               {attachments.map((a) => (
                 <div
@@ -370,10 +364,10 @@ export function TaskDetail() {
                     rel="noopener noreferrer"
                     className="text-brand-700 hover:underline truncate max-w-[60%] inline-flex items-center gap-1.5"
                   >
-                    <span className="text-muted-foreground">📄</span>
+                    <span className="text-muted">📄</span>
                     {a.file_name}
                   </a>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-2 text-xs text-muted">
                     <span>{a.uploader?.full_name ?? a.uploader?.email ?? '—'}</span>
                     {(a.uploaded_by === profile?.id || isManager) && (
                       <button
@@ -392,8 +386,8 @@ export function TaskDetail() {
 
         {/* Sidebar / properties */}
         <div className="space-y-4">
-          <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-            <div className="px-4 py-2.5 border-b border-border text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">
+          <div className="bg-surface rounded-xl border border-border shadow-sm overflow-hidden">
+            <div className="px-4 py-2.5 border-b border-border text-[10px] font-semibold tracking-widest text-muted uppercase">
               Details
             </div>
             <div className="p-4 space-y-4 text-sm">
@@ -423,20 +417,20 @@ export function TaskDetail() {
 
               <Field label="Assignee">
                 {task.assignee ? (
-                  <span className="inline-flex items-center gap-1.5 text-foreground">
+                  <span className="inline-flex items-center gap-1.5 text-ink">
                     <Avatar name={task.assignee.full_name} email={task.assignee.email} size={22} />
                     <span className="truncate">
                       {task.assignee.full_name ?? task.assignee.email}
                     </span>
                   </span>
                 ) : (
-                  <span className="text-muted-foreground italic text-xs">Unassigned</span>
+                  <span className="text-muted italic text-xs">Unassigned</span>
                 )}
               </Field>
 
               {task.consultant && (
                 <Field label="Consultant">
-                  <span className="inline-flex items-center gap-1.5 text-foreground">
+                  <span className="inline-flex items-center gap-1.5 text-ink">
                     <Avatar
                       name={task.consultant.user?.full_name}
                       email={task.consultant.user?.email}
@@ -462,7 +456,7 @@ export function TaskDetail() {
               </Field>
 
               <Field label="Created">
-                <span className="text-foreground">
+                <span className="text-ink">
                   {new Date(task.created_at).toLocaleDateString(undefined, {
                     month: 'short',
                     day: 'numeric',
@@ -505,7 +499,7 @@ export function TaskDetail() {
                     />
                   )}
                   {(task.tags ?? []).length === 0 && !canEdit && (
-                    <span className="text-xs text-muted-foreground italic">None</span>
+                    <span className="text-xs text-muted italic">None</span>
                   )}
                 </div>
               </Field>
@@ -513,8 +507,8 @@ export function TaskDetail() {
           </div>
 
           {task.consultant && (
-            <div className="bg-card rounded-xl border border-border p-4">
-              <div className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase mb-3">
+            <div className="bg-surface rounded-xl border border-border p-4">
+              <div className="text-[10px] font-semibold tracking-widest text-muted uppercase mb-3">
                 Linked record
               </div>
               <div className="flex items-center gap-3">
@@ -524,10 +518,10 @@ export function TaskDetail() {
                   size={36}
                 />
                 <div className="min-w-0">
-                  <div className="text-sm font-medium text-foreground truncate">
+                  <div className="text-sm font-medium text-ink truncate">
                     {task.consultant.user?.full_name ?? task.consultant.user?.email}
                   </div>
-                  <div className="text-xs text-muted-foreground">Consultant</div>
+                  <div className="text-xs text-muted">Consultant</div>
                 </div>
               </div>
               {/* The /consultants list is OPERATOR_TIER-only; a viewer who's
@@ -550,7 +544,7 @@ export function TaskDetail() {
           {canEdit && (
             <button
               onClick={deleteTask}
-              className="w-full bg-card border border-red-200 dark:border-red-500/30 text-red-700 dark:text-red-300 text-sm px-3 py-2 rounded-lg hover:bg-red-50"
+              className="w-full bg-surface border border-red-200 dark:border-red-500/30 text-red-700 dark:text-red-300 text-sm px-3 py-2 rounded-lg hover:bg-red-50"
             >
               Delete task
             </button>
@@ -576,9 +570,7 @@ function Field({
     <div
       className={`grid grid-cols-[5.5rem_1fr] gap-3 ${align === 'start' ? 'items-start' : 'items-center'}`}
     >
-      <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-        {label}
-      </span>
+      <span className="text-[11px] font-semibold uppercase tracking-wider text-muted">{label}</span>
       <div className="min-w-0">{children}</div>
     </div>
   );

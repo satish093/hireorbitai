@@ -218,7 +218,7 @@ export function UserProfile() {
   if (!user)
     return (
       <Layout title="Profile">
-        <div className="text-sm text-muted-foreground">User not available.</div>
+        <div className="text-sm text-muted">User not available.</div>
       </Layout>
     );
 
@@ -232,31 +232,26 @@ export function UserProfile() {
       title={displayName}
       crumbs={[{ label: 'Workspace', to: '/dashboard' }, { label: 'Profile' }]}
     >
-      <button
-        onClick={() => navigate(-1)}
-        className="text-xs text-muted-foreground hover:text-foreground mb-3"
-      >
+      <button onClick={() => navigate(-1)} className="text-xs text-muted hover:text-ink mb-3">
         ← Back
       </button>
 
-      <div className="bg-card border border-border rounded-2xl overflow-hidden">
+      <div className="bg-surface border border-border rounded-2xl overflow-hidden">
         {/* Header */}
         <div className="px-6 py-5 border-b border-border flex items-start gap-4">
           <Avatar name={displayName} email={user.email} size={64} />
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-xl font-semibold tracking-tight text-foreground">
-                {displayName}
-              </h1>
+              <h1 className="text-xl font-semibold tracking-tight text-ink">{displayName}</h1>
               <PresencePill lastSeenAt={user.last_seen_at} />
               {!user.is_active && (
-                <span className="text-[10px] font-semibold uppercase tracking-wider bg-muted text-muted-foreground px-1.5 py-0.5 rounded">
+                <span className="text-[10px] font-semibold uppercase tracking-wider bg-hover text-muted px-1.5 py-0.5 rounded">
                   Inactive
                 </span>
               )}
             </div>
-            <div className="text-sm text-muted-foreground mt-0.5 flex items-center gap-2 flex-wrap">
-              <span className="text-[10px] font-semibold uppercase tracking-widest bg-muted text-foreground px-1.5 py-0.5 rounded">
+            <div className="text-sm text-muted mt-0.5 flex items-center gap-2 flex-wrap">
+              <span className="text-[10px] font-semibold uppercase tracking-widest bg-hover text-ink px-1.5 py-0.5 rounded">
                 {ROLE_LABEL[user.role] ?? user.role}
               </span>
               <GroupBadge groupId={user.group_id} />
@@ -300,7 +295,7 @@ export function UserProfile() {
               {isSelf && (
                 <button
                   onClick={replayTour}
-                  className="border border-border text-foreground text-sm px-3 py-1.5 rounded-lg hover:bg-muted press transition-colors"
+                  className="border border-border text-ink text-sm px-3 py-1.5 rounded-lg hover:bg-hover press transition-colors"
                   title="Replay the product tour"
                 >
                   Replay tour
@@ -308,7 +303,7 @@ export function UserProfile() {
               )}
               <button
                 onClick={() => setEditing(true)}
-                className="bg-foreground text-background text-sm px-4 py-1.5 rounded-lg hover:opacity-90"
+                className="bg-ink text-bg text-sm px-4 py-1.5 rounded-lg hover:opacity-90"
               >
                 Edit
               </button>
@@ -321,14 +316,14 @@ export function UserProfile() {
                   setEditing(false);
                   setForm(user);
                 }}
-                className="border border-border text-foreground text-sm px-3 py-1.5 rounded-lg hover:bg-muted"
+                className="border border-border text-ink text-sm px-3 py-1.5 rounded-lg hover:bg-hover"
               >
                 Cancel
               </button>
               <button
                 onClick={save}
                 disabled={saving}
-                className="bg-foreground text-background text-sm px-4 py-1.5 rounded-lg hover:opacity-90 disabled:opacity-50"
+                className="bg-ink text-bg text-sm px-4 py-1.5 rounded-lg hover:opacity-90 disabled:opacity-50"
               >
                 {saving ? 'Saving…' : 'Save'}
               </button>
@@ -453,14 +448,14 @@ export function UserProfile() {
               />
               {user.context.consultant.skills && user.context.consultant.skills.length > 0 && (
                 <div className="pt-2">
-                  <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1">
+                  <div className="text-[10px] font-semibold uppercase tracking-widest text-muted mb-1">
                     Skills
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     {user.context.consultant.skills.map((s) => (
                       <span
                         key={s}
-                        className="text-[11px] bg-muted text-foreground px-2 py-0.5 rounded-full"
+                        className="text-[11px] bg-hover text-ink px-2 py-0.5 rounded-full"
                       >
                         {s}
                       </span>
@@ -505,20 +500,19 @@ export function UserProfile() {
           aria-modal="true"
         >
           <div
-            className="bg-card rounded-2xl border border-border shadow-xl w-full max-w-md p-6 animate-scale-in"
+            className="bg-surface rounded-2xl border border-border shadow-xl w-full max-w-md p-6 animate-scale-in"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-lg font-semibold text-foreground">Deactivate account?</h2>
-            <p className="text-sm text-muted-foreground mt-2">
-              <span className="font-medium text-foreground">{user.email}</span> will be signed out
-              of every session and unable to log in until you reactivate them. Their data is
-              preserved.
+            <h2 className="text-lg font-semibold text-ink">Deactivate account?</h2>
+            <p className="text-sm text-muted mt-2">
+              <span className="font-medium text-ink">{user.email}</span> will be signed out of every
+              session and unable to log in until you reactivate them. Their data is preserved.
             </p>
             <div className="flex items-center justify-end gap-2 mt-5">
               <button
                 onClick={() => setShowDeactivate(false)}
                 disabled={actBusy}
-                className="border border-border text-foreground text-sm px-3 py-1.5 rounded-lg hover:bg-muted disabled:opacity-50 press"
+                className="border border-border text-ink text-sm px-3 py-1.5 rounded-lg hover:bg-hover disabled:opacity-50 press"
               >
                 Cancel
               </button>
@@ -542,16 +536,16 @@ export function UserProfile() {
           aria-modal="true"
         >
           <div
-            className="bg-card rounded-2xl border border-border shadow-xl w-full max-w-md p-6 animate-scale-in"
+            className="bg-surface rounded-2xl border border-border shadow-xl w-full max-w-md p-6 animate-scale-in"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-lg font-semibold text-foreground">Delete account permanently?</h2>
-            <p className="text-sm text-muted-foreground mt-2">
+            <h2 className="text-lg font-semibold text-ink">Delete account permanently?</h2>
+            <p className="text-sm text-muted mt-2">
               This will permanently remove{' '}
-              <span className="font-medium text-foreground">{user.email}</span>'s auth user, profile
-              row, and active sessions. This action cannot be undone.
+              <span className="font-medium text-ink">{user.email}</span>'s auth user, profile row,
+              and active sessions. This action cannot be undone.
             </p>
-            <p className="text-xs text-muted-foreground mt-3">
+            <p className="text-xs text-muted mt-3">
               Prefer{' '}
               <button
                 type="button"
@@ -566,22 +560,22 @@ export function UserProfile() {
               if you want to keep the audit trail.
             </p>
             <label className="block mt-4">
-              <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-                Type <span className="text-foreground">{user.email}</span> to confirm
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-muted">
+                Type <span className="text-ink">{user.email}</span> to confirm
               </span>
               <input
                 type="text"
                 value={deleteConfirmText}
                 onChange={(e) => setDeleteConfirmText(e.target.value)}
                 autoComplete="off"
-                className="mt-1 w-full text-sm bg-card border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-red-500/40"
+                className="mt-1 w-full text-sm bg-surface border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-red-500/40"
               />
             </label>
             <div className="flex items-center justify-end gap-2 mt-5">
               <button
                 onClick={() => setShowDelete(false)}
                 disabled={actBusy}
-                className="border border-border text-foreground text-sm px-3 py-1.5 rounded-lg hover:bg-muted disabled:opacity-50"
+                className="border border-border text-ink text-sm px-3 py-1.5 rounded-lg hover:bg-hover disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -604,8 +598,8 @@ export function UserProfile() {
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="bg-muted border border-border rounded-xl p-4">
-      <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-3">
+    <div className="bg-hover border border-border rounded-xl p-4">
+      <div className="text-[10px] font-semibold uppercase tracking-widest text-muted mb-3">
         {title}
       </div>
       <div className="space-y-2.5">{children}</div>
@@ -633,7 +627,7 @@ function Field({
   if (editing && !readonly && onChange) {
     return (
       <label className="block">
-        <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+        <span className="text-[10px] font-semibold uppercase tracking-widest text-muted">
           {label}
         </span>
         <input
@@ -641,18 +635,16 @@ function Field({
           value={value ?? ''}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          className="mt-1 w-full text-sm bg-card border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+          className="mt-1 w-full text-sm bg-surface border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
         />
       </label>
     );
   }
   return (
     <div>
-      <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-        {label}
-      </div>
-      <div className="text-sm text-foreground mt-0.5">
-        {value || <span className="text-muted-foreground italic">Not set</span>}
+      <div className="text-[10px] font-semibold uppercase tracking-widest text-muted">{label}</div>
+      <div className="text-sm text-ink mt-0.5">
+        {value || <span className="text-muted italic">Not set</span>}
       </div>
     </div>
   );

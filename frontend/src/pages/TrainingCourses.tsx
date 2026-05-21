@@ -126,7 +126,7 @@ export function TrainingCourses() {
           {isManager && (
             <Link
               to="/training/courses/new"
-              className="bg-foreground text-background text-sm px-4 py-2 rounded-lg hover:opacity-90"
+              className="bg-ink text-bg text-sm px-4 py-2 rounded-lg hover:opacity-90"
             >
               + New course
             </Link>

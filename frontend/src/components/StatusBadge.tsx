@@ -20,7 +20,7 @@ const tone: Record<string, PillTone> = {
     text: 'text-blue-700 dark:text-blue-300',
     dot: 'bg-blue-500',
   },
-  SUBMITTED: { bg: 'bg-muted', text: 'text-foreground', dot: 'bg-muted-foreground' },
+  SUBMITTED: { bg: 'bg-hover', text: 'text-ink', dot: 'bg-muted' },
   SCREENING: {
     bg: 'bg-sky-50 dark:bg-sky-500/15',
     text: 'text-sky-700 dark:text-sky-300',
@@ -41,7 +41,7 @@ const tone: Record<string, PillTone> = {
     text: 'text-red-700 dark:text-red-300',
     dot: 'bg-red-500',
   },
-  WITHDRAWN: { bg: 'bg-muted', text: 'text-muted-foreground', dot: 'bg-muted-foreground' },
+  WITHDRAWN: { bg: 'bg-hover', text: 'text-muted', dot: 'bg-muted' },
   SCHEDULED: {
     bg: 'bg-indigo-50 dark:bg-indigo-500/15',
     text: 'text-indigo-700 dark:text-indigo-300',
@@ -87,13 +87,13 @@ const tone: Record<string, PillTone> = {
     text: 'text-emerald-700 dark:text-emerald-300',
     dot: 'bg-emerald-500',
   },
-  REVOKED: { bg: 'bg-muted', text: 'text-muted-foreground', dot: 'bg-muted-foreground' },
+  REVOKED: { bg: 'bg-hover', text: 'text-muted', dot: 'bg-muted' },
 };
 
 const DEFAULT_TONE: PillTone = {
-  bg: 'bg-muted',
-  text: 'text-foreground',
-  dot: 'bg-muted-foreground',
+  bg: 'bg-hover',
+  text: 'text-ink',
+  dot: 'bg-muted',
 };
 
 // Statuses that benefit from a slow ambient pulse on the dot (active states
@@ -115,7 +115,7 @@ export function StatusBadge({ status }: { status: string }) {
     }
   }, [status]);
 
-  if (!status) return <span className="text-muted-foreground text-xs italic">—</span>;
+  if (!status) return <span className="text-muted text-xs italic">—</span>;
   const t = tone[status] ?? DEFAULT_TONE;
   return (
     <Pill tone={t} pulseDot={PULSING.has(status)} className={clsx(pop && 'animate-pop')}>

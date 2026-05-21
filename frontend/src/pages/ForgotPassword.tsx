@@ -43,23 +43,23 @@ export function ForgotPassword() {
   }
 
   return (
-    <div className="min-h-dvh bg-muted flex items-center justify-center p-4 sm:p-6">
+    <div className="min-h-dvh bg-hover flex items-center justify-center p-4 sm:p-6">
       <div className="w-full max-w-sm animate-fade-in-up">
         <div className="flex justify-center mb-6">
           <Brand size="lg" />
         </div>
 
-        <div className="bg-card rounded-2xl border border-border shadow-sm p-7">
+        <div className="bg-surface rounded-2xl border border-border shadow-sm p-7">
           {!sent ? (
             <form onSubmit={form.handleSubmit(submit)} className="space-y-4">
-              <Link to="/login" className="text-xs text-muted-foreground hover:text-foreground">
+              <Link to="/login" className="text-xs text-muted hover:text-ink">
                 ← Back to sign in
               </Link>
               <div>
-                <h1 className="text-xl font-semibold tracking-tight text-foreground mt-1">
+                <h1 className="text-xl font-semibold tracking-tight text-ink mt-1">
                   Reset your password
                 </h1>
-                <p className="text-sm text-muted-foreground mt-1">
+                <p className="text-sm text-muted mt-1">
                   We'll send you an email with a link to set a new password. The link is valid for
                   15 minutes.
                 </p>
@@ -74,7 +74,7 @@ export function ForgotPassword() {
               />
               <button
                 disabled={busy}
-                className="w-full bg-foreground hover:opacity-90 disabled:opacity-50 text-background rounded-lg py-2.5 text-sm font-medium press"
+                className="w-full bg-ink hover:opacity-90 disabled:opacity-50 text-bg rounded-lg py-2.5 text-sm font-medium press"
               >
                 {busy ? 'Sending…' : 'Send reset link'}
               </button>
@@ -84,10 +84,8 @@ export function ForgotPassword() {
               <div className="w-12 h-12 rounded-full bg-emerald-50 dark:bg-emerald-500/15 flex items-center justify-center text-emerald-600 dark:text-emerald-400 text-2xl mx-auto">
                 ✓
               </div>
-              <h1 className="text-xl font-semibold tracking-tight text-foreground">
-                Check your inbox
-              </h1>
-              <p className="text-sm text-muted-foreground">
+              <h1 className="text-xl font-semibold tracking-tight text-ink">Check your inbox</h1>
+              <p className="text-sm text-muted">
                 If an account exists for that email, we just sent a password-reset link. It's valid
                 for 15 minutes.
               </p>

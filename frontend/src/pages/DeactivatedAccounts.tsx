@@ -31,7 +31,7 @@ interface DeactivatedRow {
 const STATUS_PILL: Record<Status, string> = {
   active:
     'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30',
-  inactive: 'bg-muted  text-muted-foreground  border-border',
+  inactive: 'bg-hover  text-muted  border-border',
   suspended:
     'bg-amber-50 dark:bg-amber-500/15   text-amber-800 dark:text-amber-300  border-amber-200 dark:border-amber-500/30',
   pending_verification:
@@ -149,8 +149,8 @@ export function DeactivatedAccounts() {
             header: 'User',
             render: (r: DeactivatedRow) => (
               <button onClick={() => nav(`/users/${r.id}`)} className="text-left hover:underline">
-                <div className="font-medium text-foreground">{r.full_name || r.email}</div>
-                {r.full_name && <div className="text-xs text-muted-foreground">{r.email}</div>}
+                <div className="font-medium text-ink">{r.full_name || r.email}</div>
+                {r.full_name && <div className="text-xs text-muted">{r.email}</div>}
               </button>
             ),
           },
@@ -158,7 +158,7 @@ export function DeactivatedAccounts() {
             key: 'role',
             header: 'Role',
             render: (r: DeactivatedRow) => (
-              <span className="text-[11px] font-medium bg-muted text-foreground px-1.5 py-0.5 rounded">
+              <span className="text-[11px] font-medium bg-hover text-ink px-1.5 py-0.5 rounded">
                 {ROLE_LABEL[r.role] ?? r.role}
               </span>
             ),
@@ -200,7 +200,7 @@ export function DeactivatedAccounts() {
               r.last_seen_at ? (
                 new Date(r.last_seen_at).toLocaleString()
               ) : (
-                <span className="text-muted-foreground">Never</span>
+                <span className="text-muted">Never</span>
               ),
           },
           {

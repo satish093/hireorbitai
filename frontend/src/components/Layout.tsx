@@ -34,7 +34,7 @@ export function Layout({
   }, [loc.pathname]);
 
   return (
-    <div className="flex min-h-dvh bg-background text-foreground">
+    <div className="flex min-h-dvh bg-bg text-ink">
       <Sidebar mobileOpen={navOpen} onMobileClose={() => setNavOpen(false)} />
       <div className="flex-1 flex flex-col min-w-0">
         <Header title={title} crumbs={crumbs} onMenuClick={() => setNavOpen(true)} />

@@ -91,7 +91,7 @@ export function Invitations() {
           (t) => (
             <div className="space-y-1">
               <div className="font-medium">Invitation created, but email failed</div>
-              <div className="text-xs text-muted-foreground">
+              <div className="text-xs text-muted">
                 {r.data?.email_error ?? 'Unknown email error'}
               </div>
               <button
@@ -157,7 +157,7 @@ export function Invitations() {
             key: 'role',
             header: 'Role',
             render: (r: any) => (
-              <span className="text-[11px] font-medium bg-muted text-foreground px-1.5 py-0.5 rounded">
+              <span className="text-[11px] font-medium bg-hover text-ink px-1.5 py-0.5 rounded">
                 {r.role}
               </span>
             ),

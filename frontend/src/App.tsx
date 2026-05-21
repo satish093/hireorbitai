@@ -142,9 +142,7 @@ const TrainingPlanView = lazy(() =>
  *  minimal so it doesn't flash a heavy spinner on fast loads. */
 function RouteFallback() {
   return (
-    <div className="min-h-dvh flex items-center justify-center text-muted-foreground text-sm">
-      Loading…
-    </div>
+    <div className="min-h-dvh flex items-center justify-center text-muted text-sm">Loading…</div>
   );
 }
 
