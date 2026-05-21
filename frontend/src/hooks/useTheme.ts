@@ -11,10 +11,8 @@ const KEY = 'ho-theme';
 export function useTheme() {
   const [theme, setTheme] = useState<Theme>(() => {
     if (typeof window === 'undefined') return 'light';
-    return (
-      (localStorage.getItem(KEY) as Theme | null) ||
-      (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
-    );
+    // Default to light unless the user has explicitly chosen dark.
+    return (localStorage.getItem(KEY) as Theme | null) || 'light';
   });
 
   useEffect(() => {

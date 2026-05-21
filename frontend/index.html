@@ -33,12 +33,8 @@
     <script>
       (function () {
         try {
-          var t = localStorage.getItem('ho-theme');
-          if (!t)
-            t =
-              window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
-                ? 'dark'
-                : 'light';
+          // Default to light unless the user has explicitly chosen dark.
+          var t = localStorage.getItem('ho-theme') || 'light';
           document.documentElement.setAttribute('data-theme', t);
         } catch (e) {}
       })();

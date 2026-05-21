@@ -16,17 +16,9 @@ export function getStoredTheme(): Theme | null {
   }
 }
 
-/** Stored choice if present, otherwise the OS preference, otherwise light. */
+/** Stored choice if present, otherwise light (we default to the light theme). */
 export function resolveInitialTheme(): Theme {
-  const stored = getStoredTheme();
-  if (stored) return stored;
-  if (
-    typeof window !== 'undefined' &&
-    window.matchMedia?.('(prefers-color-scheme: dark)').matches
-  ) {
-    return 'dark';
-  }
-  return 'light';
+  return getStoredTheme() ?? 'light';
 }
 
 export function applyTheme(theme: Theme): void {
