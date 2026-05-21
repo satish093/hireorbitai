@@ -10,11 +10,15 @@ import { ADMIN_TIER, MANAGER_TIER, OPERATOR_TIER, OWNER_TIER } from './types';
 // ---------------------------------------------------------------------------
 // Route-level code splitting.
 //
-// The auth pages and the dashboards stay in the main chunk — they're either
-// pre-auth (loaded on first paint) or the immediate landing surface, so
-// async-loading them would only add a network round-trip with no payoff.
+// The auth pages stay in the main chunk — they're pre-auth and loaded on first
+// paint, so async-loading them would only add a network round-trip.
 //
-// Every other route is lazy-loaded. Vite turns each lazy() call into its
+// The three role dashboards are lazy-loaded individually so a signed-in user
+// only downloads the dashboard for THEIR role — a consultant never fetches the
+// manager/recruiter dashboard code, and vice versa. Same for the two
+// role-specific onboarding flows.
+//
+// Every other route is lazy-loaded too. Vite turns each lazy() call into its
 // own dynamic-import chunk, which knocks the initial bundle down from ~688
 // kB to a much smaller shell. Suspense renders a low-key fallback while the
 // chunk is fetched.
@@ -24,12 +28,23 @@ import { ForgotPassword } from './pages/ForgotPassword';
 import { ChangePassword } from './pages/ChangePassword';
 import { Unauthorized } from './pages/Unauthorized';
 import { AcceptInvitation } from './pages/AcceptInvitation';
-import { ConsultantOnboarding } from './pages/ConsultantOnboarding';
-import { RecruiterOnboarding } from './pages/RecruiterOnboarding';
-import { ManagerDashboard } from './pages/ManagerDashboard';
-import { RecruiterDashboard } from './pages/RecruiterDashboard';
-import { ConsultantDashboard } from './pages/ConsultantDashboard';
 import { ResetPassword } from './pages/ResetPassword';
+
+const ConsultantOnboarding = lazy(() =>
+  import('./pages/ConsultantOnboarding').then((m) => ({ default: m.ConsultantOnboarding })),
+);
+const RecruiterOnboarding = lazy(() =>
+  import('./pages/RecruiterOnboarding').then((m) => ({ default: m.RecruiterOnboarding })),
+);
+const ManagerDashboard = lazy(() =>
+  import('./pages/ManagerDashboard').then((m) => ({ default: m.ManagerDashboard })),
+);
+const RecruiterDashboard = lazy(() =>
+  import('./pages/RecruiterDashboard').then((m) => ({ default: m.RecruiterDashboard })),
+);
+const ConsultantDashboard = lazy(() =>
+  import('./pages/ConsultantDashboard').then((m) => ({ default: m.ConsultantDashboard })),
+);
 
 // Talent + network pages.
 const Consultants = lazy(() =>

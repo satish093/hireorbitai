@@ -12,4 +12,16 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        // Split the big, rarely-changing framework libs into their own chunk.
+        // The main app chunk shrinks (faster first paint) and these stay cached
+        // across deploys, so repeat visits skip re-downloading React/Router.
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+        },
+      },
+    },
+  },
 });
