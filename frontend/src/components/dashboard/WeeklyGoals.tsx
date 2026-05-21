@@ -1,10 +1,21 @@
 import { useEffect, useState } from 'react';
+import toast from 'react-hot-toast';
 import { api } from '../../services/api';
+import { Button } from '../Button';
+import { Modal } from '../Modal';
+import { FormInput } from '../FormInput';
 import type { DashApplication, DashConsultant } from './types';
 
 type GoalType = 'submissions' | 'interviews' | 'offers' | 'bench_refresh';
 type Targets = Record<GoalType, number>;
 const DEFAULT_TARGETS: Targets = { submissions: 10, interviews: 4, offers: 2, bench_refresh: 100 };
+
+const GOAL_META: { key: GoalType; label: string }[] = [
+  { key: 'submissions', label: 'Submissions' },
+  { key: 'interviews', label: 'Interviews scheduled' },
+  { key: 'offers', label: 'Offers received' },
+  { key: 'bench_refresh', label: 'Bench refresh target (%)' },
+];
 
 // ---------------------------------------------------------------------------
 // Internal types
@@ -154,11 +165,61 @@ export function WeeklyGoals({
     };
   }, []);
 
+  // Inline target editor (persists via PUT /recruiter-goals).
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<Record<GoalType, string>>({
+    submissions: '',
+    interviews: '',
+    offers: '',
+    bench_refresh: '',
+  });
+  const [saving, setSaving] = useState(false);
+
+  function openEditor() {
+    setDraft({
+      submissions: String(targets.submissions),
+      interviews: String(targets.interviews),
+      offers: String(targets.offers),
+      bench_refresh: String(targets.bench_refresh),
+    });
+    setEditing(true);
+  }
+
+  async function saveGoals() {
+    const next = {
+      submissions: clampInt(draft.submissions),
+      interviews: clampInt(draft.interviews),
+      offers: clampInt(draft.offers),
+      bench_refresh: clampInt(draft.bench_refresh),
+    };
+    setSaving(true);
+    try {
+      await api.put('/recruiter-goals', {
+        goals: GOAL_META.map((m) => ({ goal_type: m.key, target: next[m.key] })),
+      });
+      setTargets(next);
+      setEditing(false);
+      toast.success('Goals updated');
+    } catch (e) {
+      const msg =
+        (e as { response?: { data?: { error?: string } } })?.response?.data?.error ??
+        'Failed to save goals';
+      toast.error(msg);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   const goals = computeGoals(consultants, apps, targets);
 
   return (
     <div className="rounded-xl border border-border bg-surface p-4">
-      <p className="text-sm font-semibold text-ink mb-3">Weekly goals</p>
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-sm font-semibold text-ink">Weekly goals</p>
+        <Button variant="ghost" size="sm" onClick={openEditor}>
+          Edit
+        </Button>
+      </div>
 
       <div className="flex flex-col">
         {goals.map((goal, i) => (
@@ -167,6 +228,45 @@ export function WeeklyGoals({
           </div>
         ))}
       </div>
+
+      <Modal
+        open={editing}
+        onClose={() => setEditing(false)}
+        title="Edit weekly goals"
+        description="Set your targets. Progress is tracked automatically from your pipeline."
+        size="sm"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setEditing(false)}>
+              Cancel
+            </Button>
+            <Button variant="primary" loading={saving} onClick={saveGoals}>
+              Save goals
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          {GOAL_META.map((m) => (
+            <FormInput
+              key={m.key}
+              label={m.label}
+              type="number"
+              min={0}
+              inputMode="numeric"
+              value={draft[m.key]}
+              onChange={(e) => setDraft((d) => ({ ...d, [m.key]: e.target.value }))}
+            />
+          ))}
+        </div>
+      </Modal>
     </div>
   );
+}
+
+/** Parse an input string to a non-negative bounded integer. */
+function clampInt(v: string): number {
+  const n = Math.round(Number(v));
+  if (!Number.isFinite(n) || n < 0) return 0;
+  return Math.min(100_000, n);
 }
