@@ -8,6 +8,7 @@ import {
   CourseCategoryBadge,
   TrainingStatusBadge,
   AssignTrainingModal,
+  CourseCover,
 } from '../components/Training';
 import {
   ContentStatusChip,
@@ -267,9 +268,17 @@ export function TrainingCourseDetails() {
       ]}
     >
       <div className="bg-card border border-border rounded-2xl overflow-hidden mb-6">
-        {course.thumbnail_url && (
-          <img src={course.thumbnail_url} alt={course.title} className="w-full h-48 object-cover" />
-        )}
+        <div className="h-48 overflow-hidden">
+          {course.thumbnail_url ? (
+            <img
+              src={course.thumbnail_url}
+              alt={course.title}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <CourseCover id={course.id} title={course.title} category={course.category} />
+          )}
+        </div>
         <div className="p-6">
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <div className="min-w-0 flex-1">

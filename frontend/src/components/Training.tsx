@@ -213,6 +213,149 @@ export interface CourseCardData {
   lessons?: { count: number }[];
   assignments?: { count: number }[];
 }
+
+// ---------------------------------------------------------------------------
+// Course cover art
+//
+// Courses have no uploaded imagery (thumbnail_url is null for the seeded set),
+// so we generate a deterministic SVG cover per course instead of shipping
+// raster files. The gradient is keyed off the course category — matching the
+// CourseCategoryBadge color families — and a hash of the course id rotates the
+// gradient and seeds a few translucent motif circles, so two courses in the
+// same category still look distinct. It's pure CSS-paint inside the card's
+// aspect-video slot: zero network, zero storage, and theme-agnostic (the cover
+// is its own saturated surface with white text, identical in light + dark).
+// ---------------------------------------------------------------------------
+
+// Vivid [from, to] gradient stops per category. Mirrors the hue families used
+// by CATEGORY_TONE above so the cover and the badge read as the same color.
+const CATEGORY_COVER: Record<string, [string, string]> = {
+  Java: ['#fb923c', '#ea580c'],
+  'Spring Boot': ['#10b981', '#059669'],
+  React: ['#06b6d4', '#0891b2'],
+  Angular: ['#fb7185', '#e11d48'],
+  'Node.js': ['#84cc16', '#65a30d'],
+  'QA Automation': ['#8b5cf6', '#7c3aed'],
+  Selenium: ['#8b5cf6', '#7c3aed'],
+  Playwright: ['#8b5cf6', '#7c3aed'],
+  Cypress: ['#8b5cf6', '#7c3aed'],
+  DevOps: ['#f59e0b', '#d97706'],
+  AWS: ['#f59e0b', '#d97706'],
+  Azure: ['#0ea5e9', '#0284c7'],
+  SQL: ['#6366f1', '#4f46e5'],
+  'Data Engineering': ['#6366f1', '#4f46e5'],
+  'Data Science': ['#14b8a6', '#0d9488'],
+  'Machine Learning': ['#a855f7', '#9333ea'],
+  AI: ['#d946ef', '#c026d3'],
+  'Network Security': ['#ef4444', '#dc2626'],
+  'Application Security': ['#dc2626', '#b91c1c'],
+  Cybersecurity: ['#fb7185', '#e11d48'],
+  'Cloud Security': ['#fb923c', '#ea580c'],
+  'Interview Preparation': ['#d946ef', '#c026d3'],
+  'Communication Skills': ['#ec4899', '#db2777'],
+  'Resume Building': ['#ec4899', '#db2777'],
+  'Banking Domain': ['#64748b', '#475569'],
+  'Insurance Domain': ['#64748b', '#475569'],
+  'Healthcare Domain': ['#64748b', '#475569'],
+};
+
+// FNV-1a — small, fast, deterministic. Same input → same cover, every render.
+function hashStr(s: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+// Unknown categories fall back to a hue derived from the name, so a brand-new
+// category still gets a stable, on-brand-looking gradient instead of grey.
+function coverColors(category: string): [string, string] {
+  const known = CATEGORY_COVER[category];
+  if (known) return known;
+  const hue = hashStr(category) % 360;
+  return [`hsl(${hue} 68% 55%)`, `hsl(${(hue + 28) % 360} 72% 42%)`];
+}
+
+// Up to two initials from the most significant words of the title.
+function courseInitials(title: string): string {
+  const words = title
+    .replace(/[^\p{L}\p{N} ]/gu, ' ')
+    .split(/\s+/)
+    .filter(Boolean);
+  if (words.length === 0) return '★';
+  if (words.length === 1) return words[0]!.slice(0, 2).toUpperCase();
+  return (words[0]![0]! + words[1]![0]!).toUpperCase();
+}
+
+export function CourseCover({
+  id,
+  title,
+  category,
+}: {
+  id: string;
+  title: string;
+  category: string;
+}) {
+  const [from, to] = coverColors(category);
+  const h = hashStr(id || title);
+  const gradId = `cv-${h.toString(36)}`;
+  const angle = h % 360;
+  // Derive motif-circle geometry from independent bytes of the hash. Circles
+  // hug the corners so they never crowd the monogram.
+  const b0 = h & 0xff;
+  const b1 = (h >> 8) & 0xff;
+  const b2 = (h >> 16) & 0xff;
+  const b3 = (h >> 24) & 0xff;
+
+  return (
+    <svg
+      viewBox="0 0 320 180"
+      preserveAspectRatio="xMidYMid slice"
+      className="w-full h-full"
+      role="img"
+      aria-label={`${category} course cover`}
+    >
+      <defs>
+        <linearGradient id={gradId} gradientTransform={`rotate(${angle} 0.5 0.5)`}>
+          <stop offset="0%" stopColor={from} />
+          <stop offset="100%" stopColor={to} />
+        </linearGradient>
+      </defs>
+      <rect width="320" height="180" fill={`url(#${gradId})`} />
+      <g fill="#ffffff">
+        <circle cx={250 + (b0 % 70)} cy={20 + (b1 % 40)} r={46 + (b2 % 34)} opacity="0.10" />
+        <circle cx={40 + (b2 % 60)} cy={150 + (b3 % 30)} r={26 + (b0 % 24)} opacity="0.08" />
+        <circle cx={150 + (b3 % 120)} cy={90 + (b1 % 40)} r={14 + (b1 % 16)} opacity="0.07" />
+      </g>
+      <text
+        x="22"
+        y="104"
+        fontFamily="Inter, ui-sans-serif, system-ui, sans-serif"
+        fontSize="58"
+        fontWeight="800"
+        fill="#ffffff"
+        opacity="0.96"
+      >
+        {courseInitials(title)}
+      </text>
+      <text
+        x="24"
+        y="138"
+        fontFamily="Inter, ui-sans-serif, system-ui, sans-serif"
+        fontSize="12.5"
+        fontWeight="700"
+        letterSpacing="1.6"
+        fill="#ffffff"
+        opacity="0.82"
+      >
+        {category.toUpperCase()}
+      </text>
+    </svg>
+  );
+}
+
 export function TrainingCourseCard({
   course,
   to,
@@ -224,7 +367,7 @@ export function TrainingCourseCard({
 }) {
   const inner = (
     <div className="bg-card border border-border rounded-xl overflow-hidden hover:border-brand-300 hover:shadow-sm transition flex flex-col h-full">
-      <div className="aspect-video bg-muted flex items-center justify-center">
+      <div className="aspect-video bg-muted overflow-hidden">
         {course.thumbnail_url ? (
           <img
             src={course.thumbnail_url}
@@ -232,9 +375,7 @@ export function TrainingCourseCard({
             className="w-full h-full object-cover"
           />
         ) : (
-          <div className="text-3xl font-bold text-muted-foreground">
-            {course.title.slice(0, 2).toUpperCase()}
-          </div>
+          <CourseCover id={course.id} title={course.title} category={course.category} />
         )}
       </div>
       <div className="p-4 flex-1 flex flex-col">
