@@ -25,31 +25,29 @@ export function useReportData<T extends ReportTab>(
   tab: T,
 ): { data: ReportPayloadMap[T] | null; loading: boolean } {
   const { resolved, compareToPrior } = useReportContext();
-  const [data, setData] = useState<ReportPayloadMap[T] | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Tag the loaded payload with the tab it belongs to so a stale payload from
+  // the previous tab is never handed to the new tab's component (which would
+  // read a field of the wrong shape). Use an `alive` flag rather than an
+  // AbortController so a fast unmount/remount (React StrictMode) doesn't cancel
+  // the only in-flight request — stale results are simply ignored.
+  const [loaded, setLoaded] = useState<{ tab: ReportTab; payload: unknown } | null>(null);
 
   useEffect(() => {
-    const controller = new AbortController();
-    setLoading(true);
-    setData(null);
+    let alive = true;
     api
-      .get(`/reports/${tab}`, {
-        params: { range: resolved.param, compareToPrior },
-        signal: controller.signal,
-      })
+      .get(`/reports/${tab}`, { params: { range: resolved.param, compareToPrior } })
       .then((r) => {
-        if (!controller.signal.aborted) setData(r.data as ReportPayloadMap[T]);
+        if (alive) setLoaded({ tab, payload: r.data });
       })
-      .catch((e) => {
-        if (e?.code === 'ERR_CANCELED' || controller.signal.aborted) return;
-        setData(MOCKS[tab]); // endpoint not built yet → mock
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
+      .catch(() => {
+        if (alive) setLoaded({ tab, payload: MOCKS[tab] }); // endpoint not built → mock
       });
-    return () => controller.abort();
+    return () => {
+      alive = false;
+    };
     // resolved.from/to cover custom-range changes (same param key 'custom').
   }, [tab, resolved.param, resolved.from, resolved.to, compareToPrior]);
 
-  return { data, loading };
+  const data = loaded && loaded.tab === tab ? (loaded.payload as ReportPayloadMap[T]) : null;
+  return { data, loading: data === null };
 }

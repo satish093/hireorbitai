@@ -4,11 +4,23 @@ import { PageHeader } from '../components/PageHeader';
 import { ReportProvider } from '../components/reports/ReportContext';
 import { ReportControls } from '../components/reports/ReportControls';
 import { ReportTabs } from '../components/reports/ReportTabs';
-import { KpiRow } from '../components/reports/KpiCard';
-import { EmptyChart } from '../components/reports/EmptyChart';
 import { useReportData } from '../components/reports/useReportData';
 import { downloadCsv, payloadToCsvRows, exportPanelPng } from '../components/reports/exportUtils';
-import { REPORT_TABS, type Kpi, type ReportTab } from '../components/reports/types';
+import { REPORT_TABS, type ReportTab } from '../components/reports/types';
+import type {
+  PipelinePayload,
+  RecruitersPayload,
+  ConsultantsPayload,
+  PlacementsPayload,
+  SourcesPayload,
+  AIUsagePayload,
+} from '../components/reports/types';
+import { PipelineReport } from '../components/reports/PipelineReport';
+import { RecruiterReport } from '../components/reports/RecruiterReport';
+import { ConsultantReport } from '../components/reports/ConsultantReport';
+import { PlacementsReport } from '../components/reports/PlacementsReport';
+import { SourcesReport } from '../components/reports/SourcesReport';
+import { AIUsageReport } from '../components/reports/AIUsageReport';
 
 const TAB_KEYS = REPORT_TABS.map((t) => t.key);
 const isTab = (v: string | null): v is ReportTab => !!v && (TAB_KEYS as string[]).includes(v);
@@ -32,8 +44,6 @@ function ReportsInner() {
     downloadCsv(`report-${tab}.csv`, payloadToCsvRows(data));
   }
 
-  const kpis = (data as { kpis?: Kpi[] } | null)?.kpis ?? [];
-
   return (
     <Layout title="Reports">
       <PageHeader
@@ -46,17 +56,23 @@ function ReportsInner() {
         <ReportTabs tab={tab} onTab={setTab} />
       </div>
 
-      <div id="report-panel" className="space-y-6">
-        {loading ? (
-          <EmptyChart message="Loading…" />
-        ) : kpis.length === 0 ? (
-          <EmptyChart />
-        ) : (
-          <>
-            <KpiRow kpis={kpis} />
-            <EmptyChart message="Charts for this tab are coming up." />
-          </>
+      <div id="report-panel">
+        {tab === 'pipeline' && (
+          <PipelineReport data={data as PipelinePayload | null} loading={loading} />
         )}
+        {tab === 'recruiters' && (
+          <RecruiterReport data={data as RecruitersPayload | null} loading={loading} />
+        )}
+        {tab === 'consultants' && (
+          <ConsultantReport data={data as ConsultantsPayload | null} loading={loading} />
+        )}
+        {tab === 'placements' && (
+          <PlacementsReport data={data as PlacementsPayload | null} loading={loading} />
+        )}
+        {tab === 'sources' && (
+          <SourcesReport data={data as SourcesPayload | null} loading={loading} />
+        )}
+        {tab === 'ai' && <AIUsageReport data={data as AIUsagePayload | null} loading={loading} />}
       </div>
     </Layout>
   );
