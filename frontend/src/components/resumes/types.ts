@@ -15,6 +15,7 @@ export interface ResumeVersion {
   is_current: boolean;
   created_at: string;
   tailored_for_job_id?: string | null;
+  tailored_job?: JobLite | null;
   tailor_metadata?: {
     before_score?: number;
     after_score?: number;

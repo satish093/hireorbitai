@@ -52,11 +52,21 @@ async function authorizeConsultantAccess(
 export const listForConsultant: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   await authorizeConsultantAccess(req.params.consultantId, req.user);
-  const { data, error } = await db
+  // Embed the tailored-for job so the version strip can render "Tailored for
+  // <company>" without an N+1 fetch. Fall back to '*' if the column/join isn't
+  // available yet (resumes predates the tailored_for_job_id column).
+  let { data, error } = await db
     .from('resumes')
-    .select('*')
+    .select('*, tailored_job:jobs!tailored_for_job_id(id, title, company_name)')
     .eq('consultant_id', req.params.consultantId)
     .order('version', { ascending: false });
+  if (error && /tailored_for_job_id|schema cache|column/i.test(error.message)) {
+    ({ data, error } = await db
+      .from('resumes')
+      .select('*')
+      .eq('consultant_id', req.params.consultantId)
+      .order('version', { ascending: false }));
+  }
   if (error) throw httpError(500, error.message);
   res.json(data);
 };
@@ -907,12 +917,10 @@ export const applyTailorSession: RequestHandler = async (req, res) => {
     .update({ applied: true, result_version_id: (created as any)?.id ?? null })
     .eq('id', (session as any).id);
 
-  res
-    .status(201)
-    .json({
-      resume: created,
-      session: { ...session, applied: true, result_version_id: (created as any)?.id ?? null },
-    });
+  res.status(201).json({
+    resume: created,
+    session: { ...session, applied: true, result_version_id: (created as any)?.id ?? null },
+  });
 };
 
 /** GET /resumes/:id/ats-factors?against=:jobId — 5 factors + skill coverage. */
