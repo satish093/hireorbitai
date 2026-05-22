@@ -1,6 +1,7 @@
 import { ButtonGroup, ButtonGroupItem } from '../ButtonGroup';
 import { Button } from '../Button';
 import { EmptyState } from '../EmptyState';
+import { ResumePreview } from './ResumePreview';
 import type { CenterMode, ResumeVersion } from './types';
 
 interface Props {
@@ -15,22 +16,26 @@ interface Props {
   onEdited: () => void;
 }
 
-// Placeholder shell — Preview / Diff / Edit modes are filled in their steps.
 export function CenterPane({ version, mode, onMode, onMakeCurrent }: Props) {
   if (!version) {
     return (
       <div className="bg-surface border border-border rounded-xl min-h-[420px] grid place-items-center">
         <EmptyState
+          icon="📄"
           title="No version selected"
-          description="Pick a version from the strip above."
+          description="Pick a version from the strip above, or upload a resume to begin."
         />
       </div>
     );
   }
+
   return (
     <div className="bg-surface border border-border rounded-xl flex flex-col min-h-[420px]">
-      <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-border">
-        <div className="min-w-0 text-xs font-mono text-muted truncate">{version.file_name}</div>
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 border-b border-border">
+        <div className="min-w-0 flex items-baseline gap-2">
+          <span className="text-xs font-mono font-medium text-ink">v{version.version}</span>
+          <span className="text-xs font-mono text-muted truncate">{version.file_name}</span>
+        </div>
         <ButtonGroup>
           <ButtonGroupItem pressed={mode === 'preview'} onClick={() => onMode('preview')}>
             Preview
@@ -46,7 +51,16 @@ export function CenterPane({ version, mode, onMode, onMakeCurrent }: Props) {
           {version.is_current ? 'Current' : 'Make current'}
         </Button>
       </div>
-      <div className="flex-1 p-4 text-sm text-muted">Mode: {mode}</div>
+
+      <div className="flex-1 p-4 min-h-0">
+        {mode === 'preview' && <ResumePreview resumeId={version.id} fileName={version.file_name} />}
+        {mode === 'diff' && (
+          <EmptyState compact title="Diff" description="Diff mode lands in the next step." />
+        )}
+        {mode === 'edit' && (
+          <EmptyState compact title="Edit" description="Editor lands in a later step." />
+        )}
+      </div>
     </div>
   );
 }
