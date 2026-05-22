@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { FeatureGuard } from './hooks/useFeatureFlags';
@@ -159,6 +159,52 @@ export default function App() {
   // route changes. Keyed by user id so it remounts (reconnects) on a switch
   // of identity and unmounts on sign-out.
   const { profile } = useAuth();
+
+  // Preload every page chunk as soon as the user is authenticated so all
+  // subsequent nav clicks are instant (no loading flash). The imports run in
+  // the background — the browser fetches and caches the JS bundles without
+  // blocking the current render. React.lazy reuses the same module promise,
+  // so by the time the user clicks a link the chunk is already resolved.
+  useEffect(() => {
+    if (!profile) return;
+    void import('./pages/Tasks');
+    void import('./pages/TaskDetail');
+    void import('./pages/TasksAssignedToMe');
+    void import('./pages/Messages');
+    void import('./pages/ManagerDashboard');
+    void import('./pages/RecruiterDashboard');
+    void import('./pages/ConsultantDashboard');
+    void import('./pages/Consultants');
+    void import('./pages/Recruiters');
+    void import('./pages/JobSearch');
+    void import('./pages/JobDetail');
+    void import('./pages/Applications');
+    void import('./pages/Interviews');
+    void import('./pages/Calendar');
+    void import('./pages/Resumes');
+    void import('./pages/Vendors');
+    void import('./pages/Clients');
+    void import('./pages/Reminders');
+    void import('./pages/AIEmail');
+    void import('./pages/Reports');
+    void import('./pages/Invitations');
+    void import('./pages/FeatureFlags');
+    void import('./pages/UserGroups');
+    void import('./pages/UserProfile');
+    void import('./pages/DeactivatedAccounts');
+    void import('./pages/AdminUsers');
+    void import('./pages/TrainingCourses');
+    void import('./pages/CreateTrainingCourse');
+    void import('./pages/EditTrainingCourse');
+    void import('./pages/TrainingCourseDetails');
+    void import('./pages/TrainingAssignments');
+    void import('./pages/MyTraining');
+    void import('./pages/TrainingReports');
+    void import('./pages/LessonViewer');
+    void import('./pages/QuizPage');
+    void import('./pages/TrainingPlanView');
+  }, [profile?.id]);
+
   return (
     <Suspense fallback={<RouteFallback />}>
       {profile?.id && <RealtimeNotifications key={profile.id} />}
@@ -241,7 +287,7 @@ export default function App() {
         <Route
           path="/applications"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allow={OPERATOR_TIER}>
               <Applications />
             </ProtectedRoute>
           }
