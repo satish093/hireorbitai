@@ -2,6 +2,7 @@ import { ButtonGroup, ButtonGroupItem } from '../ButtonGroup';
 import { Button } from '../Button';
 import { EmptyState } from '../EmptyState';
 import { ResumePreview } from './ResumePreview';
+import { ResumeDiff } from './ResumeDiff';
 import type { CenterMode, ResumeVersion } from './types';
 
 interface Props {
@@ -16,7 +17,16 @@ interface Props {
   onEdited: () => void;
 }
 
-export function CenterPane({ version, mode, onMode, onMakeCurrent }: Props) {
+export function CenterPane({
+  version,
+  versions,
+  mode,
+  onMode,
+  sessionId,
+  resumeId,
+  onMakeCurrent,
+  onEdited,
+}: Props) {
   if (!version) {
     return (
       <div className="bg-surface border border-border rounded-xl min-h-[420px] grid place-items-center">
@@ -55,7 +65,17 @@ export function CenterPane({ version, mode, onMode, onMakeCurrent }: Props) {
       <div className="flex-1 p-4 min-h-0">
         {mode === 'preview' && <ResumePreview resumeId={version.id} fileName={version.file_name} />}
         {mode === 'diff' && (
-          <EmptyState compact title="Diff" description="Diff mode lands in the next step." />
+          <ResumeDiff
+            resumeId={resumeId}
+            version={version}
+            sessionId={sessionId}
+            prevVersionId={
+              versions
+                .filter((v) => v.version < version.version)
+                .sort((a, b) => b.version - a.version)[0]?.id ?? null
+            }
+            onChanged={onEdited}
+          />
         )}
         {mode === 'edit' && (
           <EmptyState compact title="Edit" description="Editor lands in a later step." />
