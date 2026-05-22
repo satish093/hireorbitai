@@ -35,6 +35,7 @@ export function TaskFilterBar({
   onSaveCurrent,
   profileId,
   onNewTask,
+  canCreate,
 }: {
   filters: FilterState;
   onChange: (patch: Partial<FilterState>) => void;
@@ -50,6 +51,7 @@ export function TaskFilterBar({
   onSaveCurrent: () => void;
   profileId?: string;
   onNewTask: () => void;
+  canCreate: boolean;
 }): JSX.Element {
   const nActive = activeCount(filters);
   const userName = (id?: string) => {
@@ -260,9 +262,11 @@ export function TaskFilterBar({
             Timeline
           </ButtonGroupItem>
         </ButtonGroup>
-        <Button variant="primary" size="sm" onClick={onNewTask}>
-          New task
-        </Button>
+        {canCreate && (
+          <Button variant="primary" size="sm" onClick={onNewTask}>
+            New task
+          </Button>
+        )}
       </div>
     </div>
   );

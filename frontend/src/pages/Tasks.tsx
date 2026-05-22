@@ -28,7 +28,7 @@ export function Tasks({ initialAssigneeMe = false }: { initialAssigneeMe?: boole
   const [createOpen, setCreateOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
-  const { profile, tasks, users, loading, patchStatus, reload } = useTasksData();
+  const { profile, isManager, tasks, users, loading, patchStatus, reload } = useTasksData();
   const { views, saveView } = useSavedTaskViews();
   const visible = filterTasks(tasks, filters);
 
@@ -118,6 +118,7 @@ export function Tasks({ initialAssigneeMe = false }: { initialAssigneeMe?: boole
           onSaveCurrent={saveCurrent}
           profileId={profile?.id}
           onNewTask={() => setCreateOpen(true)}
+          canCreate={isManager}
         />
 
         <div
