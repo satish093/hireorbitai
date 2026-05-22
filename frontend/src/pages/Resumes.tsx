@@ -93,7 +93,11 @@ export function Resumes() {
           onApplied={w.onApplied}
           onEdited={() => w.reloadVersions(w.activeId)}
         />
-        <AtsBreakdownRail resumeId={w.activeId} againstJobId={active?.tailored_for_job_id} />
+        <AtsBreakdownRail
+          resumeId={w.activeId}
+          versions={versions}
+          againstJobId={active?.tailored_for_job_id}
+        />
       </div>
 
       <TailorLauncher
