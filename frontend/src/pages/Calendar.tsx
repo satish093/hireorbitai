@@ -13,6 +13,7 @@ import { MonthView } from '../components/calendar/MonthView';
 import { AgendaView } from '../components/calendar/AgendaView';
 import { EventDetailBar } from '../components/calendar/EventDetailBar';
 import { ScheduleModal } from '../components/calendar/ScheduleModal';
+import { AddReminderModal } from '../components/calendar/AddReminderModal';
 import { FeedbackModal } from '../components/calendar/FeedbackModal';
 import { useVisibleCalendars } from '../components/calendar/useVisibleCalendars';
 import type { CalView, CalendarKey } from '../components/calendar/types';
@@ -20,16 +21,35 @@ import type { CalView, CalendarKey } from '../components/calendar/types';
 const ymd = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-const VIEWS: { key: CalView; label: string }[] = [
+const ALL_VIEWS: { key: CalView; label: string }[] = [
   { key: 'day', label: 'Day' },
   { key: 'week', label: 'Week' },
   { key: 'month', label: 'Month' },
   { key: 'agenda', label: 'Agenda' },
 ];
 
-export function Calendar({ restrictTo }: { restrictTo?: CalendarKey[] } = {}) {
+/**
+ * Shared scheduling surface, two modes:
+ *  - `planner` (default, the /calendar page): no Day view; the primary action
+ *    adds a personal item to a date (a reminder); interviews are visible but
+ *    read-only — you can't schedule them here.
+ *  - `interviews` (the Interviews wrapper): the full scheduler — Day view +
+ *    "Schedule" opens the interview modal + per-interview feedback.
+ */
+export function Calendar({
+  restrictTo,
+  mode = 'planner',
+}: {
+  restrictTo?: CalendarKey[];
+  mode?: 'planner' | 'interviews';
+} = {}) {
+  const isInterviews = mode === 'interviews';
+  const VIEWS = isInterviews ? ALL_VIEWS : ALL_VIEWS.filter((v) => v.key !== 'day');
+
   const [params, setParams] = useSearchParams();
-  const view = ((params.get('view') as CalView) || 'week') as CalView;
+  // Planner has no Day view — fall back to Week if the URL asks for it.
+  const rawView = ((params.get('view') as CalView) || 'week') as CalView;
+  const view = !isInterviews && rawView === 'day' ? 'week' : rawView;
   // anchor + selection live in the URL so view/date/event persist across reloads.
   const dateParam = params.get('date');
   const anchor = useMemo(
@@ -40,9 +60,10 @@ export function Calendar({ restrictTo }: { restrictTo?: CalendarKey[] } = {}) {
   const { visible: storedVisible, toggle: toggleCalendar } = useVisibleCalendars();
   const visible = restrictTo ? new Set<CalendarKey>(restrictTo) : storedVisible;
 
-  // Schedule / feedback modals + a reload tick so a successful mutation
-  // re-fetches the calendar feed.
+  // Schedule (interviews) / Add (planner) / feedback modals + a reload tick so
+  // a successful mutation re-fetches the calendar feed.
   const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [addFor, setAddFor] = useState<Date | null>(null);
   const [feedbackFor, setFeedbackFor] = useState<{ id: string; title?: string } | null>(null);
   const [reloadTick, setReloadTick] = useState(0);
 
@@ -91,8 +112,14 @@ export function Calendar({ restrictTo }: { restrictTo?: CalendarKey[] } = {}) {
         selectedId={selectedId}
         onSelect={setSelected}
         onAnchor={(d) => {
-          setAnchor(d);
-          setView('day');
+          // Interviews: drill into the day. Planner: set something on that date.
+          if (isInterviews) {
+            setAnchor(d);
+            setView('day');
+          } else {
+            setAnchor(d);
+            setAddFor(d);
+          }
         }}
       />
     ) : view === 'agenda' ? (
@@ -103,12 +130,19 @@ export function Calendar({ restrictTo }: { restrictTo?: CalendarKey[] } = {}) {
 
   return (
     <Layout
-      title="Calendar"
-      crumbs={[{ label: 'Workspace', to: '/dashboard' }, { label: 'Calendar' }]}
+      title={isInterviews ? 'Interviews' : 'Calendar'}
+      crumbs={[
+        { label: 'Workspace', to: '/dashboard' },
+        { label: isInterviews ? 'Interviews' : 'Calendar' },
+      ]}
     >
       <PageHeader
         title={monthLabel}
-        description="Interviews, mock loops, and deadlines across your week."
+        description={
+          isInterviews
+            ? 'Schedule and review interviews and mock loops.'
+            : 'Your interviews and deadlines — add personal items to any date.'
+        }
         action={
           <>
             <ButtonGroup>
@@ -127,9 +161,15 @@ export function Calendar({ restrictTo }: { restrictTo?: CalendarKey[] } = {}) {
                 </ButtonGroupItem>
               ))}
             </ButtonGroup>
-            <Button variant="primary" onClick={() => setScheduleOpen(true)}>
-              Schedule
-            </Button>
+            {isInterviews ? (
+              <Button variant="primary" onClick={() => setScheduleOpen(true)}>
+                Schedule
+              </Button>
+            ) : (
+              <Button variant="primary" onClick={() => setAddFor(anchor)}>
+                Add
+              </Button>
+            )}
           </>
         }
       />
@@ -156,7 +196,7 @@ export function Calendar({ restrictTo }: { restrictTo?: CalendarKey[] } = {}) {
                     event={selectedEvent}
                     onClose={() => setSelected(null)}
                     onFeedback={
-                      selectedEvent.kind === 'interview'
+                      isInterviews && selectedEvent.kind === 'interview'
                         ? () => setFeedbackFor({ id: selectedEvent.id, title: selectedEvent.title })
                         : undefined
                     }
@@ -168,17 +208,28 @@ export function Calendar({ restrictTo }: { restrictTo?: CalendarKey[] } = {}) {
         </div>
       </div>
 
-      <ScheduleModal
-        open={scheduleOpen}
-        mock={false}
-        onClose={() => setScheduleOpen(false)}
-        onScheduled={() => setReloadTick((t) => t + 1)}
-      />
-      <FeedbackModal
-        interview={feedbackFor}
-        onClose={() => setFeedbackFor(null)}
-        onSaved={() => setReloadTick((t) => t + 1)}
-      />
+      {isInterviews ? (
+        <>
+          <ScheduleModal
+            open={scheduleOpen}
+            mock={false}
+            onClose={() => setScheduleOpen(false)}
+            onScheduled={() => setReloadTick((t) => t + 1)}
+          />
+          <FeedbackModal
+            interview={feedbackFor}
+            onClose={() => setFeedbackFor(null)}
+            onSaved={() => setReloadTick((t) => t + 1)}
+          />
+        </>
+      ) : (
+        <AddReminderModal
+          open={addFor !== null}
+          defaultDate={addFor ?? anchor}
+          onClose={() => setAddFor(null)}
+          onAdded={() => setReloadTick((t) => t + 1)}
+        />
+      )}
     </Layout>
   );
 }
