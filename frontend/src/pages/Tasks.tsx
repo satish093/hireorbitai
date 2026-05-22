@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { PageHeader } from '../components/PageHeader';
-import { Button } from '../components/Button';
 import { SkeletonCard } from '../components/Skeleton';
 import { useTasksData } from '../components/tasks/useTasksData';
 import { useSavedTaskViews } from '../components/tasks/useSavedTaskViews';
@@ -12,7 +11,6 @@ import {
   type ViewMode,
   type SavedView,
 } from '../components/tasks/types';
-import { TaskViewsRibbon } from '../components/tasks/TaskViewsRibbon';
 import { TaskFilterBar } from '../components/tasks/TaskFilterBar';
 import { TaskKanban } from '../components/tasks/TaskKanban';
 import { TaskTable } from '../components/tasks/TaskTable';
@@ -102,34 +100,9 @@ export function Tasks({ initialAssigneeMe = false }: { initialAssigneeMe?: boole
 
   return (
     <Layout title="Tasks" crumbs={[{ label: 'Workspace', to: '/dashboard' }, { label: 'Tasks' }]}>
-      <PageHeader
-        title="Tasks"
-        description="Saved views, filters, and three ways to see your work."
-        action={
-          <>
-            <Button variant="outline" onClick={saveCurrent}>
-              Save view
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => setFilters((f) => ({ ...f, assignee_id: profile?.id }))}
-            >
-              Assigned to me
-            </Button>
-            <Button variant="primary" onClick={() => setCreateOpen(true)}>
-              New task
-            </Button>
-          </>
-        }
-      />
+      <PageHeader title="Tasks" description="Track and organize your team's work." />
 
       <div className="space-y-3">
-        <TaskViewsRibbon
-          views={views}
-          activeId={activeViewId}
-          onSelect={selectView}
-          onSaveCurrent={saveCurrent}
-        />
         <TaskFilterBar
           filters={filters}
           onChange={(patch) => setFilters((f) => ({ ...f, ...patch }))}
@@ -139,6 +112,12 @@ export function Tasks({ initialAssigneeMe = false }: { initialAssigneeMe?: boole
           onView={setView}
           searchRef={searchRef}
           users={users}
+          views={views}
+          activeViewId={activeViewId}
+          onSelectView={selectView}
+          onSaveCurrent={saveCurrent}
+          profileId={profile?.id}
+          onNewTask={() => setCreateOpen(true)}
         />
 
         <div

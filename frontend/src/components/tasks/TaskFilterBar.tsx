@@ -1,10 +1,25 @@
 import React from 'react';
+import clsx from 'clsx';
 import { Button } from '../Button';
 import { ButtonGroup, ButtonGroupItem } from '../ButtonGroup';
+import { SelectInput } from '../SelectInput';
 import { Popover } from '../ui/Popover';
 import { TASK_PRIORITIES, type TaskPriority } from '../../types';
-import { type FilterState, type ViewMode, type TaskUser } from './types';
+import { type FilterState, type SavedView, type ViewMode, type TaskUser } from './types';
 
+const titleCase = (s: string) => s.charAt(0) + s.slice(1).toLowerCase();
+
+/** Count of advanced filters in effect (search is shown separately). */
+function activeCount(f: FilterState): number {
+  return [f.priority, f.assignee_id, f.tag, f.overdue, f.status].filter(Boolean).length;
+}
+
+/**
+ * Single, calm Tasks toolbar. The default row leads with search · the active
+ * view · New task. Advanced filters AND saved views live behind one "Filters"
+ * control (progressive disclosure); whatever's actually applied surfaces as
+ * removable chips so nothing is hidden once it's on.
+ */
 export function TaskFilterBar({
   filters,
   onChange,
@@ -14,6 +29,12 @@ export function TaskFilterBar({
   onView,
   searchRef,
   users,
+  views,
+  activeViewId,
+  onSelectView,
+  onSaveCurrent,
+  profileId,
+  onNewTask,
 }: {
   filters: FilterState;
   onChange: (patch: Partial<FilterState>) => void;
@@ -23,233 +44,210 @@ export function TaskFilterBar({
   onView: (v: ViewMode) => void;
   searchRef: React.RefObject<HTMLInputElement>;
   users: TaskUser[];
+  views: SavedView[];
+  activeViewId: string | null;
+  onSelectView: (v: SavedView) => void;
+  onSaveCurrent: () => void;
+  profileId?: string;
+  onNewTask: () => void;
 }): JSX.Element {
-  // Derive display labels for filter trigger buttons.
-  const priorityLabel = filters.priority ? filters.priority : 'Priority';
-  const assigneeLabel = filters.assignee_id
-    ? (users.find((u) => u.id === filters.assignee_id)?.full_name ??
-      users.find((u) => u.id === filters.assignee_id)?.email ??
-      'Assignee')
-    : 'Assignee';
-  const tagLabel = filters.tag ? `#${filters.tag}` : 'Tag';
+  const nActive = activeCount(filters);
+  const userName = (id?: string) => {
+    const u = users.find((x) => x.id === id);
+    return u?.full_name ?? u?.email ?? 'Someone';
+  };
+
+  // Removable chips for whatever's applied.
+  const chips: { key: string; label: string; clear: () => void }[] = [];
+  if (filters.priority)
+    chips.push({
+      key: 'priority',
+      label: `Priority: ${titleCase(filters.priority)}`,
+      clear: () => onChange({ priority: '' }),
+    });
+  if (filters.assignee_id)
+    chips.push({
+      key: 'assignee',
+      label:
+        filters.assignee_id === profileId
+          ? 'Assigned to me'
+          : `Assignee: ${userName(filters.assignee_id)}`,
+      clear: () => onChange({ assignee_id: undefined }),
+    });
+  if (filters.tag)
+    chips.push({ key: 'tag', label: `#${filters.tag}`, clear: () => onChange({ tag: undefined }) });
+  if (filters.overdue)
+    chips.push({ key: 'overdue', label: 'Overdue', clear: () => onChange({ overdue: undefined }) });
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {/* Search input */}
+      {/* Search */}
       <div className="relative">
         <input
           ref={searchRef}
           value={filters.q ?? ''}
           onChange={(e) => onChange({ q: e.target.value })}
           placeholder="Search tasks…"
-          className="h-8 w-[220px] rounded-md border border-border-strong bg-surface pl-3 pr-8 text-[13px] text-ink focus:outline-none focus-visible:ring-2 focus-visible:border-accent"
+          className="h-9 w-[220px] rounded-lg border border-border bg-surface pl-3 pr-8 text-[13px] text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:border-accent"
         />
         <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-mono text-faint border border-border rounded px-1">
           /
         </span>
       </div>
 
-      {/* Priority filter */}
+      {/* Filters + saved views (progressive disclosure) */}
       <Popover
+        panelClassName="min-w-[280px]"
         button={(open) => (
-          <Button
-            size="sm"
-            variant={filters.priority ? 'outline' : 'ghost'}
-            aria-expanded={open}
-            rightIcon={
-              <svg width="10" height="10" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                <path
-                  d="M4 6l4 4 4-4"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            }
+          <button
+            className={clsx(
+              'inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border text-[13px] transition-colors press',
+              nActive > 0
+                ? 'bg-accent-soft border-accent/40 text-accent'
+                : 'bg-surface border-border text-ink-2 hover:bg-hover',
+              open && 'ring-2 ring-accent/30',
+            )}
           >
-            {priorityLabel}
-          </Button>
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path
+                d="M2 4h12M4 8h8M6 12h4"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+              />
+            </svg>
+            Filters
+            {nActive > 0 && (
+              <span className="ml-0.5 text-[10px] font-mono bg-accent text-white rounded-full px-1.5">
+                {nActive}
+              </span>
+            )}
+          </button>
         )}
-        panelClassName="min-w-[140px]"
       >
         {(close) => (
-          <div className="flex flex-col gap-0.5">
-            <Button
-              variant="ghost"
-              size="sm"
-              block
-              className="!justify-start"
-              onClick={() => {
-                onChange({ priority: '' });
-                close();
-              }}
-            >
-              Any
-            </Button>
-            {(TASK_PRIORITIES as TaskPriority[]).map((p) => (
+          <div className="w-[260px] space-y-3">
+            {profileId && (
               <Button
-                key={p}
-                variant="ghost"
                 size="sm"
+                variant={filters.assignee_id === profileId ? 'primary' : 'outline'}
                 block
-                className="!justify-start"
-                onClick={() => {
-                  onChange({ priority: p });
-                  close();
-                }}
+                onClick={() =>
+                  onChange({
+                    assignee_id: filters.assignee_id === profileId ? undefined : profileId,
+                  })
+                }
               >
-                {p.charAt(0) + p.slice(1).toLowerCase()}
+                Assigned to me
               </Button>
-            ))}
-          </div>
-        )}
-      </Popover>
+            )}
 
-      {/* Assignee filter */}
-      <Popover
-        button={(open) => (
-          <Button
-            size="sm"
-            variant={filters.assignee_id ? 'outline' : 'ghost'}
-            aria-expanded={open}
-            rightIcon={
-              <svg width="10" height="10" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                <path
-                  d="M4 6l4 4 4-4"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            }
-          >
-            {assigneeLabel}
-          </Button>
-        )}
-        panelClassName="min-w-[180px] max-h-[260px] overflow-y-auto"
-      >
-        {(close) => (
-          <div className="flex flex-col gap-0.5">
-            <Button
-              variant="ghost"
-              size="sm"
-              block
-              className="!justify-start"
-              onClick={() => {
-                onChange({ assignee_id: undefined });
-                close();
-              }}
-            >
-              Anyone
-            </Button>
-            {users.map((u) => (
-              <Button
-                key={u.id}
-                variant="ghost"
-                size="sm"
-                block
-                className="!justify-start"
-                onClick={() => {
-                  onChange({ assignee_id: u.id });
-                  close();
-                }}
-              >
-                {u.full_name ?? u.email}
-              </Button>
-            ))}
-          </div>
-        )}
-      </Popover>
+            <SelectInput
+              label="Priority"
+              value={filters.priority ?? ''}
+              onChange={(e) => onChange({ priority: e.target.value as TaskPriority | '' })}
+              options={[
+                { value: '', label: 'Any priority' },
+                ...(TASK_PRIORITIES as TaskPriority[]).map((p) => ({
+                  value: p,
+                  label: titleCase(p),
+                })),
+              ]}
+            />
 
-      {/* Tag filter */}
-      <Popover
-        button={(open) => (
-          <Button
-            size="sm"
-            variant={filters.tag ? 'outline' : 'ghost'}
-            aria-expanded={open}
-            rightIcon={
-              <svg width="10" height="10" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                <path
-                  d="M4 6l4 4 4-4"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            }
-          >
-            {tagLabel}
-          </Button>
-        )}
-        panelClassName="min-w-[180px]"
-      >
-        {(close) => {
-          // Local state for the tag input. Using a React ref-driven uncontrolled
-          // input here avoids re-rendering the whole filter bar on every keystroke.
-          let inputRef: HTMLInputElement | null = null;
-          return (
-            <div className="flex flex-col gap-2 p-1">
+            <SelectInput
+              label="Assignee"
+              value={filters.assignee_id ?? ''}
+              onChange={(e) => onChange({ assignee_id: e.target.value || undefined })}
+              options={[
+                { value: '', label: 'Anyone' },
+                ...users.map((u) => ({ value: u.id, label: u.full_name ?? u.email })),
+              ]}
+            />
+
+            <label className="block">
+              <span className="block text-xs font-medium text-ink mb-1.5">Tag</span>
               <input
-                ref={(el) => {
-                  inputRef = el;
-                }}
                 defaultValue={filters.tag ?? ''}
-                placeholder="Enter tag…"
-                className="h-8 w-full rounded-md border border-border-strong bg-surface px-3 text-[13px] text-ink focus:outline-none focus-visible:ring-2 focus-visible:border-accent"
+                placeholder="Enter a tag + Enter"
+                className="h-9 w-full rounded-lg border border-border bg-surface px-3 text-[13px] text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:border-accent"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
-                    onChange({ tag: (e.currentTarget.value || undefined) as string | undefined });
+                    onChange({ tag: e.currentTarget.value.trim() || undefined });
                     close();
                   }
                 }}
               />
-              <div className="flex gap-1.5">
-                <Button
-                  size="sm"
-                  variant="primary"
-                  block
-                  onClick={() => {
-                    onChange({ tag: (inputRef?.value || undefined) as string | undefined });
-                    close();
-                  }}
-                >
-                  Apply
-                </Button>
-                {filters.tag && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => {
-                      onChange({ tag: undefined });
-                      close();
-                    }}
-                  >
-                    Clear
-                  </Button>
-                )}
+            </label>
+
+            <label className="flex items-center gap-2 text-[13px] text-ink cursor-pointer">
+              <input
+                type="checkbox"
+                checked={!!filters.overdue}
+                onChange={(e) => onChange({ overdue: e.target.checked || undefined })}
+                className="accent-[color:var(--accent)]"
+              />
+              Overdue only
+            </label>
+
+            {views.length > 0 && (
+              <div className="pt-2 border-t border-border">
+                <span className="block text-xs font-medium text-muted mb-1.5">Saved views</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {views.map((v) => (
+                    <button
+                      key={v.id}
+                      onClick={() => {
+                        onSelectView(v);
+                        close();
+                      }}
+                      className={clsx(
+                        'text-[12px] rounded-full px-2.5 py-1 border transition-colors',
+                        v.id === activeViewId
+                          ? 'bg-ink text-bg border-ink'
+                          : 'bg-surface border-border text-ink-2 hover:bg-hover',
+                      )}
+                    >
+                      {v.name}
+                      {v.count != null && <span className="ml-1 text-faint">{v.count}</span>}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-          );
-        }}
+            )}
+
+            <Button
+              size="sm"
+              variant="ghost"
+              block
+              className="!justify-start"
+              onClick={onSaveCurrent}
+            >
+              + Save current as view
+            </Button>
+          </div>
+        )}
       </Popover>
 
-      {/* Overdue toggle */}
-      <Button
-        size="sm"
-        variant={filters.overdue ? 'primary' : 'ghost'}
-        onClick={() => onChange({ overdue: filters.overdue ? undefined : true })}
-      >
-        Overdue
-      </Button>
+      {/* Active-filter chips */}
+      {chips.map((c) => (
+        <button
+          key={c.key}
+          onClick={c.clear}
+          className="inline-flex items-center gap-1 h-9 px-2.5 rounded-lg bg-accent-soft text-accent text-[12px] press"
+          title="Remove filter"
+        >
+          {c.label}
+          <span aria-hidden="true" className="text-accent/70">
+            ✕
+          </span>
+        </button>
+      ))}
 
-      {/* Right side: count + view switcher */}
+      {/* Right: count · view switch · New task */}
       <div className="ml-auto flex items-center gap-3">
         <span className="text-[12px] font-mono text-muted whitespace-nowrap">
-          {shown} of {total} shown
+          {shown} of {total}
         </span>
         <ButtonGroup>
           <ButtonGroupItem pressed={view === 'kanban'} onClick={() => onView('kanban')}>
@@ -262,6 +260,9 @@ export function TaskFilterBar({
             Timeline
           </ButtonGroupItem>
         </ButtonGroup>
+        <Button variant="primary" size="sm" onClick={onNewTask}>
+          New task
+        </Button>
       </div>
     </div>
   );
