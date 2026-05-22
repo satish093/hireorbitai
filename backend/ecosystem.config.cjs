@@ -46,7 +46,7 @@ const EXEC_MODE = (typeof INSTANCES === 'number' ? INSTANCES : 2) > 1 ? 'cluster
 module.exports = {
   apps: [
     {
-      name: 'hireorbit-api',
+      name: 'hireorbitai-api',
       // PM2 launches Node with these args before the script. `--env-file`
       // is a Node 22 built-in that loads `.env` next to ecosystem.config.cjs.
       interpreter: 'node',

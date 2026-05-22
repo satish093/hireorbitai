@@ -126,7 +126,7 @@ app.use(
 
 // --- Rate limiting ------------------------------------------------------------
 // Global limiter — generous on purpose. The Sidebar polls 3 endpoints every
-// 15s (~720/15min/user) plus each page navigation fires several reads, so a
+// 60s (~180/15min/user) plus each page navigation fires several reads, so a
 // strict per-IP cap would 429 normal traffic on shared NAT / office networks.
 //
 // Strategy:
