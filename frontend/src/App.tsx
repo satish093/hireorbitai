@@ -166,7 +166,7 @@ export default function App() {
   // blocking the current render. React.lazy reuses the same module promise,
   // so by the time the user clicks a link the chunk is already resolved.
   useEffect(() => {
-    if (!profile) return;
+    if (!profile?.id) return;
     void import('./pages/Tasks');
     void import('./pages/TaskDetail');
     void import('./pages/TasksAssignedToMe');

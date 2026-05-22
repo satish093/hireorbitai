@@ -12,6 +12,8 @@
  *      `.insert(req.body)` without a `.strict()` Zod allowlist gating the body.
  *   2. Email wildcard injection — `.ilike('email', ...)` (must be
  *      `.eq('email', email.toLowerCase())`).
+ *   3. Update-spread — `.update({ ...req.body })` (same risk as direct req.body).
+ *   4. Raw SQL concatenation — `pool.query(... +` (string-building into raw SQL).
  *
  * BASELINE records the count of *known, accepted-as-debt* matches per file. To
  * fix a flagged controller, validate req.body against a strict Zod schema (see
@@ -39,8 +41,14 @@ const MASS_ASSIGNMENT_PATTERNS = [
   /\.update\(\s*req\.body\s*\)/,
   /\.insert\(\s*req\.body\s*\)/,
   /\.insert\(\s*\{\s*\.\.\.req\.body/,
+  /\.update\(\s*\{\s*\.\.\.req\.body/,
 ];
 const EMAIL_ILIKE_PATTERN = /\.ilike\(\s*['"`]email['"`]/;
+
+// Raw SQL concatenation — pool.query('...' + variable) risks injection.
+// Controllers should use the db shim (parameterised) or pool.query($1 placeholders).
+const RAW_SQL_CONCAT_PATTERN = /pool\.query\(\s*[`'"][^`'"]*[`'"]\s*\+/;
+const RAW_SQL_CONCAT_BASELINE: Record<string, number> = {};
 
 interface Finding {
   file: string;
@@ -118,5 +126,11 @@ describe('security pattern guard (controllers)', () => {
     const findings = scan((line) => EMAIL_ILIKE_PATTERN.test(line));
     assertAgainstBaseline('email-ilike', findings, EMAIL_ILIKE_BASELINE);
     expect(countByFile(findings)).toEqual(EMAIL_ILIKE_BASELINE);
+  });
+
+  it('uses no pool.query() with string concatenation (raw SQL injection)', () => {
+    const findings = scan((line) => RAW_SQL_CONCAT_PATTERN.test(line));
+    assertAgainstBaseline('raw-sql-concat', findings, RAW_SQL_CONCAT_BASELINE);
+    expect(countByFile(findings)).toEqual(RAW_SQL_CONCAT_BASELINE);
   });
 });

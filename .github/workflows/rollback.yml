@@ -1,0 +1,212 @@
+name: Rollback deployment
+
+# Manual rollback to a specific commit on production or staging.
+#
+# THIS WORKFLOW IS MANUAL-ONLY AND GATED.
+# It will NOT run automatically on any push or schedule.
+#
+# Safety gates:
+#   1. workflow_dispatch only — no automatic trigger
+#   2. The ROLLBACK_APPROVED secret must be set to "true" (case-sensitive)
+#      before this workflow will proceed. Clear it immediately after use.
+#   3. Production rollbacks target the `production` GitHub environment,
+#      which can be configured with required reviewers.
+#
+# Required secrets:
+#   ROLLBACK_APPROVED  — must equal "true" (set before use, clear after)
+#   DEPLOY_HOST        — production VPS IP or hostname
+#   DEPLOY_USER        — SSH username
+#   DEPLOY_PORT        — SSH port (default 22)
+#   DEPLOY_SSH_KEY     — private key (full contents)
+#
+# Optional secrets (staging rollback):
+#   STAGING_HOST       — staging VPS hostname
+#   STAGING_USER       — staging SSH username
+#   STAGING_SSH_KEY    — staging private key
+#   STAGING_PORT       — staging SSH port
+#
+# How to use:
+#   1. Find the last-known-good git SHA: `git log --oneline -20`
+#   2. Set ROLLBACK_APPROVED=true in repo secrets (Settings → Secrets)
+#   3. Go to Actions → Rollback deployment → Run workflow
+#   4. Enter the commit SHA and choose the environment
+#   5. After the rollback completes, CLEAR the ROLLBACK_APPROVED secret
+#
+# After a rollback, run the smoke test manually:
+#   bash scripts/healthcheck.sh https://hireorbitai.com
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: 'Git SHA to roll back to (required — use full 40-char SHA)'
+        required: true
+      environment:
+        description: 'Target environment'
+        required: true
+        default: production
+        type: choice
+        options:
+          - production
+          - staging
+
+concurrency:
+  group: rollback-${{ inputs.environment }}
+  cancel-in-progress: false # never cancel a rollback mid-flight
+
+jobs:
+  # -------------------------------------------------------------------------
+  # Safety gate — refuse to proceed without explicit approval secret
+  # -------------------------------------------------------------------------
+  gate:
+    name: Safety gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check ROLLBACK_APPROVED secret
+        run: |
+          if [ "${{ secrets.ROLLBACK_APPROVED }}" != "true" ]; then
+            echo "::error::ROLLBACK_APPROVED secret is not set to 'true'."
+            echo "To authorize this rollback:"
+            echo "  1. Go to Settings → Secrets and variables → Actions"
+            echo "  2. Add or update ROLLBACK_APPROVED = true"
+            echo "  3. Re-run this workflow"
+            echo "  4. Clear ROLLBACK_APPROVED immediately after the rollback completes."
+            exit 1
+          fi
+          echo "✓ Rollback approved. Proceeding."
+
+      - name: Validate commit SHA format
+        run: |
+          SHA="${{ inputs.commit_sha }}"
+          if ! echo "$SHA" | grep -qE '^[0-9a-f]{7,40}$'; then
+            echo "::error::commit_sha must be a hex git SHA (7-40 chars). Got: $SHA"
+            exit 1
+          fi
+          echo "✓ SHA format valid: $SHA"
+
+  # -------------------------------------------------------------------------
+  # Production rollback
+  # -------------------------------------------------------------------------
+  rollback-production:
+    name: Roll back production VPS
+    needs: gate
+    runs-on: ubuntu-latest
+    if: inputs.environment == 'production'
+    environment:
+      name: production
+      url: https://hireorbitai.com
+
+    steps:
+      - name: Verify production secrets
+        run: |
+          for var in DEPLOY_HOST DEPLOY_USER DEPLOY_PORT DEPLOY_SSH_KEY; do
+            if [ -z "${!var}" ]; then
+              echo "::error::Missing required secret: $var"
+              exit 1
+            fi
+          done
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+
+      - name: Roll back via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT }}
+          command_timeout: 15m
+          script_stop: true
+          script: |
+            set -euo pipefail
+            TARGET_SHA="${{ inputs.commit_sha }}"
+            echo "→ rolling back production to $TARGET_SHA"
+            cd ~/hireorbitai
+
+            # Ensure the target SHA is available locally.
+            git fetch origin
+            if ! git cat-file -e "${TARGET_SHA}^{commit}" 2>/dev/null; then
+              echo "::error::SHA $TARGET_SHA not found in repository"
+              exit 1
+            fi
+
+            # Check out the target commit on a detached HEAD (rollback branch).
+            git checkout "$TARGET_SHA"
+
+            # Rebuild from the rolled-back source.
+            npm install --include=dev
+            npm run build
+
+            # Reload the API process with the rolled-back build.
+            pm2 reload hireorbitai-api --update-env
+
+            # Sync the frontend bundle from the rolled-back build.
+            if [ -d ~/htdocs/hireorbitai.com ]; then
+              rsync -a --delete frontend/dist/ ~/htdocs/hireorbitai.com/
+            fi
+
+            echo "✓ Rollback to $TARGET_SHA complete"
+
+      - name: Post-rollback smoke test
+        run: |
+          set -e
+          sleep 5  # allow PM2 to finish reloading
+          curl -fsS https://hireorbitai.com/api/health | tee /tmp/health.json
+          grep -q '"ok":true' /tmp/health.json || {
+            echo "::error::health check failed after rollback"
+            exit 1
+          }
+          echo "✓ Smoke test passed"
+
+  # -------------------------------------------------------------------------
+  # Staging rollback
+  # -------------------------------------------------------------------------
+  rollback-staging:
+    name: Roll back staging VPS
+    needs: gate
+    runs-on: ubuntu-latest
+    if: inputs.environment == 'staging'
+    environment:
+      name: staging
+      url: https://staging.hireorbitai.com
+
+    steps:
+      - name: Verify staging secrets
+        run: |
+          for var in STAGING_HOST STAGING_USER STAGING_SSH_KEY; do
+            if [ -z "${!var}" ]; then
+              echo "::error::Missing required secret: $var (staging rollback requires STAGING_HOST, STAGING_USER, STAGING_SSH_KEY)"
+              exit 1
+            fi
+          done
+        env:
+          STAGING_HOST: ${{ secrets.STAGING_HOST }}
+          STAGING_USER: ${{ secrets.STAGING_USER }}
+          STAGING_SSH_KEY: ${{ secrets.STAGING_SSH_KEY }}
+
+      - name: Roll back staging via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          port: ${{ secrets.STAGING_PORT || 22 }}
+          command_timeout: 15m
+          script_stop: true
+          script: |
+            set -euo pipefail
+            TARGET_SHA="${{ inputs.commit_sha }}"
+            echo "→ rolling back staging to $TARGET_SHA"
+            cd ~/hireorbitai
+            git fetch origin
+            git checkout "$TARGET_SHA"
+            npm install --include=dev
+            npm run build
+            pm2 reload hireorbitai-api --update-env
+            if [ -d ~/htdocs/staging.hireorbitai.com ]; then
+              rsync -a --delete frontend/dist/ ~/htdocs/staging.hireorbitai.com/
+            fi
+            echo "✓ Staging rollback to $TARGET_SHA complete"

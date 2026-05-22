@@ -20,7 +20,11 @@
       "Bash(npm --prefix frontend run lint)",
       "Bash(npm --prefix frontend run build)",
       "Bash(npm run shared:build)",
-      "Bash(npm run format:check)"
+      "Bash(npm run format:check)",
+      "Bash(npx @claude-flow*)",
+      "Bash(npx claude-flow*)",
+      "Bash(node .claude/*)",
+      "mcp__claude-flow__:*"
     ],
     "deny": [
       "Bash(git push --force:*)",
@@ -49,6 +53,9 @@
     ]
   },
   "env": {
-    "HIREORBITAI_STRICT_COMMITS": "0"
+    "HIREORBITAI_STRICT_COMMITS": "0",
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
+    "CLAUDE_FLOW_V3_ENABLED": "true",
+    "CLAUDE_FLOW_HOOKS_ENABLED": "true"
   }
 }

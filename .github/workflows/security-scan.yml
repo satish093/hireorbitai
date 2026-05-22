@@ -1,0 +1,79 @@
+name: Security scan (ZAP baseline)
+
+# Informational-only security scan — never blocks CI or production deploys.
+#
+# Runs OWASP ZAP in passive (baseline) mode against a staging or local URL.
+# Results are uploaded as workflow artifacts; no PR status check is set.
+#
+# Triggers:
+#   - Manual dispatch (Actions → Run workflow)
+#   - Weekly cron — Monday 03:00 UTC (low-traffic window)
+#
+# Required secret (Settings → Secrets and variables → Actions):
+#   ZAP_TARGET_URL — URL of the staging or dev environment to scan.
+#                    MUST point to staging/localhost. Never point at production.
+#                    Example: https://staging.hireorbitai.com
+#                    If this secret is not set, the job skips gracefully.
+#
+# Windows-equivalent: scripts/zap-baseline.ps1 (for local use on Windows).
+# Linux equivalent:   scripts/zap-baseline.sh  (used by this workflow).
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_url:
+        description: 'Target URL to scan (overrides ZAP_TARGET_URL secret)'
+        required: false
+        default: ''
+  schedule:
+    - cron: '0 3 * * 1' # Monday 03:00 UTC
+
+concurrency:
+  group: security-scan
+  cancel-in-progress: true
+
+jobs:
+  zap-scan:
+    name: OWASP ZAP passive scan
+    runs-on: ubuntu-latest
+    # Skip silently if no target is configured — avoids noisy failures on forks
+    # or repos that haven't set up a staging environment yet.
+    if: ${{ secrets.ZAP_TARGET_URL != '' || inputs.target_url != '' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve target URL
+        id: target
+        run: |
+          URL="${{ inputs.target_url || secrets.ZAP_TARGET_URL }}"
+          if [ -z "$URL" ]; then
+            echo "::error::No target URL configured. Set ZAP_TARGET_URL secret or provide target_url input."
+            exit 1
+          fi
+          # Safety guard: refuse to scan the production domain from an automated workflow.
+          # Operators can still run scripts/zap-baseline.sh manually against anything.
+          if echo "$URL" | grep -qiE 'hireorbitai\.com($|/)'; then
+            echo "::error::ZAP_TARGET_URL points to production (hireorbitai.com). Use staging or localhost instead."
+            exit 1
+          fi
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "→ ZAP target: $URL"
+
+      - name: Make script executable
+        run: chmod +x scripts/zap-baseline.sh
+
+      - name: Run ZAP baseline scan
+        # continue-on-error keeps the job green even if ZAP finds warnings.
+        # The report artifact carries the detail; this job is informational only.
+        continue-on-error: true
+        run: bash scripts/zap-baseline.sh "${{ steps.target.outputs.url }}" ./zap-report
+
+      - name: Upload ZAP report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: zap-report-${{ github.run_number }}
+          path: zap-report/
+          retention-days: 7

@@ -9,3 +9,24 @@ coverage/
 _dev2_compare/
 *.zip
 *.svg
+# claude-flow and claude-sdk generated tool infrastructure (not project source)
+.claude-flow/
+.claude/agents/
+.claude/commands/agents/
+.claude/commands/analysis/
+.claude/commands/automation/
+.claude/commands/claude-flow-help.md
+.claude/commands/claude-flow-memory.md
+.claude/commands/claude-flow-swarm.md
+.claude/commands/coordination/
+.claude/commands/github/
+.claude/commands/hive-mind/
+.claude/commands/hooks/
+.claude/commands/memory/
+.claude/commands/monitoring/
+.claude/commands/optimization/
+.claude/commands/sparc/
+.claude/commands/swarm/
+.claude/commands/workflows/
+.claude/helpers/
+.claude/skills/
