@@ -4,6 +4,7 @@ import * as repo from '../repositories/training.repository';
 import * as svc from '../services/training.service';
 import * as ai from '../services/trainingAI.service';
 import { httpError, MANAGER_TIER } from '../types';
+import { evaluateAchievements, logStudyMinutes } from '../services/trainingAchievements.service';
 
 function isManagerTier(role?: string): boolean {
   return !!role && (MANAGER_TIER as string[]).includes(role);
@@ -279,6 +280,11 @@ export const updateProgress: RequestHandler = async (req, res) => {
     completed: parsed.data.completed,
     time_spent_minutes: parsed.data.time_spent_minutes ?? undefined,
   });
+  // Workspace side-effects: credit study time + re-evaluate achievements for
+  // the assignment owner. Best-effort — never blocks the progress response.
+  const owner = (a as { assigned_to_user_id: string }).assigned_to_user_id;
+  void logStudyMinutes(owner, parsed.data.time_spent_minutes ?? 0);
+  void evaluateAchievements(owner);
   const fresh = await repo.assignments.get(req.params.id);
   res.json(fresh.data);
 };
@@ -452,6 +458,7 @@ export const submitQuizAttempt: RequestHandler = async (req, res) => {
     is_correct: isCorrect,
     score,
   });
+  void evaluateAchievements((a as { assigned_to_user_id: string }).assigned_to_user_id);
   res.status(201).json({
     ...saved,
     correct_answer: (quiz as any).correct_answer,

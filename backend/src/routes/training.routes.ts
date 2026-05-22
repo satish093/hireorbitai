@@ -2,8 +2,21 @@ import { Router } from 'express';
 import { requireRole } from '../middleware/auth';
 import { MANAGER_TIER, ADMIN_TIER } from '../types';
 import * as c from '../controllers/training.controller';
+import * as w from '../controllers/trainingWorkspace.controller';
 
 export const trainingRouter = Router();
+
+// ---- Learning workspace (any authed user; reads degrade gracefully) ----
+trainingRouter.get('/catalog', w.getCatalog);
+trainingRouter.get('/continue', w.getContinue);
+trainingRouter.get('/compliance', w.getCompliance);
+trainingRouter.get('/activity', w.getActivity);
+trainingRouter.get('/achievements', w.getAchievements);
+trainingRouter.get('/plans/active', w.getActivePlan);
+trainingRouter.post('/plans/generate', w.generatePlan);
+trainingRouter.patch('/plans/items/:id', w.togglePlanItem);
+trainingRouter.post('/enroll', w.enroll);
+trainingRouter.post('/courses/:id/rate', w.rateCourse);
 
 // ---- Courses (manager-tier writes; everyone authed can read) ----
 trainingRouter.get('/courses', c.listCourses);
