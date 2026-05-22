@@ -289,8 +289,12 @@ app.get('/api/ready', readyHandler);
 //   - Dedicated API subdomain (api.hireorbitai.com) — clean URLs at root.
 //   - Single-domain with reverse proxy (hireorbitai.com/api/*) — legacy alias.
 // The router is the same instance; Express doesn't double-execute.
-app.use('/', router);
+// Mount /api first. If "/" is mounted first, a request like /api/auth/login
+// reaches the root router as "/api/auth/login"; it does not match the public
+// /auth/login route and falls through to requireAuth, returning "Missing
+// bearer token" before the /api mount ever sees it.
 app.use('/api', router);
+app.use('/', router);
 
 // --- Error handler (must be last) ---------------------------------------------
 app.use(errorHandler);
