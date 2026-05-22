@@ -74,18 +74,9 @@ const envSchema = z.object({
   // Heavier model for long-form training content generation (lesson bodies,
   // capstone). Outline + quiz calls stay on the cheaper ANTHROPIC_MODEL.
   TRAINING_CONTENT_MODEL: z.string().default('claude-sonnet-4-6'),
-  // How training AI generation reaches a model:
-  //   subscription — shell out to the `claude` CLI, authenticated by the
-  //                   operator's Claude Max login (or CLAUDE_CODE_OAUTH_TOKEN).
-  //                   No per-token API billing. (default)
-  //   api          — use the Anthropic Messages API with ANTHROPIC_API_KEY.
-  //   stub         — never call a model; always return editable stubs.
-  TRAINING_AI_PROVIDER: z.enum(['subscription', 'api', 'stub']).default('subscription'),
-  // OAuth token from `claude setup-token` (Max plan). Lets the CLI auth on a
-  // headless VPS where there's no interactive login. Optional locally.
-  CLAUDE_CODE_OAUTH_TOKEN: optionalKey,
-  // Path to the Claude Code CLI binary (override if not on PATH).
-  CLAUDE_CLI_PATH: z.string().default('claude'),
+  // 'api' — use the Anthropic Messages API with ANTHROPIC_API_KEY (default).
+  // 'stub' — never call a model; always return editable stubs.
+  TRAINING_AI_PROVIDER: z.enum(['api', 'stub']).default('api'),
   // --- Token-cost controls (API provider) ---
   // Free-text inputs (resume bodies, job descriptions) are clipped to this many
   // characters before being sent to the model — input tokens are the dominant
@@ -248,8 +239,6 @@ export const env = {
     model: e.ANTHROPIC_MODEL,
     contentModel: e.TRAINING_CONTENT_MODEL,
     provider: e.TRAINING_AI_PROVIDER,
-    oauthToken: e.CLAUDE_CODE_OAUTH_TOKEN,
-    cliPath: e.CLAUDE_CLI_PATH,
     maxInputChars: e.AI_MAX_INPUT_CHARS,
     maxJobDescChars: e.AI_MAX_JOB_DESC_CHARS,
   },

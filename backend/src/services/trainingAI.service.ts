@@ -1,4 +1,3 @@
-import { spawn } from 'node:child_process';
 import { z } from 'zod';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import {
@@ -7,23 +6,15 @@ import {
   TRAINING_CONTENT_MODEL,
   AI_PROVIDER,
   AI_AVAILABLE,
-  CLAUDE_CLI_PATH,
-  CLAUDE_OAUTH_TOKEN,
 } from '../config/anthropic';
 import { logger } from '../config/logger';
-import { httpError } from '../types';
 
 /**
  * AI helpers for the Training module.
  *
- * Every call goes through `generateStructured`, which dispatches on
- * TRAINING_AI_PROVIDER:
- *   - 'api'          → Anthropic Messages API + messages.parse() (per-token billing).
- *   - 'subscription' → shells out to the `claude` CLI, authenticated by the
- *                      operator's Claude Max login / CLAUDE_CODE_OAUTH_TOKEN.
- *                      The model is asked for raw JSON, which we parse + validate
- *                      against the same Zod schema. No API key required.
- *   - 'stub'         → throws, so callers fall back to editable stubs.
+ * Every call goes through `generateStructured`, which uses the Anthropic
+ * Messages API with ANTHROPIC_API_KEY ('api' provider). Set
+ * TRAINING_AI_PROVIDER=stub to disable AI and always return editable stubs.
  *
  * The full-course generators (outline / lesson / capstone) additionally run
  * through `safeGenerate`, which returns a deterministic fallback when the
@@ -31,104 +22,20 @@ import { httpError } from '../types';
  * 500s and the generated stub stays fully editable by hand.
  */
 
-const CLI_TIMEOUT_MS = 120_000;
-
-/** Run a prompt through the Claude Code CLI using the Max subscription. */
-async function runClaudeCli(prompt: string, model: string): Promise<string> {
-  return new Promise<string>((resolve, reject) => {
-    const child = spawn(CLAUDE_CLI_PATH, ['-p', '--output-format', 'json', '--model', model], {
-      env: {
-        ...process.env,
-        ...(CLAUDE_OAUTH_TOKEN ? { CLAUDE_CODE_OAUTH_TOKEN: CLAUDE_OAUTH_TOKEN } : {}),
-      },
-    });
-    let out = '';
-    let err = '';
-    const timer = setTimeout(() => {
-      child.kill('SIGKILL');
-      reject(new Error('claude CLI timed out'));
-    }, CLI_TIMEOUT_MS);
-    child.stdout.on('data', (d) => (out += d));
-    child.stderr.on('data', (d) => (err += d));
-    child.on('error', (e) => {
-      clearTimeout(timer);
-      reject(e);
-    });
-    child.on('close', (code) => {
-      clearTimeout(timer);
-      if (code !== 0) {
-        reject(new Error(`claude CLI exited ${code}: ${err.slice(0, 500)}`));
-        return;
-      }
-      // --output-format json wraps the reply: { type:'result', result:'<text>' }.
-      try {
-        const env = JSON.parse(out);
-        resolve(typeof env?.result === 'string' ? env.result : out);
-      } catch {
-        resolve(out);
-      }
-    });
-    child.stdin.write(prompt);
-    child.stdin.end();
-  });
-}
-
-/** Pull the first balanced JSON object/array out of a model reply. */
-function extractJson(text: string): string {
-  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  const body = fenced ? fenced[1] : text;
-  const start = body.search(/[{[]/);
-  if (start === -1) return body.trim();
-  const open = body[start];
-  const close = open === '{' ? '}' : ']';
-  let depth = 0;
-  for (let i = start; i < body.length; i++) {
-    if (body[i] === open) depth++;
-    else if (body[i] === close) {
-      depth--;
-      if (depth === 0) return body.slice(start, i + 1);
-    }
-  }
-  return body.slice(start).trim();
-}
-
-/**
- * Single entry point for every structured generation. Returns a value already
- * validated against `schema`, regardless of provider.
- */
+/** Single entry point for every structured generation. */
 async function generateStructured<S extends z.ZodTypeAny>(
   schema: S,
   prompt: string,
   opts: { model: string; maxTokens: number },
 ): Promise<z.infer<S>> {
   if (AI_PROVIDER === 'stub') throw new Error('TRAINING_AI_PROVIDER=stub');
-
-  if (AI_PROVIDER === 'api') {
-    const r = await anthropic.messages.parse({
-      model: opts.model,
-      max_tokens: opts.maxTokens,
-      messages: [{ role: 'user', content: prompt }],
-      output_config: { format: zodOutputFormat(schema) },
-    });
-    return r.parsed_output!;
-  }
-
-  // subscription → CLI. Ask for raw JSON, then parse + validate ourselves.
-  // The model occasionally wraps or malforms the JSON; retry once before
-  // surfacing a clear 502 (instead of a raw SyntaxError 500) so callers that
-  // aren't wrapped in safeGenerate fail legibly.
-  const jsonPrompt = `${prompt}\n\nRespond with ONLY a single valid JSON object matching the structure described above. No prose, no explanation, no markdown code fences.`;
-  let lastErr: unknown;
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      const text = await runClaudeCli(jsonPrompt, opts.model);
-      return schema.parse(JSON.parse(extractJson(text)));
-    } catch (err) {
-      lastErr = err;
-    }
-  }
-  logger.error({ err: lastErr }, 'training AI returned unparseable output');
-  throw httpError(502, 'AI generation returned malformed output — please retry.');
+  const r = await anthropic.messages.parse({
+    model: opts.model,
+    max_tokens: opts.maxTokens,
+    messages: [{ role: 'user', content: prompt }],
+    output_config: { format: zodOutputFormat(schema) },
+  });
+  return r.parsed_output!;
 }
 
 // ---------------------------------------------------------------------------
