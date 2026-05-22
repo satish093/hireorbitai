@@ -220,6 +220,14 @@ export const list: RequestHandler = async (req, res) => {
   if (to) qb = qb.lte('scheduled_at', to);
   const { data, error } = await qb.order('scheduled_at', { ascending: true });
   if (error) throw httpError(500, error.message);
+  // Strip internal recruiter/manager feedback from consultant-facing responses.
+  if (req.user.role === 'CONSULTANT') {
+    const rows = ((data ?? []) as Record<string, unknown>[]).map(
+      ({ feedback: _f, feedback_submitted_by: _fsb, feedback_submitted_at: _fsa, ...rest }) => rest,
+    );
+    res.json(rows);
+    return;
+  }
   res.json(data);
 };
 
@@ -391,8 +399,22 @@ export const next: RequestHandler = async (req, res) => {
 
   const { data, error } = await qb.order('scheduled_at', { ascending: true }).limit(1);
   if (error) throw httpError(500, error.message);
-  const rows = (data ?? []) as unknown[];
-  res.json(rows.length > 0 ? rows[0] : null);
+  const rows = (data ?? []) as Record<string, unknown>[];
+  if (rows.length === 0) {
+    res.json(null);
+    return;
+  }
+  if (req.user.role === 'CONSULTANT') {
+    const {
+      feedback: _f,
+      feedback_submitted_by: _fsb,
+      feedback_submitted_at: _fsa,
+      ...safe
+    } = rows[0];
+    res.json(safe);
+    return;
+  }
+  res.json(rows[0]);
 };
 
 export const submitFeedback: RequestHandler = async (req, res) => {

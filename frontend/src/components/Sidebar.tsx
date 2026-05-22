@@ -96,7 +96,7 @@ const sections: Section[] = [
       { to: '/consultants', label: 'Consultants', icon: IconUsers, roles: OPERATOR_TIER },
       { to: '/recruiters', label: 'Recruiters', icon: IconUser, roles: MANAGER_TIER },
       { to: '/jobs', label: 'Jobs', icon: IconBriefcase, roles: ALL_ROLES },
-      { to: '/applications', label: 'Applications', icon: IconFileText, roles: ALL_ROLES },
+      { to: '/applications', label: 'Applications', icon: IconFileText, roles: OPERATOR_TIER },
       {
         to: '/interviews',
         label: 'Interviews',

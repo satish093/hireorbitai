@@ -35,7 +35,9 @@ export type AuditAction =
   | 'group_user_moved'
   | 'daily_digest_sent'
   | 'daily_digest_skipped'
-  | 'messages_permission_denied';
+  | 'messages_permission_denied'
+  | 'work_auth_doc_uploaded'
+  | 'work_auth_doc_deleted';
 
 interface AuditInput {
   action: AuditAction;

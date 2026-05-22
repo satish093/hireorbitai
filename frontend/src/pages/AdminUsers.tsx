@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Layout } from '../components/Layout';
 import { PageHeader } from '../components/PageHeader';
@@ -24,6 +24,7 @@ type BulkAction = 'reset-password' | 'change-role' | 'move-group' | 'suspend' | 
  *  selectable table, and a slide-in detail pane (selection persisted in ?user). */
 export function AdminUsers() {
   const { profile: me } = useAuth();
+  const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const a = useAdminUsers();
   const rows = a.data?.rows ?? [];
@@ -116,7 +117,7 @@ export function AdminUsers() {
             >
               Deactivated
             </Link>
-            <Button variant="primary" size="sm" onClick={() => toast('Invites coming soon')}>
+            <Button variant="primary" size="sm" onClick={() => navigate('/invitations')}>
               Invite
             </Button>
           </>

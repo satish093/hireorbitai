@@ -11,7 +11,6 @@ import { remindersJob } from './reminders.job';
 import { sessionsPurgeJob } from './sessions-purge.job';
 import { jobsSyncJob } from './jobs-sync.job';
 import { dailyDigestJob } from './daily-digest.job';
-
 register(remindersJob);
 register(sessionsPurgeJob);
 register(jobsSyncJob);

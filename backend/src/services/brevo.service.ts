@@ -408,6 +408,46 @@ export async function sendDailyMatchDigest(args: {
   });
 }
 
+export async function sendWorkAuthExpiryAlert(args: {
+  to: { email: string; name?: string };
+  consultantName: string;
+  docType: string;
+  label: string | null;
+  expiryDate: string;
+  daysUntilExpiry: number;
+}): Promise<void> {
+  const { consultantName, docType, label, expiryDate, daysUntilExpiry } = args;
+  const docDesc = label ? `${docType} — ${label}` : docType;
+  const urgency = daysUntilExpiry <= 7 ? 'urgent' : daysUntilExpiry <= 30 ? 'soon' : 'upcoming';
+  const body = `
+    <p>Hi ${escapeHtml(args.to.name ?? 'there')},</p>
+    <p>A work authorization document for <strong>${escapeHtml(consultantName)}</strong> is expiring ${urgency === 'urgent' ? '<strong>very soon</strong>' : urgency === 'soon' ? 'soon' : 'in the next 60 days'}.</p>
+    <table role="presentation" cellpadding="0" cellspacing="0" style="margin:16px 0;width:100%;">
+      <tr><td style="padding:14px 16px;background:${brand.bgColor};border:1px solid ${brand.borderColor};border-radius:10px;">
+        <div style="font-size:13px;color:${brand.mutedColor};font-weight:600;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">Document</div>
+        <div style="font-size:15px;font-weight:600;">${escapeHtml(docDesc)}</div>
+        <div style="font-size:13px;color:${daysUntilExpiry <= 7 ? '#dc2626' : daysUntilExpiry <= 30 ? '#d97706' : brand.mutedColor};margin-top:6px;">
+          Expires <strong>${escapeHtml(expiryDate)}</strong> · ${daysUntilExpiry} day${daysUntilExpiry === 1 ? '' : 's'} remaining
+        </div>
+      </td></tr>
+    </table>
+    <p>Please ensure a renewed document is uploaded before the expiry date to avoid compliance gaps.</p>
+  `;
+  const dashboardUrl = `${env.frontendUrl}/dashboard`;
+  await sendViaBrevo({
+    to: args.to,
+    subject: `Action required: ${escapeHtml(consultantName)}'s ${escapeHtml(docType)} expires in ${daysUntilExpiry} day${daysUntilExpiry === 1 ? '' : 's'}`,
+    html: shell({
+      preheader: `${consultantName}'s ${docType} expires ${daysUntilExpiry <= 7 ? 'in ' + daysUntilExpiry + ' days' : 'soon'} — please renew.`,
+      heading: 'Work authorization expiry notice',
+      body,
+      cta: { label: 'Open portal', href: dashboardUrl },
+    }),
+    text: `Work authorization expiry notice\n\nConsultant: ${consultantName}\nDocument: ${docDesc}\nExpiry date: ${expiryDate}\nDays remaining: ${daysUntilExpiry}\n\n${dashboardUrl}`,
+    tag: 'work-auth-expiry',
+  });
+}
+
 export async function sendAccountLockedNotice(args: {
   to: { email: string; name?: string };
   unlocksAt: Date;
