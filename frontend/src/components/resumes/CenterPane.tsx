@@ -13,6 +13,7 @@ import type { CenterMode, ResumeVersion } from './types';
 interface Props {
   version: ResumeVersion | null;
   versions: ResumeVersion[];
+  consultantId: string;
   mode: CenterMode;
   onMode: (m: CenterMode) => void;
   sessionId: string | null;
@@ -25,6 +26,7 @@ interface Props {
 export function CenterPane({
   version,
   versions,
+  consultantId,
   mode,
   onMode,
   sessionId,
@@ -121,7 +123,9 @@ export function CenterPane({
             onChanged={onEdited}
           />
         )}
-        {mode === 'edit' && <ResumeEditor resumeId={version.id} onSaved={onEdited} />}
+        {mode === 'edit' && (
+          <ResumeEditor resumeId={version.id} consultantId={consultantId} onSaved={onApplied} />
+        )}
       </div>
 
       <Modal

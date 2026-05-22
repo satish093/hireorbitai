@@ -85,6 +85,7 @@ export function Resumes() {
         <CenterPane
           version={active}
           versions={versions}
+          consultantId={consultantId}
           mode={w.mode}
           onMode={w.setMode}
           sessionId={w.sessionId}
