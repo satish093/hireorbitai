@@ -108,9 +108,6 @@ function AdminUserRedirect() {
 
 // Training module — heavy, lots of sub-pages. Loads only when a training
 // route is hit.
-const TrainingDashboard = lazy(() =>
-  import('./pages/TrainingDashboard').then((m) => ({ default: m.TrainingDashboard })),
-);
 const TrainingCourses = lazy(() =>
   import('./pages/TrainingCourses').then((m) => ({ default: m.TrainingCourses })),
 );
@@ -425,9 +422,9 @@ export default function App() {
         <Route
           path="/training"
           element={
-            <ProtectedRoute allow={MANAGER_TIER}>
+            <ProtectedRoute>
               <FeatureGuard feature="training">
-                <TrainingDashboard />
+                <MyTraining />
               </FeatureGuard>
             </ProtectedRoute>
           }
@@ -522,16 +519,9 @@ export default function App() {
             </ProtectedRoute>
           }
         />
-        <Route
-          path="/training/my"
-          element={
-            <ProtectedRoute>
-              <FeatureGuard feature="training">
-                <MyTraining />
-              </FeatureGuard>
-            </ProtectedRoute>
-          }
-        />
+        {/* Legacy student route — folded into the unified /training workspace. */}
+        <Route path="/training/my" element={<Navigate to="/training" replace />} />
+        <Route path="/training/my/*" element={<Navigate to="/training" replace />} />
 
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
