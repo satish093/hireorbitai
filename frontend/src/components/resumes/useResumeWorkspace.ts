@@ -159,6 +159,8 @@ export function useResumeWorkspace() {
 
   const onApplied = useCallback(
     (newId: string) => {
+      setSessionId(null);
+      setMode('preview');
       setHistoryKey((k) => k + 1);
       reloadVersions(newId);
     },

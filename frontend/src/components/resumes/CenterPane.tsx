@@ -1,8 +1,13 @@
+import { useState } from 'react';
+import toast from 'react-hot-toast';
 import { ButtonGroup, ButtonGroupItem } from '../ButtonGroup';
 import { Button } from '../Button';
+import { Modal } from '../Modal';
 import { EmptyState } from '../EmptyState';
+import { api } from '../../services/api';
 import { ResumePreview } from './ResumePreview';
 import { ResumeDiff } from './ResumeDiff';
+import { ResumeEditor } from './ResumeEditor';
 import type { CenterMode, ResumeVersion } from './types';
 
 interface Props {
@@ -25,8 +30,12 @@ export function CenterPane({
   sessionId,
   resumeId,
   onMakeCurrent,
+  onApplied,
   onEdited,
 }: Props) {
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+
   if (!version) {
     return (
       <div className="bg-surface border border-border rounded-xl min-h-[420px] grid place-items-center">
@@ -38,6 +47,40 @@ export function CenterPane({
       </div>
     );
   }
+
+  // A live session draft in Diff mode applies into a NEW version; otherwise the
+  // displayed version is simply flagged current. Disable only when there's
+  // nothing to do (already current and no draft to apply).
+  const applyingDraft = mode === 'diff' && !!sessionId;
+  const disabled = version.is_current && !applyingDraft;
+
+  async function confirmMakeCurrent() {
+    if (!version) return;
+    setBusy(true);
+    try {
+      if (applyingDraft && sessionId) {
+        const { data } = await api.post(`/resumes/${resumeId}/tailor-sessions/${sessionId}/apply`);
+        const newId = data?.resume?.id;
+        if (!newId) throw new Error('Apply did not return a version');
+        await api.post(`/resumes/${newId}/set-current`);
+        toast.success('Applied draft and made it current');
+        onApplied(newId);
+      } else {
+        await api.post(`/resumes/${version.id}/set-current`);
+        toast.success(`v${version.version} is now current`);
+        onMakeCurrent();
+      }
+      setConfirmOpen(false);
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error ?? 'Failed to make current');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const prevVersionId =
+    versions.filter((v) => v.version < version.version).sort((a, b) => b.version - a.version)[0]
+      ?.id ?? null;
 
   return (
     <div className="bg-surface border border-border rounded-xl flex flex-col min-h-[420px]">
@@ -57,8 +100,13 @@ export function CenterPane({
             Edit
           </ButtonGroupItem>
         </ButtonGroup>
-        <Button size="sm" variant="outline" disabled={version.is_current} onClick={onMakeCurrent}>
-          {version.is_current ? 'Current' : 'Make current'}
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={disabled}
+          onClick={() => setConfirmOpen(true)}
+        >
+          {version.is_current && !applyingDraft ? 'Current' : 'Make current'}
         </Button>
       </div>
 
@@ -69,18 +117,40 @@ export function CenterPane({
             resumeId={resumeId}
             version={version}
             sessionId={sessionId}
-            prevVersionId={
-              versions
-                .filter((v) => v.version < version.version)
-                .sort((a, b) => b.version - a.version)[0]?.id ?? null
-            }
+            prevVersionId={prevVersionId}
             onChanged={onEdited}
           />
         )}
-        {mode === 'edit' && (
-          <EmptyState compact title="Edit" description="Editor lands in a later step." />
-        )}
+        {mode === 'edit' && <ResumeEditor resumeId={version.id} onSaved={onEdited} />}
       </div>
+
+      <Modal
+        open={confirmOpen}
+        onClose={busy ? () => undefined : () => setConfirmOpen(false)}
+        title={applyingDraft ? 'Apply draft & make current' : 'Make current version'}
+        description={
+          applyingDraft
+            ? 'This materializes the accepted changes into a new resume version and marks it current. The original version is preserved.'
+            : `Mark v${version.version} as the current resume? This is the version that gets submitted.`
+        }
+        size="sm"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setConfirmOpen(false)} disabled={busy}>
+              Cancel
+            </Button>
+            <Button variant="primary" onClick={confirmMakeCurrent} loading={busy}>
+              {applyingDraft ? 'Apply & make current' : 'Make current'}
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-muted">
+          {applyingDraft
+            ? 'Rejected changes are reverted; accepted and hand-edited changes are kept.'
+            : 'You can switch the current version again at any time.'}
+        </p>
+      </Modal>
     </div>
   );
 }
