@@ -381,6 +381,94 @@ ${
   return response.parsed_output!;
 }
 
+// ---------------------------------------------------------------------------
+// Structured resume tailoring — the deep "tailoring workspace" variant.
+//
+// Unlike tailorResumeForJob (which returns a flat changes_summary), this
+// returns a reviewable per-SECTION edit list: each entry carries the original
+// section text (before_text — null when the section is brand new), the
+// rewritten text (after_text, with **bold** markers around the keywords/tokens
+// that changed), and a one-line AI rationale. The workspace renders one diff
+// card per edit, and "apply" materializes the accepted subset.
+// ---------------------------------------------------------------------------
+const TailorEditSchema = z.object({
+  section: z.string(), // section heading, e.g. "Summary", "Skills", "Experience — Acme"
+  before_text: z.string().nullable(), // null when this section did not exist before
+  after_text: z.string(), // rewritten section; wrap changed tokens in **bold**
+  ai_reason: z.string(), // one-line rationale for the change
+});
+
+const TailorSessionSchema = z.object({
+  tailored_resume_markdown: z.string(), // full rewritten resume in markdown
+  ai_summary: z.string(), // 1-2 sentence plain-English summary of the whole pass
+  edits: z.array(TailorEditSchema), // one entry per section that changed or was added
+  estimated_match_score: z.number(), // 0..100 — model's own pre-score
+});
+export type TailorSessionResult = z.infer<typeof TailorSessionSchema>;
+
+export async function tailorResumeForJobStructured(input: {
+  resumeText: string;
+  job: {
+    title: string;
+    company?: string | null;
+    description?: string | null;
+    required_skills?: string[] | null;
+    must_haves?: string[] | null;
+  };
+  sections: string[];
+  keywords: string[];
+}): Promise<TailorSessionResult> {
+  const sectionList =
+    input.sections.length > 0 ? input.sections.join(', ') : 'all sections that need work';
+  const keywordList =
+    input.keywords.length > 0 ? input.keywords.join(', ') : '(let the model infer from the JD)';
+  const skills = (input.job.required_skills ?? []).join(', ');
+  const musts = (input.job.must_haves ?? []).join(', ');
+
+  const prompt = `You are a senior recruiter and ATS-optimization expert. Rewrite the candidate's resume so it scores 85%+ against the job below, then produce a SECTION-BY-SECTION edit list a reviewer can accept or reject one change at a time.
+
+== JOB ==
+Title: ${input.job.title}
+Company: ${input.job.company ?? '(not specified)'}
+Required skills: ${skills || '(see JD)'}
+Must-haves: ${musts || '(see JD)'}
+
+JD:
+${input.job.description ?? '(none)'}
+
+== ORIGINAL RESUME ==
+${input.resumeText}
+
+== TARGETING ==
+Sections you may rewrite: ${sectionList}.
+Keywords to weave in (only where truthful given the resume's existing evidence): ${keywordList}.
+
+== RULES ==
+1. **Truthfulness is non-negotiable.** Never invent employers, titles, dates, degrees, or credentials, and never add a skill the resume gives no evidence of.
+2. **Mirror the JD's exact phrasing** for keywords the resume already supports — ATS does literal matching.
+3. **Rewrite bullets for impact + keyword density**: action verb + quantified outcome + JD keywords.
+4. **Skills section must list every required skill that has resume evidence**, grouped so ATS picks each one up.
+5. **Summary**: a 3-4 line value pitch naming the role title, total years, top JD keywords with evidence, and a quantified win.
+
+== OUTPUT ==
+- tailored_resume_markdown: FULL rewritten resume in clean markdown (\`##\` headings, \`-\` bullets). No prose outside the resume body.
+- ai_summary: 1-2 sentences, plain English, summarizing the whole tailoring pass (e.g. "Surfaced Kafka + AWS evidence into the Summary and Skills, and quantified two backend roles to lift keyword coverage.").
+- edits: ONE entry per section you changed or added. For each:
+    - section: the section heading (e.g. "Summary", "Skills", "Experience — Acme Corp").
+    - before_text: the original text of that section verbatim, or null if the section did not exist before.
+    - after_text: the rewritten section. Wrap the specific tokens/keywords you added or changed in **double asterisks** so the reviewer sees exactly what moved.
+    - ai_reason: one line explaining why (e.g. "Added Spring Boot + Kafka to match 2 must-haves with resume evidence").
+- estimated_match_score: honest 0-100 estimate; be conservative when fewer than 3 required skills had truthful evidence to surface.`;
+
+  const response = await anthropic.messages.parse({
+    model: ANTHROPIC_MODEL,
+    max_tokens: 8192,
+    messages: [{ role: 'user', content: prompt }],
+    output_config: { format: zodOutputFormat(TailorSessionSchema) },
+  });
+  return response.parsed_output!;
+}
+
 export async function matchJobsForConsultant(
   consultantProfile: {
     skills: string[];

@@ -5,6 +5,7 @@ import { uploadResumeFile, getResumeSignedUrl } from '../services/storage.servic
 import {
   scoreResume,
   tailorResumeForJob,
+  tailorResumeForJobStructured,
   scoreResumeAgainstJob,
   extractJobRequirements,
 } from '../services/ai.service';
@@ -471,5 +472,578 @@ export const body: RequestHandler = async (req, res) => {
     body: text,
     tailor_metadata: (data as any).tailor_metadata ?? null,
     ai_score: data.ai_score ?? null,
+  });
+};
+
+// ===========================================================================
+// Tailoring workspace — resume_tailor_sessions + resume_tailor_edits
+//
+// A session is one AI tailoring run from a base version toward a job. It owns
+// an ordered list of reviewable per-section edits. "apply" materializes the
+// accepted subset into a brand-new resume version (never overwrites — versions
+// stay immutable). Backed by database/resume-tailor-sessions.sql.
+// ===========================================================================
+
+const SESSION_COLS =
+  'id, resume_id, base_version_id, result_version_id, job_id, applied, ai_summary, score_before, score_after, edit_count, created_at, job:jobs!job_id(id, title, company_name)';
+const EDIT_COLS = 'id, section, before_text, after_text, ai_reason, status, ordinal';
+
+/** Load a resume version row by id and authorize the caller against its
+ *  consultant. The single choke point every workspace endpoint runs through —
+ *  IDOR protection lives here, not in the route. */
+async function loadResumeForCaller(id: string, caller: { id: string; role: string }): Promise<any> {
+  const { data } = await db
+    .from('resumes')
+    .select(
+      'id, consultant_id, version, file_name, body_text, ai_feedback, ai_score, is_current, tailored_for_job_id, tailor_metadata, created_at',
+    )
+    .eq('id', id)
+    .maybeSingle();
+  if (!data) throw httpError(404, 'Resume not found');
+  await authorizeConsultantAccess((data as any).consultant_id, caller);
+  return data;
+}
+
+function resumeBodyText(row: any): string {
+  return (
+    row?.body_text ||
+    (typeof row?.ai_feedback?.resume_text === 'string' ? row.ai_feedback.resume_text : '') ||
+    ''
+  );
+}
+
+const stripBold = (s: string): string => s.replace(/\*\*(.+?)\*\*/g, '$1');
+
+function versionLite(r: any) {
+  return r
+    ? { id: r.id, version: r.version, file_name: r.file_name, ai_score: r.ai_score ?? null }
+    : null;
+}
+
+/** Split a markdown resume into a heading -> section-body map. */
+function splitSections(md: string): Map<string, string> {
+  const map = new Map<string, string>();
+  if (!md) return map;
+  const parts = md.split(/\n(?=#{1,3}\s)/);
+  for (const part of parts) {
+    const m = part.match(/^#{1,3}\s+(.+)/);
+    const heading = m ? m[1].trim() : 'Header';
+    map.set(heading, part.trim());
+  }
+  return map;
+}
+
+/** Heuristic 5-factor ATS breakdown — cheap, no AI round-trip. Falls back
+ *  gracefully when there's no target job (perSkill empty). */
+function computeAtsFactors(text: string, perSkill: Array<{ skill: string; score: number }>) {
+  const bullets = text.split('\n').filter((l) => /^\s*[-*•]/.test(l));
+  const totalBullets = bullets.length || 1;
+  const quantified = bullets.filter((b) => /\d|%|\$/.test(b)).length;
+  const ACTION =
+    /^\s*[-*•]\s*(led|built|designed|shipped|drove|owned|launched|reduced|improved|increased|cut|automated|architected|delivered|scaled|migrated|implemented|created|developed|optimized|managed|spearheaded|engineered|established|streamlined)/i;
+  const actionful = bullets.filter((b) => ACTION.test(b)).length;
+  const matched = perSkill.filter((p) => p.score >= 0.75).length;
+  const coverPct = perSkill.length ? Math.round((matched / perSkill.length) * 100) : text ? 60 : 0;
+  const words = text.trim().split(/\s+/).filter(Boolean).length;
+  const recent = /(202[2-9]|present|current)/i.test(text);
+  const lengthScore =
+    words === 0 ? 0 : words < 250 ? 45 : words <= 950 ? 92 : words <= 1300 ? 70 : 50;
+  return [
+    {
+      key: 'keyword_coverage',
+      label: 'Keyword coverage',
+      score: coverPct,
+      hint: perSkill.length
+        ? `${matched} / ${perSkill.length} must-haves`
+        : 'No target job selected',
+    },
+    {
+      key: 'quantified_impact',
+      label: 'Quantified impact',
+      score: Math.round((quantified / totalBullets) * 100),
+      hint: `${quantified} of ${totalBullets} bullets quantified`,
+    },
+    {
+      key: 'recency',
+      label: 'Recency',
+      score: recent ? 90 : 55,
+      hint: recent ? 'Recent dates present' : 'Add recent dates',
+    },
+    {
+      key: 'length_density',
+      label: 'Length / density',
+      score: lengthScore,
+      hint: `${words} words`,
+    },
+    {
+      key: 'action_verbs',
+      label: 'Action verbs',
+      score: Math.round((actionful / totalBullets) * 100),
+      hint: `${actionful} of ${totalBullets} bullets lead with an action verb`,
+    },
+  ];
+}
+
+const MISSING_TABLE = /schema cache|does not exist|relation .* does not exist|undefined table/i;
+
+/** GET /resumes/:id/tailor-sessions?versionId=… — sessions for a version. */
+export const listTailorSessions: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const base = await loadResumeForCaller(req.params.id, req.user);
+  const versionId = (req.query.versionId as string) || base.id;
+  const { data, error } = await db
+    .from('resume_tailor_sessions')
+    .select(SESSION_COLS)
+    .eq('base_version_id', versionId)
+    .order('created_at', { ascending: false });
+  if (error) {
+    // Table not migrated yet — render an empty history rather than 500ing.
+    if (MISSING_TABLE.test(error.message)) {
+      res.json([]);
+      return;
+    }
+    throw httpError(500, error.message);
+  }
+  res.json(data ?? []);
+};
+
+/** GET /resumes/:id/tailor-sessions/:sessionId — one session with its edits. */
+export const getTailorSession: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const { data: session, error } = await db
+    .from('resume_tailor_sessions')
+    .select(SESSION_COLS)
+    .eq('id', req.params.sessionId)
+    .maybeSingle();
+  if (error && MISSING_TABLE.test(error.message)) throw httpError(404, 'Tailor session not found');
+  if (error) throw httpError(500, error.message);
+  if (!session) throw httpError(404, 'Tailor session not found');
+  // Authorize against the session's OWN resume — closes cross-consultant IDOR.
+  await loadResumeForCaller((session as any).resume_id, req.user);
+  const { data: edits } = await db
+    .from('resume_tailor_edits')
+    .select(EDIT_COLS)
+    .eq('session_id', (session as any).id)
+    .order('ordinal', { ascending: true });
+  res.json({ ...session, edits: edits ?? [] });
+};
+
+/** POST /resumes/:id/tailor-sessions — kick off a new AI tailor for a job. */
+export const createTailorSession: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const schema = z
+    .object({
+      job_id: z.string().uuid(),
+      source_version_id: z.string().uuid().optional(),
+      sections: z.array(z.string()).max(8).optional(),
+      keywords: z.array(z.string()).max(40).optional(),
+      resume_text: z.string().min(50).optional(),
+    })
+    .strict();
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
+
+  const sourceId = parsed.data.source_version_id ?? req.params.id;
+  const source = await loadResumeForCaller(sourceId, req.user);
+
+  let resumeText = resumeBodyText(source);
+  if (parsed.data.resume_text && (!resumeText || resumeText.length < 100)) {
+    resumeText = parsed.data.resume_text;
+    const persistPatch: any = {
+      ai_feedback: { ...(source.ai_feedback ?? {}), resume_text: parsed.data.resume_text },
+      body_text: parsed.data.resume_text,
+    };
+    let { error: persistErr } = await db.from('resumes').update(persistPatch).eq('id', source.id);
+    if (
+      persistErr &&
+      /body_text/.test(persistErr.message) &&
+      /schema cache|column/i.test(persistErr.message)
+    ) {
+      delete persistPatch.body_text;
+      await db.from('resumes').update(persistPatch).eq('id', source.id);
+    }
+  }
+  if (!resumeText) {
+    throw httpError(
+      400,
+      'NO_RESUME_TEXT: Source resume has no extractable text. Paste the resume text or re-upload with a text body.',
+    );
+  }
+
+  const { data: job, error: jobErr } = await db
+    .from('jobs')
+    .select('*')
+    .eq('id', parsed.data.job_id)
+    .single();
+  if (jobErr || !job) throw httpError(404, 'Job not found');
+
+  let reqs = job.requirements;
+  if (!reqs) {
+    reqs = await extractJobRequirements({
+      title: job.title,
+      description: job.description,
+      required_skills: job.required_skills,
+      location: job.location,
+    });
+    await db.from('jobs').update({ requirements: reqs }).eq('id', job.id);
+  }
+
+  const sections = parsed.data.sections ?? ['Summary', 'Skills', 'Work Experience'];
+  const keywords = parsed.data.keywords ?? [];
+
+  const before = await scoreResumeAgainstJob({
+    resumeText,
+    job: {
+      title: job.title,
+      description: job.description,
+      required_skills: reqs?.required_skills ?? job.required_skills,
+      min_years_of_experience: reqs?.min_years_of_experience ?? null,
+      job_seniority: reqs?.job_seniority ?? job.level ?? null,
+    },
+  });
+
+  const tailored = await tailorResumeForJobStructured({
+    resumeText,
+    job: {
+      title: job.title,
+      company: job.company_name,
+      description: job.description,
+      required_skills: reqs?.required_skills ?? job.required_skills,
+      must_haves: reqs?.must_haves ?? [],
+    },
+    sections,
+    keywords,
+  });
+
+  const after = await scoreResumeAgainstJob({
+    resumeText: tailored.tailored_resume_markdown,
+    job: {
+      title: job.title,
+      description: job.description,
+      required_skills: reqs?.required_skills ?? job.required_skills,
+      min_years_of_experience: reqs?.min_years_of_experience ?? null,
+      job_seniority: reqs?.job_seniority ?? job.level ?? null,
+    },
+  });
+
+  const { data: session, error: sErr } = await db
+    .from('resume_tailor_sessions')
+    .insert({
+      resume_id: source.id,
+      base_version_id: source.id,
+      result_version_id: null,
+      job_id: job.id,
+      applied: false,
+      ai_summary: tailored.ai_summary,
+      result_markdown: tailored.tailored_resume_markdown,
+      score_before: Math.round(before.overall_score),
+      score_after: Math.round(after.overall_score),
+      edit_count: tailored.edits.length,
+      created_by: req.user.id,
+    })
+    .select(SESSION_COLS)
+    .single();
+  if (sErr) {
+    if (MISSING_TABLE.test(sErr.message)) {
+      throw httpError(
+        503,
+        'Tailor sessions not migrated — apply database/resume-tailor-sessions.sql',
+      );
+    }
+    throw httpError(500, sErr.message);
+  }
+
+  const editRows = tailored.edits.map((e, i) => ({
+    session_id: (session as any).id,
+    section: e.section,
+    before_text: e.before_text,
+    after_text: e.after_text,
+    ai_reason: e.ai_reason,
+    status: 'proposed',
+    ordinal: i,
+  }));
+  let edits: any[] = [];
+  if (editRows.length) {
+    const { error: eErr } = await db.from('resume_tailor_edits').insert(editRows);
+    if (eErr) throw httpError(500, eErr.message);
+    const { data: inserted } = await db
+      .from('resume_tailor_edits')
+      .select(EDIT_COLS)
+      .eq('session_id', (session as any).id)
+      .order('ordinal', { ascending: true });
+    edits = inserted ?? [];
+  }
+
+  res.status(201).json({ ...session, edits });
+};
+
+/** PATCH /resumes/:id/tailor-sessions/:sessionId/edits/:editId — set status. */
+export const patchTailorEdit: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const schema = z
+    .object({
+      status: z.enum(['accepted', 'rejected', 'edited']),
+      after_text: z.string().min(1).optional(),
+    })
+    .strict();
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
+
+  const { data: edit } = await db
+    .from('resume_tailor_edits')
+    .select('id, session_id, status')
+    .eq('id', req.params.editId)
+    .maybeSingle();
+  if (!edit || (edit as any).session_id !== req.params.sessionId)
+    throw httpError(404, 'Edit not found');
+  const { data: session } = await db
+    .from('resume_tailor_sessions')
+    .select('id, resume_id')
+    .eq('id', (edit as any).session_id)
+    .maybeSingle();
+  if (!session) throw httpError(404, 'Edit not found');
+  await loadResumeForCaller((session as any).resume_id, req.user);
+
+  const patch: any = { status: parsed.data.status };
+  if (parsed.data.status === 'edited') {
+    if (!parsed.data.after_text) throw httpError(400, 'after_text required when status is edited');
+    patch.after_text = parsed.data.after_text;
+  }
+  const { data, error } = await db
+    .from('resume_tailor_edits')
+    .update(patch)
+    .eq('id', (edit as any).id)
+    .select(EDIT_COLS)
+    .single();
+  if (error) throw httpError(500, error.message);
+  res.json(data);
+};
+
+/** POST /resumes/:id/tailor-sessions/:sessionId/apply — materialize accepted
+ *  edits into a brand-new resume version. Idempotent once applied. */
+export const applyTailorSession: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const { data: session } = await db
+    .from('resume_tailor_sessions')
+    .select('*')
+    .eq('id', req.params.sessionId)
+    .maybeSingle();
+  if (!session) throw httpError(404, 'Tailor session not found');
+  const source = await loadResumeForCaller((session as any).resume_id, req.user);
+
+  if ((session as any).applied && (session as any).result_version_id) {
+    const { data: existing } = await db
+      .from('resumes')
+      .select('*')
+      .eq('id', (session as any).result_version_id)
+      .maybeSingle();
+    if (existing) {
+      res.json({ resume: existing, session });
+      return;
+    }
+  }
+
+  const { data: edits } = await db
+    .from('resume_tailor_edits')
+    .select(EDIT_COLS)
+    .eq('session_id', (session as any).id)
+    .order('ordinal', { ascending: true });
+
+  // Reconstruct the final body from the full AI rewrite, then revert any
+  // sections the reviewer rejected (best-effort verbatim match). Versions are
+  // immutable, so this always writes a NEW row.
+  let body: string = (session as any).result_markdown || resumeBodyText(source);
+  for (const e of edits ?? []) {
+    const aiAfter = stripBold((e as any).after_text);
+    if (
+      (e as any).status === 'rejected' &&
+      (e as any).before_text != null &&
+      body.includes(aiAfter)
+    ) {
+      body = body.replace(aiAfter, (e as any).before_text);
+    }
+  }
+  body = stripBold(body);
+
+  const { data: latest } = await db
+    .from('resumes')
+    .select('version')
+    .eq('consultant_id', source.consultant_id)
+    .order('version', { ascending: false })
+    .limit(1);
+  const nextVersion = ((latest?.[0] as any)?.version ?? 0) + 1;
+  const fileName = `tailored-v${nextVersion}.md`;
+
+  const insertRow: any = {
+    consultant_id: source.consultant_id,
+    version: nextVersion,
+    file_name: fileName,
+    storage_path: `tailored/${source.consultant_id}/${nextVersion}.md`,
+    mime_type: 'text/markdown',
+    size_bytes: Buffer.byteLength(body, 'utf8'),
+    ai_score: (session as any).score_after ?? null,
+    ai_feedback: { resume_text: body, from_tailor_session: (session as any).id },
+    is_current: false,
+    uploaded_by: req.user.id,
+    tailored_for_job_id: (session as any).job_id,
+    parent_resume_id: source.id,
+    body_text: body,
+  };
+  let { data: created, error } = await db.from('resumes').insert(insertRow).select().single();
+  if (
+    error &&
+    /tailored_for_job_id|parent_resume_id|body_text/.test(error.message) &&
+    /schema cache|column/i.test(error.message)
+  ) {
+    delete insertRow.tailored_for_job_id;
+    delete insertRow.parent_resume_id;
+    delete insertRow.body_text;
+    ({ data: created, error } = await db.from('resumes').insert(insertRow).select().single());
+  }
+  if (error) throw httpError(500, error.message);
+
+  await db
+    .from('resume_tailor_sessions')
+    .update({ applied: true, result_version_id: (created as any)?.id ?? null })
+    .eq('id', (session as any).id);
+
+  res
+    .status(201)
+    .json({
+      resume: created,
+      session: { ...session, applied: true, result_version_id: (created as any)?.id ?? null },
+    });
+};
+
+/** GET /resumes/:id/ats-factors?against=:jobId — 5 factors + skill coverage. */
+export const atsFactors: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const resume = await loadResumeForCaller(req.params.id, req.user);
+  const text = resumeBodyText(resume);
+  const against = (req.query.against as string) || '';
+
+  let perSkill: Array<{ skill: string; score: number }> = [];
+  let overall: number | null =
+    typeof resume.ai_score === 'number' ? Math.round(resume.ai_score) : null;
+  let target: { id: string; title: string; company_name?: string | null } | null = null;
+
+  if (against && text) {
+    const { data: job } = await db
+      .from('jobs')
+      .select('id, title, company_name, description, required_skills, requirements, level')
+      .eq('id', against)
+      .maybeSingle();
+    if (job) {
+      target = { id: job.id, title: job.title, company_name: job.company_name };
+      const reqs = (job as any).requirements;
+      const scored = await scoreResumeAgainstJob({
+        resumeText: text,
+        job: {
+          title: job.title,
+          description: job.description,
+          required_skills: reqs?.required_skills ?? job.required_skills,
+          min_years_of_experience: reqs?.min_years_of_experience ?? null,
+          job_seniority: reqs?.job_seniority ?? (job as any).level ?? null,
+        },
+      });
+      perSkill = scored.per_skill.map((p) => ({ skill: p.skill, score: p.score }));
+      overall = Math.round(scored.overall_score);
+    }
+  } else if (Array.isArray(resume.ai_feedback?.per_skill)) {
+    perSkill = resume.ai_feedback.per_skill.map((p: any) => ({ skill: p.skill, score: p.score }));
+  }
+
+  const factors = computeAtsFactors(text, perSkill);
+  const coverage = perSkill.map((p) => ({
+    skill: p.skill,
+    level: p.score >= 0.75 ? 'strong' : p.score >= 0.4 ? 'gap' : 'missing',
+  }));
+
+  let scoredAgainst: any[] = [];
+  try {
+    const { data } = await db
+      .from('resume_job_matches')
+      .select(
+        'job_id, ats_score, match_score, computed_at, job:jobs!job_id(id, title, company_name)',
+      )
+      .eq('consultant_id', resume.consultant_id)
+      .order('computed_at', { ascending: false })
+      .limit(12);
+    scoredAgainst = (data ?? []).map((r: any) => ({
+      job_id: r.job_id,
+      title: r.job?.title ?? 'Job',
+      company_name: r.job?.company_name ?? null,
+      ats_score: r.ats_score != null ? Math.round(r.ats_score) : null,
+      match_score: r.match_score != null ? Math.round(r.match_score) : null,
+    }));
+  } catch {
+    /* resume_job_matches not present — non-fatal */
+  }
+
+  res.json({ overall, target, factors, coverage, scored_against: scoredAgainst });
+};
+
+/** GET /resumes/:id/diff?from=:vA&to=:vB — per-section diff, AI-annotated when
+ *  a tailor session links the two versions. */
+export const diff: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const toId = (req.query.to as string) || req.params.id;
+  const fromId = (req.query.from as string) || '';
+  const to = await loadResumeForCaller(toId, req.user);
+  const from = fromId ? await loadResumeForCaller(fromId, req.user) : null;
+
+  if (fromId) {
+    const { data: session } = await db
+      .from('resume_tailor_sessions')
+      .select('id, ai_summary, score_before, score_after')
+      .eq('base_version_id', fromId)
+      .eq('result_version_id', toId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (session) {
+      const { data: edits } = await db
+        .from('resume_tailor_edits')
+        .select(EDIT_COLS)
+        .eq('session_id', (session as any).id)
+        .order('ordinal', { ascending: true });
+      res.json({
+        from: versionLite(from),
+        to: versionLite(to),
+        summary: (session as any).ai_summary,
+        score_before: (session as any).score_before,
+        score_after: (session as any).score_after,
+        changes: edits ?? [],
+      });
+      return;
+    }
+  }
+
+  // Fallback: naive section-split diff (no AI annotation).
+  const beforeSections = splitSections(resumeBodyText(from));
+  const afterSections = splitSections(resumeBodyText(to));
+  const changes: any[] = [];
+  let ord = 0;
+  for (const [heading, after] of afterSections) {
+    const before = beforeSections.has(heading) ? beforeSections.get(heading)! : null;
+    if (before !== after) {
+      changes.push({
+        id: `${heading}-${ord}`,
+        section: heading,
+        before_text: before,
+        after_text: after,
+        ai_reason: '',
+        status: 'proposed',
+        ordinal: ord++,
+      });
+    }
+  }
+  res.json({
+    from: versionLite(from),
+    to: versionLite(to),
+    summary: '',
+    score_before: from?.ai_score ?? null,
+    score_after: to.ai_score ?? null,
+    changes,
   });
 };

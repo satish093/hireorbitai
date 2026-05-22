@@ -14,3 +14,12 @@ resumesRouter.post('/:id/set-current', c.setCurrent);
 resumesRouter.get('/:id/body', c.body);
 // AI-tailor a resume for a specific job (Jobright-style "Fix My Resume").
 resumesRouter.post('/tailor', c.tailorForJob);
+
+// Deep tailoring workspace — sessions, reviewable edits, factor breakdown, diff.
+resumesRouter.get('/:id/tailor-sessions', c.listTailorSessions);
+resumesRouter.post('/:id/tailor-sessions', c.createTailorSession);
+resumesRouter.get('/:id/tailor-sessions/:sessionId', c.getTailorSession);
+resumesRouter.post('/:id/tailor-sessions/:sessionId/apply', c.applyTailorSession);
+resumesRouter.patch('/:id/tailor-sessions/:sessionId/edits/:editId', c.patchTailorEdit);
+resumesRouter.get('/:id/ats-factors', c.atsFactors);
+resumesRouter.get('/:id/diff', c.diff);
