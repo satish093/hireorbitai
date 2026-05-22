@@ -1,194 +1,109 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Layout } from '../components/Layout';
-import { DataTable } from '../components/DataTable';
-import { FileUpload } from '../components/FileUpload';
-import { SelectInput } from '../components/SelectInput';
 import { PageHeader } from '../components/PageHeader';
 import { Button } from '../components/Button';
-import { api } from '../services/api';
-import { openExternal } from '../utils/fileUrl';
-import toast from 'react-hot-toast';
+import { SelectInput } from '../components/SelectInput';
+import { FileUpload } from '../components/FileUpload';
+import { ResumeVersionStrip } from '../components/resumes/ResumeVersionStrip';
+import { TailorHistory } from '../components/resumes/TailorHistory';
+import { CenterPane } from '../components/resumes/CenterPane';
+import { AtsBreakdownRail } from '../components/resumes/AtsBreakdownRail';
+import { TailorLauncher } from '../components/resumes/TailorLauncher';
+import { useResumeWorkspace } from '../components/resumes/useResumeWorkspace';
 
 export function Resumes() {
-  const [consultants, setConsultants] = useState<any[]>([]);
-  const [consultantId, setConsultantId] = useState('');
-  const [rows, setRows] = useState<any[]>([]);
-  const [uploading, setUploading] = useState(false);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    api
-      .get('/consultants')
-      .then((r) => {
-        if (!cancelled) setConsultants(r.data ?? []);
-      })
-      .catch((e) => {
-        if (!cancelled) toast.error(e?.response?.data?.error ?? 'Failed to load consultants');
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!consultantId) {
-      setRows([]);
-      return;
-    }
-    let cancelled = false;
-    setLoading(true);
-    api
-      .get(`/resumes/consultant/${consultantId}`)
-      .then((r) => {
-        if (!cancelled) setRows(r.data ?? []);
-      })
-      .catch((e) => {
-        if (!cancelled) toast.error(e?.response?.data?.error ?? 'Failed to load resumes');
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [consultantId]);
-
-  async function upload(file: File) {
-    if (!consultantId) {
-      toast.error('Pick a consultant first');
-      return;
-    }
-    if (uploading) return;
-    setUploading(true);
-    const form = new FormData();
-    form.append('file', file);
-    form.append('consultant_id', consultantId);
-    try {
-      await api.post('/resumes/upload', form);
-      toast.success('Uploaded');
-      const { data } = await api.get(`/resumes/consultant/${consultantId}`);
-      setRows(data ?? []);
-    } catch (e: any) {
-      toast.error(e?.response?.data?.error ?? 'Upload failed');
-    } finally {
-      setUploading(false);
-    }
-  }
-
-  async function download(id: string) {
-    try {
-      const { data } = await api.get(`/resumes/${id}/download-url`);
-      if (!data?.url) {
-        toast.error('No download URL');
-        return;
-      }
-      // Centralized opener — handles absolute (signed) download URLs and
-      // relative paths, applies noopener/noreferrer.
-      openExternal(data.url);
-    } catch (e: any) {
-      toast.error(e?.response?.data?.error ?? 'Download failed');
-    }
-  }
-
-  async function setCurrent(id: string) {
-    try {
-      await api.post(`/resumes/${id}/set-current`);
-      const { data } = await api.get(`/resumes/consultant/${consultantId}`);
-      setRows(data ?? []);
-      toast.success('Marked as current');
-    } catch (e: any) {
-      toast.error(e?.response?.data?.error ?? 'Failed to set current');
-    }
-  }
+  const w = useResumeWorkspace();
+  const [launcherOpen, setLauncherOpen] = useState(false);
+  const { active, versions, currentVersion, consultantId } = w;
 
   return (
     <Layout title="Resumes">
       <PageHeader
-        title="Resumes"
-        description="Upload, version, and score consultant resumes. The 'current' version is what gets submitted."
+        title="Resume workspace"
+        description={
+          consultantId
+            ? `${versions.length} version${versions.length === 1 ? '' : 's'}${
+                currentVersion ? ` · current v${currentVersion.version}` : ''
+              }`
+            : 'Select a consultant to open their resume versions.'
+        }
+        action={
+          <>
+            <FileUpload
+              label={w.uploading ? 'Uploading…' : '+ Upload'}
+              accept=".pdf,.doc,.docx"
+              onFile={w.upload}
+            />
+            <Button variant="outline" size="md" disabled={!active} onClick={w.duplicate}>
+              Duplicate
+            </Button>
+            <Button variant="outline" size="md" disabled={!active} onClick={w.download}>
+              Download
+            </Button>
+            <Button
+              variant="accent"
+              size="md"
+              disabled={!active}
+              onClick={() => setLauncherOpen(true)}
+            >
+              ✦ Tailor with AI
+            </Button>
+          </>
+        }
       />
-      <div className="bg-surface border border-border rounded-xl p-4 mb-4 flex flex-wrap items-end gap-3">
-        <div className="flex-1 min-w-[220px]">
+
+      {w.consultants.length > 1 && (
+        <div className="mb-4 max-w-xs">
           <SelectInput
             label="Consultant"
             placeholder="Select a consultant…"
             value={consultantId}
-            onChange={(e) => setConsultantId(e.target.value)}
-            options={consultants.map((c) => ({
+            onChange={(e) => w.setConsultantId(e.target.value)}
+            options={w.consultants.map((c) => ({
               value: c.id,
               label: c.user?.full_name ?? c.user?.email,
             }))}
           />
         </div>
-        <div>
-          <FileUpload
-            label={uploading ? 'Uploading…' : '+ Upload resume'}
-            accept=".pdf,.doc,.docx"
-            onFile={upload}
-          />
-        </div>
+      )}
+
+      <ResumeVersionStrip
+        versions={versions}
+        activeId={w.activeId}
+        onSelect={w.selectVersion}
+        onNew={() => setLauncherOpen(true)}
+      />
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)_320px]">
+        <TailorHistory
+          resumeId={w.activeId}
+          refreshKey={w.historyKey}
+          activeSessionId={w.sessionId}
+          onOpenSession={w.openSession}
+          onNewSession={() => setLauncherOpen(true)}
+        />
+        <CenterPane
+          version={active}
+          versions={versions}
+          mode={w.mode}
+          onMode={w.setMode}
+          sessionId={w.sessionId}
+          resumeId={w.activeId}
+          onMakeCurrent={() => w.reloadVersions(w.activeId)}
+          onApplied={w.onApplied}
+          onEdited={() => w.reloadVersions(w.activeId)}
+        />
+        <AtsBreakdownRail resumeId={w.activeId} againstJobId={active?.tailored_for_job_id} />
       </div>
-      <DataTable
-        loading={loading}
-        empty={
-          consultantId
-            ? 'No resumes for this consultant yet.'
-            : 'Select a consultant to view versions.'
-        }
-        columns={[
-          {
-            key: 'version',
-            header: 'V',
-            render: (r: any) => (
-              <span className="text-[11px] font-mono bg-hover text-ink px-1.5 py-0.5 rounded">
-                v{r.version}
-              </span>
-            ),
-          },
-          { key: 'file_name', header: 'File' },
-          {
-            key: 'ai_score',
-            header: 'AI score',
-            align: 'right',
-            render: (r: any) => r.ai_score ?? '—',
-          },
-          {
-            key: 'current',
-            header: 'Current',
-            render: (r: any) =>
-              r.is_current ? (
-                <span className="text-[11px] font-medium bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 rounded">
-                  Current
-                </span>
-              ) : (
-                <span className="text-muted text-xs">—</span>
-              ),
-          },
-          {
-            key: 'date',
-            header: 'Uploaded',
-            render: (r: any) => (r.created_at ? new Date(r.created_at).toLocaleDateString() : '—'),
-          },
-          {
-            key: 'actions',
-            header: '',
-            align: 'right',
-            render: (r: any) => (
-              <div className="flex items-center justify-end gap-1">
-                <Button size="sm" variant="ghost" onClick={() => download(r.id)}>
-                  Download
-                </Button>
-                {!r.is_current && (
-                  <Button size="sm" variant="ghost" onClick={() => setCurrent(r.id)}>
-                    Set current
-                  </Button>
-                )}
-              </div>
-            ),
-          },
-        ]}
-        rows={rows}
+
+      <TailorLauncher
+        open={launcherOpen}
+        resumeId={w.activeId}
+        onClose={() => setLauncherOpen(false)}
+        onCreated={(s) => {
+          setLauncherOpen(false);
+          w.onSessionCreated(s);
+        }}
       />
     </Layout>
   );
