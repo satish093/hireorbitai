@@ -166,6 +166,7 @@ const createSchema = z
     follow_up_at: z.string().optional().nullable(),
     rejection_reason: z.string().optional().nullable(),
     source_url: z.string().optional().nullable(),
+    resume_id: z.string().uuid().optional().nullable(),
     force: z.boolean().optional(),
   })
   .strict();

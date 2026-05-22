@@ -9,6 +9,7 @@ interface Props {
   activeId: string;
   onSelect: (id: string) => void;
   onNew: () => void;
+  onDelete?: (id: string) => void;
 }
 
 const CURRENT_TONE = { bg: 'bg-success-soft', text: 'text-success' };
@@ -18,7 +19,7 @@ const CURRENT_TONE = { bg: 'bg-success-soft', text: 'text-success' };
  * active card gets an ink border + shadow, and a dashed "+ New" card at the end
  * opens a new tailor session. Scrolls horizontally once there are many versions.
  */
-export function ResumeVersionStrip({ versions, activeId, onSelect, onNew }: Props) {
+export function ResumeVersionStrip({ versions, activeId, onSelect, onNew, onDelete }: Props) {
   return (
     <div className="flex items-stretch gap-0 overflow-x-auto pb-2 -mx-1 px-1">
       {versions.map((v, i) => (
@@ -33,12 +34,25 @@ export function ResumeVersionStrip({ versions, activeId, onSelect, onNew }: Prop
             onClick={() => onSelect(v.id)}
             aria-pressed={v.id === activeId}
             className={clsx(
-              'shrink-0 w-56 text-left rounded-xl border bg-surface p-3 transition hover-lift',
+              'relative shrink-0 w-56 text-left rounded-xl border bg-surface p-3 transition hover-lift',
               v.id === activeId
                 ? 'border-ink shadow-md'
                 : 'border-border hover:border-border-strong',
             )}
           >
+            {onDelete && (
+              <button
+                type="button"
+                aria-label="Delete version"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (confirm(`Delete v${v.version} (${v.file_name})?`)) onDelete(v.id);
+                }}
+                className="absolute top-1.5 right-1.5 w-5 h-5 inline-flex items-center justify-center rounded-full text-muted hover:text-red-600 hover:bg-red-50 text-xs transition"
+              >
+                ✕
+              </button>
+            )}
             <div className="flex items-center justify-between gap-2">
               <span className="text-xs font-mono font-medium text-ink">v{v.version}</span>
               {v.is_current && (

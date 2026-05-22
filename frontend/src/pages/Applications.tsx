@@ -10,14 +10,16 @@ import { Button } from '../components/Button';
 import { api } from '../services/api';
 import { invalidate, useInvalidationListener } from '../hooks/useInvalidate';
 import toast from 'react-hot-toast';
+import type { ResumeVersion } from '../components/resumes/types';
 
-const EMPTY = { consultant_id: '', job_id: '', vendor_id: '', notes: '' };
+const EMPTY = { consultant_id: '', job_id: '', vendor_id: '', notes: '', resume_id: '' };
 
 export function Applications() {
   const [rows, setRows] = useState<any[]>([]);
   const [consultants, setConsultants] = useState<any[]>([]);
   const [jobs, setJobs] = useState<any[]>([]);
   const [vendors, setVendors] = useState<any[]>([]);
+  const [resumeVersions, setResumeVersions] = useState<ResumeVersion[]>([]);
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -61,6 +63,22 @@ export function Applications() {
   // mutates the applications dataset.
   useInvalidationListener('applications', () => load());
 
+  useEffect(() => {
+    if (!form.consultant_id) {
+      setResumeVersions([]);
+      return;
+    }
+    api
+      .get(`/resumes/consultant/${form.consultant_id}`)
+      .then((r) => {
+        const versions: ResumeVersion[] = r.data ?? [];
+        setResumeVersions(versions);
+        const current = versions.find((v) => v.is_current);
+        setForm((f) => ({ ...f, resume_id: current?.id ?? '' }));
+      })
+      .catch(() => setResumeVersions([]));
+  }, [form.consultant_id]);
+
   async function submit() {
     if (submitting) return;
     if (!form.consultant_id || !form.job_id) {
@@ -69,14 +87,16 @@ export function Applications() {
     }
     setSubmitting(true);
     try {
-      const { notes: _n, ...dupParams } = form;
+      const { notes: _n, resume_id: _r, ...dupParams } = form;
       void _n;
+      void _r;
       const dupRes = await api.get('/applications/check-duplicate', { params: dupParams });
+      const payload = { ...form, resume_id: form.resume_id || null };
       if (dupRes.data.duplicate) {
         if (!confirm('Duplicate submission detected — submit anyway?')) return;
-        await api.post('/applications', { ...form, force: true });
+        await api.post('/applications', { ...payload, force: true });
       } else {
-        await api.post('/applications', form);
+        await api.post('/applications', payload);
       }
       toast.success('Submitted');
       setOpen(false);
@@ -172,6 +192,18 @@ export function Applications() {
             options={jobs.map((j) => ({ value: j.id, label: j.title }))}
             onChange={(e) => setForm({ ...form, job_id: e.target.value })}
           />
+          {resumeVersions.length > 0 && (
+            <SelectInput
+              label="Resume version"
+              placeholder="No resume attached"
+              value={form.resume_id}
+              options={resumeVersions.map((v) => ({
+                value: v.id,
+                label: `v${v.version} — ${v.file_name}${v.is_current ? ' (current)' : ''}`,
+              }))}
+              onChange={(e) => setForm({ ...form, resume_id: e.target.value })}
+            />
+          )}
           <SelectInput
             label="Vendor"
             placeholder="Select a vendor…"

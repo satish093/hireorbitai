@@ -167,6 +167,18 @@ export function useResumeWorkspace() {
     [reloadVersions],
   );
 
+  const deleteVersion = useCallback(
+    async (id: string) => {
+      try {
+        await api.delete(`/resumes/${id}`);
+        await reloadVersions();
+      } catch (e: any) {
+        toast.error(e?.response?.data?.error ?? 'Delete failed');
+      }
+    },
+    [reloadVersions],
+  );
+
   return {
     consultants,
     consultantId,
@@ -189,5 +201,6 @@ export function useResumeWorkspace() {
     openSession,
     onSessionCreated,
     onApplied,
+    deleteVersion,
   };
 }

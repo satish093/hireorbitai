@@ -81,6 +81,7 @@ export function Resumes() {
             activeId={w.activeId}
             onSelect={w.selectVersion}
             onNew={() => setLauncherOpen(true)}
+            onDelete={w.deleteVersion}
           />
 
           <div className="mt-4 grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)_320px]">

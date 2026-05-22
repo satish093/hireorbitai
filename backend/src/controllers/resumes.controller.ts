@@ -1,7 +1,12 @@
 import { RequestHandler } from 'express';
 import { z } from 'zod';
 import { db } from '../config/db';
-import { uploadResumeFile, getResumeSignedUrl, readResumeFile } from '../services/storage.service';
+import {
+  uploadResumeFile,
+  getResumeSignedUrl,
+  readResumeFile,
+  deleteResumeFile,
+} from '../services/storage.service';
 import {
   scoreResume,
   tailorResumeForJob,
@@ -48,6 +53,44 @@ async function authorizeConsultantAccess(
   }
   throw httpError(403, 'Forbidden');
 }
+
+/** Delete a single resume version. Auto-promotes the next most-recent if deleting current. */
+export const deleteVersion: RequestHandler = async (req, _res, _next) => {
+  const { id } = req.params;
+  const caller = req.user!;
+
+  const { data: resume } = await db
+    .from('resumes')
+    .select('id, consultant_id, storage_path, is_current')
+    .eq('id', id)
+    .maybeSingle();
+  if (!resume) throw httpError(404, 'Resume not found');
+
+  await authorizeConsultantAccess(resume.consultant_id, caller);
+
+  if (resume.is_current) {
+    const { data: next } = await db
+      .from('resumes')
+      .select('id')
+      .eq('consultant_id', resume.consultant_id)
+      .neq('id', id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (next) {
+      await db.from('resumes').update({ is_current: true }).eq('id', next.id);
+    }
+  }
+
+  await db.from('resumes').delete().eq('id', id);
+  try {
+    await deleteResumeFile(resume.storage_path);
+  } catch {
+    // File already gone from storage — ignore
+  }
+
+  _res.status(204).end();
+};
 
 /** List resume versions for a consultant. */
 export const listForConsultant: RequestHandler = async (req, res) => {
