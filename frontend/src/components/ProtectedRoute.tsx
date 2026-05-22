@@ -1,7 +1,16 @@
-import { ReactNode } from 'react';
+import { ReactNode, Suspense } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Role } from '../types';
+
+function LayoutFallback() {
+  return (
+    <div className="flex min-h-dvh bg-bg text-ink">
+      <div className="hidden md:block w-60 shrink-0 bg-surface border-r border-border" />
+      <div className="flex-1 flex items-center justify-center text-muted text-sm">Loading…</div>
+    </div>
+  );
+}
 
 interface Props {
   children: ReactNode;
@@ -76,5 +85,5 @@ export function ProtectedRoute({ children, allow, bypassOnboarding, bypassPasswo
     }
   }
 
-  return <>{children}</>;
+  return <Suspense fallback={<LayoutFallback />}>{children}</Suspense>;
 }
