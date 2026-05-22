@@ -795,7 +795,7 @@ function Bubble({
             {message.body}
             <div
               className={clsx(
-                'text-[10px] mt-1 inline-flex items-center gap-1',
+                'text-[10px] mt-1 flex items-center gap-1',
                 mine ? 'text-white/70' : 'text-muted',
               )}
             >
