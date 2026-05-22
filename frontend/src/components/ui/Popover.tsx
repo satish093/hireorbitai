@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { useAnchoredPosition } from './useAnchoredPosition';
 
 export function Popover({
   button,
@@ -12,7 +14,9 @@ export function Popover({
   panelClassName?: string;
 }): JSX.Element {
   const [open, setOpen] = useState(false);
-  const wrapperRef = useRef<HTMLDivElement>(null);
+  // The panel is portaled to <body> and positioned in viewport coords, so it
+  // can never be clipped by an ancestor's overflow/transform/stacking context.
+  const { triggerRef, panelRef, style } = useAnchoredPosition(open, { align });
 
   const toggle = () => setOpen((prev) => !prev);
   const close = () => setOpen(false);
@@ -21,9 +25,12 @@ export function Popover({
     if (!open) return;
 
     const handleMouseDown = (e: MouseEvent) => {
-      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
-        close();
-      }
+      const target = e.target as Node;
+      // The panel now lives outside the trigger's subtree (it's portaled), so
+      // dismiss-on-outside-click must spare BOTH the trigger and the panel.
+      if (triggerRef.current?.contains(target)) return;
+      if (panelRef.current?.contains(target)) return;
+      close();
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -39,27 +46,30 @@ export function Popover({
       document.removeEventListener('mousedown', handleMouseDown);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [open]);
-
-  const alignClass = align === 'right' ? 'right-0' : 'left-0';
+  }, [open, triggerRef, panelRef]);
 
   return (
-    <div ref={wrapperRef} className="relative inline-block">
+    <div ref={triggerRef} className="relative inline-block">
       <div onClick={toggle}>{button(open)}</div>
-      {open && (
-        <div
-          className={[
-            'absolute z-30 mt-1',
-            alignClass,
-            'bg-bg-elev border border-border rounded-lg shadow-btn-hover p-2 min-w-[220px]',
-            panelClassName ?? '',
-          ]
-            .filter(Boolean)
-            .join(' ')}
-        >
-          {children(close)}
-        </div>
-      )}
+      {open &&
+        createPortal(
+          <div
+            ref={panelRef}
+            style={style}
+            className={[
+              // z-50 = the app's top chrome tier (modals/drawers). Portaled to
+              // the end of <body>, so it reliably overlays page content.
+              'z-50 max-h-[calc(100dvh-1rem)] overflow-y-auto',
+              'bg-bg-elev border border-border rounded-lg shadow-btn-hover p-2 min-w-[220px]',
+              panelClassName ?? '',
+            ]
+              .filter(Boolean)
+              .join(' ')}
+          >
+            {children(close)}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

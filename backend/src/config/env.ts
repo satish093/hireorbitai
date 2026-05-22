@@ -86,6 +86,15 @@ const envSchema = z.object({
   CLAUDE_CODE_OAUTH_TOKEN: optionalKey,
   // Path to the Claude Code CLI binary (override if not on PATH).
   CLAUDE_CLI_PATH: z.string().default('claude'),
+  // --- Token-cost controls (API provider) ---
+  // Free-text inputs (resume bodies, job descriptions) are clipped to this many
+  // characters before being sent to the model — input tokens are the dominant
+  // API cost on the hot paths. ~6000 chars ≈ 1500 tokens. Lower = cheaper.
+  AI_MAX_INPUT_CHARS: z.coerce.number().int().min(500).max(40000).default(6000),
+  // Per-job description budget in the batch job matcher (the recommended feed
+  // sends many jobs in one call; title + skills carry most of the matching
+  // signal, so each description is clipped hard). Lower = much cheaper feed.
+  AI_MAX_JOB_DESC_CHARS: z.coerce.number().int().min(120).max(8000).default(600),
 
   // --- Email (Brevo only) ---
   // Per the auth spec, ALL transactional email goes through Brevo. The
@@ -123,6 +132,12 @@ const envSchema = z.object({
 
   // --- Trust proxy (set to 1 behind Nginx/CloudPanel, 0 if direct) ---
   TRUST_PROXY: z.coerce.number().int().min(0).max(10).default(1),
+
+  // --- Cross-environment database guard ---
+  // 'enforce' (default) hard-exits if NODE_ENV and DATABASE_URL disagree about
+  // which environment they belong to; 'warn' logs and continues; 'off' skips
+  // the check entirely (use only if your DB names don't follow the convention).
+  DB_GUARD: z.enum(['enforce', 'warn', 'off']).default('enforce'),
 });
 
 // Parse + fail-fast. `safeParse` lets us format every error in one shot
@@ -141,6 +156,64 @@ if (!parsed.success) {
 }
 
 const e = parsed.data;
+
+// --- Cross-environment database safety guard ---------------------------------
+// There is no RLS and the DB runs as a single privileged Postgres role, so the
+// ONLY thing standing between a dev/staging process and production data is the
+// connection string. A fat-fingered DATABASE_URL is therefore a data-integrity
+// incident, not a typo. This turns that mistake into a fail-fast boot error
+// instead of a silent cross-environment read/write.
+//
+// Heuristic, by database-name / host substring:
+//   production DB → contains 'hireorbit_prod'
+//   development DB → contains 'hireorbit_dev' or a managed-dev host ('neon.tech')
+// If your naming differs, set DB_GUARD=off. NODE_ENV=test is exempt (the DB is
+// mocked in the Vitest suite).
+if (e.DB_GUARD !== 'off' && e.NODE_ENV !== 'test') {
+  // Classify by the database NAME + HOST only — never the raw DSN — so a
+  // password/username that happens to contain 'hireorbit_prod'/'neon.tech'
+  // can't skew the verdict (false block / false clear).
+  let host = '';
+  let dbName = '';
+  try {
+    const u = new URL(e.DATABASE_URL);
+    host = u.hostname.toLowerCase();
+    dbName = u.pathname.replace(/^\//, '').toLowerCase();
+  } catch {
+    // Not a parseable URL — fall back to the whole string so we still fail safe.
+    dbName = e.DATABASE_URL.toLowerCase();
+  }
+
+  const looksProd = dbName.includes('hireorbit_prod');
+  const looksDev = dbName.includes('hireorbit_dev') || host.endsWith('neon.tech');
+
+  const violation =
+    e.NODE_ENV === 'production'
+      ? // Production must AFFIRMATIVELY point at a prod-named DB — a prod
+        // process aimed at a dev OR an unrecognized DB is a config error.
+        looksDev
+        ? 'NODE_ENV=production but DATABASE_URL points at a DEVELOPMENT database'
+        : !looksProd
+          ? 'NODE_ENV=production but DATABASE_URL is not a recognized production database (its name should contain "hireorbit_prod")'
+          : null
+      : // Non-production must never point at the production DB.
+        looksProd
+        ? `NODE_ENV=${e.NODE_ENV} but DATABASE_URL points at the PRODUCTION database (hireorbit_prod)`
+        : null;
+
+  if (violation) {
+    const banner =
+      `Database environment guard tripped:\n  • ${violation}.\n` +
+      `  NODE_ENV and the DATABASE_URL database/host must agree.\n` +
+      `  Override with DB_GUARD=off only if you use non-standard DB names (not recommended).`;
+    if (e.DB_GUARD === 'warn') {
+      console.warn(`\n⚠ ${banner}\n`);
+    } else {
+      console.error(`\n✗ ${banner}\n`);
+      process.exit(1);
+    }
+  }
+}
 
 /**
  * Validated, typed config. Import this anywhere in the backend instead of
@@ -177,6 +250,8 @@ export const env = {
     provider: e.TRAINING_AI_PROVIDER,
     oauthToken: e.CLAUDE_CODE_OAUTH_TOKEN,
     cliPath: e.CLAUDE_CLI_PATH,
+    maxInputChars: e.AI_MAX_INPUT_CHARS,
+    maxJobDescChars: e.AI_MAX_JOB_DESC_CHARS,
   },
   email: {
     // Single provider — Brevo. Kept under env.email.* so callers in

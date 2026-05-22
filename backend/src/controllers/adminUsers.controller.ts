@@ -12,7 +12,7 @@ import { logger } from '../config/logger';
 // SUPER_ADMIN — and once the access token TTL elapses, the SUPER_ADMIN is
 // permanently locked out unless another super-admin exists to reactivate
 // them. The ladder mirrors shared/src/roles.ts ordering.
-const ROLE_RANK: Record<Role, number> = {
+export const ROLE_RANK: Record<Role, number> = {
   SUPER_ADMIN: 100,
   CEO: 90,
   CTO: 80,
@@ -26,7 +26,7 @@ const ROLE_RANK: Record<Role, number> = {
 
 /** Throws 403 if the actor is trying to mutate an equal- or higher-ranked
  *  user — admins below SUPER_ADMIN can never reach above their own tier. */
-function assertOutranks(actor: { role: Role }, targetRole: Role | null | undefined): void {
+export function assertOutranks(actor: { role: Role }, targetRole: Role | null | undefined): void {
   if (!targetRole) return;
   const a = ROLE_RANK[actor.role] ?? 0;
   const t = ROLE_RANK[targetRole] ?? 0;
@@ -39,7 +39,7 @@ function assertOutranks(actor: { role: Role }, targetRole: Role | null | undefin
  *  zero active SUPER_ADMINs in the org. Same guard the legacy
  *  `users.controller.deactivate` route uses — without it, the admin surface
  *  can lock the org out of its only super-admin. */
-async function assertNotLastSuperAdmin(targetId: string): Promise<void> {
+export async function assertNotLastSuperAdmin(targetId: string): Promise<void> {
   const { data: target } = await db
     .from('users')
     .select('role, is_active')

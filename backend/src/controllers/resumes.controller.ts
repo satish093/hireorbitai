@@ -1,7 +1,7 @@
 import { RequestHandler } from 'express';
 import { z } from 'zod';
 import { db } from '../config/db';
-import { uploadResumeFile, getResumeSignedUrl } from '../services/storage.service';
+import { uploadResumeFile, getResumeSignedUrl, readResumeFile } from '../services/storage.service';
 import {
   scoreResume,
   tailorResumeForJob,
@@ -9,6 +9,7 @@ import {
   scoreResumeAgainstJob,
   extractJobRequirements,
 } from '../services/ai.service';
+import { extractResumeText } from '../services/resumeText.service';
 import { httpError, MANAGER_TIER } from '../types';
 
 function isManagerTier(role?: string): boolean {
@@ -73,8 +74,10 @@ export const listForConsultant: RequestHandler = async (req, res) => {
 
 /**
  * Upload a new resume version. multipart/form-data: { file, consultant_id, text? }
- * If `text` is provided we run AI scoring server-side. Otherwise the client can
- * call /resumes/:id/score later.
+ * The server extracts readable text from the uploaded PDF/DOCX (stored in
+ * body_text) so the site can display it and the AI features can use it. If the
+ * client passes `text` it takes precedence over extraction. When text is
+ * available we also run AI scoring once, server-side.
  */
 export const upload: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
@@ -101,7 +104,18 @@ export const upload: RequestHandler = async (req, res) => {
 
   let aiScore: number | null = null;
   let aiFeedback: any = null;
-  const rawText = req.body?.text ? String(req.body.text) : '';
+  // Convert the raw upload into readable text. Client-pasted `text` wins (the
+  // wizard sometimes provides it); otherwise extract server-side from the
+  // PDF/DOCX so body_text is populated and every downstream AI feature can use
+  // it. Extraction is non-fatal — an unparseable file just yields ''.
+  let rawText = req.body?.text ? String(req.body.text) : '';
+  if (!rawText) {
+    rawText = await extractResumeText({
+      buffer: file.buffer,
+      mimetype: file.mimetype,
+      originalname: file.originalname,
+    });
+  }
   if (rawText) {
     try {
       const result = await scoreResume(rawText);
@@ -120,24 +134,83 @@ export const upload: RequestHandler = async (req, res) => {
   // Flip is_current off for prior versions, on for this one.
   await db.from('resumes').update({ is_current: false }).eq('consultant_id', consultant_id);
 
-  const { data, error } = await db
-    .from('resumes')
-    .insert({
-      consultant_id,
-      version: nextVersion,
-      file_name: file.originalname,
-      storage_path: path,
-      mime_type: file.mimetype,
-      size_bytes: size,
-      ai_score: aiScore,
-      ai_feedback: aiFeedback,
-      is_current: true,
-      uploaded_by: req.user.id,
-    })
-    .select()
-    .single();
+  const insertBody: any = {
+    consultant_id,
+    version: nextVersion,
+    file_name: file.originalname,
+    storage_path: path,
+    mime_type: file.mimetype,
+    size_bytes: size,
+    ai_score: aiScore,
+    ai_feedback: aiFeedback,
+    is_current: true,
+    uploaded_by: req.user.id,
+  };
+  // Persist the extracted text as readable data. body_text is a late-arrival
+  // column, so strip-and-retry if a DB hasn't applied that migration yet
+  // (the text still lives on ai_feedback.resume_text for AI consumers).
+  if (rawText) insertBody.body_text = rawText;
+  let { data, error } = await db.from('resumes').insert(insertBody).select().single();
+  if (error && /body_text/.test(error.message) && /schema cache|column/i.test(error.message)) {
+    delete insertBody.body_text;
+    ({ data, error } = await db.from('resumes').insert(insertBody).select().single());
+  }
   if (error) throw httpError(500, error.message);
   res.status(201).json(data);
+};
+
+/**
+ * Re-extract readable text from an already-uploaded resume's stored file.
+ * For versions uploaded before server-side extraction existed (body_text
+ * empty), this reads the original PDF/DOCX back, extracts the text into
+ * body_text, and re-runs AI scoring. No-op (extracted:false) for files with no
+ * extractable text (legacy .doc, scanned PDFs, tailored .md versions).
+ */
+export const reextract: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const { data: row, error } = await db
+    .from('resumes')
+    .select('id, consultant_id, storage_path, mime_type, file_name, ai_feedback')
+    .eq('id', req.params.id)
+    .maybeSingle();
+  if (error) throw httpError(500, error.message);
+  if (!row) throw httpError(404, 'Resume not found');
+  const resume = row as any;
+  await authorizeConsultantAccess(resume.consultant_id, req.user);
+  if (!resume.storage_path)
+    throw httpError(400, 'This version has no stored file to extract from.');
+
+  const buffer = await readResumeFile(resume.storage_path);
+  const text = await extractResumeText({
+    buffer,
+    mimetype: resume.mime_type ?? '',
+    originalname: resume.file_name ?? '',
+  });
+  if (!text) {
+    res.json({ id: resume.id, extracted: false, chars: 0, ai_score: null });
+    return;
+  }
+
+  let aiScore: number | null = null;
+  let aiFeedback: any = { ...(resume.ai_feedback ?? {}), resume_text: text };
+  try {
+    const scored = await scoreResume(text);
+    aiScore = scored.score;
+    aiFeedback = { ...scored, resume_text: text };
+  } catch (e) {
+    // Non-fatal — the text is still saved; the user can score on demand.
+
+    console.warn('Re-extract AI scoring failed:', e);
+  }
+
+  const patch: any = { ai_feedback: aiFeedback, ai_score: aiScore, body_text: text };
+  let { error: upErr } = await db.from('resumes').update(patch).eq('id', resume.id);
+  if (upErr && /body_text/.test(upErr.message) && /schema cache|column/i.test(upErr.message)) {
+    delete patch.body_text;
+    ({ error: upErr } = await db.from('resumes').update(patch).eq('id', resume.id));
+  }
+  if (upErr) throw httpError(500, upErr.message);
+  res.json({ id: resume.id, extracted: true, chars: text.length, ai_score: aiScore });
 };
 
 /** Signed-URL download link for a resume version. */

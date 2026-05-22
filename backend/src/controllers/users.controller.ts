@@ -3,6 +3,18 @@ import { z } from 'zod';
 import { db } from '../config/db';
 import { httpError, MANAGER_TIER, OPERATOR_TIER, Role, ALL_ROLES } from '../types';
 import * as authSvc from '../services/auth.service';
+import { assertOutranks } from './adminUsers.controller';
+
+/** Refuse to mutate an equal- or higher-ranked user. Loads the target's role
+ *  and defers to the canonical rank ladder in adminUsers.controller. Without
+ *  this, the legacy /users/:id lifecycle routes (gated only by requireAdmin,
+ *  which admits DIRECTOR/CTO) let a lower-tier admin deactivate or delete a
+ *  SUPER_ADMIN/CEO — the exact lockout the admin surface already prevents. */
+async function assertCanManageTarget(actorRole: Role, targetId: string): Promise<void> {
+  const { data } = await db.from('users').select('role').eq('id', targetId).maybeSingle();
+  const targetRole = (data as { role?: Role } | null)?.role ?? null;
+  assertOutranks({ role: actorRole }, targetRole);
+}
 
 /** Columns returned on every profile fetch. We keep this list explicit so a
  *  schema migration that lags doesn't break the read path. */
@@ -304,6 +316,7 @@ export const deactivate: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   const targetId = req.params.id;
   assertNotSelf(req, targetId);
+  await assertCanManageTarget(req.user.role, targetId);
   await assertNotLastSuperAdmin(targetId);
 
   const reason =
@@ -330,6 +343,7 @@ export const reactivate: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   const targetId = req.params.id;
   assertNotSelf(req, targetId);
+  await assertCanManageTarget(req.user.role, targetId);
 
   const updated = await authSvc.setUserStatus({
     targetId,
@@ -347,6 +361,7 @@ export const remove: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   const targetId = req.params.id;
   assertNotSelf(req, targetId);
+  await assertCanManageTarget(req.user.role, targetId);
   await assertNotLastSuperAdmin(targetId);
 
   // Order matters: drop public.users first so any FK cascades fire while the

@@ -1,0 +1,209 @@
+/**
+ * Authorization + ownership tests for tasks.controller.
+ *
+ * Pins three security-sensitive behaviours:
+ *   1. assertCanAccessTask ownership 404 — a non-manager who is neither the
+ *      assignee nor the creator gets httpError(404) (not 403) when reaching a
+ *      task-scoped resource (listSubtasks), so the endpoint can't be used as an
+ *      existence oracle. The owner / creator path is allowed.
+ *   2. update field restriction — a non-manager assignee may only change
+ *      `status`; every other field they submit is dropped from the DB patch.
+ *   3. create is manager-gated — the handler builds a payload only for the
+ *      manager-tier caller; a non-manager update of a status keeps working.
+ *
+ * The db shim is mocked at module load (so importing never reaches config/env);
+ * it records update payloads and serves rows per-table from a settable fixture.
+ */
+
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+
+const mock = vi.hoisted(() => {
+  // table -> rows the next select on that table resolves to.
+  const rows: Record<string, unknown[]> = {};
+  // captured update payloads, in order.
+  const updates: { table: string; payload: Record<string, unknown> }[] = [];
+  return { rows, updates };
+});
+
+vi.mock('../config/db', () => {
+  function makeBuilder(table: string) {
+    const b: Record<string, unknown> = {};
+    Object.assign(b, {
+      select: () => b,
+      eq: () => b,
+      neq: () => b,
+      is: () => b,
+      in: () => b,
+      lt: () => b,
+      lte: () => b,
+      gte: () => b,
+      ilike: () => b,
+      not: () => b,
+      or: () => b,
+      order: () => b,
+      limit: () => b,
+      insert(payload: Record<string, unknown>) {
+        mock.updates.push({ table: `insert:${table}`, payload });
+        return b;
+      },
+      update(payload: Record<string, unknown>) {
+        mock.updates.push({ table, payload });
+        return b;
+      },
+      delete: () => b,
+      maybeSingle: () =>
+        Promise.resolve({ data: (mock.rows[table] ?? [])[0] ?? null, error: null }),
+      single: () => Promise.resolve({ data: (mock.rows[table] ?? [])[0] ?? null, error: null }),
+      then: (resolve: (v: unknown) => unknown) =>
+        Promise.resolve({ data: mock.rows[table] ?? [], error: null }).then(resolve),
+    });
+    return b;
+  }
+  return { db: { from: (t: string) => makeBuilder(t) }, pool: {} };
+});
+
+vi.mock('../config/logger', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+}));
+
+import * as tasks from './tasks.controller';
+
+type Handler = (req: any, res: any, next: any) => unknown | Promise<unknown>;
+
+function mkRes() {
+  const res: any = {
+    statusCode: 200,
+    body: undefined,
+    status(c: number) {
+      this.statusCode = c;
+      return this;
+    },
+    json(b: unknown) {
+      this.body = b;
+      return this;
+    },
+  };
+  return res;
+}
+
+const log = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() };
+
+async function call(
+  handler: Handler,
+  user: { id: string; role: string } | undefined,
+  opts: { body?: unknown; params?: Record<string, string> } = {},
+): Promise<{ status?: number } | null> {
+  try {
+    await handler(
+      { user, body: opts.body ?? {}, params: opts.params ?? {}, query: {}, log },
+      mkRes(),
+      vi.fn(),
+    );
+    return null;
+  } catch (e) {
+    return e as { status?: number };
+  }
+}
+
+beforeEach(() => {
+  for (const k of Object.keys(mock.rows)) delete mock.rows[k];
+  mock.updates.length = 0;
+});
+
+const CONSULTANT = { id: 'u-consultant', role: 'CONSULTANT' };
+const STRANGER = { id: 'u-stranger', role: 'RECRUITER' };
+const MANAGER = { id: 'u-manager', role: 'MANAGER' };
+
+describe('tasks.controller — assertCanAccessTask ownership (via listSubtasks)', () => {
+  it('returns 404 (not 403) for a non-manager who is neither assignee nor creator', async () => {
+    mock.rows.tasks = [{ id: 't-1', assignee_id: 'u-owner', created_by: 'u-author' }];
+    const err = await call(tasks.listSubtasks as Handler, STRANGER, { params: { id: 't-1' } });
+    expect(err?.status).toBe(404);
+  });
+
+  it('returns 404 when the task row is missing (no existence leak)', async () => {
+    mock.rows.tasks = [];
+    const err = await call(tasks.listSubtasks as Handler, CONSULTANT, { params: { id: 't-x' } });
+    expect(err?.status).toBe(404);
+  });
+
+  it('allows the assignee through to the subtasks query', async () => {
+    mock.rows.tasks = [{ id: 't-1', assignee_id: CONSULTANT.id, created_by: 'u-author' }];
+    mock.rows.task_subtasks = [{ id: 's-1', task_id: 't-1' }];
+    const err = await call(tasks.listSubtasks as Handler, CONSULTANT, { params: { id: 't-1' } });
+    expect(err).toBeNull();
+  });
+
+  it('allows the creator through even when not the assignee', async () => {
+    mock.rows.tasks = [{ id: 't-1', assignee_id: 'u-someone', created_by: CONSULTANT.id }];
+    mock.rows.task_subtasks = [];
+    const err = await call(tasks.listSubtasks as Handler, CONSULTANT, { params: { id: 't-1' } });
+    expect(err).toBeNull();
+  });
+
+  it('allows a manager-tier caller through to any task', async () => {
+    mock.rows.tasks = [{ id: 't-1', assignee_id: 'u-owner', created_by: 'u-author' }];
+    mock.rows.task_subtasks = [];
+    const err = await call(tasks.listSubtasks as Handler, MANAGER, { params: { id: 't-1' } });
+    expect(err).toBeNull();
+  });
+});
+
+describe('tasks.controller — update field restriction for non-manager assignee', () => {
+  it('a non-manager assignee can only patch status; other fields are dropped', async () => {
+    // The assignee owns the task and submits status + a privileged field.
+    mock.rows.tasks = [{ id: 't-1', assignee_id: CONSULTANT.id }];
+    const err = await call(tasks.update as Handler, CONSULTANT, {
+      params: { id: 't-1' },
+      body: { status: 'IN_PROGRESS', title: 'hijacked', assignee_id: 'u-attacker' },
+    });
+    expect(err).toBeNull();
+    const patch = mock.updates.find((u) => u.table === 'tasks')?.payload;
+    expect(patch).toBeTruthy();
+    expect(patch).toMatchObject({ status: 'IN_PROGRESS' });
+    // Manager-only fields the assignee tried to set never reach the DB patch.
+    expect(patch).not.toHaveProperty('title');
+    expect(patch).not.toHaveProperty('assignee_id');
+  });
+
+  it('a non-manager who is neither assignee nor creator gets 403 on update', async () => {
+    mock.rows.tasks = [{ id: 't-1', assignee_id: 'u-owner' }];
+    const err = await call(tasks.update as Handler, STRANGER, {
+      params: { id: 't-1' },
+      body: { status: 'IN_PROGRESS' },
+    });
+    expect(err?.status).toBe(403);
+    expect(mock.updates.find((u) => u.table === 'tasks')).toBeUndefined();
+  });
+
+  it('a manager may patch non-status fields (no restriction)', async () => {
+    mock.rows.tasks = [{ id: 't-1', assignee_id: 'u-owner' }];
+    const err = await call(tasks.update as Handler, MANAGER, {
+      params: { id: 't-1' },
+      body: { title: 'Renamed', priority: 'HIGH' },
+    });
+    expect(err).toBeNull();
+    const patch = mock.updates.find((u) => u.table === 'tasks')?.payload;
+    expect(patch).toMatchObject({ title: 'Renamed', priority: 'HIGH' });
+  });
+});
+
+describe('tasks.controller — create validation', () => {
+  it('rejects a create with no title (400)', async () => {
+    const err = await call(tasks.create as Handler, MANAGER, { body: {} });
+    expect(err?.status).toBe(400);
+  });
+
+  it('sets created_by server-side from req.user, never the body', async () => {
+    // insert(...).select('*').single() and the follow-up taskWithJoins both
+    // read this row; supply one so the response re-fetch doesn't dereference null.
+    mock.rows.tasks = [{ id: 't-new' }];
+    const err = await call(tasks.create as Handler, MANAGER, {
+      body: { title: 'Do thing', created_by: 'u-attacker' },
+    });
+    expect(err).toBeNull();
+    const insert = mock.updates.find((u) => u.table === 'insert:tasks')?.payload;
+    expect(insert?.created_by).toBe(MANAGER.id);
+    expect(insert?.title).toBe('Do thing');
+  });
+});

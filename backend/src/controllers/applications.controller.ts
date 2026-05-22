@@ -147,9 +147,34 @@ export const checkDuplicate: RequestHandler = async (req, res) => {
   res.json({ duplicate: (data?.length ?? 0) > 0, matches: data });
 };
 
+// Mass-assignment allowlist for manual POST /applications. Excludes the
+// server-controlled `recruiter_id` (which must never be caller-supplied —
+// otherwise a recruiter/consultant who passes the consultant ownership check
+// could mis-attribute the application to another recruiter's pipeline) and all
+// other server-owned columns (created_at, status_changed_by, …). `force` is
+// consumed by the duplicate guard, not persisted. Types are intentionally
+// permissive (no stricter than the prior behavior) — the security fix is the
+// allowlist + `.strict()`, not tightened field validation.
+const createSchema = z
+  .object({
+    consultant_id: z.string(),
+    job_id: z.string(),
+    vendor_id: z.string().optional().nullable(),
+    notes: z.string().optional().nullable(),
+    status: z.string().optional(),
+    submitted_at: z.string().optional().nullable(),
+    follow_up_at: z.string().optional().nullable(),
+    rejection_reason: z.string().optional().nullable(),
+    source_url: z.string().optional().nullable(),
+    force: z.boolean().optional(),
+  })
+  .strict();
+
 export const create: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
-  const body = req.body ?? {};
+  const parsed = createSchema.safeParse(req.body ?? {});
+  if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
+  const body = parsed.data;
   if (!body.consultant_id || !body.job_id)
     throw httpError(400, 'consultant_id and job_id required');
 

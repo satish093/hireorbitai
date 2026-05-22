@@ -10,10 +10,46 @@ import {
 import { parseJobRequirements } from '../services/jobParser.service';
 import { tailorForJob as resumeTailorForJob } from './resumes.controller';
 import { fromJob as applicationsFromJob } from './applications.controller';
-import { httpError } from '../types';
+import { httpError, MANAGER_TIER } from '../types';
 
 // Light user join helper — explicit FK hint so the embed never collides.
 const JOB_SELECT = '*, client:clients(id, company_name), vendor:vendors(id, company_name)';
+
+/**
+ * Authorize the caller to act on behalf of a given consultant. Manager-tier
+ * sees all; a CONSULTANT only their own row; a RECRUITER only consultants they
+ * own (consultants.recruiter_id == their recruiter row id). Throws 404 (not
+ * 403) on mismatch so the endpoint isn't an existence oracle. Mirrors the
+ * caller-principal scoping in applications.controller.ts:fromJob — used to
+ * close the consultant_id IDOR on the "on-behalf-of" job endpoints.
+ */
+async function assertConsultantAccess(
+  caller: { id: string; role: string },
+  consultantId: string,
+): Promise<void> {
+  if ((MANAGER_TIER as string[]).includes(caller.role)) return;
+  if (caller.role === 'CONSULTANT') {
+    const me = await getConsultantForUser(caller.id);
+    if (me && (me as { id?: string }).id === consultantId) return;
+  } else if (caller.role === 'RECRUITER') {
+    const { data: rec } = await db
+      .from('recruiters')
+      .select('id')
+      .eq('user_id', caller.id)
+      .maybeSingle();
+    const recId = (rec as { id?: string } | null)?.id;
+    if (recId) {
+      const { data: cons } = await db
+        .from('consultants')
+        .select('id')
+        .eq('id', consultantId)
+        .eq('recruiter_id', recId)
+        .maybeSingle();
+      if (cons) return;
+    }
+  }
+  throw httpError(404, 'Not found');
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -166,11 +202,41 @@ export const get: RequestHandler = async (req, res) => {
   res.json(annotated);
 };
 
+// Mass-assignment guard for manual job create/edit. Only these columns are
+// client-writable. Server-owned fields (id, created_by, created_at,
+// updated_at) and ingestion-managed fields (source, external_id, apply_url,
+// company_name, last_synced_at — set only by jobIngestion.service) are
+// deliberately excluded. `.strict()` rejects any unknown key so a caller can't
+// overwrite created_by or forge an ingestion identity. Mirrors the canonical
+// allowlist pattern in applications.controller.ts.
+const jobWritable = {
+  title: z.string().min(1),
+  client_id: z.string().uuid().optional().nullable(),
+  vendor_id: z.string().uuid().optional().nullable(),
+  location: z.string().optional().nullable(),
+  remote: z.boolean().optional(),
+  job_type: z.string().optional().nullable(),
+  rate_min: z.number().optional().nullable(),
+  rate_max: z.number().optional().nullable(),
+  description: z.string().optional().nullable(),
+  required_skills: z.array(z.string()).optional().nullable(),
+  source_url: z.string().optional().nullable(),
+  posted_at: z.string().optional().nullable(),
+  closes_at: z.string().optional().nullable(),
+  is_active: z.boolean().optional(),
+  requirements: z.any().optional().nullable(),
+  level: z.string().optional().nullable(),
+};
+const createJobSchema = z.object(jobWritable).strict();
+const updateJobSchema = z.object(jobWritable).partial().strict();
+
 export const create: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
+  const parsed = createJobSchema.safeParse(req.body);
+  if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
   const { data, error } = await db
     .from('jobs')
-    .insert({ ...req.body, created_by: req.user.id })
+    .insert({ ...parsed.data, created_by: req.user.id })
     .select()
     .single();
   if (error) throw httpError(500, error.message);
@@ -178,9 +244,12 @@ export const create: RequestHandler = async (req, res) => {
 };
 
 export const update: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const parsed = updateJobSchema.safeParse(req.body);
+  if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
   const { data, error } = await db
     .from('jobs')
-    .update(req.body)
+    .update(parsed.data)
     .eq('id', req.params.id)
     .select()
     .single();
@@ -278,6 +347,9 @@ export const recommended: RequestHandler = async (req, res) => {
   let consultant: any = null;
   let resumeText = '';
   if (consultant_id) {
+    // An explicit consultant_id must pass the ownership scope — otherwise any
+    // consultant could read another's skill-match scores / missing keywords.
+    await assertConsultantAccess(req.user, consultant_id);
     const { data } = await db
       .from('consultants')
       .select('id, primary_skill, skills, total_experience_years, preferred_locations')
@@ -501,9 +573,11 @@ export const applied: RequestHandler = async (req, res) => {
   const { consultant_id } = req.query as Record<string, string | undefined>;
 
   // Resolve the consultant: explicit param (recruiter on-behalf-of view) or
-  // the caller's own consultant row.
+  // the caller's own consultant row. An explicit id must pass the ownership
+  // scope — without it any consultant could read another's application funnel.
   let consultantId: string | null = null;
   if (consultant_id) {
+    await assertConsultantAccess(req.user, consultant_id);
     consultantId = consultant_id;
   } else {
     const me = await getConsultantForUser(req.user.id);
@@ -923,6 +997,9 @@ export const applyOptions: RequestHandler = async (req, res) => {
   };
 
   if (consultantId) {
+    // Ownership scope: a caller may only pull apply-options for a consultant
+    // they legitimately represent (own / recruiter-owned / manager-tier).
+    await assertConsultantAccess(req.user, consultantId);
     // Duplicate check.
     const { data: dup } = await db
       .from('applications')
@@ -1002,6 +1079,10 @@ export const duplicateCheck: RequestHandler = async (req, res) => {
     res.json({ duplicate: false });
     return;
   }
+  // Ownership scope: a caller may only check duplicates for a consultant they
+  // represent (own / recruiter-owned / manager-tier) — otherwise this leaks
+  // whether/when another consultant applied to any job.
+  await assertConsultantAccess(req.user, consultantId);
   const { data } = await db
     .from('applications')
     .select('id, status, submitted_at')
@@ -1046,7 +1127,12 @@ export const applyConfirm: RequestHandler = async (req, res, next) => {
 // Legacy endpoint kept for back-compat with the old /api/jobs/match/consultant/:id route
 // ---------------------------------------------------------------------------
 export const matchForConsultant: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
   const consultantId = req.params.consultantId;
+  // Ownership scope: this legacy on-behalf-of endpoint has no route role gate,
+  // so without this any authenticated user could harvest another consultant's
+  // skill profile + match scores. Mirrors the other consultant_id handlers.
+  await assertConsultantAccess(req.user, consultantId);
   const { data: c, error: e1 } = await db
     .from('consultants')
     .select('primary_skill, skills, total_experience_years, preferred_locations')

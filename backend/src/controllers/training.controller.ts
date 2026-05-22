@@ -23,6 +23,25 @@ export const listCourses: RequestHandler = async (req, res) => {
 export const getCourse: RequestHandler = async (req, res) => {
   const { data, error } = await repo.courses.get(req.params.id);
   if (error || !data) throw httpError(404, 'Course not found');
+  // Answer-key guard. This route has no role gate (the student catalog reads
+  // it too), and repo.courses.get embeds the raw training_quizzes rows incl.
+  // correct_answer/explanation. Managers/admins author courses and need the
+  // key to edit; everyone else (students) must not see it or they can defeat
+  // the quiz completion gate. Mirrors svc.stripQuizAnswers (fail-closed: an
+  // unknown role is treated as a student).
+  if (!isManagerTier(req.user?.role)) {
+    const d = data as { quizzes?: unknown[] };
+    if (Array.isArray(d.quizzes)) {
+      d.quizzes = d.quizzes.map((q) => {
+        const {
+          correct_answer: _c,
+          explanation: _e,
+          ...rest
+        } = (q ?? {}) as Record<string, unknown>;
+        return rest;
+      });
+    }
+  }
   res.json(data);
 };
 

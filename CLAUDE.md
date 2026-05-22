@@ -43,6 +43,22 @@ npm run shared:build
 
 The pre-commit hook (lint-staged) runs prettier on every staged file. Husky lives under `.husky/`.
 
+## Testing & verification
+
+```bash
+npm run verify        # the gate: format:check → typecheck → lint → backend vitest
+npm run verify:full   # verify + full build + frontend Playwright UI smoke suite
+npm test              # backend vitest only (alias for npm --prefix backend test)
+npm --prefix frontend run test:e2e      # Playwright UI smoke (auto-starts Vite, mocked API)
+```
+
+- **`npm run verify`** is the single pre-commit/pre-push gate — same matrix CI runs, stops at the first failure. The `/verify` slash-command wraps it.
+- **Backend tests** are Vitest with the DB mocked at module load (`vi.hoisted` + `vi.mock('../config/db')`); they need no Postgres or env. Canonical pattern: `backend/src/services/permission.service.test.ts`. Security-sensitive coverage lives in `backend/src/roles.test.ts`, `controllers/adminUsers.guards.test.ts`, and `services/permission.extra.test.ts`.
+- **`backend/src/security/patterns.test.ts`** is an executable form of `.claude/rules/security.md` — a ratchet that fails on **new** mass-assignment (`db.update/insert(req.body)`) or `.ilike('email')`. Known offenders are baselined in that file; lower a baseline when you harden a controller, never raise one.
+- **UI tests** are **mocked-backend** Playwright specs in `frontend/e2e/` (no DB). Reuse `frontend/e2e/_helpers.ts` (`mockApi`, `seedSession`). One-time browser install: `npx --prefix frontend playwright install chromium`.
+- **Security scanning** beyond the static guard: `/audit-controllers` + the `idor-audit` skill (on demand) and the opt-in `scripts/zap-baseline.ps1` (OWASP ZAP, needs Docker). See `scripts/SECURITY-SCAN.md`.
+- Subagents `ui-test-writer` and `backend-test-writer` write tests in these conventions.
+
 ## Big-picture architecture
 
 ### Three-package workspace

@@ -1,0 +1,84 @@
+# Render Blueprint — FREE development hosting for HireOrbit AI.
+#
+# Two services, both built from the `dev` branch:
+#   • hireorbit-api-dev  — Express backend (free web service; cold-starts after
+#                          ~15 min idle, ~30s wake)
+#   • hireorbit-web-dev  — React/Vite frontend (free static site; always-on)
+#
+# The DEV database is Neon (free, separate server) — NOT defined here, set its
+# connection string as the DATABASE_URL secret below.
+#
+# autoDeploy is OFF on purpose: deploys are triggered by .github/workflows/dev.yml
+# AFTER `verify:full` passes, via Render Deploy Hooks. A failed test never ships.
+#
+# Field names in Render's blueprint spec drift occasionally; if `render.yaml`
+# import fails, create the two services by hand in the dashboard using the same
+# build/start commands + env vars (see docs/deployment/03-render-dev-hosting.md).
+
+services:
+  # ---------------------------------------------------------------- backend ---
+  - type: web
+    name: hireorbit-api-dev
+    runtime: node
+    plan: free
+    branch: dev
+    autoDeploy: false
+    buildCommand: npm ci && npm run shared:build && npm --prefix backend run build
+    startCommand: node backend/dist/server.js
+    healthCheckPath: /health
+    envVars:
+      # development (NOT production) so the cross-env DB guard accepts a dev DB.
+      - key: NODE_ENV
+        value: development
+      - key: DB_GUARD
+        value: enforce
+      # Render injects PORT; the app reads it. 10000 is Render's default.
+      - key: PORT
+        value: 10000
+      - key: TRUST_PROXY
+        value: 1
+      # ---- secrets / set-after-first-deploy (sync:false = enter in dashboard) ----
+      - key: DATABASE_URL # Neon dev connection string (must contain hireorbit_dev)
+        sync: false
+      - key: DATABASE_SSL
+        value: require
+      - key: CORS_ORIGIN # the static-site URL, e.g. https://hireorbit-web-dev.onrender.com
+        sync: false
+      - key: APP_URL
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: BREVO_API_KEY
+        sync: false
+      # ---- generated once by Render, stable across deploys ----
+      - key: JWT_SECRET
+        generateValue: true
+      - key: COOKIE_SECRET
+        generateValue: true
+      - key: STORAGE_URL_SECRET
+        generateValue: true
+      # ---- dev-safe defaults: ephemeral uploads, no AI/API spend ----
+      - key: UPLOADS_DIR
+        value: /tmp/uploads
+      - key: TRAINING_AI_PROVIDER
+        value: stub
+      - key: JOB_SOURCES_MOCK
+        value: 'true'
+
+  # --------------------------------------------------------------- frontend ---
+  - type: web
+    name: hireorbit-web-dev
+    runtime: static
+    branch: dev
+    autoDeploy: false
+    buildCommand: npm ci && npm run shared:build && npm --prefix frontend run build
+    staticPublishPath: frontend/dist
+    envVars:
+      # Set to the backend URL + /api, e.g. https://hireorbit-api-dev.onrender.com/api
+      - key: VITE_API_URL
+        sync: false
+    routes:
+      # SPA fallback — every unknown path serves index.html for client routing.
+      - type: rewrite
+        source: /*
+        destination: /index.html

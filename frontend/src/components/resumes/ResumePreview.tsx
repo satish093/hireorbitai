@@ -9,6 +9,11 @@ import { MarkdownView } from './markdown';
 interface Props {
   resumeId: string;
   fileName?: string;
+  /** Bump to force a re-fetch of the body (e.g. after re-extraction). */
+  refreshKey?: number;
+  /** Re-extract readable text from the stored file (for old fileless uploads). */
+  onReextract?: () => void;
+  reextracting?: boolean;
 }
 
 /**
@@ -16,7 +21,13 @@ interface Props {
  * type, sectioned headers, drop shadow. The paper is intentionally NOT themed —
  * it stays white in dark mode so the PDF export matches what's on screen.
  */
-export function ResumePreview({ resumeId, fileName }: Props) {
+export function ResumePreview({
+  resumeId,
+  fileName,
+  refreshKey,
+  onReextract,
+  reextracting,
+}: Props) {
   const [body, setBody] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -40,7 +51,7 @@ export function ResumePreview({ resumeId, fileName }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [resumeId]);
+  }, [resumeId, refreshKey]);
 
   if (loading) {
     return (
@@ -72,7 +83,14 @@ export function ResumePreview({ resumeId, fileName }: Props) {
         compact
         icon="📄"
         title="No text preview"
-        description="This version was uploaded as a file with no extractable text. Use Download to get the original."
+        description="This version has no extracted text yet. Re-extract reads the original PDF/DOCX and pulls the text in; otherwise use Download to get the original file."
+        action={
+          onReextract ? (
+            <Button size="sm" variant="primary" onClick={onReextract} loading={reextracting}>
+              ↻ Re-extract text
+            </Button>
+          ) : undefined
+        }
       />
     );
   }

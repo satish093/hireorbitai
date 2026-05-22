@@ -14,7 +14,26 @@ const zodOutputFormat = zodOutputFormatRaw as unknown as (
   schema: z.ZodType,
   name?: string,
 ) => ReturnType<typeof zodOutputFormatRaw>;
-import { anthropic, ANTHROPIC_MODEL } from '../config/anthropic';
+import {
+  anthropic,
+  ANTHROPIC_MODEL,
+  AI_MAX_INPUT_CHARS,
+  AI_MAX_JOB_DESC_CHARS,
+} from '../config/anthropic';
+import { logAiUsage } from './aiUsage';
+
+/**
+ * Clip free-text inputs before sending them to the model. Input tokens are the
+ * dominant API cost on the hot paths (resume bodies, job descriptions, and the
+ * batch job matcher), so every large free-text field is clamped to a budget.
+ * Output quality is unaffected for typical-length content; only very long
+ * inputs are trimmed. Budgets are env-tunable (AI_MAX_INPUT_CHARS /
+ * AI_MAX_JOB_DESC_CHARS) so cost can be dialed per environment.
+ */
+function clip(text: string | null | undefined, max: number = AI_MAX_INPUT_CHARS): string {
+  const s = text ?? '';
+  return s.length > max ? s.slice(0, max) : s;
+}
 
 const ResumeScoreSchema = z.object({
   score: z.number(),
@@ -49,7 +68,7 @@ const JobMatchListSchema = z.object({
 export type JobMatchResult = z.infer<typeof JobMatchListSchema>['matches'][number];
 
 export async function scoreResume(resumeText: string): Promise<ResumeScoreResult> {
-  const prompt = `You are an expert technical recruiter. Score the following resume on a 0-100 scale based on clarity, impact, quantification, skill depth, and ATS-friendliness.\n\nResume:\n${resumeText}`;
+  const prompt = `You are an expert technical recruiter. Score the following resume on a 0-100 scale based on clarity, impact, quantification, skill depth, and ATS-friendliness.\n\nResume:\n${clip(resumeText)}`;
 
   const response = await anthropic.messages.parse({
     model: ANTHROPIC_MODEL,
@@ -57,6 +76,7 @@ export async function scoreResume(resumeText: string): Promise<ResumeScoreResult
     messages: [{ role: 'user', content: prompt }],
     output_config: { format: zodOutputFormat(ResumeScoreSchema) },
   });
+  logAiUsage('scoreResume', ANTHROPIC_MODEL, response.usage);
   return response.parsed_output!;
 }
 
@@ -64,7 +84,7 @@ export async function atsScore(
   resumeText: string,
   jobDescription: string,
 ): Promise<AtsScoreResult> {
-  const prompt = `Compare the resume below against the job description and produce an ATS match score 0-100. Identify matched keywords, missing keywords, and a 1-2 sentence summary.\n\n=== RESUME ===\n${resumeText}\n\n=== JOB DESCRIPTION ===\n${jobDescription}`;
+  const prompt = `Compare the resume below against the job description and produce an ATS match score 0-100. Identify matched keywords, missing keywords, and a 1-2 sentence summary.\n\n=== RESUME ===\n${clip(resumeText)}\n\n=== JOB DESCRIPTION ===\n${clip(jobDescription)}`;
 
   const response = await anthropic.messages.parse({
     model: ANTHROPIC_MODEL,
@@ -72,6 +92,7 @@ export async function atsScore(
     messages: [{ role: 'user', content: prompt }],
     output_config: { format: zodOutputFormat(AtsScoreSchema) },
   });
+  logAiUsage('atsScore', ANTHROPIC_MODEL, response.usage);
   return response.parsed_output!;
 }
 
@@ -88,7 +109,7 @@ interface VendorEmailInput {
 export async function generateVendorSubmissionEmail(
   input: VendorEmailInput,
 ): Promise<{ subject: string; body: string }> {
-  const prompt = `Write a concise, professional vendor submission email from a recruiter introducing a consultant for a role. Friendly, confident tone, no emojis, no fluff.\n\nDetails:\n- Recruiter: ${input.recruiterName}\n- Vendor: ${input.vendorName ?? 'Hiring Manager'}\n- Consultant: ${input.consultantName} (${input.consultantExperienceYears} yrs)\n- Skills: ${input.consultantSkills.join(', ')}\n- Job: ${input.jobTitle}\n- JD: ${input.jobDescription ?? '(not provided)'}\n`;
+  const prompt = `Write a concise, professional vendor submission email from a recruiter introducing a consultant for a role. Friendly, confident tone, no emojis, no fluff.\n\nDetails:\n- Recruiter: ${input.recruiterName}\n- Vendor: ${input.vendorName ?? 'Hiring Manager'}\n- Consultant: ${input.consultantName} (${input.consultantExperienceYears} yrs)\n- Skills: ${input.consultantSkills.join(', ')}\n- Job: ${input.jobTitle}\n- JD: ${clip(input.jobDescription) || '(not provided)'}\n`;
 
   const response = await anthropic.messages.parse({
     model: ANTHROPIC_MODEL,
@@ -96,6 +117,7 @@ export async function generateVendorSubmissionEmail(
     messages: [{ role: 'user', content: prompt }],
     output_config: { format: zodOutputFormat(VendorEmailSchema) },
   });
+  logAiUsage('generateVendorSubmissionEmail', ANTHROPIC_MODEL, response.usage);
   return response.parsed_output!;
 }
 
@@ -143,7 +165,7 @@ Existing skill tags (from feed): ${(input.required_skills ?? []).join(', ') || '
 Location: ${input.location ?? '(not provided)'}
 
 Description:
-${input.description ?? '(no description provided)'}
+${clip(input.description) || '(no description provided)'}
 
 Produce:
 - must_haves: hard requirements (specific technologies, certifications, degrees) — short phrases
@@ -167,6 +189,7 @@ Produce:
     messages: [{ role: 'user', content: prompt }],
     output_config: { format: zodOutputFormat(JobRequirementsSchema) },
   });
+  logAiUsage('extractJobRequirements', ANTHROPIC_MODEL, response.usage);
   return response.parsed_output!;
 }
 
@@ -209,7 +232,7 @@ export async function scoreResumeAgainstJob(input: {
   const prompt = `Score this resume against the job. Output one score 0..1 per required skill and an overall 0..100.
 
 Resume:
-${input.resumeText}
+${clip(input.resumeText)}
 
 Job: ${input.job.title}
 Seniority: ${input.job.job_seniority ?? 'unspecified'}
@@ -217,7 +240,7 @@ Min years experience: ${input.job.min_years_of_experience ?? 'unspecified'}
 Required skills: ${skills.join(', ')}
 
 JD:
-${input.job.description ?? '(none)'}
+${clip(input.job.description) || '(none)'}
 
 Rules:
 - per_skill: one entry per required skill above. score 1.0 = strong evidence; 0.5 = mentioned/adjacent; 0.0 = absent.
@@ -235,6 +258,7 @@ Rules:
     messages: [{ role: 'user', content: prompt }],
     output_config: { format: zodOutputFormat(SkillMatchSchema) },
   });
+  logAiUsage('scoreResumeAgainstJob', ANTHROPIC_MODEL, response.usage);
   return response.parsed_output!;
 }
 
@@ -263,14 +287,12 @@ export async function jobCopilot(input: {
     input.job.required_skills?.length
       ? `Required skills: ${input.job.required_skills.join(', ')}`
       : '',
-    input.job.description
-      ? `Job description:\n${String(input.job.description).slice(0, 6000)}`
-      : '',
+    input.job.description ? `Job description:\n${clip(input.job.description)}` : '',
   ]
     .filter(Boolean)
     .join('\n');
   const candidate = input.resumeText
-    ? `\n\n=== CANDIDATE RESUME ===\n${input.resumeText.slice(0, 6000)}`
+    ? `\n\n=== CANDIDATE RESUME ===\n${clip(input.resumeText)}`
     : '\n\n(No candidate resume available — answer from the job context, and note when a resume would let you be more specific.)';
 
   const prompt = `You are a concise, practical job-search copilot helping a candidate evaluate and pursue ONE specific job. Use only the context provided; if something isn't in it, say so briefly rather than inventing. Keep answers under ~180 words, use short paragraphs or bullets, and be specific and actionable. Never fabricate company facts or salary.
@@ -286,6 +308,7 @@ ${input.question}`;
     max_tokens: 700,
     messages: [{ role: 'user', content: prompt }],
   });
+  logAiUsage('jobCopilot', ANTHROPIC_MODEL, response.usage);
   const text = response.content
     .filter((b): b is { type: 'text'; text: string } & typeof b => b.type === 'text')
     .map((b) => b.text)
@@ -343,10 +366,10 @@ Required skills: ${skills || '(see JD)'}
 Must-haves: ${musts || '(see JD)'}
 
 JD:
-${input.job.description ?? '(none)'}
+${clip(input.job.description) || '(none)'}
 
 == ORIGINAL RESUME ==
-${input.resumeText}
+${clip(input.resumeText)}
 
 == TARGETING ==
 Sections you may rewrite: ${sectionList}.
@@ -378,6 +401,7 @@ ${
     messages: [{ role: 'user', content: prompt }],
     output_config: { format: zodOutputFormat(TailoredResumeSchema) },
   });
+  logAiUsage('tailorResumeForJob', ANTHROPIC_MODEL, response.usage);
   return response.parsed_output!;
 }
 
@@ -434,10 +458,10 @@ Required skills: ${skills || '(see JD)'}
 Must-haves: ${musts || '(see JD)'}
 
 JD:
-${input.job.description ?? '(none)'}
+${clip(input.job.description) || '(none)'}
 
 == ORIGINAL RESUME ==
-${input.resumeText}
+${clip(input.resumeText)}
 
 == TARGETING ==
 Sections you may rewrite: ${sectionList}.
@@ -466,6 +490,7 @@ Keywords to weave in (only where truthful given the resume's existing evidence):
     messages: [{ role: 'user', content: prompt }],
     output_config: { format: zodOutputFormat(TailorSessionSchema) },
   });
+  logAiUsage('tailorResumeForJobStructured', ANTHROPIC_MODEL, response.usage);
   return response.parsed_output!;
 }
 
@@ -491,6 +516,17 @@ export async function matchJobsForConsultant(
 
   const hasResume =
     !!consultantProfile.resume_excerpt && consultantProfile.resume_excerpt.trim().length > 0;
+  // Cost control: this is the hottest AI path (recommended feed, many jobs per
+  // call). Send only the fields needed to rank, and clip each description hard
+  // — title + required_skills carry most of the matching signal. Without this
+  // the prompt balloons with N full job descriptions of input tokens.
+  const slimJobs = jobs.map((j) => ({
+    id: j.id,
+    title: j.title,
+    required_skills: j.required_skills ?? [],
+    location: j.location ?? null,
+    description: clip(j.description, AI_MAX_JOB_DESC_CHARS),
+  }));
   const skillsBlock =
     consultantProfile.skills.length > 0
       ? consultantProfile.skills.join(', ')
@@ -504,11 +540,11 @@ Years of experience: ${consultantProfile.experienceYears}
 Preferred locations: ${(consultantProfile.preferredLocations ?? []).join(', ') || '(any)'}
 ${
   hasResume
-    ? `\n== RESUME (primary source of truth — extract actual technologies, frameworks, domains, and years from this) ==\n${consultantProfile.resume_excerpt}\n`
+    ? `\n== RESUME (primary source of truth — extract actual technologies, frameworks, domains, and years from this) ==\n${clip(consultantProfile.resume_excerpt)}\n`
     : '\n(No resume on file — use the curated skills list above as the primary signal.)\n'
 }
 == JOBS ==
-${JSON.stringify(jobs)}
+${JSON.stringify(slimJobs)}
 
 == INSTRUCTIONS ==
 For EACH job above, output a match entry with:
@@ -534,5 +570,6 @@ Return matches sorted by match_score descending. Include every job in the list (
     messages: [{ role: 'user', content: prompt }],
     output_config: { format: zodOutputFormat(JobMatchListSchema) },
   });
+  logAiUsage('matchJobsForConsultant', ANTHROPIC_MODEL, response.usage);
   return response.parsed_output!.matches;
 }

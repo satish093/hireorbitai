@@ -37,6 +37,31 @@ export function CenterPane({
 }: Props) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [reextracting, setReextracting] = useState(false);
+  // Bumped after a re-extraction so the preview re-fetches the new body text.
+  const [previewKey, setPreviewKey] = useState(0);
+
+  async function reextract() {
+    if (!version) return;
+    setReextracting(true);
+    try {
+      const { data } = await api.post(`/resumes/${version.id}/reextract`);
+      if (data?.extracted) {
+        toast.success(
+          `Extracted ${Number(data.chars ?? 0).toLocaleString()} chars` +
+            (data.ai_score != null ? ` · ATS ${Math.round(data.ai_score)}` : ''),
+        );
+        setPreviewKey((k) => k + 1);
+        onEdited(); // reload versions so the score pill reflects the new value
+      } else {
+        toast('No extractable text in this file — original kept. Use Download.', { icon: '📄' });
+      }
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error ?? 'Re-extract failed');
+    } finally {
+      setReextracting(false);
+    }
+  }
 
   if (!version) {
     return (
@@ -90,6 +115,20 @@ export function CenterPane({
         <div className="min-w-0 flex items-baseline gap-2">
           <span className="text-xs font-mono font-medium text-ink">v{version.version}</span>
           <span className="text-xs font-mono text-muted truncate">{version.file_name}</span>
+          {version.ai_score != null && (
+            <span
+              title="AI resume score (0–100)"
+              className={`text-[11px] font-semibold px-1.5 py-0.5 rounded self-center ${
+                version.ai_score >= 80
+                  ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300'
+                  : version.ai_score >= 60
+                    ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300'
+                    : 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300'
+              }`}
+            >
+              ATS {Math.round(version.ai_score)}
+            </span>
+          )}
         </div>
         <ButtonGroup>
           <ButtonGroupItem pressed={mode === 'preview'} onClick={() => onMode('preview')}>
@@ -102,18 +141,31 @@ export function CenterPane({
             Edit
           </ButtonGroupItem>
         </ButtonGroup>
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={disabled}
-          onClick={() => setConfirmOpen(true)}
-        >
-          {version.is_current && !applyingDraft ? 'Current' : 'Make current'}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="ghost" onClick={reextract} loading={reextracting}>
+            ↻ Re-extract
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={disabled}
+            onClick={() => setConfirmOpen(true)}
+          >
+            {version.is_current && !applyingDraft ? 'Current' : 'Make current'}
+          </Button>
+        </div>
       </div>
 
       <div className="flex-1 p-4 min-h-0">
-        {mode === 'preview' && <ResumePreview resumeId={version.id} fileName={version.file_name} />}
+        {mode === 'preview' && (
+          <ResumePreview
+            resumeId={version.id}
+            fileName={version.file_name}
+            refreshKey={previewKey}
+            onReextract={reextract}
+            reextracting={reextracting}
+          />
+        )}
         {mode === 'diff' && (
           <ResumeDiff
             resumeId={resumeId}

@@ -9,6 +9,9 @@ resumesRouter.get('/consultant/:consultantId', c.listForConsultant);
 // before the controller sees them; the surfaced error becomes a 400.
 resumesRouter.post('/upload', uploadResume.single('file'), c.upload);
 resumesRouter.get('/:id/download-url', c.downloadUrl);
+// Re-extract readable text from an already-uploaded file (for versions
+// uploaded before server-side extraction existed).
+resumesRouter.post('/:id/reextract', c.reextract);
 resumesRouter.post('/:id/score', c.score);
 resumesRouter.post('/:id/set-current', c.setCurrent);
 resumesRouter.get('/:id/body', c.body);

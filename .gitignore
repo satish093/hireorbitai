@@ -7,6 +7,9 @@ dist/
 .env
 .env.*
 !.env.example
+# Per-environment templates (placeholders only, never real secrets):
+#   backend/.env.development.example, backend/.env.production.example, etc.
+!.env.*.example
 
 .env.local
 .DS_Store
@@ -37,3 +40,13 @@ backups/
 
 # Coverage
 coverage/
+
+# Playwright (UI smoke suite) — generated artifacts, never committed
+frontend/playwright-report/
+frontend/test-results/
+frontend/blob-report/
+frontend/.playwright/
+test-results/
+
+# OWASP ZAP baseline scan output (scripts/zap-baseline.ps1)
+zap-report/

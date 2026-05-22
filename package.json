@@ -20,8 +20,12 @@
     "lint:fix": "npm --prefix backend run lint:fix && npm --prefix frontend run lint:fix",
     "typecheck": "npm run shared:build && npm --prefix backend run typecheck && npm --prefix frontend run typecheck",
     "build": "npm run shared:build && npm --prefix backend run build && npm --prefix frontend run build",
+    "test": "npm --prefix backend test",
+    "verify": "npm run format:check && npm run typecheck && npm run lint && npm --prefix backend test",
+    "verify:full": "npm run verify && npm run build && npm --prefix frontend run test:e2e",
     "release": "bash scripts/release.sh",
-    "db:build-init": "node scripts/build-init-sql.mjs"
+    "db:build-init": "node scripts/build-init-sql.mjs",
+    "db:reset:dev": "node scripts/reset-dev.mjs"
   },
   "devDependencies": {
     "husky": "^9.1.7",

@@ -1,6 +1,20 @@
+import { promises as fs } from 'node:fs';
 import { db } from '../config/db';
-import { STORAGE_BUCKET } from '../config/storage.local';
+import { STORAGE_BUCKET, resolveOnDisk } from '../config/storage.local';
 import { httpError } from '../types';
+
+/** Read a stored resume file back into a Buffer (for re-extraction of older
+ *  uploads). Throws 404 if the file is missing on disk. */
+export async function readResumeFile(path: string): Promise<Buffer> {
+  try {
+    return await fs.readFile(resolveOnDisk(STORAGE_BUCKET, path));
+  } catch (err) {
+    throw httpError(
+      404,
+      `Stored file not found: ${err instanceof Error ? err.message : 'read failed'}`,
+    );
+  }
+}
 
 export async function uploadResumeFile(
   consultantId: string,

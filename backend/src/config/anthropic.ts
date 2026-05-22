@@ -6,6 +6,12 @@ export const ANTHROPIC_MODEL = env.anthropic.model;
 /** Heavier model used for long-form training content (lesson bodies, capstone). */
 export const TRAINING_CONTENT_MODEL = env.anthropic.contentModel;
 
+/** Token-cost controls. Free-text inputs are clipped to these budgets before
+ *  being sent to the model — input tokens dominate cost on the hot paths.
+ *  Tunable via AI_MAX_INPUT_CHARS / AI_MAX_JOB_DESC_CHARS. */
+export const AI_MAX_INPUT_CHARS = env.anthropic.maxInputChars;
+export const AI_MAX_JOB_DESC_CHARS = env.anthropic.maxJobDescChars;
+
 /** Generation transport: 'subscription' (claude CLI), 'api' (key), or 'stub'. */
 export const AI_PROVIDER = env.anthropic.provider;
 export const CLAUDE_CLI_PATH = env.anthropic.cliPath;

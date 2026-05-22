@@ -1,6 +1,8 @@
 import { useMemo, useRef, useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import clsx from 'clsx';
 import { IconCalendar, IconReminder } from './Icons';
+import { useAnchoredPosition } from './ui/useAnchoredPosition';
 
 /**
  * Clean date + time picker. Replaces the browser-native `datetime-local`
@@ -77,16 +79,31 @@ export function DateTimePicker({ label, value, onChange, required, hint, hidePre
   const { date, time } = useMemo(() => splitISO(value), [value]);
   const [timeOpen, setTimeOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
+  // Time dropdown is portaled to <body> so it isn't clipped when this picker
+  // sits inside a modal/scroll container.
+  const { triggerRef, panelRef, style } = useAnchoredPosition(timeOpen, { align: 'right' });
 
-  // Close the time popover on outside click.
+  // Close the time popover on outside click or Escape. The dropdown is
+  // portaled, so it lives outside wrapRef — spare both the picker and the
+  // portaled panel. Listeners exist only while open (mirrors Popover).
   useEffect(() => {
+    if (!timeOpen) return;
     function onDocClick(e: MouseEvent) {
-      if (!wrapRef.current) return;
-      if (!wrapRef.current.contains(e.target as Node)) setTimeOpen(false);
+      const target = e.target as Node;
+      if (wrapRef.current?.contains(target)) return;
+      if (panelRef.current?.contains(target)) return;
+      setTimeOpen(false);
+    }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') setTimeOpen(false);
     }
     document.addEventListener('mousedown', onDocClick);
-    return () => document.removeEventListener('mousedown', onDocClick);
-  }, []);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', onDocClick);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [timeOpen, panelRef]);
 
   // Group the time slots by hour, with a "highlight" for the active value.
   return (
@@ -115,7 +132,7 @@ export function DateTimePicker({ label, value, onChange, required, hint, hidePre
         </div>
 
         {/* Time field (button → custom popover so the UI is identical across browsers) */}
-        <div className="relative">
+        <div className="relative" ref={triggerRef}>
           <button
             type="button"
             onClick={() => setTimeOpen((v) => !v)}
@@ -127,26 +144,32 @@ export function DateTimePicker({ label, value, onChange, required, hint, hidePre
             />
             <span className="tabular-nums">{pretty12hr(time)}</span>
           </button>
-          {timeOpen && (
-            <div className="absolute right-0 mt-1 z-30 bg-surface border border-border rounded-xl shadow-lg w-44 max-h-72 overflow-y-auto py-1.5">
-              {QUARTER_HOURS.map((t) => (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => {
-                    onChange(combine(date, t));
-                    setTimeOpen(false);
-                  }}
-                  className={clsx(
-                    'w-full px-3 py-1.5 text-sm text-left hover:bg-brand-50 hover:text-brand-700 tabular-nums',
-                    t === time && 'bg-brand-50 text-brand-700 font-semibold',
-                  )}
-                >
-                  {pretty12hr(t)}
-                </button>
-              ))}
-            </div>
-          )}
+          {timeOpen &&
+            createPortal(
+              <div
+                ref={panelRef}
+                style={style}
+                className="z-50 bg-surface border border-border rounded-xl shadow-lg w-44 max-h-72 overflow-y-auto py-1.5"
+              >
+                {QUARTER_HOURS.map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => {
+                      onChange(combine(date, t));
+                      setTimeOpen(false);
+                    }}
+                    className={clsx(
+                      'w-full px-3 py-1.5 text-sm text-left hover:bg-brand-50 hover:text-brand-700 tabular-nums',
+                      t === time && 'bg-brand-50 text-brand-700 font-semibold',
+                    )}
+                  >
+                    {pretty12hr(t)}
+                  </button>
+                ))}
+              </div>,
+              document.body,
+            )}
         </div>
       </div>
 
