@@ -4,6 +4,7 @@ import { PageHeader } from '../components/PageHeader';
 import { Button } from '../components/Button';
 import { SelectInput } from '../components/SelectInput';
 import { FileUpload } from '../components/FileUpload';
+import { EmptyState } from '../components/EmptyState';
 import { ResumeVersionStrip } from '../components/resumes/ResumeVersionStrip';
 import { TailorHistory } from '../components/resumes/TailorHistory';
 import { CenterPane } from '../components/resumes/CenterPane';
@@ -67,49 +68,59 @@ export function Resumes() {
         </div>
       )}
 
-      <ResumeVersionStrip
-        versions={versions}
-        activeId={w.activeId}
-        onSelect={w.selectVersion}
-        onNew={() => setLauncherOpen(true)}
-      />
+      {!consultantId ? (
+        <EmptyState
+          icon="🧑‍💼"
+          title="Pick a consultant"
+          description="Select a consultant above to open their resume versions and the tailoring workspace."
+        />
+      ) : (
+        <>
+          <ResumeVersionStrip
+            versions={versions}
+            activeId={w.activeId}
+            onSelect={w.selectVersion}
+            onNew={() => setLauncherOpen(true)}
+          />
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)_320px]">
-        <TailorHistory
-          resumeId={w.activeId}
-          refreshKey={w.historyKey}
-          activeSessionId={w.sessionId}
-          onOpenSession={w.openSession}
-          onNewSession={() => setLauncherOpen(true)}
-        />
-        <CenterPane
-          version={active}
-          versions={versions}
-          consultantId={consultantId}
-          mode={w.mode}
-          onMode={w.setMode}
-          sessionId={w.sessionId}
-          resumeId={w.activeId}
-          onMakeCurrent={() => w.reloadVersions(w.activeId)}
-          onApplied={w.onApplied}
-          onEdited={() => w.reloadVersions(w.activeId)}
-        />
-        <AtsBreakdownRail
-          resumeId={w.activeId}
-          versions={versions}
-          againstJobId={active?.tailored_for_job_id}
-        />
-      </div>
+          <div className="mt-4 grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)_320px]">
+            <TailorHistory
+              resumeId={w.activeId}
+              refreshKey={w.historyKey}
+              activeSessionId={w.sessionId}
+              onOpenSession={w.openSession}
+              onNewSession={() => setLauncherOpen(true)}
+            />
+            <CenterPane
+              version={active}
+              versions={versions}
+              consultantId={consultantId}
+              mode={w.mode}
+              onMode={w.setMode}
+              sessionId={w.sessionId}
+              resumeId={w.activeId}
+              onMakeCurrent={() => w.reloadVersions(w.activeId)}
+              onApplied={w.onApplied}
+              onEdited={() => w.reloadVersions(w.activeId)}
+            />
+            <AtsBreakdownRail
+              resumeId={w.activeId}
+              versions={versions}
+              againstJobId={active?.tailored_for_job_id}
+            />
+          </div>
 
-      <TailorLauncher
-        open={launcherOpen}
-        resumeId={w.activeId}
-        onClose={() => setLauncherOpen(false)}
-        onCreated={(s) => {
-          setLauncherOpen(false);
-          w.onSessionCreated(s);
-        }}
-      />
+          <TailorLauncher
+            open={launcherOpen}
+            resumeId={w.activeId}
+            onClose={() => setLauncherOpen(false)}
+            onCreated={(s) => {
+              setLauncherOpen(false);
+              w.onSessionCreated(s);
+            }}
+          />
+        </>
+      )}
     </Layout>
   );
 }
