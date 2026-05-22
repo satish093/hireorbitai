@@ -33,13 +33,15 @@ SSH in as the **site user** (not root):
 ```bash
 ssh hireorbitai@<VPS_IP>
 cd ~
-git clone https://github.com/<you>/hireorbitai.git hireorbitai   # or your remote
+git clone git@github.com:satish093/hireorbitai.git hireorbitai
 cd ~/hireorbitai
 npm ci
 npm run shared:build
 ```
 
 The deploy script and PM2 both assume the repo lives at `~/hireorbitai`.
+Because the repository is private, the VPS needs a read-only GitHub deploy key
+before this clone works; see [auto-deploy.md](auto-deploy.md#3-give-the-vps-its-own-github-deploy-key).
 
 ## 3. Backend env file
 

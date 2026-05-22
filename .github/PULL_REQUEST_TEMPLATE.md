@@ -8,8 +8,7 @@
 
 <!-- Tick one. -->
 
-- [ ] `dev2` — feature branch landing
-- [ ] `dev` — release-candidate from dev2
+- [ ] `dev` — feature branch landing / development
 - [ ] `main` — production release from dev
 
 ## Test plan

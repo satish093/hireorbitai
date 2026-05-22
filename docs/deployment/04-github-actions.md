@@ -2,14 +2,14 @@
 
 Three workflows are relevant:
 
-| Workflow                | Trigger                                           | Job                                                 |
-| ----------------------- | ------------------------------------------------- | --------------------------------------------------- |
-| `ci.yml`                | PRs to `main`/`dev`/`dev2`; push to `main`/`dev2` | typecheck + build + e2e + audit                     |
-| `dev.yml`               | push to `dev`                                     | verify:full → migrate Neon → trigger Render deploys |
-| `deploy-production.yml` | push to `main`                                    | SSH → `scripts/update.sh` → health                  |
+| Workflow                | Trigger                             | Job                                                 |
+| ----------------------- | ----------------------------------- | --------------------------------------------------- |
+| `ci.yml`                | PRs to `main`/`dev`; push to `main` | typecheck + build + e2e + audit                     |
+| `dev.yml`               | push to `dev`                       | verify:full → migrate Neon → trigger Render deploys |
+| `deploy-production.yml` | push to `main`                      | SSH → `scripts/update.sh` → health                  |
 
-> `dev.yml` owns pushes to `dev`, so `dev` was removed from `ci.yml`'s push list
-> (no double-run). PRs into `dev` still get full CI.
+> `dev.yml` owns pushes to `dev`, so `dev` is intentionally absent from
+> `ci.yml`'s push list (no double-run). PRs into `dev` still get full CI.
 
 Set everything at **Settings → Secrets and variables → Actions**.
 

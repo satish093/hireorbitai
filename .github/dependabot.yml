@@ -9,7 +9,7 @@ updates:
       day: monday
       time: '06:00'
     open-pull-requests-limit: 5
-    target-branch: dev2
+    target-branch: dev
     commit-message:
       prefix: 'deps(backend)'
     groups:
@@ -24,7 +24,7 @@ updates:
       day: monday
       time: '06:00'
     open-pull-requests-limit: 5
-    target-branch: dev2
+    target-branch: dev
     commit-message:
       prefix: 'deps(frontend)'
     groups:
@@ -38,6 +38,6 @@ updates:
       interval: weekly
       day: monday
     open-pull-requests-limit: 3
-    target-branch: dev2
+    target-branch: dev
     commit-message:
       prefix: 'ci'

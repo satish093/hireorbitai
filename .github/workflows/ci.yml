@@ -5,9 +5,9 @@ name: CI
 # twice. PRs targeting dev still run full CI here.
 on:
   push:
-    branches: [main, dev2]
+    branches: [main]
   pull_request:
-    branches: [main, dev, dev2]
+    branches: [main, dev]
 
 # Cancel superseded runs on the same branch / PR — saves Actions minutes
 # when someone pushes twice in a row.

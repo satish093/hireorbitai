@@ -116,7 +116,7 @@ You should see a "Deploy to production" run, taking ~60s, with a green ✓.
 | Where you change something        | What happens                                                                                                              |
 | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | Local code → push to `main`       | GitHub Action deploys to the VPS.                                                                                         |
-| Local code → push to `dev`        | Staging deploy (if you configured `STAGING_*` secrets).                                                                   |
+| Local code → push to `dev`        | Dev pipeline runs tests, migrates Neon, then triggers Render deploy hooks.                                                |
 | `.env` file on the VPS            | Run `pm2 restart hireorbit-api --update-env` manually. Env vars never leave the VPS — by design, they're not in the repo. |
 | A `database/*.sql` file           | Push to `main` triggers the deploy, but **schema changes don't auto-apply**. See "Database changes" below.                |
 | Manually editing files on the VPS | They survive only until the next `git pull`. Always commit + push locally instead.                                        |
@@ -220,4 +220,4 @@ The full incident playbook is in [production.md](production.md).
 
 - [cloudpanel.md](cloudpanel.md) — first-time VPS setup
 - [production.md](production.md) — day-2 ops (backups, restore, incident playbooks)
-- [../branching.md](../branching.md) — when to push to `main` vs `dev` vs `dev2`
+- [../branching.md](../branching.md) — when to push to `main` vs `dev`

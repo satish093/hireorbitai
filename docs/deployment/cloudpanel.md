@@ -163,9 +163,12 @@ SSH in as the application user:
 
 ```bash
 ssh hireorbitai@<your-vps-ip>
-git clone https://github.com/<you>/hireorbitai ~/hireorbitai
+git clone git@github.com:satish093/hireorbitai.git ~/hireorbitai
 cd ~/hireorbitai
 ```
+
+Because the repository is private, configure a read-only GitHub deploy key for
+the VPS first; see [auto-deploy.md](auto-deploy.md#3-give-the-vps-its-own-github-deploy-key).
 
 ### 4.1 Apply the database schema
 

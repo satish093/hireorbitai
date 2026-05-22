@@ -78,7 +78,7 @@ The Windows script does all of this for you; on Unix the steps are short enough 
 ### 1. Clone and select Node 22
 
 ```bash
-git clone https://github.com/<you>/hireorbitai.git
+git clone git@github.com:satish093/hireorbitai.git
 cd hireorbitai
 nvm use     # picks Node 22 from .nvmrc
 ```
