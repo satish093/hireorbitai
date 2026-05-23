@@ -37,8 +37,9 @@ function aiError(status: number, message: string): Error {
 function cacheableBlock(text: string, minChars = 4_096): TextBlockParam {
   const block: TextBlockParam = { type: 'text', text };
   if (text.length >= minChars) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (block as any).cache_control = { type: 'ephemeral' };
+    (block as { type: 'text'; text: string; cache_control?: object }).cache_control = {
+      type: 'ephemeral',
+    };
   }
   return block;
 }
@@ -67,8 +68,7 @@ async function generateStructured<S extends z.ZodTypeAny>(
     const response = await anthropic.messages.create({
       model: opts.model,
       max_tokens: opts.maxTokens,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      system: [cacheableBlock(systemPrompt, 0)] as any,
+      system: [cacheableBlock(systemPrompt, 0)],
       messages: [{ role: 'user', content: userBlocks }],
     });
     const block = response.content[0];
@@ -287,7 +287,7 @@ export async function generateQuiz(input: {
 //    free skill-gap computation. No API cost, no latency, no failure mode.
 // ---------------------------------------------------------------------------
 
-const SkillGapSchema = z.object({
+export const SkillGapSchema = z.object({
   matched_skills: z.array(z.string()),
   missing_skills: z.array(z.string()),
   partial_skills: z.array(z.object({ skill: z.string(), evidence: z.string() })),

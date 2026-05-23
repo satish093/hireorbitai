@@ -56,8 +56,9 @@ function usageFrom(response: { usage: { input_tokens: number; output_tokens: num
 function cacheableBlock(text: string, minChars = 4_096): TextBlockParam {
   const block: TextBlockParam = { type: 'text', text };
   if (text.length >= minChars) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (block as any).cache_control = { type: 'ephemeral' };
+    (block as { type: 'text'; text: string; cache_control?: object }).cache_control = {
+      type: 'ephemeral',
+    };
   }
   return block;
 }
@@ -89,8 +90,7 @@ async function callStructured<T extends z.ZodType>(
   const response = await anthropic.messages.create({
     model,
     max_tokens: maxTokens,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    system: [cacheableBlock(systemInstruction, 0)] as any,
+    system: [cacheableBlock(systemInstruction, 0)],
     messages,
   });
 
@@ -118,8 +118,7 @@ async function callText(
   const response = await anthropic.messages.create({
     model,
     max_tokens: maxTokens,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    system: [cacheableBlock(systemInstruction, 0)] as any,
+    system: [cacheableBlock(systemInstruction, 0)],
     messages: [{ role: 'user', content: userContent }],
   });
   const text = response.content[0]?.type === 'text' ? response.content[0].text.trim() : '';
@@ -273,7 +272,7 @@ export async function parseResumeProfile(resumeText: string): Promise<ResumeProf
 // ATS keyword score vs a job description
 // ---------------------------------------------------------------------------
 
-const AtsScoreSchema = z.object({
+export const AtsScoreSchema = z.object({
   score: z.number(),
   matched_keywords: z.array(z.string()),
   missing_keywords: z.array(z.string()),
