@@ -28,7 +28,9 @@ async function anthropicParse<T extends z.ZodType>(
     system: 'Output valid JSON only. No markdown fences, no explanation.',
     messages: [{ role: 'user', content: prompt }],
   });
-  const text = response.content[0].type === 'text' ? response.content[0].text.trim() : '{}';
+  const raw = response.content[0].type === 'text' ? response.content[0].text.trim() : '{}';
+  // Strip markdown code fences that Claude occasionally adds despite the system prompt.
+  const text = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '');
   logAiUsage(call, ANTHROPIC_MODEL, usage(response));
   return schema.parse(JSON.parse(text)) as z.infer<T>;
 }

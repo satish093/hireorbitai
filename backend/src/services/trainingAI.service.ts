@@ -34,7 +34,8 @@ async function generateStructured<S extends z.ZodTypeAny>(
     system: 'Output valid JSON only. No markdown fences, no explanation.',
     messages: [{ role: 'user', content: prompt }],
   });
-  const text = response.content[0].type === 'text' ? response.content[0].text.trim() : '{}';
+  const raw = response.content[0].type === 'text' ? response.content[0].text.trim() : '{}';
+  const text = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '');
   return schema.parse(JSON.parse(text)) as z.infer<S>;
 }
 
