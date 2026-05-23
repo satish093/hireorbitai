@@ -9,6 +9,7 @@ import {
 } from '../services/storage.service';
 import {
   scoreResume,
+  parseResumeProfile,
   tailorResumeForJob,
   tailorResumeForJobStructured,
   scoreResumeAgainstJob,
@@ -92,6 +93,26 @@ export const deleteVersion: RequestHandler = async (req, _res, _next) => {
   _res.status(204).end();
 };
 
+/** (Re-)parse a structured profile from an already-uploaded resume's body text. */
+export const parseProfile: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const { id } = req.params;
+  const { data: resume } = await db
+    .from('resumes')
+    .select('id, consultant_id, body_text, ai_feedback')
+    .eq('id', id)
+    .maybeSingle();
+  if (!resume) throw httpError(404, 'Resume not found');
+  await authorizeConsultantAccess(resume.consultant_id, req.user);
+
+  const text: string = (resume as any).body_text ?? (resume as any).ai_feedback?.resume_text ?? '';
+  if (!text) throw httpError(400, 'No extractable text — re-extract the resume first');
+
+  const profile = await parseResumeProfile(text);
+  await db.from('resumes').update({ parsed_profile: profile }).eq('id', id);
+  res.json(profile);
+};
+
 /** List resume versions for a consultant. */
 export const listForConsultant: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
@@ -147,6 +168,7 @@ export const upload: RequestHandler = async (req, res) => {
 
   let aiScore: number | null = null;
   let aiFeedback: any = null;
+  let parsedProfile: any = null;
   // Convert the raw upload into readable text. Client-pasted `text` wins (the
   // wizard sometimes provides it); otherwise extract server-side from the
   // PDF/DOCX so body_text is populated and every downstream AI feature can use
@@ -160,14 +182,21 @@ export const upload: RequestHandler = async (req, res) => {
     });
   }
   if (rawText) {
-    try {
-      const result = await scoreResume(rawText);
-      aiScore = result.score;
-      aiFeedback = result;
-    } catch (e) {
-      // Non-fatal — resume is still saved; client can retry scoring.
-
-      console.warn('Resume AI scoring failed:', e);
+    // Run ATS scoring and profile extraction in parallel — both are non-fatal.
+    const [scoreResult, profileResult] = await Promise.allSettled([
+      scoreResume(rawText),
+      parseResumeProfile(rawText),
+    ]);
+    if (scoreResult.status === 'fulfilled') {
+      aiScore = scoreResult.value.score;
+      aiFeedback = scoreResult.value;
+    } else {
+      console.warn('Resume AI scoring failed:', scoreResult.reason);
+    }
+    if (profileResult.status === 'fulfilled') {
+      parsedProfile = profileResult.value;
+    } else {
+      console.warn('Resume profile parse failed:', profileResult.reason);
     }
     // Keep the raw text on ai_feedback so /jobs/:id/skill-match-for-me can
     // score against this resume later without the client having to re-paste.
@@ -193,9 +222,14 @@ export const upload: RequestHandler = async (req, res) => {
   // column, so strip-and-retry if a DB hasn't applied that migration yet
   // (the text still lives on ai_feedback.resume_text for AI consumers).
   if (rawText) insertBody.body_text = rawText;
+  if (parsedProfile) insertBody.parsed_profile = parsedProfile;
   let { data, error } = await db.from('resumes').insert(insertBody).select().single();
   if (error && /body_text/.test(error.message) && /schema cache|column/i.test(error.message)) {
     delete insertBody.body_text;
+    ({ data, error } = await db.from('resumes').insert(insertBody).select().single());
+  }
+  if (error && /parsed_profile/.test(error.message) && /schema cache|column/i.test(error.message)) {
+    delete insertBody.parsed_profile;
     ({ data, error } = await db.from('resumes').insert(insertBody).select().single());
   }
   if (error) throw httpError(500, error.message);

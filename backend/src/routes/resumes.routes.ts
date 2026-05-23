@@ -27,3 +27,4 @@ resumesRouter.patch('/:id/tailor-sessions/:sessionId/edits/:editId', c.patchTail
 resumesRouter.get('/:id/ats-factors', c.atsFactors);
 resumesRouter.get('/:id/diff', c.diff);
 resumesRouter.delete('/:id', c.deleteVersion);
+resumesRouter.post('/:id/parse-profile', c.parseProfile);

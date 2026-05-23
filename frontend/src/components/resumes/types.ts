@@ -2,9 +2,41 @@
 // (the backend has no separate resume_versions table), so ResumeVersion mirrors
 // a row of public.resumes.
 
-export type CenterMode = 'preview' | 'diff' | 'edit';
+export type CenterMode = 'preview' | 'diff' | 'edit' | 'profile';
 
 export type EditStatus = 'proposed' | 'accepted' | 'rejected' | 'edited';
+
+export interface ResumeExperience {
+  company: string;
+  title: string;
+  start_date: string | null;
+  end_date: string | null;
+  is_current?: boolean;
+  description: string | null;
+}
+
+export interface ResumeEducation {
+  institution: string;
+  degree: string | null;
+  field: string | null;
+  graduation_year: number | null;
+}
+
+export interface ResumeProfile {
+  name: string | null;
+  email: string | null;
+  phone: string | null;
+  location: string | null;
+  linkedin_url: string | null;
+  website: string | null;
+  summary: string | null;
+  total_years_experience: number | null;
+  skills: string[];
+  experiences: ResumeExperience[];
+  education: ResumeEducation[];
+  certifications: string[];
+  languages: string[];
+}
 
 export interface ResumeVersion {
   id: string;
@@ -21,6 +53,7 @@ export interface ResumeVersion {
     after_score?: number;
     changes_summary?: string[];
   } | null;
+  parsed_profile?: ResumeProfile | null;
 }
 
 export interface JobLite {

@@ -8,6 +8,7 @@ import { api } from '../../services/api';
 import { ResumePreview } from './ResumePreview';
 import { ResumeDiff } from './ResumeDiff';
 import { ResumeEditor } from './ResumeEditor';
+import { ResumeProfileCard } from './ResumeProfileCard';
 import type { CenterMode, ResumeVersion } from './types';
 
 interface Props {
@@ -140,6 +141,9 @@ export function CenterPane({
           <ButtonGroupItem pressed={mode === 'edit'} onClick={() => onMode('edit')}>
             Edit
           </ButtonGroupItem>
+          <ButtonGroupItem pressed={mode === 'profile'} onClick={() => onMode('profile')}>
+            Profile
+          </ButtonGroupItem>
         </ButtonGroup>
         <div className="flex items-center gap-2">
           <Button size="sm" variant="ghost" onClick={reextract} loading={reextracting}>
@@ -177,6 +181,13 @@ export function CenterPane({
         )}
         {mode === 'edit' && (
           <ResumeEditor resumeId={version.id} consultantId={consultantId} onSaved={onApplied} />
+        )}
+        {mode === 'profile' && (
+          <ResumeProfileCard
+            profile={version.parsed_profile}
+            resumeId={version.id}
+            onParsed={onEdited}
+          />
         )}
       </div>
 

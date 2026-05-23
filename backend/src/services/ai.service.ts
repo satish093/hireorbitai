@@ -80,6 +80,63 @@ export async function scoreResume(resumeText: string): Promise<ResumeScoreResult
   return response.parsed_output!;
 }
 
+const ExperienceItemSchema = z.object({
+  company: z.string(),
+  title: z.string(),
+  start_date: z.string().nullable(),
+  end_date: z.string().nullable(),
+  is_current: z.boolean().optional(),
+  description: z.string().nullable(),
+});
+
+const EducationItemSchema = z.object({
+  institution: z.string(),
+  degree: z.string().nullable(),
+  field: z.string().nullable(),
+  graduation_year: z.number().nullable(),
+});
+
+const ResumeProfileSchema = z.object({
+  name: z.string().nullable(),
+  email: z.string().nullable(),
+  phone: z.string().nullable(),
+  location: z.string().nullable(),
+  linkedin_url: z.string().nullable(),
+  website: z.string().nullable(),
+  summary: z.string().nullable(),
+  total_years_experience: z.number().nullable(),
+  skills: z.array(z.string()),
+  experiences: z.array(ExperienceItemSchema),
+  education: z.array(EducationItemSchema),
+  certifications: z.array(z.string()),
+  languages: z.array(z.string()),
+});
+
+export type ResumeProfile = z.infer<typeof ResumeProfileSchema>;
+
+export async function parseResumeProfile(resumeText: string): Promise<ResumeProfile> {
+  const prompt = `Extract structured profile information from this resume. Extract ONLY what is explicitly stated — never invent data.
+
+Resume:
+${clip(resumeText)}
+
+Rules:
+- Set null for any field not clearly present in the text
+- experiences: list all jobs ordered most-recent first
+- skills: include both technical and soft skills as stated
+- certifications: standalone certs/licenses only (not degrees)
+- languages: spoken languages only (not programming languages)`;
+
+  const response = await anthropic.messages.parse({
+    model: ANTHROPIC_MODEL,
+    max_tokens: 4096,
+    messages: [{ role: 'user', content: prompt }],
+    output_config: { format: zodOutputFormat(ResumeProfileSchema) },
+  });
+  logAiUsage('parseResumeProfile', ANTHROPIC_MODEL, response.usage);
+  return response.parsed_output!;
+}
+
 export async function atsScore(
   resumeText: string,
   jobDescription: string,
