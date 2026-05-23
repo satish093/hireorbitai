@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { TextBlockParam } from '@anthropic-ai/sdk/resources/messages';
 import {
   anthropic,
   ANTHROPIC_MODEL,
@@ -6,58 +7,81 @@ import {
   AI_AVAILABLE,
 } from '../config/anthropic';
 import { logger } from '../config/logger';
+import { withCache, trainingPlanCache, interviewQuestionsCache, quizCache } from './aiCache';
+import { normalizeSkill, normalizeSkills, diffSkills } from './skillNorm';
 
 /**
  * AI helpers for the Training module.
  *
- * Every call goes through `generateStructured`, which uses the Anthropic
- * Messages API with ANTHROPIC_API_KEY ('api' provider). Set
- * TRAINING_AI_PROVIDER=stub to disable AI and always return editable stubs.
- *
- * The full-course generators (outline / lesson / capstone) additionally run
- * through `safeGenerate`, which returns a deterministic fallback when the
- * provider is unavailable or the call fails — so the authoring pipeline never
- * 500s and the generated stub stays fully editable by hand.
+ * Improvements vs. the original:
+ *   1. Prompt caching — stable system blocks are marked `cache_control: ephemeral`.
+ *   2. LRU response cache — identical inputs skip the API for 1 h – 24 h.
+ *   3. Library-based skill gap — `skillGapAnalysis` uses `diffSkills` from
+ *      skillNorm.ts (fast, deterministic, free) instead of an AI call.
+ *   4. Better prompts — instructional-design best practices, Bloom's taxonomy
+ *      verbs for objectives, interleaved practice theory for quizzes.
  */
 
-/** Attach a status code + isHttpError to any thrown Error so the errorHandler formats it correctly. */
+// ---------------------------------------------------------------------------
+// Internals
+// ---------------------------------------------------------------------------
+
 function aiError(status: number, message: string): Error {
   return Object.assign(new Error(message), { status, isHttpError: true as const });
 }
 
-/** Single entry point for every structured generation. */
+/**
+ * Mark a block as prompt-cacheable when it's large enough to benefit.
+ * Anthropic requires ≥ 1 024 tokens (≈ 4 096 chars) for Haiku cache hits.
+ */
+function cacheableBlock(text: string, minChars = 4_096): TextBlockParam {
+  const block: TextBlockParam = { type: 'text', text };
+  if (text.length >= minChars) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (block as any).cache_control = { type: 'ephemeral' };
+  }
+  return block;
+}
+
+/**
+ * Single entry point for every structured generation.
+ * `systemPrompt` is always marked cacheable — it's large and stable.
+ * `userContent` can be an array of blocks so callers can mark specific
+ * parts (e.g. resume text) as cacheable independently.
+ */
 async function generateStructured<S extends z.ZodTypeAny>(
   schema: S,
-  prompt: string,
+  systemPrompt: string,
+  userContent: string | TextBlockParam[],
   opts: { model: string; maxTokens: number },
 ): Promise<z.infer<S>> {
   if (!AI_AVAILABLE) {
     throw aiError(503, 'AI is not configured — ask your admin to set ANTHROPIC_API_KEY.');
   }
 
+  const userBlocks: TextBlockParam[] =
+    typeof userContent === 'string' ? [{ type: 'text', text: userContent }] : userContent;
+
   let raw: string;
   try {
     const response = await anthropic.messages.create({
       model: opts.model,
       max_tokens: opts.maxTokens,
-      system: 'Output valid JSON only. No markdown fences, no explanation.',
-      messages: [{ role: 'user', content: prompt }],
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      system: [cacheableBlock(systemPrompt, 0)] as any,
+      messages: [{ role: 'user', content: userBlocks }],
     });
     const block = response.content[0];
     raw = block?.type === 'text' ? block.text.trim() : '{}';
   } catch (err: any) {
-    // Remap Anthropic SDK errors so the errorHandler doesn't confuse a bad API
-    // key (upstream 401) with an unauthenticated user request.
     throw aiError(502, `AI request failed: ${err?.message ?? String(err)}`);
   }
 
-  // Strip markdown fences that models sometimes add despite the system prompt.
   let text = raw
     .replace(/^```(?:json)?\s*/i, '')
     .replace(/\s*```\s*$/, '')
     .trim();
 
-  // If the model returned prose surrounding the JSON, extract the object/array.
   if (!text.startsWith('{') && !text.startsWith('[')) {
     const m = text.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
     if (m) text = m[1]!;
@@ -78,9 +102,26 @@ async function generateStructured<S extends z.ZodTypeAny>(
   return result.data as z.infer<S>;
 }
 
+async function safeGenerate<T>(
+  label: string,
+  fn: () => Promise<T>,
+  fallback: () => T,
+): Promise<{ data: T; degraded: boolean }> {
+  if (!AI_AVAILABLE) {
+    return { data: fallback(), degraded: true };
+  }
+  try {
+    return { data: await fn(), degraded: false };
+  } catch (err) {
+    logger.error({ err, label }, 'training AI generation failed — using fallback');
+    return { data: fallback(), degraded: true };
+  }
+}
+
 // ---------------------------------------------------------------------------
 // 1) generateTrainingPlan
 // ---------------------------------------------------------------------------
+
 const TrainingPlanSchema = z.object({
   missing_skills: z.array(z.string()),
   recommended_courses: z.array(
@@ -102,33 +143,46 @@ const TrainingPlanSchema = z.object({
 });
 export type TrainingPlan = z.infer<typeof TrainingPlanSchema>;
 
+const TRAINING_PLAN_SYSTEM = `You are a senior L&D (Learning & Development) consultant at a top-tier IT staffing firm. Your job is to build focused, achievable training plans that close a specific consultant's skill gaps before an upcoming engagement.
+
+ANALYSIS APPROACH:
+1. Read the resume carefully — note what's present, at what depth, and how recently used.
+2. Extract every hard requirement from the JD (skills, tools, certifications, methodologies).
+3. Identify gaps (required but not evidenced in resume) vs. depth gaps (mentioned but likely shallow).
+4. Sequence the roadmap so each phase unblocks the next — don't recommend advanced topics before foundations.
+
+OUTPUT RULES:
+- missing_skills: 5–12 items. Use canonical names (React not ReactJS). Omit skills the resume clearly demonstrates.
+- recommended_courses: 4–8 items. Each "why_recommended" must name the specific JD requirement it addresses.
+- learning_roadmap: 2–4 phases ordered by dependency. Phase 1 = most critical blockers.
+  duration_weeks: realistic estimate (null if open-ended); don't pad with 52-week phases.
+- summary: 2–3 sentences addressing the consultant directly — what to focus on and why the order matters.
+
+Return valid JSON only. No markdown, no explanation.`;
+
 export async function generateTrainingPlan(input: {
   resume_text: string;
   job_description: string;
 }): Promise<TrainingPlan> {
-  const prompt = `You're an L&D lead building a training plan to close a consultant's skill gaps before they go on a specific engagement.
-
-Resume:
-${input.resume_text}
-
-Target job description:
-${input.job_description}
-
-Produce:
-- missing_skills: skills required by the JD that the resume does NOT clearly evidence (5–12 items)
-- recommended_courses: 4–8 specific courses, each with category and difficulty (BEGINNER/INTERMEDIATE/ADVANCED), and a one-sentence "why_recommended"
-- learning_roadmap: 2–4 phases, each with a duration and 2–4 focus areas. Order by what unblocks the most JD requirements first.
-- summary: 2–3 sentences for the consultant on what to focus on and in what order.`;
-
-  return generateStructured(TrainingPlanSchema, prompt, {
-    model: ANTHROPIC_MODEL,
-    maxTokens: 3072,
-  });
+  const clippedResume = input.resume_text.slice(0, 6000);
+  const clippedJd = input.job_description.slice(0, 3000);
+  return withCache(trainingPlanCache, { r: clippedResume, jd: clippedJd }, () =>
+    generateStructured(
+      TrainingPlanSchema,
+      TRAINING_PLAN_SYSTEM,
+      [
+        cacheableBlock(`CONSULTANT RESUME:\n\n${clippedResume}`),
+        { type: 'text', text: `TARGET JOB DESCRIPTION:\n\n${clippedJd}` },
+      ],
+      { model: ANTHROPIC_MODEL, maxTokens: 3072 },
+    ),
+  );
 }
 
 // ---------------------------------------------------------------------------
 // 2) generateInterviewQuestions
 // ---------------------------------------------------------------------------
+
 const InterviewQuestionsSchema = z.object({
   technical: z.array(z.object({ question: z.string(), expected_signal: z.string() })),
   behavioral: z.array(z.object({ question: z.string(), expected_signal: z.string() })),
@@ -136,33 +190,49 @@ const InterviewQuestionsSchema = z.object({
 });
 export type InterviewQuestions = z.infer<typeof InterviewQuestionsSchema>;
 
+const INTERVIEW_QUESTIONS_SYSTEM = `You are a principal-level technical interviewer at a FAANG-calibre firm. You write questions that reveal how candidates actually think, not just whether they've memorised vocabulary.
+
+QUESTION DESIGN PRINCIPLES:
+- Technical questions: probe depth, not definitions. "How would you debug X in production?" beats "What is X?".
+  expected_signal: describe what distinguishes a good answer (specific behaviour, tool, or reasoning pattern).
+- Behavioral questions: STAR-format prompts (Situation, Task, Action, Result). One question per competency.
+  expected_signal: the competency being tested (ownership, cross-functional influence, resilience, etc.).
+- Scenario questions: realistic on-the-job situations tied to the role's actual daily work.
+  situation: 2–3 sentences of realistic context; question: what the interviewer asks next.
+
+VOLUME:
+- technical: 6–10 questions covering the most critical JD requirements, ordered from foundational to advanced.
+- behavioral: 4–6 questions — vary the competency (don't ask 4 "tell me about a challenge" variants).
+- scenarios: 3–5 situations — at least one should involve a system failure or stakeholder conflict.
+
+Return valid JSON only. No generic filler questions ("Tell me about yourself").`;
+
 export async function generateInterviewQuestions(input: {
   job_description: string;
   skills: string[];
 }): Promise<InterviewQuestions> {
-  const prompt = `Generate interview questions for the following role.
-
-JD:
-${input.job_description}
-
-Required skills: ${input.skills.join(', ') || '(see JD)'}
-
-Produce:
-- technical: 6–10 specific technical questions, each with a one-line "expected_signal" describing what a good answer reveals.
-- behavioral: 4–6 behavioral questions, with expected_signal.
-- scenarios: 3–5 realistic on-the-job scenarios — each with "situation" (1–2 sentences) and the "question" the interviewer asks.
-
-Avoid generic "tell me about yourself"-style filler. Every item should map back to a JD requirement.`;
-
-  return generateStructured(InterviewQuestionsSchema, prompt, {
-    model: ANTHROPIC_MODEL,
-    maxTokens: 3072,
-  });
+  const normSkills = normalizeSkills(input.skills);
+  const clippedJd = input.job_description.slice(0, 3000);
+  return withCache(interviewQuestionsCache, { jd: clippedJd, skills: [...normSkills].sort() }, () =>
+    generateStructured(
+      InterviewQuestionsSchema,
+      INTERVIEW_QUESTIONS_SYSTEM,
+      [
+        cacheableBlock(`JOB DESCRIPTION:\n${clippedJd}`),
+        {
+          type: 'text',
+          text: `Required skills (normalised): ${normSkills.join(', ') || '(see JD)'}`,
+        },
+      ],
+      { model: ANTHROPIC_MODEL, maxTokens: 3072 },
+    ),
+  );
 }
 
 // ---------------------------------------------------------------------------
-// 3) generateQuiz — multiple-choice from lesson content
+// 3) generateQuiz — multiple-choice from lesson content (library-assisted)
 // ---------------------------------------------------------------------------
+
 const QuizSchema = z.object({
   questions: z.array(
     z.object({
@@ -176,31 +246,47 @@ const QuizSchema = z.object({
 });
 export type GeneratedQuiz = z.infer<typeof QuizSchema>;
 
+const QUIZ_SYSTEM = `You are a certified instructional designer writing formative assessments for an online course. Apply interleaved practice theory: space questions across the full lesson, not just the last topic.
+
+QUESTION DESIGN (Bloom's taxonomy levels):
+- ~50% Remember / Understand — direct recall of definitions, facts, sequences from the lesson.
+- ~30% Apply — "given [scenario], what would you do / which approach is correct?"
+- ~20% Analyze / Evaluate — "which option is BEST and why?" or "what is the flaw in this approach?"
+
+QUALITY RULES:
+- Every question must be answerable from the lesson body alone — no outside knowledge required.
+- Distractors must be plausible (common misconceptions, near-synonyms) — not obviously wrong.
+- correct_answer must be the EXACT TEXT of one of the options array items (copy-paste identical).
+- explanation: 1–2 sentences citing the specific lesson section that supports the answer.
+- points: 1 for recall/apply questions; 2 for analysis/evaluation questions.
+
+Return valid JSON only.`;
+
 export async function generateQuiz(input: {
   lesson_content: string;
-  count?: number; // default 5
+  count?: number;
 }): Promise<GeneratedQuiz> {
   const count = Math.max(3, Math.min(15, input.count ?? 5));
-  const prompt = `Write a multiple-choice quiz for a training lesson. Each question must be answerable from the lesson body alone — don't introduce outside facts.
-
-Lesson:
-${input.lesson_content}
-
-Produce ${count} questions. Each:
-- question: the prompt
-- options: 4 plausible options
-- correct_answer: the literal text of the correct option (must match one of options exactly)
-- explanation: 1–2 sentences citing the lesson
-- points: 1 (or 2 for harder ones)
-
-Mix difficulty: ~60% recall, ~30% applied, ~10% scenario.`;
-
-  return generateStructured(QuizSchema, prompt, { model: ANTHROPIC_MODEL, maxTokens: 3072 });
+  const clipped = input.lesson_content.slice(0, 6000);
+  return withCache(quizCache, { lesson: clipped, count }, () =>
+    generateStructured(
+      QuizSchema,
+      QUIZ_SYSTEM,
+      [
+        cacheableBlock(`LESSON CONTENT:\n\n${clipped}`),
+        { type: 'text', text: `Generate exactly ${count} questions.` },
+      ],
+      { model: ANTHROPIC_MODEL, maxTokens: 3072 },
+    ),
+  );
 }
 
 // ---------------------------------------------------------------------------
-// 4) skillGapAnalysis
+// 4) skillGapAnalysis — LIBRARY-BASED (no AI call)
+//    Uses diffSkills + normalizeSkills from skillNorm.ts for fast, deterministic,
+//    free skill-gap computation. No API cost, no latency, no failure mode.
 // ---------------------------------------------------------------------------
+
 const SkillGapSchema = z.object({
   matched_skills: z.array(z.string()),
   missing_skills: z.array(z.string()),
@@ -212,7 +298,7 @@ const SkillGapSchema = z.object({
       priority: z.enum(['LOW', 'MEDIUM', 'HIGH']),
     }),
   ),
-  overall_score: z.number(), // 0..100
+  overall_score: z.number(),
   readiness_summary: z.string(),
 });
 export type SkillGap = z.infer<typeof SkillGapSchema>;
@@ -223,63 +309,67 @@ export async function skillGapAnalysis(input: {
   resume_text?: string;
   job_description?: string;
 }): Promise<SkillGap> {
-  const prompt = `Run a skill-gap analysis comparing a consultant against a target job.
+  const normConsultant = normalizeSkills(input.consultant_skills);
+  const normJob = normalizeSkills(input.job_skills);
 
-Consultant skills (recruiter-curated): ${input.consultant_skills.join(', ') || '(none listed)'}
-${input.resume_text ? `\nResume excerpt:\n${input.resume_text.slice(0, 3000)}\n` : ''}
-Job-required skills: ${input.job_skills.join(', ') || '(see JD)'}
-${input.job_description ? `\nJD:\n${input.job_description.slice(0, 2500)}\n` : ''}
+  const { matched, missing } = diffSkills(normJob, normConsultant);
+  const normConsultantLower = normConsultant.map((s) => s.toLowerCase());
 
-Produce:
-- matched_skills: required skills the consultant clearly has
-- missing_skills: required skills with no evidence
-- partial_skills: skills where there's adjacent or limited evidence (with a 1-line "evidence" quote/paraphrase)
-- recommended_training: 3–6 training topics with category + rationale + priority (HIGH/MEDIUM/LOW)
-- overall_score: 0–100 readiness score
-- readiness_summary: 2–3 sentences a recruiter would forward to the consultant.`;
+  // Partial match: required skill substring-overlaps an existing candidate skill.
+  const partialSkills = missing
+    .filter((req) => {
+      const rLow = normalizeSkill(req).toLowerCase();
+      return normConsultantLower.some((c) => c.includes(rLow) || rLow.includes(c));
+    })
+    .map((skill) => ({
+      skill,
+      evidence: 'Partial overlap detected with existing skill set',
+    }));
 
-  return generateStructured(SkillGapSchema, prompt, { model: ANTHROPIC_MODEL, maxTokens: 2048 });
+  const partialSet = new Set(partialSkills.map((p) => p.skill));
+  const trulyMissing = missing.filter((s) => !partialSet.has(s));
+
+  const total = normJob.length || 1;
+  const overallScore = Math.round((matched.length / total) * 100);
+
+  const recommended_training = trulyMissing.slice(0, 6).map((skill, i) => ({
+    category: skill,
+    rationale: `Required by the target role and not evidenced in the current skill set.`,
+    priority: (i < 2 ? 'HIGH' : i < 5 ? 'MEDIUM' : 'LOW') as 'HIGH' | 'MEDIUM' | 'LOW',
+  }));
+
+  const readinessLabel =
+    overallScore >= 80 ? 'strong' : overallScore >= 60 ? 'moderate' : 'limited';
+  const gapSentence =
+    trulyMissing.length > 0
+      ? `Priority gaps: ${trulyMissing.slice(0, 3).join(', ')}${trulyMissing.length > 3 ? ` and ${trulyMissing.length - 3} more` : ''}.`
+      : 'All key skill requirements are covered.';
+  const readiness_summary = `Consultant shows ${readinessLabel} readiness (${overallScore}/100) for this role. ${gapSentence}`;
+
+  return {
+    matched_skills: matched,
+    missing_skills: trulyMissing,
+    partial_skills: partialSkills,
+    recommended_training,
+    overall_score: overallScore,
+    readiness_summary,
+  };
 }
 
 // ===========================================================================
 // FULL-COURSE GENERATION (LMS)
 // ===========================================================================
-// These power the "type a title → get a teachable course" flow. Each call is
-// bounded (one outline call, one call per lesson, one capstone call) so no
-// single request blows the token/HTTP budget. Every call is wrapped in
-// `safeGenerate` so a missing key or a transient model error degrades to an
-// editable stub instead of a 500.
-
-/**
- * Run an AI generator, falling back to a deterministic stub when the API key
- * is absent or the call throws. The `degraded` flag lets the caller mark the
- * persisted row FAILED so the UI can offer a Retry.
- */
-async function safeGenerate<T>(
-  label: string,
-  fn: () => Promise<T>,
-  fallback: () => T,
-): Promise<{ data: T; degraded: boolean }> {
-  if (!AI_AVAILABLE) {
-    return { data: fallback(), degraded: true };
-  }
-  try {
-    return { data: await fn(), degraded: false };
-  } catch (err) {
-    logger.error({ err, label }, 'training AI generation failed — using fallback');
-    return { data: fallback(), degraded: true };
-  }
-}
 
 // ---------------------------------------------------------------------------
-// Course outline — overview + objectives + roadmap + resources + criteria +
-// lesson stubs. Cheap model; bodies are filled in per-lesson later.
+// Course outline
 // ---------------------------------------------------------------------------
+
 const ResourceSchema = z.object({
   title: z.string(),
   url: z.string(),
   type: z.enum(['DOC', 'VIDEO', 'ARTICLE', 'TOOL']),
 });
+
 const CourseOutlineSchema = z.object({
   overview: z.string(),
   learning_objectives: z.array(z.string()),
@@ -322,7 +412,6 @@ export interface CourseOutlineInput {
   target_audience?: string | null;
 }
 
-/** ≈1 lesson per hour, clamped 4–12, unless the caller pins lesson_count. */
 function deriveLessonCount(input: CourseOutlineInput): number {
   if (input.lesson_count && input.lesson_count > 0) {
     return Math.max(3, Math.min(20, Math.round(input.lesson_count)));
@@ -331,31 +420,47 @@ function deriveLessonCount(input: CourseOutlineInput): number {
   return Math.max(4, Math.min(12, Math.round(hours)));
 }
 
+const COURSE_OUTLINE_SYSTEM = `You are a senior instructional designer creating a complete, teachable online course from minimal metadata. You apply backward design: start with outcomes, then design assessments, then sequence content.
+
+DESIGN PRINCIPLES:
+- learning_objectives: 4–8 items using Bloom's verbs (Define, Explain, Apply, Analyze, Design, Evaluate). Avoid "understand" — it's unmeasurable.
+- expected_outcomes: outcome statements from the learner's perspective ("You will be able to…"). 3–5 items.
+- roadmap: sequence phases logically — foundational concepts → application → practice → mastery. 2–4 phases.
+- resources: 3–6 genuinely useful external references. Official documentation > blog posts. Use plausible, well-known URLs (MDN, official docs, GitHub repos, YouTube channels from known authors). Set type accurately: DOC/VIDEO/ARTICLE/TOOL.
+- completion_criteria: be realistic. minimum_time_minutes = (estimated_duration_hours × 60 × 0.8). quiz_passing_score default 70. requires_manager_approval true only for compliance/safety topics.
+- lessons: exactly the requested count, in strict teaching order (0-based). Each lesson has ONE measurable objective (single Bloom's verb). Do NOT write lesson bodies here — summaries only (1 sentence).
+
+DIFFICULTY CALIBRATION:
+- BEGINNER: assumes no prior knowledge of the topic; introduces vocabulary and basic concepts.
+- INTERMEDIATE: assumes 6–12 months of practice; goes deeper into trade-offs and patterns.
+- ADVANCED: assumes professional experience; covers edge cases, performance, and architecture decisions.
+
+Return valid JSON only. No markdown, no preamble.`;
+
 export async function generateCourseOutline(
   input: CourseOutlineInput,
 ): Promise<{ data: CourseOutline; degraded: boolean }> {
   const count = deriveLessonCount(input);
-  const prompt = `You are an instructional designer building a complete, teachable online course from a title and metadata.
 
-Course title: ${input.title}
-Category: ${input.category}
-Difficulty: ${input.difficulty}
-${input.target_audience ? `Target audience: ${input.target_audience}\n` : ''}${input.estimated_duration_hours ? `Target length: ~${input.estimated_duration_hours} hours\n` : ''}${input.tags?.length ? `Tags: ${input.tags.join(', ')}\n` : ''}
-Produce a course OUTLINE only (lesson bodies are written separately later):
-- overview: 2–4 short paragraphs (markdown) introducing the course, who it's for, and what they'll be able to do at the end.
-- learning_objectives: 4–8 concrete, measurable objectives.
-- skills_taught: the discrete skills/tools a learner walks away with.
-- expected_outcomes: what the learner can DO after finishing (outcome statements).
-- roadmap: 2–4 phases, each with a duration_label (e.g. "Week 1") and 2–4 focus_areas.
-- resources: 3–6 genuinely useful external references (official docs, well-known articles/videos). Use real, plausible URLs; set type to DOC/VIDEO/ARTICLE/TOOL.
-- completion_criteria: sensible gates for this course — minimum_time_minutes (total expected study minutes), quiz_passing_score (0–100, default 70), quiz_max_attempts (default 3), requires_manager_approval (true only if the topic warrants sign-off).
-- estimated_duration_hours: your best estimate.
-- lessons: exactly ${count} lessons in teaching order. Each lesson: title, a one-sentence summary, a single measurable objective, estimated_minutes, and lesson_order (0-based, sequential). Sequence from fundamentals → application. Do NOT write lesson bodies here.`;
+  const userText = [
+    `Course title: ${input.title}`,
+    `Category: ${input.category}`,
+    `Difficulty: ${input.difficulty}`,
+    input.target_audience ? `Target audience: ${input.target_audience}` : '',
+    input.estimated_duration_hours ? `Target length: ~${input.estimated_duration_hours} hours` : '',
+    input.tags?.length ? `Tags: ${input.tags.join(', ')}` : '',
+    `Produce exactly ${count} lessons in teaching order (lesson_order 0 to ${count - 1}).`,
+  ]
+    .filter(Boolean)
+    .join('\n');
 
   return safeGenerate(
     'course-outline',
     () =>
-      generateStructured(CourseOutlineSchema, prompt, { model: ANTHROPIC_MODEL, maxTokens: 3072 }),
+      generateStructured(CourseOutlineSchema, COURSE_OUTLINE_SYSTEM, userText, {
+        model: ANTHROPIC_MODEL,
+        maxTokens: 3072,
+      }),
     () => fallbackOutline(input, count),
   );
 }
@@ -387,9 +492,9 @@ function fallbackOutline(input: CourseOutlineInput, count: number): CourseOutlin
 }
 
 // ---------------------------------------------------------------------------
-// Lesson content — full markdown body + practical example + exercises +
-// takeaways + a per-lesson knowledge-check quiz. Heavier model.
+// Lesson content
 // ---------------------------------------------------------------------------
+
 const LessonContentSchema = z.object({
   content: z.string(),
   practical_example: z.string(),
@@ -422,25 +527,48 @@ export interface LessonContentInput {
   lesson_objective?: string | null;
 }
 
+const LESSON_CONTENT_SYSTEM = `You are writing one lesson inside an online technical course. Apply the 4C/ID model: show the concept, give a concrete worked example, provide practice exercises, consolidate with takeaways.
+
+CONTENT STRUCTURE (content field — Markdown):
+## [Lesson Title]
+### Introduction (1–2 short paragraphs: why this matters, what learners will know after)
+### Core Concepts (## / ### subsections; use bullets and code blocks for technical content)
+### [Additional subsections as needed]
+Target 350–550 words. No front-matter, no "In this lesson we will…" openers.
+
+PRACTICAL EXAMPLE (practical_example — Markdown):
+One concrete, worked example. For technical topics: include a real code snippet with explanation.
+For conceptual topics: a realistic scenario with a step-by-step walkthrough.
+
+EXERCISES (1–2 items):
+- prompt: what the learner will DO (active, specific — "Build a function that…", "Configure X to…")
+- expected_outcome: the observable result of a correct attempt
+- hints: 1–2 directional nudges (not answers)
+
+KEY TAKEAWAYS (3–4 one-line bullets, each starting with a strong verb)
+
+QUIZ (2–4 questions — apply the Bloom's rubric: mix recall, application, analysis):
+- correct_answer must be copied EXACTLY from the options array
+- explanation cites the specific section of the lesson
+
+Return valid JSON only. No prose outside the JSON.`;
+
 export async function generateLessonContent(
   input: LessonContentInput,
 ): Promise<{ data: LessonContent; degraded: boolean }> {
-  const prompt = `You are writing one lesson inside an online course.
-
-Course: ${input.course_title} (category: ${input.category}, difficulty: ${input.difficulty})
-Lesson title: ${input.lesson_title}
-${input.lesson_summary ? `Lesson summary: ${input.lesson_summary}\n` : ''}${input.lesson_objective ? `Lesson objective: ${input.lesson_objective}\n` : ''}
-Produce CONCISE output:
-- content: lesson body in MARKDOWN (## / ### headings, bullets, code blocks where technical). Aim 300–500 words. No front-matter.
-- practical_example: one short worked example (markdown).
-- exercises: 1–2 hands-on exercises. Each: prompt, expected_outcome, and 1–2 hints.
-- key_takeaways: 3–4 one-line takeaways.
-- quiz: 2–4 multiple-choice questions from this lesson. Each: question, 3–4 options, correct_answer (must match one option exactly), short explanation, points (1 or 2).`;
+  const contextLines = [
+    `Course: ${input.course_title} (${input.category}, ${input.difficulty})`,
+    `Lesson title: ${input.lesson_title}`,
+    input.lesson_summary ? `Lesson summary: ${input.lesson_summary}` : '',
+    input.lesson_objective ? `Lesson objective: ${input.lesson_objective}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
 
   return safeGenerate(
     'lesson-content',
     () =>
-      generateStructured(LessonContentSchema, prompt, {
+      generateStructured(LessonContentSchema, LESSON_CONTENT_SYSTEM, contextLines, {
         model: TRAINING_CONTENT_MODEL,
         maxTokens: 2500,
       }),
@@ -457,8 +585,9 @@ Produce CONCISE output:
 }
 
 // ---------------------------------------------------------------------------
-// Capstone — course-level final-assessment template. Heavier model.
+// Capstone
 // ---------------------------------------------------------------------------
+
 const CapstoneSchema = z.object({
   assessment_type: z.enum(['PRACTICAL_ASSIGNMENT', 'SHORT_ANSWER', 'MULTIPLE_CHOICE']),
   instructions: z.string(),
@@ -479,23 +608,43 @@ export interface CapstoneInput {
   learning_objectives?: string[];
 }
 
+const CAPSTONE_SYSTEM = `You are designing a capstone final assessment that measures whether a learner has achieved the course's learning objectives — not just whether they can recall facts.
+
+ASSESSMENT TYPE SELECTION:
+- PRACTICAL_ASSIGNMENT: choose when the course teaches a hands-on skill (coding, configuration, design). Deliverables should be tangible artefacts a reviewer can evaluate.
+- SHORT_ANSWER: choose when the course teaches decision-making, strategy, or analysis. 3–5 open questions that require synthesis, not recall.
+- MULTIPLE_CHOICE: only for pure knowledge courses where there is one clearly correct answer per question. 8–12 questions covering the full syllabus.
+
+INSTRUCTIONS (Markdown):
+- Frame the capstone as a realistic professional task, not a school exam.
+- State clearly what to submit, what tools to use, and how it will be graded.
+- Reference at least 2 specific learning objectives.
+
+QUESTIONS (1–5):
+For PRACTICAL_ASSIGNMENT: each question is one deliverable (e.g. "Implement X", "Write a report on Y").
+Include 1–2 sentences of guidance per question.
+
+RUBRIC (3–6 criteria, weights summing to 100):
+Criteria should be outcome-based, not process-based ("Demonstrates correct use of X" not "Followed instructions").
+
+Return valid JSON only.`;
+
 export async function generateCapstone(
   input: CapstoneInput,
 ): Promise<{ data: Capstone; degraded: boolean }> {
-  const prompt = `Design a capstone final assessment for this course.
-
-Course: ${input.course_title} (category: ${input.category}, difficulty: ${input.difficulty})
-${input.learning_objectives?.length ? `Objectives:\n- ${input.learning_objectives.join('\n- ')}\n` : ''}
-Produce:
-- assessment_type: PRACTICAL_ASSIGNMENT (preferred for hands-on topics), SHORT_ANSWER, or MULTIPLE_CHOICE.
-- instructions: markdown instructions framing the capstone and how it ties the objectives together.
-- questions: 1–5 prompts. For PRACTICAL_ASSIGNMENT, each prompt is a deliverable; include short guidance per prompt.
-- rubric: 3–6 grading criteria, each with a weight (weights should sum to ~100).`;
+  const contextLines = [
+    `Course: ${input.course_title} (${input.category}, ${input.difficulty})`,
+    input.learning_objectives?.length
+      ? `Learning objectives:\n- ${input.learning_objectives.join('\n- ')}`
+      : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
 
   return safeGenerate(
     'capstone',
     () =>
-      generateStructured(CapstoneSchema, prompt, {
+      generateStructured(CapstoneSchema, CAPSTONE_SYSTEM, contextLines, {
         model: TRAINING_CONTENT_MODEL,
         maxTokens: 3072,
       }),
@@ -514,10 +663,9 @@ Produce:
 }
 
 // ---------------------------------------------------------------------------
-// Enrich-only — generate the structured META for an existing course (overview,
-// objectives, roadmap, resources, completion criteria, capstone) WITHOUT
-// touching its lessons/quizzes. Used to backfill hand-seeded courses.
+// Enrich course meta
 // ---------------------------------------------------------------------------
+
 const EnrichSchema = z.object({
   overview: z.string(),
   learning_objectives: z.array(z.string()),
@@ -549,31 +697,42 @@ export interface EnrichInput {
   existing_lesson_titles?: string[];
 }
 
+const ENRICH_SYSTEM = `An existing course already has its lessons written. Your job is to generate the surrounding STRUCTURE — overview, objectives, roadmap, resources, completion criteria, and a final capstone assessment — that frames those lessons into a coherent learning experience.
+
+DO NOT rewrite, reorder, or invent new lessons. The lesson list is fixed.
+
+DERIVATION RULES:
+- Infer learning_objectives, skills_taught, and expected_outcomes from the lesson titles — they must reflect what the existing lessons actually teach.
+- roadmap phases should group related lessons logically (e.g., "Foundations", "Core Patterns", "Advanced Topics").
+- resources: choose references that directly support the lesson topics (official docs, well-known tutorials).
+- capstone: design a final assessment that integrates the skills from ALL lessons, not just the last one.
+
+Return valid JSON only.`;
+
 export async function enrichCourseMeta(
   input: EnrichInput,
 ): Promise<{ data: CourseEnrichment; degraded: boolean }> {
-  const prompt = `An existing course already has its lessons written. Generate the surrounding STRUCTURE for it — do NOT rewrite or invent lessons.
+  const lessonList = input.existing_lesson_titles?.length
+    ? `Existing lessons:\n- ${input.existing_lesson_titles.join('\n- ')}`
+    : '(no lesson titles provided)';
 
-Course title: ${input.title}
-Category: ${input.category}
-Difficulty: ${input.difficulty}
-${input.target_audience ? `Target audience: ${input.target_audience}\n` : ''}${
-    input.existing_lesson_titles?.length
-      ? `Existing lessons (for context only):\n- ${input.existing_lesson_titles.join('\n- ')}\n`
-      : ''
-  }
-Produce:
-- overview: 2–4 markdown paragraphs introducing the course and who it's for.
-- learning_objectives, skills_taught, expected_outcomes: concrete lists derived from the lessons above.
-- roadmap: 2–4 phases (phase, duration_label, focus_areas[]).
-- resources: 3–6 genuinely useful references (DOC/VIDEO/ARTICLE/TOOL with plausible URLs).
-- completion_criteria: minimum_time_minutes, quiz_passing_score (default 70), quiz_max_attempts (default 3), requires_manager_approval.
-- capstone: a final assessment tying the lessons together (assessment_type, instructions, questions[], rubric[]).`;
+  const contextLines = [
+    `Course title: ${input.title}`,
+    `Category: ${input.category}`,
+    `Difficulty: ${input.difficulty}`,
+    input.target_audience ? `Target audience: ${input.target_audience}` : '',
+    lessonList,
+  ]
+    .filter(Boolean)
+    .join('\n');
 
   return safeGenerate(
     'enrich-course',
     () =>
-      generateStructured(EnrichSchema, prompt, { model: TRAINING_CONTENT_MODEL, maxTokens: 3072 }),
+      generateStructured(EnrichSchema, ENRICH_SYSTEM, contextLines, {
+        model: TRAINING_CONTENT_MODEL,
+        maxTokens: 3072,
+      }),
     () => ({
       overview: `# ${input.title}\n\n_Enrichment was unavailable — edit this overview._`,
       learning_objectives: [],

@@ -39,5 +39,8 @@
     "**/*.{json,md,yml,yaml,css}": [
       "prettier --write"
     ]
+  },
+  "dependencies": {
+    "lru-cache": "^11.5.0"
   }
 }
