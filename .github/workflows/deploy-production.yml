@@ -68,6 +68,7 @@ jobs:
           # for "something is genuinely wrong" rather than "this is slow".
           command_timeout: 10m
           script_stop: true
+          debug: true
           script: |
             set -euo pipefail
             cd ~/hireorbitai
