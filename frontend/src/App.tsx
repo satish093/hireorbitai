@@ -67,6 +67,7 @@ const Vendors = lazy(() => import('./pages/Vendors').then((m) => ({ default: m.V
 const Clients = lazy(() => import('./pages/Clients').then((m) => ({ default: m.Clients })));
 const Reminders = lazy(() => import('./pages/Reminders').then((m) => ({ default: m.Reminders })));
 const AIEmail = lazy(() => import('./pages/AIEmail').then((m) => ({ default: m.AIEmail })));
+const AIUsage = lazy(() => import('./pages/AIUsage').then((m) => ({ default: m.AIUsage })));
 const Reports = lazy(() => import('./pages/Reports').then((m) => ({ default: m.Reports })));
 const Invitations = lazy(() =>
   import('./pages/Invitations').then((m) => ({ default: m.Invitations })),
@@ -186,6 +187,7 @@ export default function App() {
     void import('./pages/Clients');
     void import('./pages/Reminders');
     void import('./pages/AIEmail');
+    void import('./pages/AIUsage');
     void import('./pages/Reports');
     void import('./pages/Invitations');
     void import('./pages/FeatureFlags');
@@ -351,6 +353,14 @@ export default function App() {
               <FeatureGuard feature="ai_email">
                 <AIEmail />
               </FeatureGuard>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ai-usage"
+          element={
+            <ProtectedRoute allow={MANAGER_TIER}>
+              <AIUsage />
             </ProtectedRoute>
           }
         />

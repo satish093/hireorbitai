@@ -166,6 +166,12 @@ const sections: Section[] = [
         flagKey: 'reports',
       },
       {
+        to: '/ai-usage',
+        label: 'AI Usage',
+        icon: IconSparkles,
+        roles: MANAGER_TIER,
+      },
+      {
         to: '/ai-email',
         label: 'AI Email',
         icon: IconSparkles,
