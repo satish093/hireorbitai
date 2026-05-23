@@ -2,6 +2,12 @@ import mammoth from 'mammoth';
 import { extractText, getDocumentProxy } from 'unpdf';
 import { logger } from '../config/logger';
 
+// word-extractor has no @types package; type the constructor inline.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const WordExtractor: new () => {
+  extract(input: Buffer): Promise<{ getBody(): string }>;
+} = require('word-extractor');
+
 /**
  * Convert an uploaded resume file into plain, readable text so the site can
  * display it and the AI features (scoring, job match, copilot, tailoring) have
@@ -11,10 +17,10 @@ import { logger } from '../config/logger';
  * Pure-JS extractors, no native deps:
  *   - PDF  → unpdf (pdf.js under the hood)
  *   - DOCX → mammoth (raw text)
+ *   - DOC  → word-extractor (binary Compound Document Format)
  *
- * Legacy binary .doc and scanned/image-only PDFs are NOT handled (no OCR) —
- * those return '' and the upload still succeeds (the caller treats an empty
- * result as "no extractable text", same as a file the user never pasted).
+ * Scanned/image-only PDFs are NOT handled (no OCR) — those return '' and the
+ * upload still succeeds.
  *
  * Always non-throwing: a malformed file logs a warning and yields '' rather
  * than failing the upload request.
@@ -44,6 +50,10 @@ function isDocx(mimetype: string, name: string): boolean {
   );
 }
 
+function isDoc(mimetype: string, name: string): boolean {
+  return mimetype === 'application/msword' || /\.doc$/i.test(name);
+}
+
 export async function extractResumeText(file: {
   buffer: Buffer;
   mimetype: string;
@@ -60,7 +70,12 @@ export async function extractResumeText(file: {
       const { value } = await mammoth.extractRawText({ buffer: file.buffer });
       return normalize(value ?? '');
     }
-    // Legacy .doc / unsupported type — no pure-JS extractor; skip gracefully.
+    if (isDoc(file.mimetype, file.originalname)) {
+      const extractor = new WordExtractor();
+      const doc = await extractor.extract(file.buffer);
+      return normalize(doc.getBody() ?? '');
+    }
+    // Unsupported type — skip gracefully.
     return '';
   } catch (err) {
     logger.warn(
