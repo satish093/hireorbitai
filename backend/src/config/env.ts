@@ -68,7 +68,11 @@ const envSchema = z.object({
     .min(3600)
     .default(60 * 60 * 24 * 30),
 
-  // --- Anthropic ---
+  // --- Google Gemini ---
+  GOOGLE_AI_API_KEY: optionalKey,
+  GEMINI_MODEL: z.string().default('gemini-2.0-flash'),
+
+  // --- Anthropic (kept for backward compat — provider switch uses TRAINING_AI_PROVIDER) ---
   ANTHROPIC_API_KEY: optionalKey,
   ANTHROPIC_MODEL: z.string().default('claude-haiku-4-5-20251001'),
   // Heavier model for long-form training content generation (lesson bodies,
@@ -233,6 +237,10 @@ export const env = {
     secret: e.JWT_SECRET,
     accessTtlSeconds: e.JWT_ACCESS_TTL_SECONDS,
     refreshTtlSeconds: e.JWT_REFRESH_TTL_SECONDS,
+  },
+  google: {
+    apiKey: e.GOOGLE_AI_API_KEY,
+    model: e.GEMINI_MODEL,
   },
   anthropic: {
     apiKey: e.ANTHROPIC_API_KEY,

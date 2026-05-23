@@ -1,12 +1,11 @@
 import { z } from 'zod';
-import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import {
-  anthropic,
-  ANTHROPIC_MODEL,
+  genai,
+  GEMINI_MODEL,
   TRAINING_CONTENT_MODEL,
   AI_PROVIDER,
   AI_AVAILABLE,
-} from '../config/anthropic';
+} from '../config/gemini';
 import { logger } from '../config/logger';
 
 /**
@@ -29,13 +28,12 @@ async function generateStructured<S extends z.ZodTypeAny>(
   opts: { model: string; maxTokens: number },
 ): Promise<z.infer<S>> {
   if (AI_PROVIDER === 'stub') throw new Error('TRAINING_AI_PROVIDER=stub');
-  const r = await anthropic.messages.parse({
+  const model = genai.getGenerativeModel({
     model: opts.model,
-    max_tokens: opts.maxTokens,
-    messages: [{ role: 'user', content: prompt }],
-    output_config: { format: zodOutputFormat(schema) },
+    generationConfig: { responseMimeType: 'application/json', maxOutputTokens: opts.maxTokens },
   });
-  return r.parsed_output!;
+  const result = await model.generateContent(prompt);
+  return schema.parse(JSON.parse(result.response.text())) as z.infer<S>;
 }
 
 // ---------------------------------------------------------------------------
@@ -81,7 +79,7 @@ Produce:
 - summary: 2–3 sentences for the consultant on what to focus on and in what order.`;
 
   return generateStructured(TrainingPlanSchema, prompt, {
-    model: ANTHROPIC_MODEL,
+    model: GEMINI_MODEL,
     maxTokens: 3072,
   });
 }
@@ -115,7 +113,7 @@ Produce:
 Avoid generic "tell me about yourself"-style filler. Every item should map back to a JD requirement.`;
 
   return generateStructured(InterviewQuestionsSchema, prompt, {
-    model: ANTHROPIC_MODEL,
+    model: GEMINI_MODEL,
     maxTokens: 3072,
   });
 }
@@ -155,7 +153,7 @@ Produce ${count} questions. Each:
 
 Mix difficulty: ~60% recall, ~30% applied, ~10% scenario.`;
 
-  return generateStructured(QuizSchema, prompt, { model: ANTHROPIC_MODEL, maxTokens: 3072 });
+  return generateStructured(QuizSchema, prompt, { model: GEMINI_MODEL, maxTokens: 3072 });
 }
 
 // ---------------------------------------------------------------------------
@@ -198,7 +196,7 @@ Produce:
 - overall_score: 0–100 readiness score
 - readiness_summary: 2–3 sentences a recruiter would forward to the consultant.`;
 
-  return generateStructured(SkillGapSchema, prompt, { model: ANTHROPIC_MODEL, maxTokens: 2048 });
+  return generateStructured(SkillGapSchema, prompt, { model: GEMINI_MODEL, maxTokens: 2048 });
 }
 
 // ===========================================================================
@@ -314,8 +312,7 @@ Produce a course OUTLINE only (lesson bodies are written separately later):
 
   return safeGenerate(
     'course-outline',
-    () =>
-      generateStructured(CourseOutlineSchema, prompt, { model: ANTHROPIC_MODEL, maxTokens: 3072 }),
+    () => generateStructured(CourseOutlineSchema, prompt, { model: GEMINI_MODEL, maxTokens: 3072 }),
     () => fallbackOutline(input, count),
   );
 }

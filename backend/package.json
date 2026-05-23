@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.95.1",
+    "@google/generative-ai": "^0.24.1",
     "@hireorbitai/shared": "*",
     "axios": "^1.7.7",
     "bcryptjs": "^2.4.3",
