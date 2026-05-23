@@ -33,6 +33,7 @@ vi.mock('../config/db', () => {
   }
   return { db: { from: (t: string) => builder(t) }, pool: {} };
 });
+vi.mock('../config/anthropic', () => ({ ANTHROPIC_ENABLED: false, AI_AVAILABLE: false }));
 vi.mock('../services/ai.service', () => ({
   matchJobsForConsultant: vi.fn(),
   atsScore: vi.fn(),

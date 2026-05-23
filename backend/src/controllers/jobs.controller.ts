@@ -10,7 +10,8 @@ import {
 import { parseJobRequirements } from '../services/jobParser.service';
 import { tailorForJob as resumeTailorForJob } from './resumes.controller';
 import { fromJob as applicationsFromJob } from './applications.controller';
-import { httpError, MANAGER_TIER } from '../types';
+import { httpError, MANAGER_TIER, OPERATOR_TIER } from '../types';
+import { ANTHROPIC_ENABLED } from '../config/anthropic';
 
 // Light user join helper — explicit FK hint so the embed never collides.
 const JOB_SELECT = '*, client:clients(id, company_name), vendor:vendors(id, company_name)';
@@ -796,13 +797,15 @@ export const skillMatchForMe: RequestHandler = async (req, res) => {
   // Use the latest current resume text from the resumes table.
   const { data: resume } = await db
     .from('resumes')
-    .select('ai_feedback, file_name')
+    .select('body_text, ai_feedback, file_name')
     .eq('consultant_id', consultant.id)
     .eq('is_current', true)
     .maybeSingle();
   // Caller can also pass resume_text directly (e.g. from a fresh paste).
   const resumeText: string =
-    String(req.body?.resume_text ?? '') || extractResumeText(resume?.ai_feedback);
+    String(req.body?.resume_text ?? '') ||
+    resume?.body_text ||
+    extractResumeText(resume?.ai_feedback);
   if (!resumeText) throw httpError(400, 'No resume text available. POST resume_text in the body.');
 
   const { data: job, error } = await db.from('jobs').select('*').eq('id', req.params.id).single();
@@ -843,7 +846,7 @@ const copilotSchema = z.object({ question: z.string().trim().min(1).max(500) }).
 
 export const copilot: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (!ANTHROPIC_ENABLED) {
     throw httpError(503, 'AI copilot is not configured (set ANTHROPIC_API_KEY).');
   }
   const parsed = copilotSchema.safeParse(req.body);
@@ -858,11 +861,11 @@ export const copilot: RequestHandler = async (req, res) => {
   if (consultant) {
     const { data: resume } = await db
       .from('resumes')
-      .select('ai_feedback')
+      .select('body_text, ai_feedback')
       .eq('consultant_id', consultant.id)
       .eq('is_current', true)
       .maybeSingle();
-    resumeText = extractResumeText(resume?.ai_feedback) || null;
+    resumeText = resume?.body_text || extractResumeText(resume?.ai_feedback) || null;
   }
 
   const reqs = job.requirements ?? {};
@@ -1215,15 +1218,8 @@ export const skillGap: RequestHandler = async (req, res) => {
   const explicitId = (req.query.consultant_id as string | undefined)?.trim();
   if (explicitId) {
     const role = req.user.role;
-    const isManagerTier = [
-      'SUPER_ADMIN',
-      'CEO',
-      'CTO',
-      'DIRECTOR',
-      'MANAGER',
-      'RECRUITER',
-    ].includes(role);
-    if (!isManagerTier) throw httpError(403, 'Only managers can request another consultant gap');
+    if (!(OPERATOR_TIER as string[]).includes(role))
+      throw httpError(403, 'Only managers can request another consultant gap');
     const { data } = await db
       .from('consultants')
       .select('id, primary_skill, skills')

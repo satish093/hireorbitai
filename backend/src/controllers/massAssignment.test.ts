@@ -41,6 +41,7 @@ vi.mock('../config/db', () => {
 });
 
 // Stub the heavy modules jobs.controller imports at load time.
+vi.mock('../config/anthropic', () => ({ ANTHROPIC_ENABLED: false, AI_AVAILABLE: false }));
 vi.mock('../services/ai.service', () => ({
   matchJobsForConsultant: vi.fn(),
   atsScore: vi.fn(),
