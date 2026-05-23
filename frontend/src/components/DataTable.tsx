@@ -87,7 +87,7 @@ export function DataTable<T extends { id?: string }>({
                   style={{ animationDelay: `${Math.min(i, STAGGER_MAX) * 25}ms` }}
                   className={clsx(
                     'border-t border-border transition animate-fade-in-up',
-                    onRowClick ? 'cursor-pointer hover:bg-hover' : 'hover:bg-slate-50/50',
+                    onRowClick ? 'cursor-pointer hover:bg-hover' : 'hover:bg-hover',
                   )}
                 >
                   {columns.map((c) => (
