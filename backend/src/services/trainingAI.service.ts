@@ -3,7 +3,6 @@ import {
   anthropic,
   ANTHROPIC_MODEL,
   TRAINING_CONTENT_MODEL,
-  AI_PROVIDER,
   AI_AVAILABLE,
 } from '../config/anthropic';
 import { logger } from '../config/logger';
@@ -27,7 +26,7 @@ async function generateStructured<S extends z.ZodTypeAny>(
   prompt: string,
   opts: { model: string; maxTokens: number },
 ): Promise<z.infer<S>> {
-  if (AI_PROVIDER === 'stub') throw new Error('TRAINING_AI_PROVIDER=stub');
+  if (!AI_AVAILABLE) throw new Error('AI unavailable: set ANTHROPIC_API_KEY on the server');
   const response = await anthropic.messages.create({
     model: opts.model,
     max_tokens: opts.maxTokens,
