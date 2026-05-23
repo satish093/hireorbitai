@@ -48,7 +48,7 @@ export function ResumeVersionStrip({ versions, activeId, onSelect, onNew, onDele
                   e.stopPropagation();
                   if (confirm(`Delete v${v.version} (${v.file_name})?`)) onDelete(v.id);
                 }}
-                className="absolute top-1.5 right-1.5 w-5 h-5 inline-flex items-center justify-center rounded-full text-muted hover:text-red-600 hover:bg-red-50 text-xs transition"
+                className="absolute top-1.5 right-1.5 w-5 h-5 inline-flex items-center justify-center rounded-full text-muted hover:text-danger hover:bg-danger-soft text-xs transition"
               >
                 ✕
               </button>

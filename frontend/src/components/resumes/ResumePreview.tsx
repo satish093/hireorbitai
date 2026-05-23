@@ -56,12 +56,12 @@ export function ResumePreview({
   if (loading) {
     return (
       <div className="bg-bg-sunken rounded-lg p-8 flex justify-center">
-        <div className="bg-white w-full max-w-[760px] rounded-sm shadow-xl px-10 py-12 space-y-3">
-          <Skeleton className="h-6 w-1/2 !bg-slate-200" />
-          <Skeleton className="h-3 w-1/3 !bg-slate-200" />
-          <Skeleton className="h-3 w-full !bg-slate-200 mt-6" />
-          <Skeleton className="h-3 w-5/6 !bg-slate-200" />
-          <Skeleton className="h-3 w-4/6 !bg-slate-200" />
+        <div className="bg-surface w-full max-w-[760px] rounded-sm px-10 py-12 space-y-3">
+          <Skeleton className="h-6 w-1/2" />
+          <Skeleton className="h-3 w-1/3" />
+          <Skeleton className="h-3 w-full mt-6" />
+          <Skeleton className="h-3 w-5/6" />
+          <Skeleton className="h-3 w-4/6" />
         </div>
       </div>
     );
@@ -105,7 +105,7 @@ export function ResumePreview({
       <div className="overflow-y-auto max-h-[68vh] bg-bg-sunken rounded-lg p-4 sm:p-8 flex justify-center">
         <div
           ref={paperRef}
-          className="bg-white text-slate-900 shadow-xl rounded-sm w-full max-w-[760px] px-8 sm:px-12 py-10 sm:py-14 print:shadow-none print:max-w-none"
+          className="bg-white dark:bg-surface text-slate-900 dark:text-ink shadow-xl dark:shadow-none rounded-sm w-full max-w-[760px] px-8 sm:px-12 py-10 sm:py-14 print:!bg-white print:!text-slate-900 print:shadow-none print:max-w-none"
           style={{ fontFamily: 'ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif' }}
         >
           <MarkdownView md={body} className="text-[13px] leading-relaxed" />

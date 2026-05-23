@@ -58,7 +58,7 @@ export function MarkdownView({ md, className }: { md: string; className?: string
         blocks.push(
           <h2
             key={`h-${key++}`}
-            className="text-sm font-bold uppercase tracking-wider mt-5 mb-1.5 pb-1 border-b border-slate-300"
+            className="text-sm font-bold uppercase tracking-wider mt-5 mb-1.5 pb-1 border-b border-border"
           >
             {renderInline(text)}
           </h2>,
