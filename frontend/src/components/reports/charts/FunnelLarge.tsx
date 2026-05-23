@@ -39,7 +39,7 @@ export function FunnelLarge({ stages }: { stages: FunnelStage[] }): JSX.Element 
             <div className="flex items-center justify-between mb-1">
               <span className="text-[13px] text-ink">{s.stage}</span>
               <div className="flex items-center gap-2">
-                <span className="text-[12px] font-mono text-muted">{s.pct}%</span>
+                <span className="text-[12px] font-mono text-ink-2">{s.pct}%</span>
                 <span className="text-[13px] font-mono font-semibold text-ink">
                   {s.count.toLocaleString()}
                 </span>

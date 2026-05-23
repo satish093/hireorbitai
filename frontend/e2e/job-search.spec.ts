@@ -129,7 +129,10 @@ test.describe('Job search page — rendering', () => {
     await forceRecommendedReload(page);
 
     await expect(page.getByText('Senior Software Engineer')).toBeVisible({ timeout: 8000 });
-    await page.getByText('Senior Software Engineer').first().click();
+    await page
+      .getByRole('button', { name: /Senior Software Engineer at/i })
+      .first()
+      .click();
 
     // Should navigate to job detail (/jobs/:id)
     await expect(page).toHaveURL(/\/jobs\/j-1/, { timeout: 8000 });

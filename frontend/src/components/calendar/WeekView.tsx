@@ -79,7 +79,7 @@ export function WeekView({
               <span
                 className={clsx(
                   'text-[13px] font-mono grid place-items-center w-7 h-7 rounded-full',
-                  isToday ? 'bg-accent text-white font-semibold' : 'text-ink',
+                  isToday ? 'bg-accent text-white dark:text-bg font-semibold' : 'text-ink',
                 )}
               >
                 {day.getDate()}

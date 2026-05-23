@@ -397,7 +397,7 @@ export function Messages() {
                             className={clsx(
                               'text-[11px] shrink-0',
                               c.unread_count > 0
-                                ? 'text-brand-600 dark:text-brand-400 font-semibold'
+                                ? 'text-brand-600 dark:text-brand-200 font-semibold'
                                 : 'text-muted',
                             )}
                           >

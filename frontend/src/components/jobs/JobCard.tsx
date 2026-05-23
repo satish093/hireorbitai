@@ -84,24 +84,34 @@ function JobCard({
   const location = job.location ?? (job.remote ? 'Remote' : 'Location N/A');
 
   return (
+    // Wrapper establishes an isolated stacking context so the overlay button
+    // sits below the action buttons without leaking z-index to the page.
     <div
-      role="button"
-      tabIndex={0}
-      aria-pressed={selected}
-      onClick={onSelect}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onSelect();
-        }
-      }}
       className={clsx(
-        'w-full text-left rounded-xl border p-3.5 transition cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-accent',
+        'relative isolate w-full rounded-xl border p-3.5 transition',
         selected
           ? 'bg-surface border-border-strong shadow-md'
           : 'bg-surface border-border hover:border-border-strong hover:shadow-sm',
       )}
     >
+      {/* Full-card selection button — sits at z-0, below the action buttons.
+          Fixes nested-interactive: interactive children are siblings, not
+          descendants, of an interactive element. */}
+      <button
+        type="button"
+        tabIndex={0}
+        aria-pressed={selected}
+        onClick={onSelect}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onSelect();
+          }
+        }}
+        aria-label={`${job.title} at ${companyName}`}
+        className="absolute inset-0 z-0 rounded-xl cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+      />
+
       {/* Top: initials + title/company + match pill */}
       <div className="flex items-start gap-3">
         <span
@@ -141,8 +151,9 @@ function JobCard({
         </div>
       )}
 
-      {/* Footer: comp + posted (mono) · save + apply */}
-      <div className="mt-3 flex items-center justify-between gap-2">
+      {/* Footer: comp + posted (mono) · save + apply.
+          relative z-10 ensures action buttons sit above the overlay button. */}
+      <div className="relative z-10 mt-3 flex items-center justify-between gap-2">
         <div className="font-mono text-[11px] text-muted truncate">
           {job.rate_min != null || job.rate_max != null
             ? prettyRate(job.rate_min, job.rate_max)

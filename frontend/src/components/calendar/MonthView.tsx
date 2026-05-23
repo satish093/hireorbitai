@@ -137,7 +137,7 @@ export function MonthView({
                 {/* Day number */}
                 <div className="flex items-center justify-start mb-1">
                   {isToday ? (
-                    <span className="font-mono text-[12px] font-semibold bg-accent text-white rounded-full w-6 h-6 grid place-items-center select-none">
+                    <span className="font-mono text-[12px] font-semibold bg-accent text-white dark:text-bg rounded-full w-6 h-6 grid place-items-center select-none">
                       {day.getDate()}
                     </span>
                   ) : (

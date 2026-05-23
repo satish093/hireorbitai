@@ -191,7 +191,7 @@ export function CalendarSidebar({
                   className={[
                     'w-8 h-8 grid place-items-center rounded-full text-[12px] font-medium transition-colors',
                     isToday
-                      ? 'bg-accent text-white font-semibold'
+                      ? 'bg-accent text-white dark:text-bg font-semibold'
                       : isSelected
                         ? 'ring-2 ring-accent text-accent'
                         : 'text-ink hover:bg-hover',
@@ -226,7 +226,7 @@ export function CalendarSidebar({
             <p className="text-[13px] font-semibold text-ink leading-snug">{upNext.title}</p>
 
             {/* Time */}
-            <p className="text-[12px] text-ink-2">{formatEventTime(new Date(upNext.start))}</p>
+            <p className="text-[12px] text-ink">{formatEventTime(new Date(upNext.start))}</p>
 
             {/* Actions */}
             <div className="flex items-center gap-2 pt-0.5">

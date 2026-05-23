@@ -95,7 +95,7 @@
   --ink: oklch(0.96 0.004 260);
   --ink-2: oklch(0.84 0.006 260);
   --muted: oklch(0.66 0.01 260);
-  --faint: oklch(0.5 0.01 260);
+  --faint: oklch(0.67 0.01 260);
   --accent: oklch(0.68 0.2 275);
   --accent-2: oklch(0.74 0.19 280);
   --accent-soft: oklch(0.28 0.12 275);
@@ -106,7 +106,7 @@
   --success-soft: oklch(0.28 0.06 150);
   --warn: oklch(0.72 0.13 75);
   --warn-soft: oklch(0.3 0.07 75);
-  --danger: oklch(0.6 0.18 25);
+  --danger: oklch(0.65 0.18 25);
   --danger-soft: oklch(0.3 0.08 25);
   --ring: oklch(0.68 0.2 275 / 0.5);
 }
