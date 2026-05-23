@@ -8,6 +8,13 @@
  *   4. No console errors throughout.
  *
  * All API calls are intercepted; no real backend is needed.
+ *
+ * StrictMode + dedup workaround: React 18 StrictMode double-mounts effects,
+ * which causes the GET dedup cache (api.ts) to reuse the aborted first
+ * request for the second mount — resulting in an empty feed on initial render.
+ * The cache clears when the aborted promise settles. To get reliable job data,
+ * we switch to a different tab and back after the page loads; that triggers a
+ * fresh non-deduped request for /jobs/recommended.
  */
 
 import { test, expect } from '@playwright/test';
@@ -38,12 +45,34 @@ const MOCK_JOBS = [
   },
 ];
 
+// Default tab is "recommended" → fetches /jobs/recommended with pagination shape.
+const RECOMMENDED_RESPONSE = {
+  rows: MOCK_JOBS,
+  page: 1,
+  per_page: 40,
+  total: 2,
+  total_pages: 1,
+};
+
 const JOB_PAGE_HANDLERS = {
-  '/jobs': { json: MOCK_JOBS },
+  '/jobs/recommended': { json: RECOMMENDED_RESPONSE },
   '/job-sources': { json: [] },
   '/consultants': { json: [] },
   '/recruiters': { json: [] },
 };
+
+/**
+ * After the page loads (StrictMode double-mount leaves feed empty due to GET
+ * dedup), cycle through the "Saved" tab and back to "Top" to trigger a fresh
+ * /jobs/recommended request with a clean dedup cache.
+ */
+async function forceRecommendedReload(page: import('@playwright/test').Page) {
+  await page.waitForLoadState('networkidle');
+  await page.getByRole('button', { name: 'Saved' }).click();
+  await page.waitForLoadState('networkidle');
+  await page.getByRole('button', { name: /^Top/ }).click();
+  await page.waitForLoadState('networkidle');
+}
 
 test.describe('Job search page — rendering', () => {
   // /jobs has no allow= restriction — any authenticated role can access it.
@@ -57,7 +86,7 @@ test.describe('Job search page — rendering', () => {
       handlers: JOB_PAGE_HANDLERS,
     });
     await page.goto('/jobs');
-    await page.waitForLoadState('networkidle');
+    await forceRecommendedReload(page);
 
     await expect(page.getByText('Senior Software Engineer')).toBeVisible({ timeout: 8000 });
     await expect(page.getByText('Frontend Developer')).toBeVisible({ timeout: 8000 });
@@ -91,6 +120,7 @@ test.describe('Job search page — rendering', () => {
       },
     });
     await page.goto('/jobs');
+    await forceRecommendedReload(page);
 
     await expect(page.getByText('Senior Software Engineer')).toBeVisible({ timeout: 8000 });
     await page.getByText('Senior Software Engineer').first().click();

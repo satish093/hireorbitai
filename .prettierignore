@@ -3,6 +3,9 @@ dist/
 build/
 coverage/
 *.tsbuildinfo
+# Playwright test artifacts — auto-generated, not project source
+frontend/e2e-results/
+frontend/playwright-report/
 **/package-lock.json
 **/pnpm-lock.yaml
 **/yarn.lock

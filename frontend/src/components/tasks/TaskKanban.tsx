@@ -54,7 +54,7 @@ export function TaskKanban({
             <div className="space-y-2 min-h-[120px] rounded-lg">
               {colTasks.length === 0 ? (
                 <div className="flex items-center justify-center min-h-[80px] rounded-lg border border-dashed border-border">
-                  <span className="text-[12px] text-faint">Drop here</span>
+                  <span className="text-[12px] text-muted">Drop here</span>
                 </div>
               ) : (
                 colTasks.map((t) => (

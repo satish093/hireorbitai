@@ -16,6 +16,7 @@ const API_ORIGIN = 'http://localhost:4000';
 
 export default defineConfig({
   testDir: './e2e',
+  outputDir: './e2e-results',
   // Fail the build on CI if test.only was committed.
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
@@ -30,6 +31,8 @@ export default defineConfig({
     // No real network should ever be hit; surface it loudly if a test forgets
     // to mock an endpoint by failing fast rather than hanging on a real host.
     actionTimeout: 10_000,
+    screenshot: 'only-on-failure',
+    video: 'off',
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: {

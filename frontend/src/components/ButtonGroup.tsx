@@ -32,7 +32,7 @@ export function ButtonGroupItem({
         'h-6 px-2.5 text-xs font-medium rounded-[4px] transition-colors',
         pressed
           ? 'bg-surface text-ink shadow-sm dark:bg-[oklch(0.30_0.011_260)]'
-          : 'text-muted hover:text-ink',
+          : 'text-ink-2 hover:text-ink',
       )}
     >
       {children}

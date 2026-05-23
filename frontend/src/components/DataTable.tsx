@@ -38,7 +38,7 @@ export function DataTable<T extends { id?: string }>({
           before the scroller engages. */}
       <div className="overflow-x-auto">
         <table className="w-full text-sm min-w-[560px]">
-          <thead className="bg-hover text-[10px] font-semibold tracking-widest text-muted uppercase">
+          <thead className="bg-hover text-[10px] font-semibold tracking-widest text-ink-2 uppercase">
             <tr>
               {columns.map((c) => (
                 <th

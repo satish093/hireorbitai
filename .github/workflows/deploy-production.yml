@@ -79,5 +79,14 @@ jobs:
         # the public URL is healthy, not just the loopback.
         run: |
           set -e
+          # 1. Health endpoint
           curl -fsS https://hireorbitai.com/api/health | tee /tmp/health.json
           grep -q '"ok":true' /tmp/health.json || { echo "::error::health did not report ok=true"; exit 1; }
+
+          # 2. Auth middleware alive — /auth/me must return 401 (not 200/500)
+          AUTH_STATUS=$(curl -o /dev/null -w '%{http_code}' -s https://hireorbitai.com/api/auth/me)
+          [ "$AUTH_STATUS" = "401" ] || { echo "::error::/auth/me returned $AUTH_STATUS, expected 401"; exit 1; }
+
+          # 3. Frontend serves index.html — not a 502/503
+          FRONT_STATUS=$(curl -o /dev/null -w '%{http_code}' -s https://hireorbitai.com/)
+          [ "$FRONT_STATUS" = "200" ] || { echo "::error::frontend returned $FRONT_STATUS, expected 200"; exit 1; }
