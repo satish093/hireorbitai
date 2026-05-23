@@ -38,7 +38,9 @@ jobs:
     runs-on: ubuntu-latest
     # Skip silently if no target is configured — avoids noisy failures on forks
     # or repos that haven't set up a staging environment yet.
-    if: ${{ secrets.ZAP_TARGET_URL != '' || inputs.target_url != '' }}
+    # Note: secrets cannot be referenced in job-level if expressions; the check
+    # is done inside the "Resolve target URL" step instead.
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
 
     steps:
       - name: Checkout
