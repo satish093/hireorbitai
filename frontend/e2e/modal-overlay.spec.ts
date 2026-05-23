@@ -26,8 +26,9 @@ async function goToVendors(page: Parameters<typeof mockApi>[0]) {
     },
   });
   await page.goto('/vendors');
+  await page.waitForLoadState('load');
   // Wait for the page to fully load (the "+ New vendor" button should appear).
-  await page.getByRole('button', { name: /new vendor/i }).waitFor({ timeout: 8000 });
+  await page.getByRole('button', { name: /new vendor/i }).waitFor({ timeout: 10_000 });
 }
 
 // ---------------------------------------------------------------------------

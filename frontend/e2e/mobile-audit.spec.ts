@@ -15,7 +15,7 @@
  * reminders, applications, reports, messages, training, resumes.
  */
 
-import { test, expect, devices } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { seedSession, mockApi, MANAGER, RECRUITER, CONSULTANT, trackPageErrors } from './_helpers';
 import {
@@ -32,9 +32,20 @@ import {
   BASE_HANDLERS,
 } from './_mock-data';
 
-// ─── Device emulation (iPhone 12 — 390×844, 3× retina, touch, iOS UA) ───────
+// ─── Device emulation — iPhone 12 form factor on Chromium ────────────────────
+// We specify only the context-level properties (viewport, scale, touch, UA)
+// and omit `defaultBrowserType` so the test runs on the configured chromium
+// project instead of trying to launch webkit (which is not installed).
 
-test.use({ ...devices['iPhone 12'] });
+test.use({
+  viewport: { width: 390, height: 844 },
+  deviceScaleFactor: 3,
+  isMobile: true,
+  hasTouch: true,
+  userAgent:
+    'Mozilla/5.0 (iPhone; CPU iPhone OS 14_4 like Mac OS X) ' +
+    'AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1',
+});
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -81,7 +92,7 @@ test.describe('Mobile — Dashboard page', () => {
 
     await setupPage(page);
     await page.goto('/dashboard');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     await expect(page.locator('h1, h2, [data-testid="page-header"]').first()).toBeVisible({
       timeout: 8000,
@@ -93,7 +104,7 @@ test.describe('Mobile — Dashboard page', () => {
   test('screenshot and axe audit — mobile dashboard', async ({ page }) => {
     await setupPage(page);
     await page.goto('/dashboard');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     expect(await hasHorizontalOverflow(page)).toBe(false);
     const violations = await screenshotAndAudit(page, 'dashboard');
@@ -112,7 +123,7 @@ test.describe('Mobile — Tasks page', () => {
 
     await setupPage(page);
     await page.goto('/tasks');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     await expect(page.getByText('Design the onboarding flow')).toBeVisible({ timeout: 8000 });
     await expect(page.getByText('Implement auth middleware')).toBeVisible({ timeout: 8000 });
@@ -125,7 +136,7 @@ test.describe('Mobile — Tasks page', () => {
   test('screenshot and axe audit — mobile tasks', async ({ page }) => {
     await setupPage(page);
     await page.goto('/tasks');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     expect(await hasHorizontalOverflow(page)).toBe(false);
     const violations = await screenshotAndAudit(page, 'tasks');
@@ -144,7 +155,7 @@ test.describe('Mobile — Consultants page', () => {
 
     await setupPage(page);
     await page.goto('/consultants');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     await expect(page.getByText('Alice Chen')).toBeVisible({ timeout: 8000 });
     await expect(page.getByText('Bob Kim')).toBeVisible({ timeout: 8000 });
@@ -157,7 +168,7 @@ test.describe('Mobile — Consultants page', () => {
   test('screenshot and axe audit — mobile consultants', async ({ page }) => {
     await setupPage(page);
     await page.goto('/consultants');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     expect(await hasHorizontalOverflow(page)).toBe(false);
     const violations = await screenshotAndAudit(page, 'consultants');
@@ -172,11 +183,11 @@ test.describe('Mobile — Consultants page', () => {
 
 test.describe('Mobile — Jobs page', () => {
   async function forceRecommendedReload(page: import('@playwright/test').Page) {
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
     await page.getByRole('button', { name: 'Saved' }).click();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
     await page.getByRole('button', { name: /^Top/ }).click();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
   }
 
   test('renders job listings after tab cycle', async ({ page }) => {
@@ -220,7 +231,7 @@ test.describe('Mobile — Jobs page', () => {
       },
     });
     await page.goto('/jobs');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     expect(await hasHorizontalOverflow(page)).toBe(false);
     const violations = await screenshotAndAudit(page, 'jobs');
@@ -239,7 +250,7 @@ test.describe('Mobile — Calendar page', () => {
 
     await setupPage(page);
     await page.goto('/calendar');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     await expect(page.locator('h1, h2, [role="heading"]').first()).toBeVisible({ timeout: 8000 });
 
@@ -250,7 +261,7 @@ test.describe('Mobile — Calendar page', () => {
   test('screenshot and axe audit — mobile calendar', async ({ page }) => {
     await setupPage(page);
     await page.goto('/calendar');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     expect(await hasHorizontalOverflow(page)).toBe(false);
     const violations = await screenshotAndAudit(page, 'calendar');
@@ -269,7 +280,7 @@ test.describe('Mobile — Interviews page', () => {
 
     await setupPage(page);
     await page.goto('/interviews');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     await expect(page.locator('h1, h2, [role="heading"]').first()).toBeVisible({ timeout: 8000 });
 
@@ -280,7 +291,7 @@ test.describe('Mobile — Interviews page', () => {
   test('screenshot and axe audit — mobile interviews', async ({ page }) => {
     await setupPage(page);
     await page.goto('/interviews');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     expect(await hasHorizontalOverflow(page)).toBe(false);
     const violations = await screenshotAndAudit(page, 'interviews');
@@ -299,7 +310,7 @@ test.describe('Mobile — Reminders page', () => {
 
     await setupPage(page);
     await page.goto('/reminders');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     await expect(page.getByText('Follow up with Alice re: Google offer')).toBeVisible({
       timeout: 8000,
@@ -313,7 +324,7 @@ test.describe('Mobile — Reminders page', () => {
   test('screenshot and axe audit — mobile reminders', async ({ page }) => {
     await setupPage(page);
     await page.goto('/reminders');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     expect(await hasHorizontalOverflow(page)).toBe(false);
     const violations = await screenshotAndAudit(page, 'reminders');
@@ -332,7 +343,7 @@ test.describe('Mobile — Applications page', () => {
 
     await setupPage(page);
     await page.goto('/applications');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     await expect(page.getByText('Alice Chen')).toBeVisible({ timeout: 8000 });
     await expect(page.getByText('Senior Java Developer')).toBeVisible({ timeout: 8000 });
@@ -345,7 +356,7 @@ test.describe('Mobile — Applications page', () => {
   test('screenshot and axe audit — mobile applications', async ({ page }) => {
     await setupPage(page);
     await page.goto('/applications');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     expect(await hasHorizontalOverflow(page)).toBe(false);
     const violations = await screenshotAndAudit(page, 'applications');
@@ -364,7 +375,7 @@ test.describe('Mobile — Reports page', () => {
 
     await setupPage(page);
     await page.goto('/reports');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     await expect(page.locator('h1, h2, [role="tablist"]').first()).toBeVisible({ timeout: 8000 });
 
@@ -375,7 +386,7 @@ test.describe('Mobile — Reports page', () => {
   test('screenshot and axe audit — mobile reports', async ({ page }) => {
     await setupPage(page);
     await page.goto('/reports');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     expect(await hasHorizontalOverflow(page)).toBe(false);
     const violations = await screenshotAndAudit(page, 'reports');
@@ -394,7 +405,7 @@ test.describe('Mobile — Messages page', () => {
 
     await setupPage(page);
     await page.goto('/messages');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     await expect(page.getByText('Alice Chen')).toBeVisible({ timeout: 8000 });
     await expect(page.getByText('Can we schedule a call this week?')).toBeVisible({
@@ -408,7 +419,7 @@ test.describe('Mobile — Messages page', () => {
   test('screenshot and axe audit — mobile messages', async ({ page }) => {
     await setupPage(page);
     await page.goto('/messages');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     expect(await hasHorizontalOverflow(page)).toBe(false);
     const violations = await screenshotAndAudit(page, 'messages');
@@ -427,7 +438,7 @@ test.describe('Mobile — Training page', () => {
 
     await setupPage(page);
     await page.goto('/training/courses');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     await expect(page.getByText('AWS Cloud Practitioner')).toBeVisible({ timeout: 8000 });
     await expect(page.getByText('Node.js Advanced Patterns')).toBeVisible({ timeout: 8000 });
@@ -450,7 +461,7 @@ test.describe('Mobile — Training page', () => {
       },
     });
     await page.goto('/training');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     await expect(page.locator('h1, h2, main').first()).toBeVisible({ timeout: 8000 });
 
@@ -461,7 +472,7 @@ test.describe('Mobile — Training page', () => {
   test('screenshot and axe audit — mobile training courses', async ({ page }) => {
     await setupPage(page);
     await page.goto('/training/courses');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     expect(await hasHorizontalOverflow(page)).toBe(false);
     const violations = await screenshotAndAudit(page, 'training-courses');
@@ -483,7 +494,7 @@ test.describe('Mobile — Resumes page', () => {
       '/resumes/consultant/c-1': { json: MOCK_RESUMES_FOR_C1 },
     });
     await page.goto('/resumes');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     await expect(page.getByText('Resume workspace')).toBeVisible({ timeout: 8000 });
     await expect(page.getByText('v1').first()).toBeVisible({ timeout: 8000 });
@@ -499,7 +510,7 @@ test.describe('Mobile — Resumes page', () => {
       '/resumes/consultant/c-1': { json: MOCK_RESUMES_FOR_C1 },
     });
     await page.goto('/resumes');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     expect(await hasHorizontalOverflow(page)).toBe(false);
     const violations = await screenshotAndAudit(page, 'resumes');

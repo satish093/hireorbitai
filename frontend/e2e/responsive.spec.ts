@@ -64,7 +64,7 @@ for (const vp of VIEWPORTS) {
         },
       });
       await page.goto('/dashboard');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('load');
 
       const clean = await noHorizontalOverflow(page);
       expect(clean).toBe(true);
@@ -76,7 +76,7 @@ for (const vp of VIEWPORTS) {
 
       await mockApi(page, {}); // unauthenticated
       await page.goto('/login');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('load');
 
       const clean = await noHorizontalOverflow(page);
       expect(clean).toBe(true);
@@ -96,7 +96,7 @@ test.describe('Responsive — mobile sidebar behaviour', () => {
     await seedSession(page, MANAGER);
     await mockApi(page, { profile: MANAGER });
     await page.goto('/dashboard');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     // On mobile, the full sidebar should be hidden by default (either display:none
     // or off-screen). A hamburger / menu toggle should be present instead.
@@ -120,7 +120,7 @@ test.describe('Responsive — mobile sidebar behaviour', () => {
     await seedSession(page, MANAGER);
     await mockApi(page, { profile: MANAGER });
     await page.goto('/dashboard');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     // Check primary action buttons in the header / nav area.
     const smallButtons = await page.evaluate(() => {
@@ -157,7 +157,7 @@ test.describe('Responsive — dvh viewport units', () => {
     await seedSession(page, MANAGER);
     await mockApi(page, { profile: MANAGER });
     await page.goto('/dashboard');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     // Check that the outermost layout element does not use a fixed 100vh height,
     // which breaks on iOS Safari when the URL bar is visible.

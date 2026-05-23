@@ -15,7 +15,7 @@ export function ReportTabs({ tab, onTab }: { tab: PageTab; onTab: (t: PageTab) =
             onClick={() => onTab(t.key)}
             className={clsx(
               'relative pb-2.5 -mb-px text-sm whitespace-nowrap transition-colors focus:outline-none focus-visible:text-ink',
-              tab === t.key ? 'text-ink font-semibold' : 'text-muted hover:text-ink',
+              tab === t.key ? 'text-ink font-semibold' : 'text-ink-2 hover:text-ink',
             )}
           >
             {t.label}

@@ -73,11 +73,11 @@ const JOB_PAGE_HANDLERS = {
  * /jobs/recommended request with a clean dedup cache.
  */
 async function forceRecommendedReload(page: import('@playwright/test').Page) {
-  await page.waitForLoadState('networkidle');
+  await page.waitForLoadState('load');
   await page.getByRole('button', { name: 'Saved' }).click();
-  await page.waitForLoadState('networkidle');
+  await page.waitForLoadState('load');
   await page.getByRole('button', { name: /^Top/ }).click();
-  await page.waitForLoadState('networkidle');
+  await page.waitForLoadState('load');
 }
 
 test.describe('Job search page — rendering', () => {
@@ -108,7 +108,7 @@ test.describe('Job search page — rendering', () => {
       handlers: JOB_PAGE_HANDLERS,
     });
     await page.goto('/jobs');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     await expect(page).toHaveURL(/\/jobs$/);
   });
@@ -149,7 +149,7 @@ test.describe('Job search page — rendering', () => {
       handlers: JOB_PAGE_HANDLERS,
     });
     await page.goto('/jobs');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     expect(errors).toHaveLength(0);
   });

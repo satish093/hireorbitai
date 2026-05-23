@@ -41,6 +41,7 @@ export function Layout({
         <main
           key={loc.pathname}
           className="flex-1 p-4 sm:p-6 lg:p-8 overflow-auto animate-fade-in-up"
+          tabIndex={0}
         >
           {children}
         </main>

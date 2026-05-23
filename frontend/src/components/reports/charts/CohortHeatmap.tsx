@@ -11,7 +11,7 @@ export function CohortHeatmap({ cohorts }: { cohorts: Cohort[] }): JSX.Element {
   const colLabels = Array.from({ length: maxCols }, (_, i) => `W+${i}`);
 
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto" tabIndex={0}>
       <div className="inline-flex flex-col gap-1 min-w-full">
         {/* Header row */}
         <div className="flex items-center gap-1">

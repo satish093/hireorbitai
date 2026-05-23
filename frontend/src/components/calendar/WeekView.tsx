@@ -56,7 +56,7 @@ export function WeekView({
   const nowInRange = nowHour >= DAY_START && nowHour < DAY_END;
 
   return (
-    <div className="rounded-xl border border-border bg-surface overflow-x-auto">
+    <div className="rounded-xl border border-border bg-surface overflow-x-auto" tabIndex={0}>
       {/* ── DAY HEADER ── */}
       <div className="flex border-b border-border sticky top-0 bg-surface z-10">
         {/* Gutter spacer */}

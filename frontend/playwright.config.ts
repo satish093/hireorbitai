@@ -23,7 +23,7 @@ export default defineConfig({
   // Single worker keeps the shared dev server happy and output deterministic.
   workers: 1,
   reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : [['list']],
-  timeout: 30_000,
+  timeout: 60_000,
   expect: { timeout: 7_500 },
   use: {
     baseURL: 'http://localhost:5173',

@@ -143,7 +143,7 @@ const AVATAR_COLORS = [
   'bg-sky-100 dark:bg-sky-500/20 text-sky-700 dark:text-sky-300',
   'bg-violet-100 dark:bg-violet-500/20 text-violet-700 dark:text-violet-300',
   'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300',
-  'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-300',
+  'bg-orange-100 dark:bg-orange-500/20 text-orange-800 dark:text-orange-300',
   'bg-fuchsia-100 dark:bg-fuchsia-500/20 text-fuchsia-700 dark:text-fuchsia-300',
 ];
 

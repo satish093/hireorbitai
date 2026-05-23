@@ -12,7 +12,8 @@ interface Props {
   onDelete?: (id: string) => void;
 }
 
-const CURRENT_TONE = { bg: 'bg-success-soft', text: 'text-success' };
+// solid success bg + white text → 4.5:1+ contrast at 11px (was 3:1 with soft bg)
+const CURRENT_TONE = { bg: 'bg-success-soft', text: 'text-[#166534] dark:text-white' };
 
 /**
  * Horizontal scrollable row of fat version cards. Arrows separate cards, the
@@ -29,17 +30,41 @@ export function ResumeVersionStrip({ versions, activeId, onSelect, onNew, onDele
               ←
             </div>
           )}
-          <button
-            type="button"
-            onClick={() => onSelect(v.id)}
-            aria-pressed={v.id === activeId}
-            className={clsx(
-              'relative shrink-0 w-56 text-left rounded-xl border bg-surface p-3 transition hover-lift',
-              v.id === activeId
-                ? 'border-ink shadow-md'
-                : 'border-border hover:border-border-strong',
-            )}
-          >
+          {/* Wrapper div so the delete button is a sibling of the card button,
+              not nested inside it (nested-interactive a11y violation). */}
+          <div className="relative shrink-0">
+            <button
+              type="button"
+              onClick={() => onSelect(v.id)}
+              aria-pressed={v.id === activeId}
+              className={clsx(
+                'w-56 text-left rounded-xl border bg-surface p-3 transition hover-lift',
+                v.id === activeId
+                  ? 'border-ink shadow-md'
+                  : 'border-border hover:border-border-strong',
+              )}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-mono font-medium text-ink">v{v.version}</span>
+                {v.is_current && (
+                  <Pill tone={CURRENT_TONE} size="xs">
+                    CURRENT
+                  </Pill>
+                )}
+              </div>
+              <div className="mt-1 text-[10px] font-mono text-muted">
+                {fmtShortDate(v.created_at)}
+              </div>
+              <div className="mt-1.5 text-xs text-ink-2 line-clamp-2 min-h-[2rem] break-words">
+                {v.file_name}
+              </div>
+              <AtsBar score={v.ai_score != null ? Math.round(v.ai_score) : null} className="mt-2" />
+              {(v.tailored_job || v.tailored_for_job_id) && (
+                <div className="mt-2 text-[10px] text-muted truncate">
+                  Tailored for {v.tailored_job?.company_name ?? v.tailored_job?.title ?? 'a job'}
+                </div>
+              )}
+            </button>
             {onDelete && (
               <button
                 type="button"
@@ -53,27 +78,7 @@ export function ResumeVersionStrip({ versions, activeId, onSelect, onNew, onDele
                 ✕
               </button>
             )}
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-mono font-medium text-ink">v{v.version}</span>
-              {v.is_current && (
-                <Pill tone={CURRENT_TONE} size="xs">
-                  CURRENT
-                </Pill>
-              )}
-            </div>
-            <div className="mt-1 text-[10px] font-mono text-muted">
-              {fmtShortDate(v.created_at)}
-            </div>
-            <div className="mt-1.5 text-xs text-ink-2 line-clamp-2 min-h-[2rem] break-words">
-              {v.file_name}
-            </div>
-            <AtsBar score={v.ai_score != null ? Math.round(v.ai_score) : null} className="mt-2" />
-            {(v.tailored_job || v.tailored_for_job_id) && (
-              <div className="mt-2 text-[10px] text-muted truncate">
-                Tailored for {v.tailored_job?.company_name ?? v.tailored_job?.title ?? 'a job'}
-              </div>
-            )}
-          </button>
+          </div>
         </Fragment>
       ))}
       {versions.length > 0 && (

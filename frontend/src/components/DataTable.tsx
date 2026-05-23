@@ -36,7 +36,7 @@ export function DataTable<T extends { id?: string }>({
       {/* `overflow-x-auto` scrolls the table on narrow viewports instead of
           squashing every column. A min-width keeps the columns from collapsing
           before the scroller engages. */}
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto" tabIndex={0}>
         <table className="w-full text-sm min-w-[560px]">
           <thead className="bg-hover text-[10px] font-semibold tracking-widest text-ink-2 uppercase">
             <tr>

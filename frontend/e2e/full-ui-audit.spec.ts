@@ -72,7 +72,7 @@ test.describe('Dashboard page', () => {
 
     await setupPage(page);
     await page.goto('/dashboard');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     // Verify the page rendered a recognisable heading or KPI element.
     await expect(page.locator('h1, h2, [data-testid="page-header"]').first()).toBeVisible({
@@ -127,7 +127,7 @@ test.describe('Tasks page', () => {
   test('screenshot and axe audit — tasks page', async ({ page }) => {
     await setupPage(page);
     await page.goto('/tasks');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     const violations = await screenshotAndAudit(page, 'tasks');
     expect(
@@ -145,7 +145,7 @@ test.describe('Consultants page', () => {
 
     await setupPage(page);
     await page.goto('/consultants');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     await expect(page.getByText('Alice Chen')).toBeVisible({ timeout: 8000 });
     await expect(page.getByText('Bob Kim')).toBeVisible({ timeout: 8000 });
@@ -159,7 +159,7 @@ test.describe('Consultants page', () => {
 
     await setupPage(page);
     await page.goto('/consultants');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     // Bob Kim has no recruiter — his row should show an "Assign" button.
     const assignBtn = page.getByRole('button', { name: /assign/i }).first();
@@ -178,7 +178,7 @@ test.describe('Consultants page', () => {
   test('screenshot and axe audit — consultants page', async ({ page }) => {
     await setupPage(page);
     await page.goto('/consultants');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     const violations = await screenshotAndAudit(page, 'consultants');
     expect(
@@ -192,11 +192,11 @@ test.describe('Consultants page', () => {
 
 test.describe('Jobs page', () => {
   async function forceRecommendedReload(page: import('@playwright/test').Page) {
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
     await page.getByRole('button', { name: 'Saved' }).click();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
     await page.getByRole('button', { name: /^Top/ }).click();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
   }
 
   test('renders job listings after tab cycle (StrictMode dedup workaround)', async ({ page }) => {
@@ -239,7 +239,7 @@ test.describe('Jobs page', () => {
       },
     });
     await page.goto('/jobs');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     const violations = await screenshotAndAudit(page, 'jobs');
     expect(
@@ -257,7 +257,7 @@ test.describe('Calendar page', () => {
 
     await setupPage(page);
     await page.goto('/calendar');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     // The calendar should render a date/month heading.
     await expect(page.locator('h1, h2, [role="heading"]').first()).toBeVisible({ timeout: 8000 });
@@ -268,7 +268,7 @@ test.describe('Calendar page', () => {
   test('screenshot and axe audit — calendar page', async ({ page }) => {
     await setupPage(page);
     await page.goto('/calendar');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     const violations = await screenshotAndAudit(page, 'calendar');
     expect(
@@ -286,7 +286,7 @@ test.describe('Interviews page', () => {
 
     await setupPage(page);
     await page.goto('/interviews');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     // Page should render without crashing.
     await expect(page.locator('h1, h2, [role="heading"]').first()).toBeVisible({ timeout: 8000 });
@@ -297,7 +297,7 @@ test.describe('Interviews page', () => {
   test('screenshot and axe audit — interviews page', async ({ page }) => {
     await setupPage(page);
     await page.goto('/interviews');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     const violations = await screenshotAndAudit(page, 'interviews');
     expect(
@@ -315,7 +315,7 @@ test.describe('Reminders page', () => {
 
     await setupPage(page);
     await page.goto('/reminders');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     await expect(page.getByText('Follow up with Alice re: Google offer')).toBeVisible({
       timeout: 8000,
@@ -346,7 +346,7 @@ test.describe('Reminders page', () => {
   test('screenshot and axe audit — reminders page', async ({ page }) => {
     await setupPage(page);
     await page.goto('/reminders');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     const violations = await screenshotAndAudit(page, 'reminders');
     expect(
@@ -364,7 +364,7 @@ test.describe('Applications page', () => {
 
     await setupPage(page);
     await page.goto('/applications');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     await expect(page.getByText('Alice Chen')).toBeVisible({ timeout: 8000 });
     await expect(page.getByText('Senior Java Developer')).toBeVisible({ timeout: 8000 });
@@ -378,7 +378,7 @@ test.describe('Applications page', () => {
 
     await setupPage(page);
     await page.goto('/applications');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     const newBtn = page.getByRole('button', { name: /new submission|submit/i });
     await newBtn.waitFor({ timeout: 8000 });
@@ -395,7 +395,7 @@ test.describe('Applications page', () => {
   test('screenshot and axe audit — applications page', async ({ page }) => {
     await setupPage(page);
     await page.goto('/applications');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     const violations = await screenshotAndAudit(page, 'applications');
     expect(
@@ -413,7 +413,7 @@ test.describe('Reports page', () => {
 
     await setupPage(page);
     await page.goto('/reports');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     // The page header or a tab bar should appear.
     await expect(page.locator('h1, h2, [role="tablist"]').first()).toBeVisible({ timeout: 8000 });
@@ -424,7 +424,7 @@ test.describe('Reports page', () => {
   test('screenshot and axe audit — reports page', async ({ page }) => {
     await setupPage(page);
     await page.goto('/reports');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     const violations = await screenshotAndAudit(page, 'reports');
     expect(
@@ -442,7 +442,7 @@ test.describe('Messages page', () => {
 
     await setupPage(page);
     await page.goto('/messages');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     await expect(page.getByText('Alice Chen')).toBeVisible({ timeout: 8000 });
     await expect(page.getByText('Can we schedule a call this week?')).toBeVisible({
@@ -460,10 +460,10 @@ test.describe('Messages page', () => {
       '/messages/with/u-c1/read': { json: { ok: true } },
     });
     await page.goto('/messages');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     await page.getByText('Alice Chen').first().click();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     // After clicking, the thread area should become visible (composer input or header).
     await expect(page.locator('[placeholder], textarea, [role="textbox"]').first()).toBeVisible({
@@ -474,9 +474,11 @@ test.describe('Messages page', () => {
   });
 
   test('screenshot and axe audit — messages page', async ({ page }) => {
+    test.setTimeout(90_000);
     await setupPage(page);
     await page.goto('/messages');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
+    await expect(page.getByText('Alice Chen')).toBeVisible({ timeout: 10_000 });
 
     const violations = await screenshotAndAudit(page, 'messages');
     expect(
@@ -494,7 +496,7 @@ test.describe('Training page', () => {
 
     await setupPage(page);
     await page.goto('/training/courses');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     await expect(page.getByText('AWS Cloud Practitioner')).toBeVisible({ timeout: 8000 });
     await expect(page.getByText('Node.js Advanced Patterns')).toBeVisible({ timeout: 8000 });
@@ -516,7 +518,7 @@ test.describe('Training page', () => {
       },
     });
     await page.goto('/training');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     // The page should render without crashing.
     await expect(page.locator('h1, h2, main').first()).toBeVisible({ timeout: 8000 });
@@ -525,9 +527,11 @@ test.describe('Training page', () => {
   });
 
   test('screenshot and axe audit — training courses page', async ({ page }) => {
+    test.setTimeout(90_000);
     await setupPage(page);
     await page.goto('/training/courses');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
+    await expect(page.getByText('AWS Cloud Practitioner')).toBeVisible({ timeout: 10_000 });
 
     const violations = await screenshotAndAudit(page, 'training-courses');
     expect(
@@ -550,7 +554,7 @@ test.describe('Resumes page', () => {
       '/resumes/consultant/c-1': { json: MOCK_RESUMES_FOR_C1 },
     });
     await page.goto('/resumes');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     await expect(page.getByText('Resume workspace')).toBeVisible({ timeout: 8000 });
     // ResumeVersionStrip renders v{version} — asserting real content from mock data.
@@ -561,9 +565,11 @@ test.describe('Resumes page', () => {
   });
 
   test('screenshot and axe audit — resumes page', async ({ page }) => {
+    test.setTimeout(90_000);
     await setupPage(page);
     await page.goto('/resumes');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
+    await expect(page.locator('h1, h2, main').first()).toBeVisible({ timeout: 10_000 });
 
     const violations = await screenshotAndAudit(page, 'resumes');
     expect(

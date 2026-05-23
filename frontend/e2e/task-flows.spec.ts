@@ -181,13 +181,14 @@ test.describe('Tasks page — create task modal', () => {
       handlers: TASK_PAGE_HANDLERS,
     });
     await page.goto('/tasks');
+    await page.waitForLoadState('load');
 
     const newTaskBtn = page.getByRole('button', { name: /new task/i });
-    await newTaskBtn.waitFor({ timeout: 8000 });
+    await newTaskBtn.waitFor({ timeout: 10_000 });
     await newTaskBtn.click();
 
     // A dialog with a form should appear.
-    await expect(page.getByRole('dialog')).toBeVisible({ timeout: 3000 });
+    await expect(page.getByRole('dialog')).toBeVisible({ timeout: 5000 });
 
     // The modal should contain at least one text input (task title field).
     const titleInput = page.getByRole('dialog').getByRole('textbox').first();

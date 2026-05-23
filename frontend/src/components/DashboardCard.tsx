@@ -24,7 +24,7 @@ export function DashboardCard({ label, value, hint, accent = 'slate', selected }
         selected ? 'border-ink shadow-sm' : 'border-border'
       } p-5 overflow-hidden hover-lift before:absolute before:left-0 before:top-0 before:bottom-0 before:w-1 ${accents[accent]} before:scale-y-0 before:origin-top before:transition-transform before:duration-300 before:ease-out hover:before:scale-y-100`}
     >
-      <div className="text-[10px] font-semibold tracking-widest text-muted uppercase">{label}</div>
+      <div className="text-[10px] font-semibold tracking-widest text-ink-2 uppercase">{label}</div>
       <div className="text-3xl font-semibold mt-2 tabular-nums tracking-tight text-ink">
         {typeof value === 'number' ? <CountUp value={value} /> : value}
       </div>
