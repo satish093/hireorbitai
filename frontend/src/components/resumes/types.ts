@@ -31,6 +31,7 @@ export interface ResumeProfile {
   website: string | null;
   summary: string | null;
   total_years_experience: number | null;
+  age?: number | null;
   skills: string[];
   experiences: ResumeExperience[];
   education: ResumeEducation[];

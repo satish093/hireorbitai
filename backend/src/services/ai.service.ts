@@ -105,6 +105,7 @@ const ResumeProfileSchema = z.object({
   website: z.string().nullable(),
   summary: z.string().nullable(),
   total_years_experience: z.number().nullable(),
+  age: z.number().nullable(),
   skills: z.array(z.string()),
   experiences: z.array(ExperienceItemSchema),
   education: z.array(EducationItemSchema),
@@ -125,7 +126,8 @@ Rules:
 - experiences: list all jobs ordered most-recent first
 - skills: include both technical and soft skills as stated
 - certifications: standalone certs/licenses only (not degrees)
-- languages: spoken languages only (not programming languages)`;
+- languages: spoken languages only (not programming languages)
+- age: extract the candidate's age as an integer if explicitly stated; otherwise null`;
 
   const response = await anthropic.messages.parse({
     model: ANTHROPIC_MODEL,
