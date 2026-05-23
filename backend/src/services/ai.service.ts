@@ -1,5 +1,10 @@
 import { z } from 'zod/v4';
-import { genai, GEMINI_MODEL, AI_MAX_INPUT_CHARS, AI_MAX_JOB_DESC_CHARS } from '../config/gemini';
+import {
+  anthropic,
+  ANTHROPIC_MODEL,
+  AI_MAX_INPUT_CHARS,
+  AI_MAX_JOB_DESC_CHARS,
+} from '../config/anthropic';
 import { logAiUsage } from './aiUsage';
 
 function clip(text: string | null | undefined, max: number = AI_MAX_INPUT_CHARS): string {
@@ -7,61 +12,36 @@ function clip(text: string | null | undefined, max: number = AI_MAX_INPUT_CHARS)
   return s.length > max ? s.slice(0, max) : s;
 }
 
-/** Normalize Gemini usageMetadata to the shape logAiUsage expects. */
-function usage(result: {
-  response: { usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number } };
-}) {
-  const m = result.response.usageMetadata;
-  return { input_tokens: m?.promptTokenCount ?? 0, output_tokens: m?.candidatesTokenCount ?? 0 };
+function usage(response: { usage: { input_tokens: number; output_tokens: number } }) {
+  return { input_tokens: response.usage.input_tokens, output_tokens: response.usage.output_tokens };
 }
 
-/** Retry a Gemini call up to 4 times on 429 RESOURCE_EXHAUSTED with linear backoff. */
-async function withGeminiRetry<T>(fn: () => Promise<T>): Promise<T> {
-  for (let attempt = 0; attempt < 4; attempt++) {
-    try {
-      return await fn();
-    } catch (err: unknown) {
-      const msg = String((err as { message?: string })?.message ?? '');
-      const status = (err as { status?: number })?.status;
-      const is429 = status === 429 || msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED');
-      if (is429 && attempt < 3) {
-        await new Promise((r) => setTimeout(r, (attempt + 1) * 4000));
-        continue;
-      }
-      throw err;
-    }
-  }
-  throw new Error('unreachable');
-}
-
-/**
- * Call Gemini with JSON mode and parse the response through a Zod schema.
- * Gemini's JSON mode guarantees well-formed JSON; Zod validates the structure.
- */
-async function geminiParse<T extends z.ZodType>(
+async function anthropicParse<T extends z.ZodType>(
   call: string,
   prompt: string,
   schema: T,
-  maxOutputTokens = 4096,
+  maxTokens = 1024,
 ): Promise<z.infer<T>> {
-  const model = genai.getGenerativeModel({
-    model: GEMINI_MODEL,
-    generationConfig: { responseMimeType: 'application/json', maxOutputTokens },
+  const response = await anthropic.messages.create({
+    model: ANTHROPIC_MODEL,
+    max_tokens: maxTokens,
+    system: 'Output valid JSON only. No markdown fences, no explanation.',
+    messages: [{ role: 'user', content: prompt }],
   });
-  const result = await withGeminiRetry(() => model.generateContent(prompt));
-  logAiUsage(call, GEMINI_MODEL, usage(result));
-  return schema.parse(JSON.parse(result.response.text())) as z.infer<T>;
+  const text = response.content[0].type === 'text' ? response.content[0].text.trim() : '{}';
+  logAiUsage(call, ANTHROPIC_MODEL, usage(response));
+  return schema.parse(JSON.parse(text)) as z.infer<T>;
 }
 
-/** Plain-text Gemini call (no structured output). */
-async function geminiText(call: string, prompt: string, maxOutputTokens = 700): Promise<string> {
-  const model = genai.getGenerativeModel({
-    model: GEMINI_MODEL,
-    generationConfig: { maxOutputTokens },
+async function anthropicText(call: string, prompt: string, maxTokens = 600): Promise<string> {
+  const response = await anthropic.messages.create({
+    model: ANTHROPIC_MODEL,
+    max_tokens: maxTokens,
+    messages: [{ role: 'user', content: prompt }],
   });
-  const result = await withGeminiRetry(() => model.generateContent(prompt));
-  logAiUsage(call, GEMINI_MODEL, usage(result));
-  return result.response.text().trim();
+  const text = response.content[0].type === 'text' ? response.content[0].text.trim() : '';
+  logAiUsage(call, ANTHROPIC_MODEL, usage(response));
+  return text;
 }
 
 // ---------------------------------------------------------------------------
@@ -77,13 +57,14 @@ const ResumeScoreSchema = z.object({
 type ResumeScoreResult = z.infer<typeof ResumeScoreSchema>;
 
 export async function scoreResume(resumeText: string): Promise<ResumeScoreResult> {
-  return geminiParse(
+  return anthropicParse(
     'scoreResume',
     `You are an expert technical recruiter. Score the following resume on a 0-100 scale based on clarity, impact, quantification, skill depth, and ATS-friendliness. Return JSON with: score (number), strengths (string[]), weaknesses (string[]), suggestions (string[]).
 
 Resume:
 ${clip(resumeText)}`,
     ResumeScoreSchema,
+    512,
   );
 }
 
@@ -127,7 +108,7 @@ const ResumeProfileSchema = z.object({
 export type ResumeProfile = z.infer<typeof ResumeProfileSchema>;
 
 export async function parseResumeProfile(resumeText: string): Promise<ResumeProfile> {
-  return geminiParse(
+  return anthropicParse(
     'parseResumeProfile',
     `Extract structured profile information from this resume. Extract ONLY what is explicitly stated — never invent data. Return JSON matching the exact field names below.
 
@@ -152,7 +133,7 @@ Fields to extract:
 
 Set null (not empty string) for any field not clearly present.`,
     ResumeProfileSchema,
-    4096,
+    1200,
   );
 }
 
@@ -172,7 +153,7 @@ export async function atsScore(
   resumeText: string,
   jobDescription: string,
 ): Promise<AtsScoreResult> {
-  return geminiParse(
+  return anthropicParse(
     'atsScore',
     `Compare the resume below against the job description and produce an ATS match score 0-100. Return JSON with: score (number 0-100), matched_keywords (string[]), missing_keywords (string[]), summary (1-2 sentence string).
 
@@ -182,6 +163,7 @@ ${clip(resumeText)}
 === JOB DESCRIPTION ===
 ${clip(jobDescription)}`,
     AtsScoreSchema,
+    512,
   );
 }
 
@@ -207,7 +189,7 @@ interface VendorEmailInput {
 export async function generateVendorSubmissionEmail(
   input: VendorEmailInput,
 ): Promise<{ subject: string; body: string }> {
-  return geminiParse(
+  return anthropicParse(
     'generateVendorSubmissionEmail',
     `Write a concise, professional vendor submission email from a recruiter introducing a consultant for a role. Friendly, confident tone, no emojis, no fluff. Return JSON with: subject (string), body (string).
 
@@ -219,7 +201,7 @@ Details:
 - Job: ${input.jobTitle}
 - JD: ${clip(input.jobDescription) || '(not provided)'}`,
     VendorEmailSchema,
-    2048,
+    700,
   );
 }
 
@@ -251,7 +233,7 @@ export async function extractJobRequirements(input: {
   required_skills?: string[] | null;
   location?: string | null;
 }): Promise<JobRequirements> {
-  return geminiParse(
+  return anthropicParse(
     'extractJobRequirements',
     `You are reading a real job posting and producing structured fields used by a job-matching UI. Identify ONLY what's explicitly stated or strongly implied — never invent. Use empty arrays / null when not stated. Return JSON with the exact field names listed.
 
@@ -278,7 +260,7 @@ Fields to return:
 - highlights: 3-5 short positives a candidate would care about
 - recommendation_tags: short chips for visa/clearance signals`,
     JobRequirementsSchema,
-    3072,
+    1024,
   );
 }
 
@@ -316,7 +298,7 @@ export async function scoreResumeAgainstJob(input: {
   };
 }): Promise<SkillMatchResult> {
   const skills = input.job.required_skills ?? [];
-  return geminiParse(
+  return anthropicParse(
     'scoreResumeAgainstJob',
     `Score this resume against the job. Return JSON with exact field names.
 
@@ -338,7 +320,7 @@ Fields to return:
 - feature_scores: { seniority_match (0..1), skill_match (avg of per_skill), industry_match (0..1) }
 - rationale: 2-3 short sentences from the candidate's perspective`,
     SkillMatchSchema,
-    2048,
+    1024,
   );
 }
 
@@ -382,7 +364,7 @@ ${ctx}${candidate}
 === QUESTION ===
 ${input.question}`;
 
-  const text = await geminiText('jobCopilot', prompt, 700);
+  const text = await anthropicText('jobCopilot', prompt, 600);
   return text || 'I could not generate an answer for that. Try rephrasing your question.';
 }
 
@@ -420,7 +402,7 @@ export async function tailorResumeForJob(input: {
   const musts = (input.job.must_haves ?? []).join(', ');
   const mode = input.mode ?? 'polish';
 
-  return geminiParse(
+  return anthropicParse(
     'tailorResumeForJob',
     `You are a senior recruiter and ATS-optimization expert. Rewrite the candidate's resume so it scores 85% or higher against the job below. Return JSON with exact field names.
 

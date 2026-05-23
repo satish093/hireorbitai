@@ -8,6 +8,7 @@ import { Avatar } from '../components/TaskBits';
 import { PageHeader } from '../components/PageHeader';
 import { Button } from '../components/Button';
 import { GroupBadge } from '../components/GroupBadge';
+import { Popover } from '../components/ui/Popover';
 import { api } from '../services/api';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
@@ -53,10 +54,73 @@ const STATUS_TONE: Record<string, string> = {
   ACTIVE:
     'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30 focus:ring-emerald-500/30',
   PAUSED:
-    'bg-amber-50 dark:bg-amber-500/15  text-amber-800 dark:text-amber-300  border-amber-200 dark:border-amber-500/30  focus:ring-amber-500/30',
+    'bg-amber-50 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-500/30 focus:ring-amber-500/30',
   PLACED:
-    'bg-blue-50 dark:bg-blue-500/15   text-blue-700 dark:text-blue-300   border-blue-200 dark:border-blue-500/30   focus:ring-blue-500/30',
+    'bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-500/30 focus:ring-blue-500/30',
 };
+
+const STATUS_OPTIONS = [
+  { value: 'ACTIVE', label: 'Active', dot: 'bg-emerald-500' },
+  { value: 'PAUSED', label: 'Paused', dot: 'bg-amber-400' },
+  { value: 'PLACED', label: 'Placed', dot: 'bg-blue-500' },
+] as const;
+
+function StatusSelect({
+  value,
+  onChange,
+}: {
+  value: 'ACTIVE' | 'PAUSED' | 'PLACED';
+  onChange: (v: string) => void;
+}) {
+  const opt = STATUS_OPTIONS.find((o) => o.value === value)!;
+  return (
+    <Popover
+      align="left"
+      button={(open) => (
+        <button
+          className={clsx(
+            'inline-flex items-center gap-1.5 text-[11px] font-medium pl-2.5 pr-2 py-1 rounded-full border cursor-pointer focus:outline-none focus:ring-2 transition',
+            STATUS_TONE[value],
+          )}
+        >
+          {opt.label}
+          <svg
+            width="10"
+            height="6"
+            viewBox="0 0 10 6"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            className={clsx('transition-transform', open && 'rotate-180')}
+          >
+            <path d="M1 1l4 4 4-4" />
+          </svg>
+        </button>
+      )}
+    >
+      {(close) => (
+        <div className="py-1 min-w-[120px]">
+          {STATUS_OPTIONS.map((o) => (
+            <button
+              key={o.value}
+              onClick={() => {
+                onChange(o.value);
+                close();
+              }}
+              className={clsx(
+                'w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm text-ink hover:bg-hover transition cursor-pointer',
+                o.value === value && 'bg-hover',
+              )}
+            >
+              <span className={clsx('w-2 h-2 rounded-full shrink-0', o.dot)} />
+              {o.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </Popover>
+  );
+}
 
 export function Consultants() {
   const [rows, setRows] = useState<ConsultantRow[]>([]);
@@ -214,23 +278,7 @@ export function Consultants() {
             key: 'status',
             header: 'Status',
             render: (c: ConsultantRow) => (
-              <select
-                value={c.marketing_status}
-                onChange={(e) => setStatus(c.id, e.target.value)}
-                aria-label="Marketing status"
-                className={clsx(
-                  'appearance-none text-[11px] font-medium pl-2.5 pr-6 py-1 rounded-full border bg-no-repeat bg-[length:14px] bg-[position:right_4px_center] cursor-pointer focus:outline-none focus:ring-2 transition',
-                  STATUS_TONE[c.marketing_status],
-                )}
-                style={{
-                  backgroundImage:
-                    'url("data:image/svg+xml;utf8,<svg xmlns=%27http://www.w3.org/2000/svg%27 width=%2710%27 height=%276%27 viewBox=%270 0 10 6%27 fill=%27none%27 stroke=%27currentColor%27 stroke-width=%271.5%27><path d=%27M1 1l4 4 4-4%27/></svg>")',
-                }}
-              >
-                <option value="ACTIVE">Active</option>
-                <option value="PAUSED">Paused</option>
-                <option value="PLACED">Placed</option>
-              </select>
+              <StatusSelect value={c.marketing_status} onChange={(v) => setStatus(c.id, v)} />
             ),
           },
           {
