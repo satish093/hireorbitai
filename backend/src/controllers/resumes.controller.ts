@@ -40,7 +40,7 @@ async function authorizeConsultantAccess(
   if (!cons) throw httpError(404, 'Consultant not found');
 
   if (caller.role === 'CONSULTANT') {
-    if (cons.user_id !== caller.id) throw httpError(403, 'Forbidden');
+    if (cons.user_id !== caller.id) throw httpError(404, 'Not found');
     return;
   }
   if (caller.role === 'RECRUITER') {
@@ -49,10 +49,10 @@ async function authorizeConsultantAccess(
       .select('id')
       .eq('user_id', caller.id)
       .maybeSingle();
-    if (!rec || cons.recruiter_id !== rec.id) throw httpError(403, 'Forbidden');
+    if (!rec || cons.recruiter_id !== rec.id) throw httpError(404, 'Not found');
     return;
   }
-  throw httpError(403, 'Forbidden');
+  throw httpError(404, 'Not found');
 }
 
 /** Delete a single resume version. Auto-promotes the next most-recent if deleting current. */
