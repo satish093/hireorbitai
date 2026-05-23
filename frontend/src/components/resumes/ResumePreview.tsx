@@ -9,7 +9,7 @@ import { MarkdownView } from './markdown';
 interface Props {
   resumeId: string;
   fileName?: string;
-  /** Bump to force a re-fetch of the body (e.g. after re-extraction). */
+  /** Bump to force a background re-fetch (e.g. after re-extraction). */
   refreshKey?: number;
   /** Re-extract readable text from the stored file (for old fileless uploads). */
   onReextract?: () => void;
@@ -20,6 +20,11 @@ interface Props {
  * Renders a resume version the way it would print: real white paper, sans-serif
  * type, sectioned headers, drop shadow. The paper is intentionally NOT themed —
  * it stays white in dark mode so the PDF export matches what's on screen.
+ *
+ * Stale-while-revalidate: when the same resumeId re-fetches (e.g. after AI
+ * re-extraction or applying a tailor session) the existing body stays visible
+ * rather than being replaced by a skeleton. A skeleton only appears when a
+ * genuinely different resumeId is loaded for the first time.
  */
 export function ResumePreview({
   resumeId,
@@ -30,8 +35,12 @@ export function ResumePreview({
 }: Props) {
   const [body, setBody] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(false);
   const paperRef = useRef<HTMLDivElement>(null);
+  // Track the last ID we showed content for so we can distinguish a new-resume
+  // load (show skeleton) from a background refresh of the same resume (keep content).
+  const loadedIdRef = useRef<string | null>(null);
 
   const print = useReactToPrint({
     contentRef: paperRef,
@@ -41,13 +50,35 @@ export function ResumePreview({
   useEffect(() => {
     if (!resumeId) return;
     let cancelled = false;
-    setLoading(true);
+    const isNewResume = resumeId !== loadedIdRef.current;
+
+    if (isNewResume) {
+      // Different version selected — clear content and show skeleton.
+      setBody(null);
+      setLoading(true);
+      setRefreshing(false);
+    } else {
+      // Same resume re-fetching (AI re-extract, apply, etc.) — keep old content
+      // visible and show only a subtle refreshing indicator.
+      setRefreshing(true);
+    }
     setError(false);
+
     api
       .get(`/resumes/${resumeId}/body`)
-      .then((r) => !cancelled && setBody(r.data?.body ?? ''))
-      .catch(() => !cancelled && setError(true))
-      .finally(() => !cancelled && setLoading(false));
+      .then((r) => {
+        if (cancelled) return;
+        loadedIdRef.current = resumeId;
+        setBody(r.data?.body ?? '');
+        setLoading(false);
+        setRefreshing(false);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setError(true);
+        setLoading(false);
+        setRefreshing(false);
+      });
     return () => {
       cancelled = true;
     };
@@ -104,13 +135,15 @@ export function ResumePreview({
       </div>
       {/* Outer tray — neutral gray so the white paper stands out. */}
       <div className="overflow-y-auto max-h-[72vh] bg-[#d8dce3] dark:bg-[#1a1c22] rounded-xl p-5 sm:p-8 flex justify-center">
-        {/* Paper — always white regardless of app theme; matches what will print. */}
+        {/* Paper — always white regardless of app theme; matches what will print.
+            Fades slightly during background re-fetches so the user knows something
+            is happening without losing the readable content. */}
         <div
           ref={paperRef}
-          className="bg-white text-slate-900 w-full max-w-[720px] shadow-[0_6px_40px_-4px_rgba(0,0,0,0.22)] px-10 sm:px-14 py-10 sm:py-12 print:!bg-white print:!text-slate-900 print:shadow-none print:max-w-none print:px-0 print:py-0"
+          className={`bg-white text-slate-900 w-full max-w-[720px] shadow-[0_6px_40px_-4px_rgba(0,0,0,0.22)] px-10 sm:px-14 py-10 sm:py-12 print:!bg-white print:!text-slate-900 print:shadow-none print:max-w-none print:px-0 print:py-0 transition-opacity duration-300 ${refreshing ? 'opacity-60' : 'opacity-100'}`}
           style={{ fontFamily: "'Helvetica Neue', Arial, ui-sans-serif, system-ui, sans-serif" }}
         >
-          <MarkdownView md={body} />
+          <MarkdownView md={body ?? ''} />
         </div>
       </div>
     </div>
