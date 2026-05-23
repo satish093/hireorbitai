@@ -77,7 +77,7 @@ const envSchema = z.object({
   ANTHROPIC_MODEL: z.string().default('claude-haiku-4-5-20251001'),
   // Heavier model for long-form training content generation (lesson bodies,
   // capstone). Outline + quiz calls stay on the cheaper ANTHROPIC_MODEL.
-  TRAINING_CONTENT_MODEL: z.string().default('claude-sonnet-4-6'),
+  TRAINING_CONTENT_MODEL: z.string().default('claude-haiku-4-5-20251001'),
   // 'api' — use the Anthropic Messages API with ANTHROPIC_API_KEY (default).
   // 'stub' — never call a model; always return editable stubs.
   TRAINING_AI_PROVIDER: z.enum(['api', 'stub']).default('api'),

@@ -1,11 +1,11 @@
 import { z } from 'zod';
 import {
-  genai,
-  GEMINI_MODEL,
+  anthropic,
+  ANTHROPIC_MODEL,
   TRAINING_CONTENT_MODEL,
   AI_PROVIDER,
   AI_AVAILABLE,
-} from '../config/gemini';
+} from '../config/anthropic';
 import { logger } from '../config/logger';
 
 /**
@@ -21,24 +21,6 @@ import { logger } from '../config/logger';
  * 500s and the generated stub stays fully editable by hand.
  */
 
-async function withGeminiRetry<T>(fn: () => Promise<T>): Promise<T> {
-  for (let attempt = 0; attempt < 4; attempt++) {
-    try {
-      return await fn();
-    } catch (err: unknown) {
-      const msg = String((err as { message?: string })?.message ?? '');
-      const status = (err as { status?: number })?.status;
-      const is429 = status === 429 || msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED');
-      if (is429 && attempt < 3) {
-        await new Promise((r) => setTimeout(r, (attempt + 1) * 4000));
-        continue;
-      }
-      throw err;
-    }
-  }
-  throw new Error('unreachable');
-}
-
 /** Single entry point for every structured generation. */
 async function generateStructured<S extends z.ZodTypeAny>(
   schema: S,
@@ -46,12 +28,14 @@ async function generateStructured<S extends z.ZodTypeAny>(
   opts: { model: string; maxTokens: number },
 ): Promise<z.infer<S>> {
   if (AI_PROVIDER === 'stub') throw new Error('TRAINING_AI_PROVIDER=stub');
-  const model = genai.getGenerativeModel({
+  const response = await anthropic.messages.create({
     model: opts.model,
-    generationConfig: { responseMimeType: 'application/json', maxOutputTokens: opts.maxTokens },
+    max_tokens: opts.maxTokens,
+    system: 'Output valid JSON only. No markdown fences, no explanation.',
+    messages: [{ role: 'user', content: prompt }],
   });
-  const result = await withGeminiRetry(() => model.generateContent(prompt));
-  return schema.parse(JSON.parse(result.response.text())) as z.infer<S>;
+  const text = response.content[0].type === 'text' ? response.content[0].text.trim() : '{}';
+  return schema.parse(JSON.parse(text)) as z.infer<S>;
 }
 
 // ---------------------------------------------------------------------------
@@ -97,7 +81,7 @@ Produce:
 - summary: 2–3 sentences for the consultant on what to focus on and in what order.`;
 
   return generateStructured(TrainingPlanSchema, prompt, {
-    model: GEMINI_MODEL,
+    model: ANTHROPIC_MODEL,
     maxTokens: 3072,
   });
 }
@@ -131,7 +115,7 @@ Produce:
 Avoid generic "tell me about yourself"-style filler. Every item should map back to a JD requirement.`;
 
   return generateStructured(InterviewQuestionsSchema, prompt, {
-    model: GEMINI_MODEL,
+    model: ANTHROPIC_MODEL,
     maxTokens: 3072,
   });
 }
@@ -171,7 +155,7 @@ Produce ${count} questions. Each:
 
 Mix difficulty: ~60% recall, ~30% applied, ~10% scenario.`;
 
-  return generateStructured(QuizSchema, prompt, { model: GEMINI_MODEL, maxTokens: 3072 });
+  return generateStructured(QuizSchema, prompt, { model: ANTHROPIC_MODEL, maxTokens: 3072 });
 }
 
 // ---------------------------------------------------------------------------
@@ -214,7 +198,7 @@ Produce:
 - overall_score: 0–100 readiness score
 - readiness_summary: 2–3 sentences a recruiter would forward to the consultant.`;
 
-  return generateStructured(SkillGapSchema, prompt, { model: GEMINI_MODEL, maxTokens: 2048 });
+  return generateStructured(SkillGapSchema, prompt, { model: ANTHROPIC_MODEL, maxTokens: 2048 });
 }
 
 // ===========================================================================
@@ -330,7 +314,8 @@ Produce a course OUTLINE only (lesson bodies are written separately later):
 
   return safeGenerate(
     'course-outline',
-    () => generateStructured(CourseOutlineSchema, prompt, { model: GEMINI_MODEL, maxTokens: 3072 }),
+    () =>
+      generateStructured(CourseOutlineSchema, prompt, { model: ANTHROPIC_MODEL, maxTokens: 3072 }),
     () => fallbackOutline(input, count),
   );
 }

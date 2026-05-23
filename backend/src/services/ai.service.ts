@@ -441,7 +441,7 @@ ${
 - sections_modified: section heading names you touched
 - estimated_match_score: honest 0-100 estimate (conservative if fewer than 3 required skills had evidence)`,
     TailoredResumeSchema,
-    8192,
+    2048,
   );
 }
 
@@ -483,7 +483,7 @@ export async function tailorResumeForJobStructured(input: {
   const skills = (input.job.required_skills ?? []).join(', ');
   const musts = (input.job.must_haves ?? []).join(', ');
 
-  return geminiParse(
+  return anthropicParse(
     'tailorResumeForJobStructured',
     `You are a senior recruiter and ATS-optimization expert. Rewrite the candidate's resume so it scores 85%+ against the job below, then produce a SECTION-BY-SECTION edit list a reviewer can accept or reject one change at a time. Return JSON with exact field names.
 
@@ -516,7 +516,7 @@ Keywords to weave in (only where truthful): ${keywordList}.
 - edits: ONE entry per section changed or added. Each: { section (heading name), before_text (original verbatim or null if new section), after_text (rewritten — wrap changed tokens in **double asterisks**), ai_reason (one line why) }
 - estimated_match_score: honest 0-100 estimate`,
     TailorSessionSchema,
-    8192,
+    3072,
   );
 }
 
@@ -566,7 +566,7 @@ export async function matchJobsForConsultant(
       ? consultantProfile.skills.join(', ')
       : '(none listed — derive skills from the resume below)';
 
-  const result = await geminiParse(
+  const result = await anthropicParse(
     'matchJobsForConsultant',
     `You are ranking jobs for a specific consultant. Score each job 0-100 and return sorted matches. Return JSON with: matches (array of { job_id, match_score, reasons }).
 
@@ -596,7 +596,7 @@ ${
 }
 Return all jobs sorted by match_score descending.`,
     JobMatchListSchema,
-    8192,
+    800,
   );
   return result.matches;
 }
