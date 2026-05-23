@@ -94,6 +94,7 @@ export function TrainingCourses() {
         <h1 className="text-2xl font-semibold tracking-tight">Courses</h1>
         <div className="flex items-center gap-2">
           <select
+            aria-label="Filter by status"
             value={filter.status}
             onChange={(e) => setFilter({ ...filter, status: e.target.value })}
             className="text-sm border border-border rounded-md px-2 py-1.5"
@@ -104,6 +105,7 @@ export function TrainingCourses() {
             <option value="ARCHIVED">Archived</option>
           </select>
           <select
+            aria-label="Filter by category"
             value={filter.category}
             onChange={(e) => setFilter({ ...filter, category: e.target.value })}
             className="text-sm border border-border rounded-md px-2 py-1.5"

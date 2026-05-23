@@ -54,7 +54,7 @@ const ymd = (d: Date) =>
 
 function ActivitySparkline({ byDay }: { byDay: UserTimeRow['by_day'] }) {
   const bars = byDay.slice(-14);
-  if (!bars.length) return <span className="text-faint text-xs">—</span>;
+  if (!bars.length) return <span className="text-muted text-xs">—</span>;
   const peak = Math.max(1, ...bars.map((b) => b.active_seconds));
   return (
     <span className="inline-flex items-end gap-[1px] h-4">

@@ -29,7 +29,7 @@ export function ReportTabs({ tab, onTab }: { tab: PageTab; onTab: (t: PageTab) =
           </button>
         ))}
       </div>
-      <span className="hidden sm:block shrink-0 pb-2.5 text-[11px] font-mono text-faint">
+      <span className="hidden sm:block shrink-0 pb-2.5 text-[11px] font-mono text-muted">
         {resolved.label}
       </span>
     </div>

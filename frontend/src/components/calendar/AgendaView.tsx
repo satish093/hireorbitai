@@ -236,7 +236,7 @@ export function AgendaView({
           {/* Sentinel for IntersectionObserver — only rendered when more data exists */}
           {hasMore && (
             <div ref={sentinelRef} className="h-8 flex items-center justify-center">
-              <span className="text-[11px] text-faint select-none">Loading more…</span>
+              <span className="text-[11px] text-muted select-none">Loading more…</span>
             </div>
           )}
         </>

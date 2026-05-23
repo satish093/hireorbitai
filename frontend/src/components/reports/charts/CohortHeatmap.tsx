@@ -20,7 +20,7 @@ export function CohortHeatmap({ cohorts }: { cohorts: Cohort[] }): JSX.Element {
           {colLabels.map((label) => (
             <div
               key={label}
-              className="h-7 flex-1 min-w-[28px] grid place-items-center text-[10px] font-mono text-faint"
+              className="h-7 flex-1 min-w-[28px] grid place-items-center text-[10px] font-mono text-muted"
             >
               {label}
             </div>
@@ -64,7 +64,7 @@ export function CohortHeatmap({ cohorts }: { cohorts: Cohort[] }): JSX.Element {
             })}
 
             {/* n= label */}
-            <div className="w-16 ml-2 text-[11px] font-mono text-faint text-left shrink-0">
+            <div className="w-16 ml-2 text-[11px] font-mono text-muted text-left shrink-0">
               n={cohort.size}
             </div>
           </div>

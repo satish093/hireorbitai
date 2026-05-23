@@ -56,7 +56,7 @@ function sortRows(rows: RecruiterRow[], key: SortKey, dir: SortDir): RecruiterRo
 // ---------------------------------------------------------------------------
 
 function Sparkline({ spark }: { spark: number[] }) {
-  if (!spark.length) return <span className="text-faint text-xs">—</span>;
+  if (!spark.length) return <span className="text-muted text-xs">—</span>;
   const max = Math.max(1, ...spark);
   return (
     <span className="inline-flex items-end gap-[1px] h-5">

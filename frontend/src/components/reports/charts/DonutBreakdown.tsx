@@ -105,7 +105,7 @@ export function DonutBreakdown({
             </span>
             {/* Value + pct */}
             <span className="text-[12px] font-mono text-muted whitespace-nowrap ml-2">
-              {seg.datum.value.toLocaleString()} <span className="text-faint">({seg.pct}%)</span>
+              {seg.datum.value.toLocaleString()} <span className="text-muted">({seg.pct}%)</span>
             </span>
           </div>
         ))}

@@ -144,7 +144,7 @@ export function MonthView({
                     <span
                       className={clsx(
                         'font-mono text-[12px] w-6 h-6 grid place-items-center select-none',
-                        isCurrentMonth ? 'text-ink' : 'text-faint',
+                        isCurrentMonth ? 'text-ink' : 'text-muted',
                       )}
                     >
                       {day.getDate()}

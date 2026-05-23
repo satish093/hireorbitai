@@ -160,7 +160,7 @@ export function CalendarSidebar({
           {WEEKDAY_LETTERS.map((letter, i) => (
             <div
               key={i}
-              className="flex items-center justify-center text-[10px] text-faint font-medium h-6"
+              className="flex items-center justify-center text-[10px] text-muted font-medium h-6"
             >
               {letter}
             </div>
@@ -226,7 +226,7 @@ export function CalendarSidebar({
             <p className="text-[13px] font-semibold text-ink leading-snug">{upNext.title}</p>
 
             {/* Time */}
-            <p className="text-[12px] text-muted">{formatEventTime(new Date(upNext.start))}</p>
+            <p className="text-[12px] text-ink-2">{formatEventTime(new Date(upNext.start))}</p>
 
             {/* Actions */}
             <div className="flex items-center gap-2 pt-0.5">

@@ -76,6 +76,7 @@ export function RecruiterTargetingBar({
         Apply on behalf of
       </span>
       <select
+        aria-label="Select consultant"
         value={value?.consultantId ?? ''}
         onChange={(e) => {
           const c = consultants.find((x) => x.id === e.target.value) ?? null;
@@ -94,6 +95,7 @@ export function RecruiterTargetingBar({
       {value && (
         <>
           <select
+            aria-label="Select resume version"
             value={value.resumeId ?? ''}
             onChange={(e) => pickResume(e.target.value)}
             className="text-sm bg-surface border border-border rounded-md px-2 py-1 min-w-[180px]"

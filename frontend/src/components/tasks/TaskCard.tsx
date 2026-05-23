@@ -60,7 +60,7 @@ export function TaskCard({
             )}
           </div>
           {/* Short ID — top-right of tags row */}
-          <span className="text-[10px] font-mono text-faint ml-auto shrink-0">
+          <span className="text-[10px] font-mono text-muted ml-auto shrink-0">
             {shortId(task.id)}
           </span>
         </div>
@@ -69,7 +69,7 @@ export function TaskCard({
       {/* If no tags, still show the short ID aligned right */}
       {tags.length === 0 && (
         <div className="flex justify-end">
-          <span className="text-[10px] font-mono text-faint">{shortId(task.id)}</span>
+          <span className="text-[10px] font-mono text-muted">{shortId(task.id)}</span>
         </div>
       )}
 

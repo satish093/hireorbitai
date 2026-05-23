@@ -40,7 +40,7 @@
   --success-soft: oklch(0.95 0.04 150);
   --warn: oklch(0.72 0.13 75);
   --warn-soft: oklch(0.96 0.05 80);
-  --danger: oklch(0.6 0.18 25);
+  --danger: oklch(0.54 0.2 25);
   --danger-soft: oklch(0.96 0.04 25);
   --ring: oklch(0.535 0.22 275 / 0.35);
 

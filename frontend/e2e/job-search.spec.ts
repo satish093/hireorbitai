@@ -20,11 +20,15 @@
 import { test, expect } from '@playwright/test';
 import { seedSession, mockApi, RECRUITER, trackPageErrors } from './_helpers';
 
+// Backend returns embedded client/vendor joins alongside top-level company_name.
+// JobCard resolves: company_name ?? client?.company_name ?? vendor?.company_name.
 const MOCK_JOBS = [
   {
     id: 'j-1',
     title: 'Senior Software Engineer',
     company_name: 'Acme Corp',
+    client: { id: 'cl-1', company_name: 'Acme Corp' },
+    vendor: null,
     location: 'Remote',
     status: 'ACTIVE',
     job_type: 'FULL_TIME',
@@ -36,6 +40,8 @@ const MOCK_JOBS = [
     id: 'j-2',
     title: 'Frontend Developer',
     company_name: 'Beta Inc',
+    client: { id: 'cl-2', company_name: 'Beta Inc' },
+    vendor: null,
     location: 'New York, NY',
     status: 'ACTIVE',
     job_type: 'CONTRACT',

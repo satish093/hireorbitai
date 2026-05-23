@@ -15,6 +15,7 @@ export function PillSelect({
     <label className="inline-flex items-center gap-1.5 border border-border bg-surface rounded-full pl-3 pr-1 py-1 text-sm text-ink hover:bg-hover">
       <span className="text-muted">{label}:</span>
       <select
+        aria-label={label}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className="bg-transparent text-sm font-medium text-ink outline-none pr-1"

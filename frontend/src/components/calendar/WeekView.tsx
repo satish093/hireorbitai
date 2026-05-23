@@ -100,7 +100,7 @@ export function WeekView({
             return (
               <span
                 key={h}
-                className="absolute right-2 text-[10px] font-mono text-faint select-none"
+                className="absolute right-2 text-[10px] font-mono text-muted select-none"
                 style={{ top: topPx - 7 }}
               >
                 {hourLabel(h)}

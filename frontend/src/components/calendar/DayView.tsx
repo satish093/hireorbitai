@@ -220,7 +220,7 @@ export function DayView({
               return (
                 <span
                   key={h}
-                  className="absolute right-2 text-[10px] font-mono text-faint select-none"
+                  className="absolute right-2 text-[10px] font-mono text-muted select-none"
                   style={{ top: (h - DAY_START) * LOCAL_HOUR_HEIGHT - 7 }}
                 >
                   {hourLabel(h)}
@@ -338,8 +338,8 @@ export function DayView({
             ))}
           </div>
           <div className="flex justify-between mt-1.5">
-            <span className="text-[10px] font-mono text-faint">{hourLabel(DAY_START)}</span>
-            <span className="text-[10px] font-mono text-faint">{hourLabel(DAY_END)}</span>
+            <span className="text-[10px] font-mono text-muted">{hourLabel(DAY_START)}</span>
+            <span className="text-[10px] font-mono text-muted">{hourLabel(DAY_END)}</span>
           </div>
         </div>
 
