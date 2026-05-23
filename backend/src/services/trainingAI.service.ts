@@ -385,24 +385,24 @@ export interface LessonContentInput {
 export async function generateLessonContent(
   input: LessonContentInput,
 ): Promise<{ data: LessonContent; degraded: boolean }> {
-  const prompt = `You are writing one full lesson inside an online course.
+  const prompt = `You are writing one lesson inside an online course.
 
 Course: ${input.course_title} (category: ${input.category}, difficulty: ${input.difficulty})
 Lesson title: ${input.lesson_title}
 ${input.lesson_summary ? `Lesson summary: ${input.lesson_summary}\n` : ''}${input.lesson_objective ? `Lesson objective: ${input.lesson_objective}\n` : ''}
-Produce:
-- content: the full lesson body in MARKDOWN. Use ## / ### headings, bullet/numbered lists, and fenced code blocks where the topic is technical. Teach the objective thoroughly but stay focused on THIS lesson (aim ~500–900 words). No front-matter, no "Lesson N:" prefix.
-- practical_example: one concrete worked example (markdown) the learner can follow along with.
-- exercises: 1–3 hands-on exercises. Each: prompt, expected_outcome (what a correct result looks like), and 1–3 hints.
-- key_takeaways: 3–5 one-line takeaways.
-- quiz: 3–5 multiple-choice knowledge-check questions answerable from this lesson alone. Each: question, 3–5 options, correct_answer (must match one option exactly), a 1–2 sentence explanation, and points (1, or 2 for harder).`;
+Produce CONCISE output:
+- content: lesson body in MARKDOWN (## / ### headings, bullets, code blocks where technical). Aim 300–500 words. No front-matter.
+- practical_example: one short worked example (markdown).
+- exercises: 1–2 hands-on exercises. Each: prompt, expected_outcome, and 1–2 hints.
+- key_takeaways: 3–4 one-line takeaways.
+- quiz: 2–4 multiple-choice questions from this lesson. Each: question, 3–4 options, correct_answer (must match one option exactly), short explanation, points (1 or 2).`;
 
   return safeGenerate(
     'lesson-content',
     () =>
       generateStructured(LessonContentSchema, prompt, {
         model: TRAINING_CONTENT_MODEL,
-        maxTokens: 5000,
+        maxTokens: 2500,
       }),
     () => ({
       content: `## ${input.lesson_title}\n\n> ⚠️ Content generation failed — edit this lesson manually.\n\n${

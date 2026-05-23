@@ -1,7 +1,12 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { env } from './env';
 
-export const anthropic = new Anthropic({ apiKey: env.anthropic.apiKey });
+export const anthropic = new Anthropic({
+  apiKey: env.anthropic.apiKey,
+  // Don't let the SDK sleep-retry on 429s — the caller handles failure/degradation
+  // itself. SDK retries add 30-60 s per call and compound into multi-minute waits.
+  maxRetries: 0,
+});
 export const ANTHROPIC_MODEL = env.anthropic.model;
 /** Heavier model used for long-form training content (lesson bodies, capstone). */
 export const TRAINING_CONTENT_MODEL = env.anthropic.contentModel;

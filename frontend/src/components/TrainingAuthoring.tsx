@@ -98,26 +98,31 @@ export function ReviewStatusPill({ status }: { status?: string | null }) {
   );
 }
 
-/** Sequentially generate content for each PENDING/FAILED lesson, one call at a
- *  time, surfacing live progress. Returns when all lessons are attempted. */
+/** Generate content for lessons in parallel batches of 3, surfacing live
+ *  progress. Batching limits rate-limit exposure while being 3× faster than
+ *  purely sequential. Returns when all lessons are attempted. */
 export async function generateAllLessons(
   lessonIds: string[],
   onProgress: (done: number, total: number, currentId: string) => void,
 ): Promise<{ ok: number; failed: number }> {
   let ok = 0;
   let failed = 0;
-  for (let i = 0; i < lessonIds.length; i++) {
-    const lid = lessonIds[i];
-    onProgress(i, lessonIds.length, lid);
-    try {
-      const r = await api.post(`/training/lessons/${lid}/generate-content`);
-      if (r.data?.degraded) failed++;
-      else ok++;
-    } catch {
-      failed++;
+  let done = 0;
+  const BATCH = 3;
+
+  for (let i = 0; i < lessonIds.length; i += BATCH) {
+    const batch = lessonIds.slice(i, i + BATCH);
+    onProgress(done, lessonIds.length, batch[0] ?? '');
+    const results = await Promise.allSettled(
+      batch.map((lid) => api.post(`/training/lessons/${lid}/generate-content`)),
+    );
+    for (const r of results) {
+      done++;
+      if (r.status === 'fulfilled' && !r.value.data?.degraded) ok++;
+      else failed++;
     }
+    onProgress(done, lessonIds.length, '');
   }
-  onProgress(lessonIds.length, lessonIds.length, '');
   return { ok, failed };
 }
 
