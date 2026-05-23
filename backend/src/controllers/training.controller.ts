@@ -4,6 +4,7 @@ import * as repo from '../repositories/training.repository';
 import * as svc from '../services/training.service';
 import * as ai from '../services/trainingAI.service';
 import { httpError, MANAGER_TIER } from '../types';
+import { logger } from '../config/logger';
 import { evaluateAchievements, logStudyMinutes } from '../services/trainingAchievements.service';
 
 function isManagerTier(role?: string): boolean {
@@ -499,7 +500,11 @@ export const aiGeneratePlan: RequestHandler = async (req, res) => {
   const schema = z.object({ resume_text: z.string().min(50), job_description: z.string().min(20) });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
-  res.json(await ai.generateTrainingPlan(parsed.data));
+  try {
+    res.json(await ai.generateTrainingPlan(parsed.data));
+  } catch (e: any) {
+    throw httpError(e?.status ?? 502, e?.message ?? 'Training plan generation failed');
+  }
 };
 
 export const aiInterviewQuestions: RequestHandler = async (req, res) => {
@@ -509,7 +514,11 @@ export const aiInterviewQuestions: RequestHandler = async (req, res) => {
   });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
-  res.json(await ai.generateInterviewQuestions(parsed.data));
+  try {
+    res.json(await ai.generateInterviewQuestions(parsed.data));
+  } catch (e: any) {
+    throw httpError(e?.status ?? 502, e?.message ?? 'Interview question generation failed');
+  }
 };
 
 export const aiGenerateQuiz: RequestHandler = async (req, res) => {
@@ -522,10 +531,15 @@ export const aiGenerateQuiz: RequestHandler = async (req, res) => {
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
 
-  const out = await ai.generateQuiz({
-    lesson_content: parsed.data.lesson_content,
-    count: parsed.data.count,
-  });
+  let out: Awaited<ReturnType<typeof ai.generateQuiz>>;
+  try {
+    out = await ai.generateQuiz({
+      lesson_content: parsed.data.lesson_content,
+      count: parsed.data.count,
+    });
+  } catch (e: any) {
+    throw httpError(e?.status ?? 502, e?.message ?? 'Quiz generation failed');
+  }
 
   if (parsed.data.course_id) {
     const rows = out.questions.map((q, i) => ({
@@ -537,7 +551,10 @@ export const aiGenerateQuiz: RequestHandler = async (req, res) => {
       points: q.points ?? 1,
       question_order: i,
     }));
-    await repo.quizzes.createMany(rows);
+    // Non-fatal — return the generated questions even if persistence fails.
+    await repo.quizzes
+      .createMany(rows)
+      .catch((e) => logger.warn({ err: e }, 'quiz persistence failed after generation'));
   }
   res.json(out);
 };
@@ -887,7 +904,11 @@ export const aiSkillGap: RequestHandler = async (req, res) => {
   });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
-  res.json(await ai.skillGapAnalysis(parsed.data));
+  try {
+    res.json(await ai.skillGapAnalysis(parsed.data));
+  } catch (e: any) {
+    throw httpError(e?.status ?? 502, e?.message ?? 'Skill gap analysis failed');
+  }
 };
 
 // ---------------------------------------------------------------------------

@@ -43,6 +43,9 @@ vi.mock('../services/training.service', () => ({
   evaluateCompletion: vi.fn(() => Promise.resolve({ blockers: [], progress_percentage: 0 })),
 }));
 
+vi.mock('../config/logger', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+}));
 vi.mock('../services/trainingAI.service', () => ({}));
 vi.mock('../services/trainingAchievements.service', () => ({
   evaluateAchievements: vi.fn(),

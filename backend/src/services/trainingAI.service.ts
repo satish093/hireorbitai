@@ -20,22 +20,62 @@ import { logger } from '../config/logger';
  * 500s and the generated stub stays fully editable by hand.
  */
 
+/** Attach a status code + isHttpError to any thrown Error so the errorHandler formats it correctly. */
+function aiError(status: number, message: string): Error {
+  return Object.assign(new Error(message), { status, isHttpError: true as const });
+}
+
 /** Single entry point for every structured generation. */
 async function generateStructured<S extends z.ZodTypeAny>(
   schema: S,
   prompt: string,
   opts: { model: string; maxTokens: number },
 ): Promise<z.infer<S>> {
-  if (!AI_AVAILABLE) throw new Error('AI unavailable: set ANTHROPIC_API_KEY on the server');
-  const response = await anthropic.messages.create({
-    model: opts.model,
-    max_tokens: opts.maxTokens,
-    system: 'Output valid JSON only. No markdown fences, no explanation.',
-    messages: [{ role: 'user', content: prompt }],
-  });
-  const raw = response.content[0].type === 'text' ? response.content[0].text.trim() : '{}';
-  const text = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '');
-  return schema.parse(JSON.parse(text)) as z.infer<S>;
+  if (!AI_AVAILABLE) {
+    throw aiError(503, 'AI is not configured — ask your admin to set ANTHROPIC_API_KEY.');
+  }
+
+  let raw: string;
+  try {
+    const response = await anthropic.messages.create({
+      model: opts.model,
+      max_tokens: opts.maxTokens,
+      system: 'Output valid JSON only. No markdown fences, no explanation.',
+      messages: [{ role: 'user', content: prompt }],
+    });
+    const block = response.content[0];
+    raw = block?.type === 'text' ? block.text.trim() : '{}';
+  } catch (err: any) {
+    // Remap Anthropic SDK errors so the errorHandler doesn't confuse a bad API
+    // key (upstream 401) with an unauthenticated user request.
+    throw aiError(502, `AI request failed: ${err?.message ?? String(err)}`);
+  }
+
+  // Strip markdown fences that models sometimes add despite the system prompt.
+  let text = raw
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```\s*$/, '')
+    .trim();
+
+  // If the model returned prose surrounding the JSON, extract the object/array.
+  if (!text.startsWith('{') && !text.startsWith('[')) {
+    const m = text.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
+    if (m) text = m[1]!;
+  }
+
+  let obj: unknown;
+  try {
+    obj = JSON.parse(text);
+  } catch {
+    throw aiError(502, 'AI returned malformed JSON — please try again.');
+  }
+
+  const result = schema.safeParse(obj);
+  if (!result.success) {
+    logger.warn({ issues: result.error.issues.slice(0, 3) }, 'AI schema validation failed');
+    throw aiError(502, 'AI returned an unexpected structure — please try again.');
+  }
+  return result.data as z.infer<S>;
 }
 
 // ---------------------------------------------------------------------------
@@ -130,7 +170,7 @@ const QuizSchema = z.object({
       options: z.array(z.string()).min(3).max(5),
       correct_answer: z.string(),
       explanation: z.string(),
-      points: z.number().default(1),
+      points: z.preprocess((v) => (v == null ? 1 : v), z.number()),
     }),
   ),
 });
@@ -367,7 +407,7 @@ const LessonContentSchema = z.object({
       options: z.array(z.string()).min(3).max(5),
       correct_answer: z.string(),
       explanation: z.string(),
-      points: z.number().default(1),
+      points: z.preprocess((v) => (v == null ? 1 : v), z.number()),
     }),
   ),
 });

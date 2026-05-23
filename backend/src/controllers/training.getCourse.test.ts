@@ -29,6 +29,9 @@ vi.mock('../repositories/training.repository', () => ({
   courses: { get: vi.fn().mockImplementation(async () => ({ data: mock.course, error: null })) },
 }));
 // Heavy sibling imports — stub so importing the controller never reaches config/env.
+vi.mock('../config/logger', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+}));
 vi.mock('../services/training.service', () => ({}));
 vi.mock('../services/trainingAI.service', () => ({}));
 vi.mock('../services/trainingAchievements.service', () => ({
