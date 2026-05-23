@@ -132,17 +132,17 @@ export function CenterPane({
           )}
         </div>
         <ButtonGroup>
+          <ButtonGroupItem pressed={mode === 'profile'} onClick={() => onMode('profile')}>
+            Profile
+          </ButtonGroupItem>
           <ButtonGroupItem pressed={mode === 'preview'} onClick={() => onMode('preview')}>
             Preview
-          </ButtonGroupItem>
-          <ButtonGroupItem pressed={mode === 'diff'} onClick={() => onMode('diff')}>
-            Diff vs prev
           </ButtonGroupItem>
           <ButtonGroupItem pressed={mode === 'edit'} onClick={() => onMode('edit')}>
             Edit
           </ButtonGroupItem>
-          <ButtonGroupItem pressed={mode === 'profile'} onClick={() => onMode('profile')}>
-            Profile
+          <ButtonGroupItem pressed={mode === 'diff'} onClick={() => onMode('diff')}>
+            Diff vs prev
           </ButtonGroupItem>
         </ButtonGroup>
         <div className="flex items-center gap-2">

@@ -94,6 +94,7 @@ export function useResumeWorkspace() {
         const { data } = await api.post('/resumes/upload', form);
         toast.success('Uploaded');
         await reloadVersions(data?.id);
+        setMode('profile');
       } catch (e: any) {
         toast.error(e?.response?.data?.error ?? 'Upload failed');
       } finally {

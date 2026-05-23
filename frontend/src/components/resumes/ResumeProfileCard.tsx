@@ -2,7 +2,7 @@ import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { Button } from '../Button';
 import { api } from '../../services/api';
-import type { ResumeProfile, ResumeExperience } from './types';
+import type { ResumeProfile } from './types';
 
 interface Props {
   profile: ResumeProfile | null | undefined;
@@ -10,48 +10,12 @@ interface Props {
   onParsed: () => void;
 }
 
-function SectionHeading({ children }: { children: React.ReactNode }) {
+function Heading({ children }: { children: React.ReactNode }) {
   return (
-    <h3 className="text-[10px] font-semibold tracking-widest text-muted uppercase mb-3">
+    <h3 className="text-xs font-bold uppercase tracking-widest text-muted pt-5 mt-5 border-t border-border mb-3">
       {children}
     </h3>
   );
-}
-
-function InfoField({
-  label,
-  value,
-  href,
-}: {
-  label: string;
-  value?: string | number | null;
-  href?: string;
-}) {
-  if (value == null || value === '') return null;
-  const display = String(value);
-  return (
-    <div>
-      <div className="text-[10px] font-semibold uppercase tracking-widest text-muted mb-0.5">
-        {label}
-      </div>
-      {href ? (
-        <a
-          href={href}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-sm text-accent hover:underline break-all"
-        >
-          {display}
-        </a>
-      ) : (
-        <div className="text-sm text-ink">{display}</div>
-      )}
-    </div>
-  );
-}
-
-function expPeriod(exp: ResumeExperience): string {
-  return [exp.start_date, exp.is_current ? 'Present' : exp.end_date].filter(Boolean).join(' – ');
 }
 
 export function ResumeProfileCard({ profile: initialProfile, resumeId, onParsed }: Props) {
@@ -75,7 +39,7 @@ export function ResumeProfileCard({ profile: initialProfile, resumeId, onParsed 
 
   if (!profile) {
     return (
-      <div className="flex flex-col items-center justify-center gap-4 py-12 text-center">
+      <div className="flex flex-col items-center justify-center gap-4 py-16 text-center">
         <div className="text-4xl">🪪</div>
         <div>
           <p className="text-sm font-medium text-ink">No profile extracted yet</p>
@@ -90,119 +54,96 @@ export function ResumeProfileCard({ profile: initialProfile, resumeId, onParsed 
     );
   }
 
-  const SKILL_LIMIT = 12;
+  const SKILL_LIMIT = 15;
   const skills = profile.skills ?? [];
   const visibleSkills = showAllSkills ? skills : skills.slice(0, SKILL_LIMIT);
   const hiddenCount = skills.length - SKILL_LIMIT;
 
-  const currentExp =
-    profile.experiences.find((e) => e.is_current) ?? profile.experiences[0] ?? null;
-
-  const primaryEdu = profile.education[0] ?? null;
-  const eduText = profile.education
-    .map((e) => {
-      const deg = [e.degree, e.field].filter(Boolean).join(' ');
-      return deg ? `${deg} from ${e.institution}` : e.institution;
-    })
-    .join(', ');
-
-  const yrs = profile.total_years_experience;
-
   return (
-    <div className="overflow-y-auto max-h-[calc(100vh-260px)] pr-1 space-y-0">
-      {/* ── Contact & Identity ── */}
-      <div>
-        <SectionHeading>Contact &amp; Identity</SectionHeading>
-        <div className="grid grid-cols-2 gap-x-8 gap-y-4">
-          <InfoField label="Full Name" value={profile.name} />
-          <InfoField label="Email" value={profile.email} />
-          <InfoField label="Phone" value={profile.phone} />
-          <InfoField label="Location" value={profile.location} />
-          <InfoField
-            label="LinkedIn"
-            value={profile.linkedin_url}
-            href={profile.linkedin_url ?? undefined}
-          />
-          {profile.website && (
-            <InfoField label="Website" value={profile.website} href={profile.website} />
+    <div className="overflow-y-auto max-h-[calc(100vh-260px)] pr-1">
+      {/* ── Header: name + contact ── */}
+      <div className="pb-4 border-b border-border">
+        <h2 className="text-2xl font-bold text-ink leading-tight">{profile.name ?? 'Unknown'}</h2>
+        <p className="text-sm text-muted mt-1 flex flex-wrap gap-x-1 items-center">
+          {[profile.email, profile.phone].filter(Boolean).map((v, i, arr) => (
+            <span key={i}>
+              {v}
+              {i < arr.length - 1 && <span className="mx-1 opacity-30">·</span>}
+            </span>
+          ))}
+          {profile.linkedin_url && (
+            <>
+              <span className="mx-1 opacity-30">·</span>
+              <a
+                href={profile.linkedin_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-accent hover:underline"
+              >
+                LinkedIn ↗
+              </a>
+            </>
           )}
-          <InfoField label="Current Position" value={currentExp?.title} />
-          <InfoField label="Current Company" value={currentExp?.company} />
-          <InfoField label="Years of Experience" value={yrs != null ? String(yrs) : null} />
-        </div>
+          {profile.website && (
+            <>
+              <span className="mx-1 opacity-30">·</span>
+              <a
+                href={profile.website}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-accent hover:underline"
+              >
+                Website ↗
+              </a>
+            </>
+          )}
+        </p>
       </div>
 
-      {/* ── Work Experience ── */}
-      {profile.experiences.length > 0 && (
-        <div className="pt-5 mt-5 border-t border-border">
-          <SectionHeading>Work Experience</SectionHeading>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[540px]">
-              <thead className="text-[10px] font-semibold uppercase tracking-widest text-muted">
-                <tr>
-                  <th className="pb-2 pr-4 text-left font-semibold">Title</th>
-                  <th className="pb-2 pr-4 text-left font-semibold">Company</th>
-                  <th className="pb-2 pr-4 text-left font-semibold whitespace-nowrap">Period</th>
-                  <th className="pb-2 text-left font-semibold">Highlights</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {profile.experiences.map((exp, i) => (
-                  <tr key={i} className="align-top">
-                    <td className="py-2.5 pr-4 font-medium text-ink whitespace-nowrap">
-                      {exp.title}
-                    </td>
-                    <td className="py-2.5 pr-4 text-ink-2 text-xs whitespace-nowrap">
-                      {exp.company}
-                    </td>
-                    <td className="py-2.5 pr-4 text-muted text-xs whitespace-nowrap">
-                      {expPeriod(exp) || '—'}
-                    </td>
-                    <td className="py-2.5 text-ink-2 text-xs leading-relaxed">
-                      {exp.description ?? '—'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* ── Education ── */}
-      {profile.education.length > 0 && (
-        <div className="pt-5 mt-5 border-t border-border">
-          <SectionHeading>Education</SectionHeading>
-          {eduText && <p className="text-sm text-ink-2 leading-relaxed mb-3">{eduText}</p>}
-          {primaryEdu && (
-            <div className="grid grid-cols-3 gap-x-6 gap-y-3">
-              <InfoField label="Highest Degree" value={primaryEdu.degree} />
-              <InfoField label="University" value={primaryEdu.institution} />
-              <InfoField
-                label="Graduation Year"
-                value={
-                  primaryEdu.graduation_year != null ? String(primaryEdu.graduation_year) : null
-                }
-              />
-            </div>
+      {/* ── Stats row ── */}
+      {(profile.age != null || profile.total_years_experience != null || profile.location) && (
+        <div className="flex flex-wrap gap-6 py-3 border-b border-border">
+          {profile.age != null && (
+            <span>
+              <span className="text-[10px] uppercase tracking-widest font-semibold text-muted mr-1.5">
+                Age
+              </span>
+              <span className="text-sm font-medium text-ink">{profile.age}</span>
+            </span>
+          )}
+          {profile.total_years_experience != null && (
+            <span>
+              <span className="text-[10px] uppercase tracking-widest font-semibold text-muted mr-1.5">
+                Experience
+              </span>
+              <span className="text-sm font-medium text-ink">
+                {profile.total_years_experience} yrs
+              </span>
+            </span>
+          )}
+          {profile.location && (
+            <span>
+              <span className="text-[10px] uppercase tracking-widest font-semibold text-muted mr-1.5">
+                Location
+              </span>
+              <span className="text-sm font-medium text-ink">{profile.location}</span>
+            </span>
           )}
         </div>
       )}
 
       {/* ── Summary ── */}
       {profile.summary && (
-        <div className="pt-5 mt-5 border-t border-border">
-          <SectionHeading>Summary</SectionHeading>
-          <p className="text-xs text-ink-2 leading-relaxed bg-bg-sunken rounded-lg px-3 py-2.5">
-            {profile.summary}
-          </p>
-        </div>
+        <>
+          <Heading>Summary</Heading>
+          <p className="text-sm text-ink-2 leading-relaxed">{profile.summary}</p>
+        </>
       )}
 
       {/* ── Skills ── */}
       {skills.length > 0 && (
-        <div className="pt-5 mt-5 border-t border-border">
-          <SectionHeading>Skills ({skills.length} items)</SectionHeading>
+        <>
+          <Heading>Skills ({skills.length})</Heading>
           <div className="flex flex-wrap gap-1.5">
             {visibleSkills.map((s) => (
               <span key={s} className="text-xs bg-accent-soft text-ink-2 px-2 py-0.5 rounded-full">
@@ -219,13 +160,62 @@ export function ResumeProfileCard({ profile: initialProfile, resumeId, onParsed 
               </button>
             )}
           </div>
-        </div>
+        </>
+      )}
+
+      {/* ── Experience ── */}
+      {profile.experiences.length > 0 && (
+        <>
+          <Heading>Experience</Heading>
+          <div className="space-y-4">
+            {profile.experiences.map((exp, i) => (
+              <div key={i}>
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-sm font-semibold text-ink">{exp.title}</span>
+                  <span className="text-xs text-muted font-mono shrink-0">
+                    {[exp.start_date, exp.is_current ? 'Present' : exp.end_date]
+                      .filter(Boolean)
+                      .join(' – ')}
+                  </span>
+                </div>
+                <div className="text-xs text-ink-2 mt-0.5">{exp.company}</div>
+                {exp.description && (
+                  <p className="text-xs text-ink-2 mt-1.5 leading-relaxed">{exp.description}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* ── Education ── */}
+      {profile.education.length > 0 && (
+        <>
+          <Heading>Education</Heading>
+          <div className="space-y-3">
+            {profile.education.map((edu, i) => (
+              <div key={i} className="flex items-start justify-between gap-2">
+                <div>
+                  <div className="text-sm font-medium text-ink">
+                    {[edu.degree, edu.field].filter(Boolean).join(' in ') || 'Degree'}
+                  </div>
+                  <div className="text-xs text-ink-2">{edu.institution}</div>
+                </div>
+                {edu.graduation_year != null && (
+                  <span className="text-xs font-mono text-muted shrink-0">
+                    {edu.graduation_year}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        </>
       )}
 
       {/* ── Certifications ── */}
       {profile.certifications.length > 0 && (
-        <div className="pt-5 mt-5 border-t border-border">
-          <SectionHeading>Certifications</SectionHeading>
+        <>
+          <Heading>Certifications</Heading>
           <ul className="space-y-1">
             {profile.certifications.map((c, i) => (
               <li key={i} className="text-sm text-ink-2 flex gap-2">
@@ -234,22 +224,15 @@ export function ResumeProfileCard({ profile: initialProfile, resumeId, onParsed 
               </li>
             ))}
           </ul>
-        </div>
+        </>
       )}
 
       {/* ── Languages ── */}
       {profile.languages.length > 0 && (
-        <div className="pt-5 mt-5 border-t border-border">
-          <SectionHeading>Languages</SectionHeading>
-          <ul className="space-y-1">
-            {profile.languages.map((l, i) => (
-              <li key={i} className="text-sm text-ink-2 flex gap-2">
-                <span className="text-muted shrink-0">•</span>
-                {l}
-              </li>
-            ))}
-          </ul>
-        </div>
+        <>
+          <Heading>Languages</Heading>
+          <p className="text-sm text-ink-2">{profile.languages.join(' · ')}</p>
+        </>
       )}
 
       {/* ── Re-extract ── */}

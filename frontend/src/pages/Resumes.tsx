@@ -6,9 +6,7 @@ import { SelectInput } from '../components/SelectInput';
 import { FileUpload } from '../components/FileUpload';
 import { EmptyState } from '../components/EmptyState';
 import { ResumeVersionStrip } from '../components/resumes/ResumeVersionStrip';
-import { TailorHistory } from '../components/resumes/TailorHistory';
 import { CenterPane } from '../components/resumes/CenterPane';
-import { AtsBreakdownRail } from '../components/resumes/AtsBreakdownRail';
 import { TailorLauncher } from '../components/resumes/TailorLauncher';
 import { useResumeWorkspace } from '../components/resumes/useResumeWorkspace';
 
@@ -84,14 +82,7 @@ export function Resumes() {
             onDelete={w.deleteVersion}
           />
 
-          <div className="mt-4 grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)_320px]">
-            <TailorHistory
-              resumeId={w.activeId}
-              refreshKey={w.historyKey}
-              activeSessionId={w.sessionId}
-              onOpenSession={w.openSession}
-              onNewSession={() => setLauncherOpen(true)}
-            />
+          <div className="mt-4">
             <CenterPane
               version={active}
               versions={versions}
@@ -103,11 +94,6 @@ export function Resumes() {
               onMakeCurrent={() => w.reloadVersions(w.activeId)}
               onApplied={w.onApplied}
               onEdited={() => w.reloadVersions(w.activeId)}
-            />
-            <AtsBreakdownRail
-              resumeId={w.activeId}
-              versions={versions}
-              againstJobId={active?.tailored_for_job_id}
             />
           </div>
 

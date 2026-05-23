@@ -115,6 +115,22 @@ function assertAgainstBaseline(
 }
 
 describe('security pattern guard (controllers)', () => {
+  it('ownership helpers throw 404, not 403, to avoid existence oracle leaks', () => {
+    // resumes.controller.ts previously threw 403 in authorizeConsultantAccess — fixed.
+    // This ratchet prevents re-introducing it.
+    const src = readFileSync(join(CONTROLLERS_DIR, 'resumes.controller.ts'), 'utf8');
+    const matches = src
+      .split(/\r?\n/)
+      .filter(
+        (line) => /httpError\(403/.test(line) && /authorizeConsultantAccess|Forbidden/.test(line),
+      );
+    expect(
+      matches,
+      `resumes.controller.ts must use 404 in authorizeConsultantAccess to prevent existence ` +
+        `oracle leaks: ${matches.join(' | ')}`,
+    ).toHaveLength(0);
+  });
+
   it('introduces no new mass-assignment (db.update/insert of req.body)', () => {
     const findings = scan((line) => MASS_ASSIGNMENT_PATTERNS.some((re) => re.test(line)));
     // Throws with a file:line detail message on a new/stale violation.

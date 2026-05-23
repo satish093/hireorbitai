@@ -3,7 +3,6 @@ import { extractText, getDocumentProxy } from 'unpdf';
 import { logger } from '../config/logger';
 
 // word-extractor has no @types package; type the constructor inline.
-// eslint-disable-next-line @typescript-eslint/no-require-imports
 const WordExtractor: new () => {
   extract(input: Buffer): Promise<{ getBody(): string }>;
 } = require('word-extractor');
