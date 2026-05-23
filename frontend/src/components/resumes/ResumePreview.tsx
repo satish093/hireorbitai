@@ -102,13 +102,15 @@ export function ResumePreview({
           ⬇ Export PDF
         </Button>
       </div>
-      <div className="overflow-y-auto max-h-[68vh] bg-bg-sunken rounded-lg p-4 sm:p-8 flex justify-center">
+      {/* Outer tray — neutral gray so the white paper stands out. */}
+      <div className="overflow-y-auto max-h-[72vh] bg-[#d8dce3] dark:bg-[#1a1c22] rounded-xl p-5 sm:p-8 flex justify-center">
+        {/* Paper — always white regardless of app theme; matches what will print. */}
         <div
           ref={paperRef}
-          className="bg-white dark:bg-surface text-slate-900 dark:text-ink shadow-xl dark:shadow-none rounded-sm w-full max-w-[760px] px-8 sm:px-12 py-10 sm:py-14 print:!bg-white print:!text-slate-900 print:shadow-none print:max-w-none"
-          style={{ fontFamily: 'ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif' }}
+          className="bg-white text-slate-900 w-full max-w-[720px] shadow-[0_6px_40px_-4px_rgba(0,0,0,0.22)] px-10 sm:px-14 py-10 sm:py-12 print:!bg-white print:!text-slate-900 print:shadow-none print:max-w-none print:px-0 print:py-0"
+          style={{ fontFamily: "'Helvetica Neue', Arial, ui-sans-serif, system-ui, sans-serif" }}
         >
-          <MarkdownView md={body} className="text-[13px] leading-relaxed" />
+          <MarkdownView md={body} />
         </div>
       </div>
     </div>
