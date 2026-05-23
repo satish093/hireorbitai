@@ -41,9 +41,9 @@ export function JobSearchHero({
       </div>
 
       {/* RIGHT: AI search + filters + rightSlot */}
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2 justify-end">
         {/* AI search field */}
-        <div className="relative flex items-center h-9 w-[300px] max-w-[60vw] rounded-lg border border-border-strong bg-surface pl-9 pr-16">
+        <div className="relative flex items-center h-9 w-[300px] max-w-[calc(100vw-2rem)] rounded-lg border border-border-strong bg-surface pl-9 pr-16">
           {/* Sparkle badge */}
           <span className="absolute left-1.5 top-1/2 -translate-y-1/2 w-6 h-6 rounded-md bg-brand-grad text-white grid place-items-center">
             <IconSparkles size={13} />

@@ -86,7 +86,10 @@ export function ManagerDashboard() {
       );
     api
       .get('/tasks/metrics')
-      .then((r) => setTasks(r.data))
+      .then((r) => {
+        const d = r.data;
+        if (d && typeof d === 'object' && !Array.isArray(d)) setTasks(d);
+      })
       .catch((e) =>
         pushError(
           'tasks',

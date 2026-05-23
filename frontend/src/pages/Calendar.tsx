@@ -174,7 +174,7 @@ export function Calendar({
         }
       />
 
-      <div className="flex gap-5 items-start">
+      <div className="flex flex-col md:flex-row gap-5 items-start">
         <CalendarSidebar
           anchor={anchor}
           onAnchor={setAnchor}

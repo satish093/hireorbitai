@@ -40,9 +40,9 @@ const variants: Record<Variant, string> = {
     'hover:bg-[oklch(0.97_0.005_260)] hover:border-[oklch(0.78_0.010_260)] ' +
     'dark:bg-[oklch(0.245_0.010_260)] dark:border-[oklch(0.38_0.012_260)] dark:hover:bg-[oklch(0.295_0.011_260)]',
   ghost:
-    'bg-transparent text-ink-2 border-transparent ' +
-    'hover:bg-[oklch(0.94_0.006_260)] hover:text-ink ' +
-    'dark:hover:bg-[oklch(0.245_0.010_260)] dark:hover:text-white',
+    'bg-transparent text-ink border-transparent ' +
+    'hover:bg-[oklch(0.94_0.006_260)] ' +
+    'dark:hover:bg-[oklch(0.245_0.010_260)]',
   danger: 'bg-danger text-white border border-danger shadow-btn hover:bg-[oklch(0.52_0.19_25)]',
   'danger-ghost': 'bg-transparent text-danger hover:bg-danger-soft',
 };

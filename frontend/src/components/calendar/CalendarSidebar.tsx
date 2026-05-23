@@ -109,7 +109,7 @@ export function CalendarSidebar({
   const monthLabel = anchor.toLocaleString(undefined, { month: 'long', year: 'numeric' });
 
   return (
-    <div className="w-[260px] shrink-0 space-y-4">
+    <div className="w-full md:w-[260px] shrink-0 space-y-4">
       {/* ------------------------------------------------------------------ */}
       {/* 1. Mini month picker                                                */}
       {/* ------------------------------------------------------------------ */}

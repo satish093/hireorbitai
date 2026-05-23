@@ -31,12 +31,14 @@ export function DataTable<T extends { id?: string }>({
   const alignClass = (a?: Column<T>['align']) =>
     a === 'right' ? 'text-right' : a === 'center' ? 'text-center' : 'text-left';
 
+  const isEmpty = !loading && rows.length === 0;
+
   return (
     <div className="bg-surface rounded-xl border border-border overflow-hidden animate-fade-in">
       {/* `overflow-x-auto` scrolls the table on narrow viewports instead of
           squashing every column. A min-width keeps the columns from collapsing
           before the scroller engages. */}
-      <div className="overflow-x-auto" tabIndex={0}>
+      <div className="overflow-x-auto" tabIndex={isEmpty ? undefined : 0}>
         <table className="w-full text-sm min-w-[560px]">
           <thead className="bg-hover text-[10px] font-semibold tracking-widest text-ink-2 uppercase">
             <tr>
@@ -55,61 +57,56 @@ export function DataTable<T extends { id?: string }>({
             </tr>
           </thead>
           <tbody>
-            {loading ? (
-              // Animated skeleton rows give the loading state real presence
-              // instead of a single italic "Loading…" line.
-              Array.from({ length: 5 }).map((_, i) => (
-                <tr key={`skel-${i}`} className="border-t border-border">
-                  {columns.map((c, j) => (
-                    <td key={c.key} className={clsx('px-3 sm:px-4 py-3.5', alignClass(c.align))}>
-                      <div
-                        className="skeleton h-3"
-                        style={{ width: `${50 + ((i * 7 + j * 11) % 40)}%` }}
-                      />
-                    </td>
-                  ))}
-                </tr>
-              ))
-            ) : rows.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={columns.length}
-                  className="px-4 py-12 text-center text-muted text-sm animate-fade-in-up"
-                >
-                  {empty ?? <span className="italic text-muted">No records yet</span>}
-                </td>
-              </tr>
-            ) : (
-              rows.map((row, i) => (
-                <tr
-                  key={row.id ?? i}
-                  onClick={onRowClick ? () => onRowClick(row) : undefined}
-                  style={{ animationDelay: `${Math.min(i, STAGGER_MAX) * 25}ms` }}
-                  className={clsx(
-                    'border-t border-border transition animate-fade-in-up',
-                    onRowClick ? 'cursor-pointer hover:bg-hover' : 'hover:bg-hover',
-                  )}
-                >
-                  {columns.map((c) => (
-                    <td
-                      key={c.key}
-                      className={clsx(
-                        'px-3 sm:px-4 py-3 text-ink align-middle',
-                        alignClass(c.align),
-                        c.className,
-                      )}
-                    >
-                      {c.render
-                        ? c.render(row)
-                        : ((row as any)[c.key] ?? <span className="text-muted">—</span>)}
-                    </td>
-                  ))}
-                </tr>
-              ))
-            )}
+            {loading
+              ? // Animated skeleton rows give the loading state real presence
+                // instead of a single italic "Loading…" line.
+                Array.from({ length: 5 }).map((_, i) => (
+                  <tr key={`skel-${i}`} className="border-t border-border">
+                    {columns.map((c, j) => (
+                      <td key={c.key} className={clsx('px-3 sm:px-4 py-3.5', alignClass(c.align))}>
+                        <div
+                          className="skeleton h-3"
+                          style={{ width: `${50 + ((i * 7 + j * 11) % 40)}%` }}
+                        />
+                      </td>
+                    ))}
+                  </tr>
+                ))
+              : rows.map((row, i) => (
+                  <tr
+                    key={row.id ?? i}
+                    onClick={onRowClick ? () => onRowClick(row) : undefined}
+                    style={{ animationDelay: `${Math.min(i, STAGGER_MAX) * 25}ms` }}
+                    className={clsx(
+                      'border-t border-border transition animate-fade-in-up',
+                      onRowClick ? 'cursor-pointer hover:bg-hover' : 'hover:bg-hover',
+                    )}
+                  >
+                    {columns.map((c) => (
+                      <td
+                        key={c.key}
+                        className={clsx(
+                          'px-3 sm:px-4 py-3 text-ink align-middle',
+                          alignClass(c.align),
+                          c.className,
+                        )}
+                      >
+                        {c.render
+                          ? c.render(row)
+                          : ((row as any)[c.key] ?? <span className="text-muted">—</span>)}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
           </tbody>
         </table>
       </div>
+      {/* Empty state lives outside the scroll container so it's never clipped on mobile. */}
+      {isEmpty && (
+        <div className="px-4 py-12 text-center text-muted text-sm animate-fade-in-up">
+          {empty ?? <span className="italic text-muted">No records yet</span>}
+        </div>
+      )}
     </div>
   );
 }
