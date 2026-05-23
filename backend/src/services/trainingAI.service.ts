@@ -21,6 +21,24 @@ import { logger } from '../config/logger';
  * 500s and the generated stub stays fully editable by hand.
  */
 
+async function withGeminiRetry<T>(fn: () => Promise<T>): Promise<T> {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      return await fn();
+    } catch (err: unknown) {
+      const msg = String((err as { message?: string })?.message ?? '');
+      const status = (err as { status?: number })?.status;
+      const is429 = status === 429 || msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED');
+      if (is429 && attempt < 3) {
+        await new Promise((r) => setTimeout(r, (attempt + 1) * 4000));
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw new Error('unreachable');
+}
+
 /** Single entry point for every structured generation. */
 async function generateStructured<S extends z.ZodTypeAny>(
   schema: S,
@@ -32,7 +50,7 @@ async function generateStructured<S extends z.ZodTypeAny>(
     model: opts.model,
     generationConfig: { responseMimeType: 'application/json', maxOutputTokens: opts.maxTokens },
   });
-  const result = await model.generateContent(prompt);
+  const result = await withGeminiRetry(() => model.generateContent(prompt));
   return schema.parse(JSON.parse(result.response.text())) as z.infer<S>;
 }
 

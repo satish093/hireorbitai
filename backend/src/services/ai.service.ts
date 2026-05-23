@@ -15,6 +15,25 @@ function usage(result: {
   return { input_tokens: m?.promptTokenCount ?? 0, output_tokens: m?.candidatesTokenCount ?? 0 };
 }
 
+/** Retry a Gemini call up to 4 times on 429 RESOURCE_EXHAUSTED with linear backoff. */
+async function withGeminiRetry<T>(fn: () => Promise<T>): Promise<T> {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      return await fn();
+    } catch (err: unknown) {
+      const msg = String((err as { message?: string })?.message ?? '');
+      const status = (err as { status?: number })?.status;
+      const is429 = status === 429 || msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED');
+      if (is429 && attempt < 3) {
+        await new Promise((r) => setTimeout(r, (attempt + 1) * 4000));
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw new Error('unreachable');
+}
+
 /**
  * Call Gemini with JSON mode and parse the response through a Zod schema.
  * Gemini's JSON mode guarantees well-formed JSON; Zod validates the structure.
@@ -29,7 +48,7 @@ async function geminiParse<T extends z.ZodType>(
     model: GEMINI_MODEL,
     generationConfig: { responseMimeType: 'application/json', maxOutputTokens },
   });
-  const result = await model.generateContent(prompt);
+  const result = await withGeminiRetry(() => model.generateContent(prompt));
   logAiUsage(call, GEMINI_MODEL, usage(result));
   return schema.parse(JSON.parse(result.response.text())) as z.infer<T>;
 }
@@ -40,7 +59,7 @@ async function geminiText(call: string, prompt: string, maxOutputTokens = 700): 
     model: GEMINI_MODEL,
     generationConfig: { maxOutputTokens },
   });
-  const result = await model.generateContent(prompt);
+  const result = await withGeminiRetry(() => model.generateContent(prompt));
   logAiUsage(call, GEMINI_MODEL, usage(result));
   return result.response.text().trim();
 }
