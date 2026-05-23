@@ -10,6 +10,16 @@ export const errorHandler: ErrorRequestHandler = (err: ApiError, req, res, _next
   // so the upload UI shows the actual reason instead of a generic 500.
   let status = err.status ?? 500;
   let message = err.message ?? 'Internal Server Error';
+
+  // Upstream API errors (Anthropic, Gemini, etc.) can carry 401/403 status
+  // codes that mean "bad API key" — not "user not authenticated". Passing them
+  // through would trigger the frontend's auth-redirect interceptor. Remap to
+  // 502 so the client sees a server-side failure, not an auth failure.
+  if ((status === 401 || status === 403) && !(err as any).isHttpError) {
+    status = 502;
+    message = 'AI service error — check the API key configuration on the server.';
+  }
+
   if (err instanceof MulterError) {
     status = 400;
     if (err.code === 'LIMIT_FILE_SIZE') message = 'File is too large.';

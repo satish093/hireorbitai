@@ -49,11 +49,13 @@ declare global {
 export interface ApiError extends Error {
   status?: number;
   details?: unknown;
+  isHttpError?: true;
 }
 
 export function httpError(status: number, message: string, details?: unknown): ApiError {
   const e = new Error(message) as ApiError;
   e.status = status;
   e.details = details;
+  e.isHttpError = true;
   return e;
 }
