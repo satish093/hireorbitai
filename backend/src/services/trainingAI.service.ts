@@ -73,7 +73,14 @@ async function generateStructured<S extends z.ZodTypeAny>(
     });
     const block = response.content[0];
     raw = block?.type === 'text' ? block.text.trim() : '{}';
+    if (response.stop_reason === 'max_tokens') {
+      throw aiError(
+        502,
+        `AI response truncated (hit ${opts.maxTokens}-token limit) — try again or reduce input length.`,
+      );
+    }
   } catch (err: any) {
+    if ((err as { isHttpError?: boolean }).isHttpError) throw err;
     throw aiError(502, `AI request failed: ${err?.message ?? String(err)}`);
   }
 
@@ -82,9 +89,37 @@ async function generateStructured<S extends z.ZodTypeAny>(
     .replace(/\s*```\s*$/, '')
     .trim();
 
-  if (!text.startsWith('{') && !text.startsWith('[')) {
-    const m = text.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
-    if (m) text = m[1]!;
+  // Extract the outermost JSON object/array; the model sometimes appends
+  // a trailing note after the closing brace which breaks JSON.parse.
+  const jsonStart = text.search(/[\[{]/);
+  if (jsonStart >= 0) {
+    const opener = text[jsonStart];
+    const closer = opener === '{' ? '}' : ']';
+    let depth = 0,
+      inStr = false,
+      esc = false;
+    for (let i = jsonStart; i < text.length; i++) {
+      const ch = text[i];
+      if (esc) {
+        esc = false;
+        continue;
+      }
+      if (ch === '\\' && inStr) {
+        esc = true;
+        continue;
+      }
+      if (ch === '"') {
+        inStr = !inStr;
+        continue;
+      }
+      if (inStr) continue;
+      if (ch === opener) depth++;
+      else if (ch === closer && --depth === 0) {
+        text = text.slice(jsonStart, i + 1);
+        break;
+      }
+    }
+    if (depth !== 0) text = text.slice(jsonStart);
   }
 
   let obj: unknown;

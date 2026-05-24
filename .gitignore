@@ -50,3 +50,6 @@ test-results/
 
 # OWASP ZAP baseline scan output (scripts/zap-baseline.ps1)
 zap-report/
+
+# Live AI test script (contains no secrets but excluded to avoid confusion)
+scripts/test-ai-live.mjs
