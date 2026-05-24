@@ -147,9 +147,9 @@ test.describe('Consultants page', () => {
     await page.goto('/consultants');
     await page.waitForLoadState('load');
 
-    await expect(page.getByText('Alice Chen')).toBeVisible({ timeout: 8000 });
-    await expect(page.getByText('Bob Kim')).toBeVisible({ timeout: 8000 });
-    await expect(page.getByText('Carol Patel')).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('Alice Chen').first()).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('Bob Kim').first()).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('Carol Patel').first()).toBeVisible({ timeout: 8000 });
 
     expect(errors).toHaveLength(0);
   });
@@ -317,10 +317,10 @@ test.describe('Reminders page', () => {
     await page.goto('/reminders');
     await page.waitForLoadState('load');
 
-    await expect(page.getByText('Follow up with Alice re: Google offer')).toBeVisible({
+    await expect(page.getByText('Follow up with Alice re: Google offer').first()).toBeVisible({
       timeout: 8000,
     });
-    await expect(page.getByText('Send resume to Acme Corp')).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('Send resume to Acme Corp').first()).toBeVisible({ timeout: 8000 });
 
     expect(errors).toHaveLength(0);
   });
@@ -366,9 +366,9 @@ test.describe('Applications page', () => {
     await page.goto('/applications');
     await page.waitForLoadState('load');
 
-    await expect(page.getByText('Alice Chen')).toBeVisible({ timeout: 8000 });
-    await expect(page.getByText('Senior Java Developer')).toBeVisible({ timeout: 8000 });
-    await expect(page.getByText('TechStaff Inc')).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('Alice Chen').first()).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('Senior Java Developer').first()).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('TechStaff Inc').first()).toBeVisible({ timeout: 8000 });
 
     expect(errors).toHaveLength(0);
   });

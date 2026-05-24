@@ -259,10 +259,10 @@ test.describe('Recruiters page', () => {
     await page.goto('/recruiters');
     await page.waitForLoadState('networkidle');
 
-    await expect(page.getByText('Riley Recruiter')).toBeVisible({ timeout: 8000 });
-    await expect(page.getByText('Sam Recruiter')).toBeVisible({ timeout: 8000 });
-    await expect(page.getByText('Team Alpha')).toBeVisible({ timeout: 8000 });
-    await expect(page.getByText('Team Beta')).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('Riley Recruiter').first()).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('Sam Recruiter').first()).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('Team Alpha').first()).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('Team Beta').first()).toBeVisible({ timeout: 8000 });
 
     await page.screenshot({ path: 'e2e-results/audit-recruiters.png' });
     expect(errors).toHaveLength(0);
@@ -304,8 +304,8 @@ test.describe('Vendors page', () => {
     await page.goto('/vendors');
     await page.waitForLoadState('networkidle');
 
-    await expect(page.getByText('TechStaff Inc')).toBeVisible({ timeout: 8000 });
-    await expect(page.getByText('DataBridge LLC')).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('TechStaff Inc').first()).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('DataBridge LLC').first()).toBeVisible({ timeout: 8000 });
 
     await page.screenshot({ path: 'e2e-results/audit-vendors.png' });
     expect(errors).toHaveLength(0);
@@ -345,9 +345,9 @@ test.describe('Clients page', () => {
     await page.goto('/clients');
     await page.waitForLoadState('networkidle');
 
-    await expect(page.getByText('Acme Corp')).toBeVisible({ timeout: 8000 });
-    await expect(page.getByText('Beta Inc')).toBeVisible({ timeout: 8000 });
-    await expect(page.getByText('Technology')).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('Acme Corp').first()).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('Beta Inc').first()).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('Technology').first()).toBeVisible({ timeout: 8000 });
 
     await page.screenshot({ path: 'e2e-results/audit-clients.png' });
     expect(errors).toHaveLength(0);
@@ -387,8 +387,8 @@ test.describe('Invitations page', () => {
     await page.goto('/invitations');
     await page.waitForLoadState('networkidle');
 
-    await expect(page.getByText('newuser@example.com')).toBeVisible({ timeout: 8000 });
-    await expect(page.getByText('another@example.com')).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('newuser@example.com').first()).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('another@example.com').first()).toBeVisible({ timeout: 8000 });
     // Pending invite should show Revoke button
     await expect(page.getByRole('button', { name: /revoke/i }).first()).toBeVisible({
       timeout: 8000,
@@ -523,8 +523,8 @@ test.describe('Deactivated Accounts page', () => {
     await expect(page.getByRole('heading', { name: 'Deactivated accounts' })).toBeVisible({
       timeout: 8000,
     });
-    await expect(page.getByText('Deactivated User')).toBeVisible({ timeout: 8000 });
-    await expect(page.getByText('Suspended User')).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('Deactivated User').first()).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('Suspended User').first()).toBeVisible({ timeout: 8000 });
     // Each row should have a Reactivate button
     await expect(page.getByRole('button', { name: /reactivate/i }).first()).toBeVisible({
       timeout: 8000,

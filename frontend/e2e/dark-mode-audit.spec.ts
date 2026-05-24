@@ -102,7 +102,7 @@ test.describe('Dark mode — Desktop', () => {
     await setupManagerPage(page);
     await page.goto('/consultants');
     await page.waitForLoadState('load');
-    await expect(page.getByText('Alice Chen')).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('Alice Chen').first()).toBeVisible({ timeout: 8000 });
     await enableDarkMode(page);
     const v = await auditPage(page, 'dark-desktop-consultants');
     expect(v, `${v.length} violation(s) on dark desktop /consultants`).toHaveLength(0);
@@ -156,7 +156,7 @@ test.describe('Dark mode — Desktop', () => {
     await setupManagerPage(page);
     await page.goto('/reminders');
     await page.waitForLoadState('load');
-    await expect(page.getByText('Follow up with Alice re: Google offer')).toBeVisible({
+    await expect(page.getByText('Follow up with Alice re: Google offer').first()).toBeVisible({
       timeout: 8000,
     });
     await enableDarkMode(page);
@@ -168,7 +168,7 @@ test.describe('Dark mode — Desktop', () => {
     await setupManagerPage(page);
     await page.goto('/applications');
     await page.waitForLoadState('load');
-    await expect(page.getByText('Alice Chen')).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('Alice Chen').first()).toBeVisible({ timeout: 8000 });
     await enableDarkMode(page);
     const v = await auditPage(page, 'dark-desktop-applications');
     expect(v, `${v.length} violation(s) on dark desktop /applications`).toHaveLength(0);
@@ -187,7 +187,7 @@ test.describe('Dark mode — Desktop', () => {
     await setupManagerPage(page);
     await page.goto('/messages');
     await page.waitForLoadState('load');
-    await expect(page.getByText('Alice Chen')).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('Alice Chen').first()).toBeVisible({ timeout: 8000 });
     await enableDarkMode(page);
     const v = await auditPage(page, 'dark-desktop-messages');
     expect(v, `${v.length} violation(s) on dark desktop /messages`).toHaveLength(0);
@@ -253,7 +253,7 @@ test.describe('Dark mode — Mobile', () => {
     await setupManagerPage(page);
     await page.goto('/consultants');
     await page.waitForLoadState('load');
-    await expect(page.getByText('Alice Chen')).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('Alice Chen').last()).toBeVisible({ timeout: 8000 });
     await enableDarkMode(page);
     const v = await auditPage(page, 'dark-mobile-consultants');
     expect(v, `${v.length} violation(s) on dark mobile /consultants`).toHaveLength(0);
@@ -306,7 +306,7 @@ test.describe('Dark mode — Mobile', () => {
     await setupManagerPage(page);
     await page.goto('/reminders');
     await page.waitForLoadState('load');
-    await expect(page.getByText('Follow up with Alice re: Google offer')).toBeVisible({
+    await expect(page.getByText('Follow up with Alice re: Google offer').last()).toBeVisible({
       timeout: 8000,
     });
     await enableDarkMode(page);
@@ -318,7 +318,7 @@ test.describe('Dark mode — Mobile', () => {
     await setupManagerPage(page);
     await page.goto('/applications');
     await page.waitForLoadState('load');
-    await expect(page.getByText('Alice Chen')).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('Alice Chen').last()).toBeVisible({ timeout: 8000 });
     await enableDarkMode(page);
     const v = await auditPage(page, 'dark-mobile-applications');
     expect(v, `${v.length} violation(s) on dark mobile /applications`).toHaveLength(0);
@@ -337,7 +337,7 @@ test.describe('Dark mode — Mobile', () => {
     await setupManagerPage(page);
     await page.goto('/messages');
     await page.waitForLoadState('load');
-    await expect(page.getByText('Alice Chen')).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('Alice Chen').first()).toBeVisible({ timeout: 8000 });
     await enableDarkMode(page);
     const v = await auditPage(page, 'dark-mobile-messages');
     expect(v, `${v.length} violation(s) on dark mobile /messages`).toHaveLength(0);

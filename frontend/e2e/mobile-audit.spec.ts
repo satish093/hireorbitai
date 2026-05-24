@@ -157,9 +157,9 @@ test.describe('Mobile — Consultants page', () => {
     await page.goto('/consultants');
     await page.waitForLoadState('load');
 
-    await expect(page.getByText('Alice Chen')).toBeVisible({ timeout: 8000 });
-    await expect(page.getByText('Bob Kim')).toBeVisible({ timeout: 8000 });
-    await expect(page.getByText('Carol Patel')).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('Alice Chen').last()).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('Bob Kim').last()).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('Carol Patel').last()).toBeVisible({ timeout: 8000 });
 
     expect(await hasHorizontalOverflow(page)).toBe(false);
     expect(errors).toHaveLength(0);
@@ -312,10 +312,10 @@ test.describe('Mobile — Reminders page', () => {
     await page.goto('/reminders');
     await page.waitForLoadState('load');
 
-    await expect(page.getByText('Follow up with Alice re: Google offer')).toBeVisible({
+    await expect(page.getByText('Follow up with Alice re: Google offer').last()).toBeVisible({
       timeout: 8000,
     });
-    await expect(page.getByText('Send resume to Acme Corp')).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('Send resume to Acme Corp').last()).toBeVisible({ timeout: 8000 });
 
     expect(await hasHorizontalOverflow(page)).toBe(false);
     expect(errors).toHaveLength(0);
@@ -345,9 +345,9 @@ test.describe('Mobile — Applications page', () => {
     await page.goto('/applications');
     await page.waitForLoadState('load');
 
-    await expect(page.getByText('Alice Chen')).toBeVisible({ timeout: 8000 });
-    await expect(page.getByText('Senior Java Developer')).toBeVisible({ timeout: 8000 });
-    await expect(page.getByText('TechStaff Inc')).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('Alice Chen').last()).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('Senior Java Developer').last()).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('TechStaff Inc').last()).toBeVisible({ timeout: 8000 });
 
     expect(await hasHorizontalOverflow(page)).toBe(false);
     expect(errors).toHaveLength(0);

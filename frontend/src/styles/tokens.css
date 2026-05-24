@@ -84,18 +84,23 @@
 [data-theme='dark'] {
   color-scheme: dark;
 
-  --bg: oklch(0.16 0.008 260);
-  --bg-elev: oklch(0.19 0.008 260);
-  --bg-sunken: oklch(0.13 0.008 260);
-  --surface: oklch(0.2 0.008 260);
-  --surface-2: oklch(0.22 0.008 260);
-  --hover: oklch(0.245 0.009 260);
-  --border: oklch(0.27 0.01 260);
-  --border-strong: oklch(0.34 0.012 260);
-  --ink: oklch(0.96 0.004 260);
-  --ink-2: oklch(0.84 0.006 260);
-  --muted: oklch(0.66 0.01 260);
-  --faint: oklch(0.67 0.01 260);
+  /* Backgrounds: slightly richer blue-gray tint — less "pure black" */
+  --bg: oklch(0.15 0.012 260);
+  --bg-elev: oklch(0.18 0.012 260);
+  --bg-sunken: oklch(0.12 0.012 260);
+  --surface: oklch(0.195 0.012 260);
+  --surface-2: oklch(0.22 0.012 260);
+  --hover: oklch(0.255 0.013 260);
+  --border: oklch(0.29 0.014 260);
+  --border-strong: oklch(0.36 0.016 260);
+
+  /* Text: softer off-white instead of near-pure white */
+  --ink: oklch(0.87 0.008 260);
+  --ink-2: oklch(0.7 0.012 260);
+  --muted: oklch(0.56 0.013 260);
+  --faint: oklch(0.46 0.012 260);
+
+  /* Accent: unchanged */
   --accent: oklch(0.68 0.2 275);
   --accent-2: oklch(0.74 0.19 280);
   --accent-soft: oklch(0.28 0.12 275);
@@ -103,11 +108,11 @@
   --brand-from: #3b82f6;
   --brand-to: #8b5cf6;
   --success: oklch(0.62 0.13 150);
-  --success-soft: oklch(0.28 0.06 150);
+  --success-soft: oklch(0.26 0.07 150);
   --warn: oklch(0.72 0.13 75);
-  --warn-soft: oklch(0.3 0.07 75);
+  --warn-soft: oklch(0.28 0.08 75);
   --danger: oklch(0.65 0.18 25);
-  --danger-soft: oklch(0.3 0.08 25);
+  --danger-soft: oklch(0.28 0.09 25);
   --ring: oklch(0.68 0.2 275 / 0.5);
 }
 

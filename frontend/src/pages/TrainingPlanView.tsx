@@ -85,18 +85,18 @@ export function TrainingPlanView() {
     >
       <div className="max-w-4xl">
         {/* Action bar (hidden when printed) */}
-        <div className="flex items-center justify-between mb-4 print:hidden">
-          <div>
+        <div className="mb-4 print:hidden">
+          <div className="mb-3">
             <h1 className="text-2xl font-semibold tracking-tight">I-983 Training Plan</h1>
             <p className="text-xs text-muted mt-0.5">
               STEM-OPT training plan for {student.full_name ?? student.email ?? 'student'} ·{' '}
               {c.title}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Link
               to={`/training/assignments/${a.id}`}
-              className="border border-border text-ink text-sm px-3 py-1.5 rounded-lg hover:bg-hover"
+              className="inline-flex items-center h-9 border border-border text-ink text-sm px-3 rounded-lg hover:bg-hover"
             >
               ← Back to course
             </Link>

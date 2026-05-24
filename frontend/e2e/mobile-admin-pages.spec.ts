@@ -292,9 +292,9 @@ test.describe('Mobile — Recruiters page', () => {
     await page.goto('/recruiters');
     await page.waitForLoadState('networkidle');
 
-    await expect(page.getByText('Riley Recruiter')).toBeVisible({ timeout: 8000 });
-    await expect(page.getByText('Sam Recruiter')).toBeVisible({ timeout: 8000 });
-    await expect(page.getByText('Team Alpha')).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('Riley Recruiter').last()).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('Sam Recruiter').last()).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('Team Alpha').last()).toBeVisible({ timeout: 8000 });
 
     expect(await hasHorizontalOverflow(page)).toBe(false);
     await screenshotAndAudit(page, 'recruiters');
@@ -312,8 +312,8 @@ test.describe('Mobile — Vendors page', () => {
     await page.goto('/vendors');
     await page.waitForLoadState('networkidle');
 
-    await expect(page.getByText('TechStaff Inc')).toBeVisible({ timeout: 8000 });
-    await expect(page.getByText('DataBridge LLC')).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('TechStaff Inc').last()).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('DataBridge LLC').last()).toBeVisible({ timeout: 8000 });
 
     expect(await hasHorizontalOverflow(page)).toBe(false);
     await screenshotAndAudit(page, 'vendors');
@@ -331,9 +331,9 @@ test.describe('Mobile — Clients page', () => {
     await page.goto('/clients');
     await page.waitForLoadState('networkidle');
 
-    await expect(page.getByText('Acme Corp')).toBeVisible({ timeout: 8000 });
-    await expect(page.getByText('Beta Inc')).toBeVisible({ timeout: 8000 });
-    await expect(page.getByText('Technology')).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('Acme Corp').last()).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('Beta Inc').last()).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('Technology').last()).toBeVisible({ timeout: 8000 });
 
     expect(await hasHorizontalOverflow(page)).toBe(false);
     await screenshotAndAudit(page, 'clients');
@@ -354,8 +354,8 @@ test.describe('Mobile — Invitations page', () => {
     await page.goto('/invitations');
     await page.waitForLoadState('networkidle');
 
-    await expect(page.getByText('newuser@example.com')).toBeVisible({ timeout: 8000 });
-    await expect(page.getByText('another@example.com')).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('newuser@example.com').last()).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('another@example.com').last()).toBeVisible({ timeout: 8000 });
     await expect(page.getByRole('button', { name: /revoke/i }).first()).toBeVisible({
       timeout: 8000,
     });
@@ -452,8 +452,8 @@ test.describe('Mobile — Deactivated Accounts page', () => {
     await expect(page.getByRole('heading', { name: 'Deactivated accounts' })).toBeVisible({
       timeout: 8000,
     });
-    await expect(page.getByText('Deactivated User')).toBeVisible({ timeout: 8000 });
-    await expect(page.getByText('Suspended User')).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('Deactivated User').last()).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('Suspended User').last()).toBeVisible({ timeout: 8000 });
     await expect(page.getByRole('button', { name: /reactivate/i }).first()).toBeVisible({
       timeout: 8000,
     });
