@@ -5,8 +5,6 @@ import { api } from '../services/api';
 
 export type AIProviderConfig = { mode: 'api' } | { mode: 'oauth'; token: string };
 
-const API_KEY_STORAGE = 'ai_api_key';
-
 type OAuthPhase =
   | 'checking'
   | 'idle'
@@ -33,11 +31,6 @@ export function AIProviderModal({ open, onConfirm, onClose, action = 'Generate' 
   const [sessionId, setSessionId] = useState('');
   const [oauthError, setOauthError] = useState('');
 
-  // API key state
-  const [apiKey, setApiKey] = useState(() => localStorage.getItem(API_KEY_STORAGE) ?? '');
-  const [apiChecking, setApiChecking] = useState(false);
-  const [apiError, setApiError] = useState('');
-
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   function stopPoll() {
@@ -47,7 +40,7 @@ export function AIProviderModal({ open, onConfirm, onClose, action = 'Generate' 
     }
   }
 
-  // On open: check if server already has subscription
+  // On open: check if server already has a subscription configured
   useEffect(() => {
     if (!open) {
       stopPoll();
@@ -55,7 +48,6 @@ export function AIProviderModal({ open, onConfirm, onClose, action = 'Generate' 
     }
     setOauthPhase('checking');
     setOauthError('');
-    setApiError('');
     api
       .get<{ provider: string }>('/training/ai/provider')
       .then((r) => {
@@ -93,10 +85,7 @@ export function AIProviderModal({ open, onConfirm, onClose, action = 'Generate' 
         if (data.status === 'complete') {
           stopPoll();
           setOauthPhase('restarting');
-          // Wait for PM2 restart then confirm
-          setTimeout(() => {
-            setOauthPhase('connected');
-          }, 5000);
+          setTimeout(() => setOauthPhase('connected'), 5000);
         } else if (data.status === 'failed' || data.status === 'not_found') {
           stopPoll();
           setOauthError(data.error ?? 'Login failed or timed out. Please try again.');
@@ -108,49 +97,15 @@ export function AIProviderModal({ open, onConfirm, onClose, action = 'Generate' 
     }, 3000);
   }
 
-  function handleApiKeyChange(v: string) {
-    setApiKey(v);
-    setApiError('');
-    if (v) localStorage.setItem(API_KEY_STORAGE, v);
-    else localStorage.removeItem(API_KEY_STORAGE);
-  }
-
-  async function handleConfirm() {
-    if (mode === 'oauth') {
-      // Token is already on the server — use server key path
-      onConfirm({ mode: 'api' });
-      return;
-    }
-    // API key: validate first
-    const trimmed = apiKey.trim();
-    if (!trimmed.startsWith('sk-ant-')) {
-      setApiError('Enter a valid Anthropic API key starting with sk-ant-');
-      return;
-    }
-    setApiChecking(true);
-    setApiError('');
-    try {
-      const r = await api.post('/training/ai/check-token', { aiToken: trimmed });
-      if (r.data?.ok) {
-        onConfirm({ mode: 'oauth', token: trimmed });
-      } else {
-        setApiError(r.data?.error ?? 'API key is invalid or has no credits.');
-      }
-    } catch {
-      setApiError('Could not validate the key. Please try again.');
-    } finally {
-      setApiChecking(false);
-    }
+  function handleConfirm() {
+    // Both options use the server key — 'api' mode sends no aiToken in the request body
+    onConfirm({ mode: 'api' });
   }
 
   const oauthReady = oauthPhase === 'connected';
-  const apiKeyReady = !apiChecking && apiKey.trim().startsWith('sk-ant-');
-  const canGenerate = mode === 'oauth' ? oauthReady : apiKeyReady;
-  const busy =
-    oauthPhase === 'starting' ||
-    oauthPhase === 'polling' ||
-    oauthPhase === 'restarting' ||
-    apiChecking;
+  // API key option is always ready — the key is already in .env
+  const canGenerate = mode === 'apikey' || oauthReady;
+  const busy = oauthPhase === 'starting' || oauthPhase === 'polling' || oauthPhase === 'restarting';
 
   return (
     <Modal
@@ -168,13 +123,8 @@ export function AIProviderModal({ open, onConfirm, onClose, action = 'Generate' 
           <Button variant="outline" onClick={onClose} disabled={busy}>
             Cancel
           </Button>
-          <Button
-            variant="accent"
-            onClick={handleConfirm}
-            disabled={!canGenerate || apiChecking}
-            loading={apiChecking}
-          >
-            {apiChecking ? 'Validating…' : `${action} →`}
+          <Button variant="accent" onClick={handleConfirm} disabled={!canGenerate}>
+            {action} →
           </Button>
         </div>
       }
@@ -270,52 +220,26 @@ export function AIProviderModal({ open, onConfirm, onClose, action = 'Generate' 
         </div>
 
         {/* ── API key option ── */}
-        <div
-          className={`rounded-lg border p-3 transition-colors ${
-            mode === 'apikey' ? 'border-accent bg-accent/5' : 'border-border'
+        <label
+          className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+            mode === 'apikey' ? 'border-accent bg-accent/5' : 'border-border hover:border-accent/40'
           }`}
         >
-          <label className="flex items-start gap-3 cursor-pointer">
-            <input
-              type="radio"
-              name="ai-mode"
-              value="apikey"
-              checked={mode === 'apikey'}
-              onChange={() => setMode('apikey')}
-              className="mt-0.5 accent-[var(--accent)]"
-            />
-            <div className="min-w-0 flex-1">
-              <div className="text-sm font-medium text-ink">API key</div>
-              <div className="text-xs text-muted mt-0.5">
-                Use your own Anthropic API key — billed per token.
-              </div>
-
-              {mode === 'apikey' && (
-                <div className="mt-2 space-y-1.5">
-                  <input
-                    type="password"
-                    value={apiKey}
-                    onChange={(e) => handleApiKeyChange(e.target.value)}
-                    placeholder="sk-ant-api03-…"
-                    autoFocus
-                    className="w-full text-sm bg-bg-sunken border border-border rounded-md px-2.5 py-1.5 text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent/40"
-                  />
-                  {apiError && (
-                    <p className="text-xs text-rose-600 dark:text-rose-400">{apiError}</p>
-                  )}
-                  <a
-                    href="https://console.anthropic.com/settings/keys"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1 text-xs text-accent hover:underline"
-                  >
-                    Get your API key →
-                  </a>
-                </div>
-              )}
+          <input
+            type="radio"
+            name="ai-mode"
+            value="apikey"
+            checked={mode === 'apikey'}
+            onChange={() => setMode('apikey')}
+            className="mt-0.5 accent-[var(--accent)]"
+          />
+          <div>
+            <div className="text-sm font-medium text-ink">API key</div>
+            <div className="text-xs text-muted mt-0.5">
+              Use the Anthropic API key configured on the server.
             </div>
-          </label>
-        </div>
+          </div>
+        </label>
       </div>
     </Modal>
   );
