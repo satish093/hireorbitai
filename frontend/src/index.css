@@ -246,6 +246,14 @@ body {
   color: var(--foreground);
 }
 
+/* Override browser's native dark-mode select rendering (color-scheme:dark gives
+   selects a #6b6b6b background that fails contrast with our light text tokens). */
+[data-theme='dark'] select {
+  background-color: var(--surface-2);
+  color: var(--ink);
+  border-color: var(--border);
+}
+
 /* Respect OS-level reduced-motion preference: kill all animation + transitions. */
 @media (prefers-reduced-motion: reduce) {
   *,
