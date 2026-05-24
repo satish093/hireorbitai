@@ -338,7 +338,12 @@ export function Messages() {
       <div className="bg-surface border border-border rounded-xl overflow-hidden h-[calc(100dvh-180px)] min-h-[480px] flex flex-col sm:flex-row">
         {/* Left: conversation list. Becomes a full-width column on phones
             (stacked above the chat pane); fixed 20rem rail on tablet+. */}
-        <aside className="w-full sm:w-80 shrink-0 border-b sm:border-b-0 sm:border-r border-border flex flex-col bg-surface max-h-72 sm:max-h-none">
+        <aside
+          className={clsx(
+            'w-full sm:w-80 sm:flex shrink-0 border-b sm:border-b-0 sm:border-r border-border flex-col bg-surface sm:max-h-none',
+            activePeer ? 'hidden' : 'flex',
+          )}
+        >
           <div className="px-4 pt-3.5 pb-2 flex items-center justify-between">
             <h2 className="text-base font-semibold text-ink">Chats</h2>
           </div>
@@ -464,7 +469,7 @@ export function Messages() {
         </aside>
 
         {/* Right: active thread */}
-        <main className="flex-1 flex flex-col min-w-0">
+        <main className={clsx('flex-1 flex-col min-w-0', activePeer ? 'flex' : 'hidden sm:flex')}>
           {!activePeer ? (
             <div className="flex-1 flex items-center justify-center text-muted text-sm bg-hover/30">
               Select a conversation, or search a name to start a new one.
@@ -472,6 +477,17 @@ export function Messages() {
           ) : (
             <>
               <header className="px-5 py-3 border-b border-border flex items-center gap-3 bg-surface">
+                <button
+                  className="sm:hidden -ml-1 mr-1 p-1.5 rounded-lg hover:bg-hover text-muted shrink-0"
+                  onClick={() => {
+                    const next = new URLSearchParams(params);
+                    next.delete('with');
+                    setParams(next, { replace: true });
+                  }}
+                  aria-label="Back to conversations"
+                >
+                  ←
+                </button>
                 <div className="relative shrink-0">
                   <Avatar name={activePeer.full_name} email={activePeer.email} size={40} />
                   <PresenceDot

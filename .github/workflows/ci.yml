@@ -58,10 +58,22 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run shared:build
+      # Cache the Playwright browser binary keyed on package-lock so it
+      # survives repeat runs without re-downloading ~130 MB.
+      - name: Cache Playwright browser
+        uses: actions/cache@v4
+        id: pw-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ hashFiles('frontend/package-lock.json') }}
       # The smoke suite mocks every API call, so no backend/Postgres is needed.
       # Playwright auto-starts the Vite dev server itself (see playwright.config.ts).
+      # ubuntu-latest ships with Chromium's system deps; --with-deps is omitted
+      # to avoid the slow/hanging apt-get update that occurs on Azure runners.
       - name: Install Playwright browser
-        run: npx --prefix frontend playwright install --with-deps chromium
+        if: steps.pw-cache.outputs.cache-hit != 'true'
+        timeout-minutes: 8
+        run: npx --prefix frontend playwright install chromium
       - run: npm --prefix frontend run test:e2e
       - name: Upload Playwright report
         if: ${{ !cancelled() }}
