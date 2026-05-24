@@ -54,7 +54,7 @@ export function AIProviderModal({ open, onConfirm, onClose, action = 'Generate' 
       }
     >
       <div className="space-y-2">
-        {/* OAuth / My Key option */}
+        {/* My API Key option */}
         <label
           className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
             mode === 'oauth' ? 'border-accent bg-accent/5' : 'border-border hover:border-accent/40'
@@ -69,38 +69,28 @@ export function AIProviderModal({ open, onConfirm, onClose, action = 'Generate' 
             className="mt-0.5 accent-[var(--accent)]"
           />
           <div className="min-w-0 flex-1">
-            <div className="text-sm font-medium text-ink">OAuth</div>
+            <div className="text-sm font-medium text-ink">My API Key</div>
             <div className="text-xs text-muted mt-0.5">
-              Use your own Anthropic API key or Claude.ai subscription token
+              Use your own Anthropic API key — billed to your account
             </div>
             {mode === 'oauth' && (
-              <div className="mt-2 space-y-2">
+              <div className="mt-2 space-y-1.5">
                 <input
                   type="password"
                   value={token}
                   onChange={(e) => handleTokenChange(e.target.value)}
-                  placeholder="sk-ant-… or claude-…"
+                  placeholder="sk-ant-…"
                   autoFocus
                   className="w-full text-sm bg-bg-sunken border border-border rounded-md px-2.5 py-1.5 text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent/40"
                 />
-                <div className="flex flex-col gap-1">
-                  <a
-                    href="https://console.anthropic.com/settings/oauth-tokens"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1 text-xs text-accent hover:underline"
-                  >
-                    Get OAuth token (claude-…) →
-                  </a>
-                  <a
-                    href="https://console.anthropic.com/settings/keys"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1 text-xs text-muted hover:underline"
-                  >
-                    Get API key (sk-ant-…) →
-                  </a>
-                </div>
+                <a
+                  href="https://console.anthropic.com/settings/keys"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-xs text-accent hover:underline"
+                >
+                  Get your API key from console.anthropic.com →
+                </a>
               </div>
             )}
           </div>
