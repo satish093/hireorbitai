@@ -3,6 +3,7 @@ import { Popover } from '../ui/Popover';
 import { TONE_STYLES, sameDay, type CalEvent } from './types';
 
 const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const WEEKDAY_LETTERS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const MAX_CHIPS = 3;
 
 function fmtTime(iso: string): string {
@@ -98,12 +99,13 @@ export function MonthView({
     <div className="rounded-xl border border-border bg-surface overflow-hidden">
       {/* ── WEEKDAY HEADER ── */}
       <div className="grid grid-cols-7 border-b border-border">
-        {WEEKDAY_LABELS.map((label) => (
+        {WEEKDAY_LABELS.map((label, i) => (
           <div
-            key={label}
+            key={label + i}
             className="text-center text-[10px] text-muted uppercase tracking-wide py-2 select-none"
           >
-            {label}
+            <span className="sm:hidden">{WEEKDAY_LETTERS[i]}</span>
+            <span className="hidden sm:inline">{label}</span>
           </div>
         ))}
       </div>
