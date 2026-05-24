@@ -657,7 +657,7 @@ export async function generateLessonContent(
   const generate = () =>
     generateStructured(LessonContentSchema, LESSON_CONTENT_SYSTEM, contextLines, {
       model: TRAINING_CONTENT_MODEL,
-      maxTokens: 4096,
+      maxTokens: 8192,
       client: opts?.client,
     });
 
