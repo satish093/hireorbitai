@@ -718,9 +718,29 @@ export const pipelineReport: RequestHandler = async (req, res) => {
     cohorts = [];
   }
 
-  // --- KPIs (REAL conversion %; time-to-first-submission STUBBED) -----------
+  // --- KPIs (conversion rates + time-to-first-submission) -------------------
   let prior: Awaited<ReturnType<typeof funnelFor>> | undefined;
   if (compare) prior = await funnelFor(priorWindow(w));
+
+  let avgDaysToFirstSub: number | undefined;
+  try {
+    const r = await pool.query<{ avg_days: string | null }>(
+      `SELECT extract(epoch from avg(fs.first_sub - c.onboarded_at)) / 86400 AS avg_days
+       FROM public.consultants c
+       JOIN LATERAL (
+         SELECT min(a.submitted_at) AS first_sub
+         FROM public.applications a WHERE a.consultant_id = c.id
+       ) fs ON fs.first_sub IS NOT NULL
+       WHERE c.onboarded_at IS NOT NULL
+         AND fs.first_sub > c.onboarded_at
+         AND fs.first_sub >= $1 AND fs.first_sub <= $2`,
+      [w.from.toISOString(), w.to.toISOString()],
+    );
+    const raw = r.rows[0]?.avg_days;
+    if (raw != null) avgDaysToFirstSub = Math.round(parseFloat(raw));
+  } catch (e: any) {
+    req.log?.warn?.({ err: e?.message }, 'avg days to first sub query failed');
+  }
 
   const conv = (a: number, b: number) => (b === 0 ? 0 : (a / b) * 100);
   const kpis: Kpi[] = [
@@ -736,9 +756,14 @@ export const pipelineReport: RequestHandler = async (req, res) => {
       fmt: pct1,
       prior: prior ? conv(prior.placed, prior.offer) : undefined,
     }),
-    // TODO: Time → first submission. No reliable "consultant onboarded_at →
-    // first application" timestamp pairing wired yet; omitting rather than
-    // emitting a fabricated number.
+    ...(avgDaysToFirstSub !== undefined
+      ? [
+          makeKpi('Avg days to first submission', avgDaysToFirstSub, {
+            fmt: (n) => `${Math.round(n)}d`,
+            higherIsBetter: false,
+          }),
+        ]
+      : []),
   ];
 
   res.json({ kpis, charts: { funnel, series, cohorts } });
@@ -1000,6 +1025,36 @@ export const consultantsReport: RequestHandler = async (req, res) => {
     priorBench = bench;
   }
 
+  let avgAiScore: number | undefined;
+  try {
+    const r = await pool.query<{ avg: string | null }>(
+      `SELECT avg(r.ai_score)::numeric(5,1) AS avg
+       FROM public.resumes r
+       WHERE r.is_current = true AND r.ai_score IS NOT NULL`,
+      [],
+    );
+    const raw = r.rows[0]?.avg;
+    if (raw != null) avgAiScore = parseFloat(raw);
+  } catch (e: any) {
+    req.log?.warn?.({ err: e?.message }, 'avg ai_score query failed');
+  }
+
+  let avgDaysToPlacement: number | undefined;
+  try {
+    const r = await pool.query<{ avg_days: string | null }>(
+      `SELECT extract(epoch from avg(c.updated_at - c.onboarded_at)) / 86400 AS avg_days
+       FROM public.consultants c
+       WHERE c.marketing_status = 'PLACED'
+         AND c.onboarded_at IS NOT NULL
+         AND c.updated_at > c.onboarded_at`,
+      [],
+    );
+    const raw = r.rows[0]?.avg_days;
+    if (raw != null) avgDaysToPlacement = Math.round(parseFloat(raw));
+  } catch (e: any) {
+    req.log?.warn?.({ err: e?.message }, 'avg days to placement query failed');
+  }
+
   const kpis: Kpi[] = [
     makeKpi('Active consultants', active, { fmt: num, prior: priorActive }),
     makeKpi('On bench (14d idle)', bench, {
@@ -1007,9 +1062,22 @@ export const consultantsReport: RequestHandler = async (req, res) => {
       prior: priorBench,
       higherIsBetter: false,
     }),
-    // TODO: Avg AI score — no per-consultant AI score column on consultants
-    // (resumes.ai_score exists but is per-resume); omitting rather than guessing.
-    // TODO: Avg time to placement — no onboarded_at → placed_at pairing wired; omitted.
+    ...(avgAiScore !== undefined
+      ? [
+          makeKpi('Avg Resume AI Score', avgAiScore, {
+            fmt: (n) => n.toFixed(1),
+            higherIsBetter: true,
+          }),
+        ]
+      : []),
+    ...(avgDaysToPlacement !== undefined
+      ? [
+          makeKpi('Avg days to placement', avgDaysToPlacement, {
+            fmt: (n) => `${Math.round(n)}d`,
+            higherIsBetter: false,
+          }),
+        ]
+      : []),
   ];
 
   res.json({ kpis, charts: { visaMix, statusMix } });
