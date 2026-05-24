@@ -35,6 +35,7 @@ jobsRouter.post('/import-url', ingest, requireRole(...OPERATOR_TIER), c.importBy
 
 jobsRouter.get('/', c.list);
 jobsRouter.post('/', requireRole(...OPERATOR_TIER), c.create);
+jobsRouter.post('/score', c.scoreJobs);
 
 jobsRouter.get('/:id', c.get);
 jobsRouter.patch('/:id', requireRole(...OPERATOR_TIER), c.update);

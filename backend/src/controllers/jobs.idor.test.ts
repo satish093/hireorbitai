@@ -9,6 +9,8 @@
 
 import { describe, it, expect, vi } from 'vitest';
 
+const mockFlags = vi.hoisted(() => ({ nullConsultant: false }));
+
 vi.mock('../config/db', () => {
   // The caller's own consultant row resolves to id 'mine'; everything else is
   // an empty list / minimal row so the handlers don't crash post-authorization.
@@ -25,7 +27,12 @@ vi.mock('../config/db', () => {
       limit: () => b,
       insert: () => b,
       single: () => Promise.resolve({ data: tableDefaults[table] ?? { id: 'x' }, error: null }),
-      maybeSingle: () => Promise.resolve({ data: tableDefaults[table] ?? null, error: null }),
+      maybeSingle: () => {
+        if (table === 'consultants' && mockFlags.nullConsultant) {
+          return Promise.resolve({ data: null, error: null });
+        }
+        return Promise.resolve({ data: tableDefaults[table] ?? null, error: null });
+      },
       then: (resolve: (v: unknown) => unknown) =>
         Promise.resolve({ data: [], error: null }).then(resolve),
     });
@@ -50,6 +57,7 @@ import {
   recommended,
   duplicateCheck,
   matchForConsultant,
+  scoreJobs,
 } from './jobs.controller';
 
 const CONSULTANT = { id: 'u-consultant', role: 'CONSULTANT' };
@@ -175,5 +183,22 @@ describe('jobs.matchForConsultant — :consultantId IDOR guard', () => {
       user: MANAGER,
     });
     expect(err).toBeNull();
+  });
+});
+
+describe('jobs.scoreJobs — role + profile guards', () => {
+  it('404s when caller is not a CONSULTANT', async () => {
+    const { err } = await call(scoreJobs, { user: MANAGER });
+    expect(err?.status).toBe(404);
+  });
+
+  it('400s when CONSULTANT has no consultant profile', async () => {
+    mockFlags.nullConsultant = true;
+    try {
+      const { err } = await call(scoreJobs, { user: CONSULTANT });
+      expect(err?.status).toBe(400);
+    } finally {
+      mockFlags.nullConsultant = false;
+    }
   });
 });

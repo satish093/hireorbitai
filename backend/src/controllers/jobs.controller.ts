@@ -1209,6 +1209,69 @@ function skillsMatch(consultantSkill: string, jobSkill: string): boolean {
   return short.length > 0 && short.every((t) => long.includes(t));
 }
 
+// ---------------------------------------------------------------------------
+// POST /jobs/score — natural-language re-ranking for the consultant job feed
+// ---------------------------------------------------------------------------
+
+/**
+ * Re-ranks the active job pool for the calling CONSULTANT using
+ * matchJobsForConsultant (AI + LRU-cached). An optional `q` query param is
+ * prepended to the resume excerpt as a search-intent hint so the model weights
+ * intent-aligned roles higher without changing the AI service signature.
+ *
+ * Returns: { id: string; score: number }[] — sorted highest-score first.
+ * Only CONSULTANT role is allowed; any other role gets 404 (not 403) so the
+ * endpoint is not an existence oracle for non-consultant users.
+ */
+export const scoreJobs: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  if (req.user.role !== 'CONSULTANT') throw httpError(404, 'Not found');
+
+  const consultant = await getConsultantForUser(req.user.id);
+  if (!consultant) throw httpError(400, 'Complete your consultant profile first');
+
+  const q = String(req.query.q ?? '').trim();
+
+  // Load the consultant's current resume text for richer skill matching.
+  let resumeText = '';
+  const { data: resume } = await db
+    .from('resumes')
+    .select('body_text')
+    .eq('consultant_id', (consultant as any).id)
+    .eq('is_current', true)
+    .maybeSingle();
+  if (resume) resumeText = (resume as any)?.body_text ?? '';
+
+  // Prepend the NL search intent so the model factors the user's goal.
+  const resumeExcerpt = q
+    ? `Search intent: "${q}"${resumeText ? `\n\n${resumeText.slice(0, 3800)}` : ''}`
+    : resumeText.slice(0, 4000);
+
+  const { data: jobs } = await db
+    .from('jobs')
+    .select('id, title, required_skills, location, description')
+    .eq('is_active', true)
+    .limit(2000);
+
+  const matches = await matchJobsForConsultant(
+    {
+      skills: skillsForMatching(consultant),
+      experienceYears: (consultant as any).total_experience_years ?? 0,
+      preferredLocations: (consultant as any).preferred_locations ?? [],
+      ...(resumeExcerpt ? { resume_excerpt: resumeExcerpt } : {}),
+    },
+    (jobs ?? []).map((j: any) => ({
+      id: j.id,
+      title: j.title,
+      required_skills: j.required_skills,
+      location: j.location,
+      description: (j.description ?? '').slice(0, 1500),
+    })),
+  );
+
+  res.json(matches.map((m) => ({ id: m.job_id, score: m.match_score })));
+};
+
 export const skillGap: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
 
