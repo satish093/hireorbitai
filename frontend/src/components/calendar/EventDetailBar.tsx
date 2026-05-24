@@ -83,37 +83,46 @@ export function EventDetailBar({
 
   return (
     <div className="border-t border-border bg-bg-elev animate-fade-in-up">
-      <div className="flex items-center gap-3 px-4 py-3">
-        {/* Left tone bar */}
-        <div className={`w-1 self-stretch rounded-full ${toneStyles.bar}`} aria-hidden="true" />
-
-        {/* Title + meta column */}
-        <div className="min-w-0 flex-1">
-          <p className="text-[14px] font-semibold text-ink truncate leading-snug">{event.title}</p>
-          {metaLine && <p className="text-[12px] text-muted leading-snug mt-0.5">{metaLine}</p>}
+      {/* Mobile: two rows. Desktop (sm+): single row. */}
+      <div className="flex flex-col sm:flex-row sm:items-center">
+        {/* Row 1: tone bar + title/meta + close (mobile) */}
+        <div className="flex items-center gap-3 px-4 pt-3 pb-1 sm:py-3 min-w-0 flex-1">
+          <div className={`w-1 self-stretch rounded-full ${toneStyles.bar}`} aria-hidden="true" />
+          <div className="min-w-0 flex-1">
+            <p className="text-[14px] font-semibold text-ink truncate leading-snug">
+              {event.title}
+            </p>
+            {metaLine && <p className="text-[12px] text-muted leading-snug mt-0.5">{metaLine}</p>}
+          </div>
+          {/* Close on mobile top-right */}
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
+            aria-label="Close"
+            leftIcon={CloseIcon}
+            onClick={onClose}
+            className="sm:hidden shrink-0"
+          />
         </div>
 
-        {/* Match score badge */}
-        {showMatch && (
-          <span className="text-[11px] font-mono font-semibold text-success bg-success-soft rounded px-1.5 py-0.5 shrink-0">
-            {event.matchScore}% MATCH
-          </span>
-        )}
-
-        {/* Action buttons */}
-        <div className="flex items-center gap-1.5 shrink-0">
+        {/* Row 2: badge + action buttons + close (desktop) */}
+        <div className="flex items-center gap-1.5 shrink-0 px-4 pb-3 sm:py-3 sm:pl-0">
+          {showMatch && (
+            <span className="text-[11px] font-mono font-semibold text-success bg-success-soft rounded px-1.5 py-0.5 shrink-0">
+              {event.matchScore}% MATCH
+            </span>
+          )}
           {showFeedback && (
             <Button variant="outline" size="sm" onClick={onFeedback}>
               Feedback
             </Button>
           )}
-
           {showBrief && (
             <Button variant="outline" size="sm" onClick={onBrief}>
               Brief
             </Button>
           )}
-
           {showJoin && (
             <Button
               variant="outline"
@@ -123,7 +132,7 @@ export function EventDetailBar({
               Join Zoom
             </Button>
           )}
-
+          {/* Close on desktop end */}
           <Button
             variant="ghost"
             size="sm"
@@ -131,6 +140,7 @@ export function EventDetailBar({
             aria-label="Close"
             leftIcon={CloseIcon}
             onClick={onClose}
+            className="hidden sm:inline-flex"
           />
         </div>
       </div>

@@ -66,6 +66,7 @@ export function Calendar({
   const [addFor, setAddFor] = useState<Date | null>(null);
   const [feedbackFor, setFeedbackFor] = useState<{ id: string; title?: string } | null>(null);
   const [reloadTick, setReloadTick] = useState(0);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const { events, loading } = useCalendarData(anchor, reloadTick);
   const shown = events.filter((e) => visible.has(e.calendar));
@@ -145,22 +146,55 @@ export function Calendar({
         }
         action={
           <>
+            {/* Sidebar toggle — mobile only */}
+            <button
+              className="md:hidden p-2 rounded-lg hover:bg-hover border border-border text-muted shrink-0"
+              onClick={() => setSidebarOpen((o) => !o)}
+              aria-label="Toggle sidebar"
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+                <path
+                  d="M2 4h12M2 8h12M2 12h12"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </button>
+
+            {/* Nav: prev / today / next */}
             <ButtonGroup>
               <ButtonGroupItem onClick={() => shift(-1)}>‹</ButtonGroupItem>
               <ButtonGroupItem onClick={() => setAnchor(new Date())}>Today</ButtonGroupItem>
               <ButtonGroupItem onClick={() => shift(1)}>›</ButtonGroupItem>
             </ButtonGroup>
-            <ButtonGroup>
+
+            {/* View selector — native select on mobile, button group on md+ */}
+            <select
+              className="md:hidden text-sm border border-border rounded-lg px-2 py-1.5 bg-surface text-ink"
+              value={view}
+              onChange={(e) => setView(e.target.value as CalView)}
+            >
               {VIEWS.map((v) => (
-                <ButtonGroupItem
-                  key={v.key}
-                  pressed={view === v.key}
-                  onClick={() => setView(v.key)}
-                >
+                <option key={v.key} value={v.key}>
                   {v.label}
-                </ButtonGroupItem>
+                </option>
               ))}
-            </ButtonGroup>
+            </select>
+            <div className="hidden md:block">
+              <ButtonGroup>
+                {VIEWS.map((v) => (
+                  <ButtonGroupItem
+                    key={v.key}
+                    pressed={view === v.key}
+                    onClick={() => setView(v.key)}
+                  >
+                    {v.label}
+                  </ButtonGroupItem>
+                ))}
+              </ButtonGroup>
+            </div>
+
             {isInterviews ? (
               <Button variant="primary" onClick={() => setScheduleOpen(true)}>
                 Schedule
@@ -176,6 +210,8 @@ export function Calendar({
 
       <div className="flex flex-col md:flex-row gap-5 items-start">
         <CalendarSidebar
+          open={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
           anchor={anchor}
           onAnchor={setAnchor}
           events={shown}

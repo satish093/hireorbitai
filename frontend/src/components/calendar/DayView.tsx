@@ -315,8 +315,8 @@ export function DayView({
         </div>
       </div>
 
-      {/* ── RIGHT: side panel ── */}
-      <div className="w-full lg:w-[320px] lg:shrink-0 space-y-4">
+      {/* ── RIGHT: side panel — hidden on mobile/tablet, shown lg+ ── */}
+      <div className="hidden lg:block lg:w-[320px] lg:shrink-0 space-y-4">
         {/* Focus time card */}
         <div className="rounded-xl border border-border bg-surface p-4">
           <p className="text-[11px] font-mono uppercase tracking-wider text-muted mb-3">

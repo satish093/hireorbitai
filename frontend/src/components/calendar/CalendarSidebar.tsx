@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import clsx from 'clsx';
 import { Button } from '../Button';
 // Avatar is imported for potential future attendee display; kept per contract.
 import { Avatar } from '../TaskBits'; // eslint-disable-line @typescript-eslint/no-unused-vars
@@ -57,6 +58,8 @@ export function CalendarSidebar({
   onToggleCalendar,
   onSelectEvent,
   showCalendars = true,
+  open = false,
+  onClose,
 }: {
   anchor: Date;
   onAnchor: (d: Date) => void;
@@ -67,6 +70,9 @@ export function CalendarSidebar({
   /** Hidden in restricted mode (e.g. Interviews wrapper) where the visible
    *  set is fixed and the toggles would be inert. */
   showCalendars?: boolean;
+  /** Mobile: whether the sidebar is expanded (ignored on md+). */
+  open?: boolean;
+  onClose?: () => void;
 }): JSX.Element {
   // Tick state for countdown recompute every 60s.
   const [tick, setTick] = useState(0);
@@ -109,7 +115,19 @@ export function CalendarSidebar({
   const monthLabel = anchor.toLocaleString(undefined, { month: 'long', year: 'numeric' });
 
   return (
-    <div className="w-full md:w-[260px] shrink-0 space-y-4">
+    <div className={clsx('w-full md:w-[260px] shrink-0 space-y-4', !open && 'hidden md:block')}>
+      {/* Mobile close row */}
+      <div className="md:hidden flex items-center justify-between">
+        <span className="text-sm font-semibold text-ink">Calendar</span>
+        <button
+          onClick={onClose}
+          className="p-1.5 rounded-lg hover:bg-hover text-muted"
+          aria-label="Close sidebar"
+        >
+          ✕
+        </button>
+      </div>
+
       {/* ------------------------------------------------------------------ */}
       {/* 1. Mini month picker                                                */}
       {/* ------------------------------------------------------------------ */}

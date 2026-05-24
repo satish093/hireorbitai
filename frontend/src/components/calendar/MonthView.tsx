@@ -127,7 +127,7 @@ export function MonthView({
             <div
               key={idx}
               className={clsx(
-                'min-h-[104px] border-t border-l border-border p-1.5 cursor-pointer transition-colors hover:bg-hover/50',
+                'min-h-[52px] sm:min-h-[104px] border-t border-l border-border p-1.5 cursor-pointer transition-colors hover:bg-hover/50',
                 isWeekend && isCurrentMonth && 'bg-bg-sunken/40',
               )}
               onClick={() => onAnchor(day)}
@@ -152,75 +152,91 @@ export function MonthView({
                   )}
                 </div>
 
-                {/* Event chips */}
-                {visible.map((ev) => (
-                  <EventChip
-                    key={ev.id}
-                    ev={ev}
-                    isSelected={ev.id === selectedId}
-                    onSelect={onSelect}
-                  />
-                ))}
+                {/* Event chips — sm+ only */}
+                <div className="hidden sm:block">
+                  {visible.map((ev) => (
+                    <EventChip
+                      key={ev.id}
+                      ev={ev}
+                      isSelected={ev.id === selectedId}
+                      onSelect={onSelect}
+                    />
+                  ))}
+                </div>
 
-                {/* Overflow — Popover listing all events for the day */}
-                {overflow > 0 && (
-                  <Popover
-                    button={(open) => (
+                {/* Event dots — mobile only */}
+                {dayEvents.length > 0 && (
+                  <div className="sm:hidden flex gap-[3px] flex-wrap mt-0.5">
+                    {dayEvents.slice(0, 3).map((ev) => (
                       <span
-                        role="button"
-                        tabIndex={0}
-                        onClick={(e) => e.stopPropagation()}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') e.stopPropagation();
-                        }}
-                        className={clsx(
-                          'block text-[11px] text-accent px-1 py-0.5 rounded cursor-pointer select-none',
-                          open ? 'bg-accent-soft' : 'hover:bg-hover',
-                        )}
-                      >
-                        +{overflow} more
-                      </span>
-                    )}
-                  >
-                    {(close) => (
-                      <div className="flex flex-col gap-0.5 py-1">
-                        {dayEvents.map((ev) => {
-                          const tone = TONE_STYLES[ev.tone];
-                          return (
-                            <div
-                              key={ev.id}
-                              role="button"
-                              tabIndex={0}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onSelect(ev.id);
-                                close();
-                              }}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter' || e.key === ' ') {
+                        key={ev.id}
+                        className={clsx('w-1.5 h-1.5 rounded-full', TONE_STYLES[ev.tone].dot)}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {/* Overflow — Popover listing all events for the day (sm+ only) */}
+                {overflow > 0 && (
+                  <div className="hidden sm:block">
+                    <Popover
+                      button={(open) => (
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          onClick={(e) => e.stopPropagation()}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') e.stopPropagation();
+                          }}
+                          className={clsx(
+                            'block text-[11px] text-accent px-1 py-0.5 rounded cursor-pointer select-none',
+                            open ? 'bg-accent-soft' : 'hover:bg-hover',
+                          )}
+                        >
+                          +{overflow} more
+                        </span>
+                      )}
+                    >
+                      {(close) => (
+                        <div className="flex flex-col gap-0.5 py-1">
+                          {dayEvents.map((ev) => {
+                            const tone = TONE_STYLES[ev.tone];
+                            return (
+                              <div
+                                key={ev.id}
+                                role="button"
+                                tabIndex={0}
+                                onClick={(e) => {
                                   e.stopPropagation();
                                   onSelect(ev.id);
                                   close();
-                                }
-                              }}
-                              className={clsx(
-                                'relative flex items-center gap-2 text-[12px] rounded px-2 py-1.5 cursor-pointer truncate',
-                                ev.id === selectedId ? 'bg-accent-soft' : 'hover:bg-hover',
-                              )}
-                            >
-                              <span
-                                className={clsx('shrink-0 w-1.5 h-1.5 rounded-full', tone.dot)}
-                              />
-                              <span className="truncate text-ink flex-1">{ev.title}</span>
-                              <span className="font-mono text-muted shrink-0 text-[11px]">
-                                {fmtTime(ev.start)}
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </Popover>
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' || e.key === ' ') {
+                                    e.stopPropagation();
+                                    onSelect(ev.id);
+                                    close();
+                                  }
+                                }}
+                                className={clsx(
+                                  'relative flex items-center gap-2 text-[12px] rounded px-2 py-1.5 cursor-pointer truncate',
+                                  ev.id === selectedId ? 'bg-accent-soft' : 'hover:bg-hover',
+                                )}
+                              >
+                                <span
+                                  className={clsx('shrink-0 w-1.5 h-1.5 rounded-full', tone.dot)}
+                                />
+                                <span className="truncate text-ink flex-1">{ev.title}</span>
+                                <span className="font-mono text-muted shrink-0 text-[11px]">
+                                  {fmtTime(ev.start)}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </Popover>
+                  </div>
                 )}
               </div>
             </div>
