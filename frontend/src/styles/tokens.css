@@ -84,36 +84,39 @@
 [data-theme='dark'] {
   color-scheme: dark;
 
-  /* Backgrounds: slightly richer blue-gray tint — less "pure black" */
-  --bg: oklch(0.15 0.012 260);
-  --bg-elev: oklch(0.18 0.012 260);
-  --bg-sunken: oklch(0.12 0.012 260);
-  --surface: oklch(0.195 0.012 260);
-  --surface-2: oklch(0.22 0.012 260);
-  --hover: oklch(0.255 0.013 260);
-  --border: oklch(0.29 0.014 260);
-  --border-strong: oklch(0.36 0.016 260);
+  /* Backgrounds: slightly richer blue-gray tint — less "pure black".
+   * Values are sRGB hex equivalents of the original oklch palette so that
+   * axe-core (which cannot parse oklch from getComputedStyle) can correctly
+   * trace background colours when auditing accessibility contrast. */
+  --bg: #080b10;
+  --bg-elev: #0e1217;
+  --bg-sunken: #04060a;
+  --surface: #12151a;
+  --surface-2: #171b20;
+  --hover: #1f2329;
+  --border: #272c32;
+  --border-strong: #383d46;
 
   /* Text: muted steel tones — readable but not harsh-white */
-  --ink: oklch(0.8 0.008 260);
-  --ink-2: oklch(0.65 0.012 260);
-  --muted: oklch(0.63 0.013 260);
-  --faint: oklch(0.6 0.01 260);
+  --ink: #bbbec3;
+  --ink-2: #8b8f97;
+  --muted: #858991;
+  --faint: #7d8086;
 
-  /* Accent: unchanged */
-  --accent: oklch(0.68 0.2 275);
-  --accent-2: oklch(0.74 0.19 280);
-  --accent-soft: oklch(0.28 0.12 275);
+  /* Accent (sRGB-clipped from wide-gamut oklch originals) */
+  --accent: #7887ff;
+  --accent-2: #9698ff;
+  --accent-soft: #1c1c62;
   --accent-fg: #ffffff;
   --brand-from: #3b82f6;
   --brand-to: #8b5cf6;
-  --success: oklch(0.62 0.13 150);
-  --success-soft: oklch(0.26 0.07 150);
-  --warn: oklch(0.72 0.13 75);
-  --warn-soft: oklch(0.28 0.08 75);
-  --danger: oklch(0.65 0.18 25);
-  --danger-soft: oklch(0.28 0.09 25);
-  --ring: oklch(0.68 0.2 275 / 0.5);
+  --success: #429c5a;
+  --success-soft: #012d10;
+  --warn: #d49838;
+  --warn-soft: #3f2100;
+  --danger: #e85854;
+  --danger-soft: #4c1010;
+  --ring: rgba(120, 135, 255, 0.5);
 }
 
 html,

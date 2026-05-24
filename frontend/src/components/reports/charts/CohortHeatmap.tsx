@@ -58,7 +58,7 @@ export function CohortHeatmap({ cohorts }: { cohorts: Cohort[] }): JSX.Element {
                     backgroundColor: `color-mix(in oklch, var(--accent) ${pct}%, var(--bg-sunken))`,
                   }}
                 >
-                  <span className={pct >= 45 ? 'text-ink' : 'text-ink-2'}>{pct}</span>
+                  <span className={pct >= 20 ? 'text-ink' : 'text-ink-2'}>{pct}</span>
                 </div>
               );
             })}

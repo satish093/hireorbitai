@@ -317,7 +317,7 @@ export function TrainingCourseDetails() {
               )}
             </div>
             {isManager && (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Link
                   to={`/training/courses/${course.id}/edit`}
                   className="border border-border text-ink text-sm px-3 py-1.5 rounded-lg hover:bg-hover"
