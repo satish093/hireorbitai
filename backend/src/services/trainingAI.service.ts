@@ -219,12 +219,13 @@ ANALYSIS APPROACH:
 
 OUTPUT RULES:
 - missing_skills: 5–12 items. Use canonical names (React not ReactJS). Omit skills the resume clearly demonstrates.
-- recommended_courses: 4–8 items. Each "why_recommended" must name the specific JD requirement it addresses.
+- recommended_courses: 4–8 items. Use EXACTLY these field names: title (course name), category (e.g. "Security", "Cloud"), difficulty ("BEGINNER"|"INTERMEDIATE"|"ADVANCED"), why_recommended (specific JD requirement it addresses).
 - learning_roadmap: 2–4 phases ordered by dependency. Phase 1 = most critical blockers.
-  duration_weeks: realistic estimate (null if open-ended); don't pad with 52-week phases.
+  Use EXACTLY these field names: phase (name), duration_weeks (number or null), focus_areas (string array).
 - summary: 2–3 sentences addressing the consultant directly — what to focus on and why the order matters.
 
-Return valid JSON only. No markdown, no explanation.`;
+Return valid JSON matching this exact structure — no extra keys, no markdown:
+{"missing_skills":["..."],"recommended_courses":[{"title":"...","category":"...","difficulty":"BEGINNER","why_recommended":"..."}],"learning_roadmap":[{"phase":"...","duration_weeks":4,"focus_areas":["..."]}],"summary":"..."}`;
 
 export async function generateTrainingPlan(input: {
   resume_text: string;
@@ -240,7 +241,7 @@ export async function generateTrainingPlan(input: {
         cacheableBlock(`CONSULTANT RESUME:\n\n${clippedResume}`),
         { type: 'text', text: `TARGET JOB DESCRIPTION:\n\n${clippedJd}` },
       ],
-      { model: ANTHROPIC_MODEL, maxTokens: 3072 },
+      { model: ANTHROPIC_MODEL, maxTokens: 4096 },
     ),
   );
 }
@@ -290,7 +291,7 @@ export async function generateInterviewQuestions(input: {
           text: `Required skills (normalised): ${normSkills.join(', ') || '(see JD)'}`,
         },
       ],
-      { model: ANTHROPIC_MODEL, maxTokens: 3072 },
+      { model: ANTHROPIC_MODEL, maxTokens: 4096 },
     ),
   );
 }
