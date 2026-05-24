@@ -272,7 +272,10 @@ VOLUME:
 - behavioral: 4–6 questions — vary the competency (don't ask 4 "tell me about a challenge" variants).
 - scenarios: 3–5 situations — at least one should involve a system failure or stakeholder conflict.
 
-Return valid JSON only. No generic filler questions ("Tell me about yourself").`;
+Return valid JSON matching this exact structure — use these exact top-level keys:
+{"technical":[{"question":"...","expected_signal":"..."}],"behavioral":[{"question":"...","expected_signal":"..."}],"scenarios":[{"situation":"...","question":"..."}]}
+
+No generic filler questions ("Tell me about yourself"). No markdown, no explanation.`;
 
 export async function generateInterviewQuestions(input: {
   job_description: string;
