@@ -628,13 +628,73 @@ async function applyOutline(
   return lessons ?? [];
 }
 
+/** Generate lesson content server-side without a request context (background use). */
+async function generateLessonContentBackground(lessonId: string): Promise<void> {
+  const { data: lesson } = await repo.lessons.get(lessonId);
+  if (!lesson) return;
+  const l: any = lesson;
+  const { data: course } = await repo.courses.get(l.course_id);
+  const c: any = course ?? {};
+
+  const AnthropicSDK = (await import('@anthropic-ai/sdk')).default;
+  const oauthToken = process.env.ANTHROPIC_OAUTH_TOKEN ?? '';
+  const apiKey = process.env.ANTHROPIC_API_KEY ?? '';
+  let customClient: InstanceType<typeof AnthropicSDK> | undefined;
+  if (oauthToken.length > 10) {
+    customClient = new AnthropicSDK({ authToken: oauthToken, maxRetries: 0 });
+  } else if (apiKey.length > 10) {
+    customClient = new AnthropicSDK({ apiKey, maxRetries: 0 });
+  }
+
+  await repo.lessons.update(lessonId, { content_status: 'GENERATING' });
+  try {
+    const { data: content } = await ai.generateLessonContent(
+      {
+        course_title: c.title ?? l.title,
+        category: c.category ?? 'General',
+        difficulty: c.difficulty ?? 'BEGINNER',
+        lesson_title: l.title,
+        lesson_summary: l.summary,
+        lesson_objective: l.lesson_objective,
+      },
+      { strict: true, client: customClient },
+    );
+    await repo.lessons.update(lessonId, {
+      content: content.content,
+      content_format: 'markdown',
+      practical_example: content.practical_example,
+      exercises: content.exercises != null ? JSON.stringify(content.exercises) : null,
+      key_takeaways: JSON.stringify(content.key_takeaways),
+      content_status: 'READY',
+    });
+    await repo.quizzes.removeForLesson(lessonId);
+    if (content.quiz?.length) {
+      const rows = content.quiz.map((q: any, i: number) => ({
+        lesson_id: lessonId,
+        course_id: l.course_id,
+        question: q.question,
+        options: JSON.stringify(q.options),
+        correct_answer: q.correct_answer,
+        explanation: q.explanation,
+        points: q.points ?? 1,
+        question_order: i,
+      }));
+      await repo.quizzes
+        .createMany(rows)
+        .catch((e: Error) => logger.warn({ err: e }, 'quiz persistence failed in background'));
+    }
+  } catch (err) {
+    await repo.lessons.update(lessonId, { content_status: 'FAILED' });
+    logger.error({ err, lessonId }, 'background lesson content generation failed');
+  }
+}
+
 export const generateCourse: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   const parsed = generateCourseSchema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
 
-  // Create the shell first so a slow/failed generation still leaves an
-  // editable DRAFT behind.
+  // Create the shell immediately so the UI can navigate to AI Activity.
   const { data: course, error } = await repo.courses.create({
     title: parsed.data.title,
     category: parsed.data.category,
@@ -650,26 +710,38 @@ export const generateCourse: RequestHandler = async (req, res) => {
   if (error || !course) throw httpError(500, error?.message ?? 'Failed to create course');
   const courseId = (course as any).id as string;
 
-  const { data: outline, degraded } = await ai.generateCourseOutline({
-    title: parsed.data.title,
-    category: parsed.data.category,
-    difficulty: parsed.data.difficulty,
-    estimated_duration_hours: parsed.data.estimated_duration_hours ?? undefined,
-    tags: parsed.data.tags,
-    lesson_count: parsed.data.lesson_count ?? undefined,
-    target_audience: parsed.data.target_audience ?? undefined,
-  });
-  const lessons = await applyOutline(courseId, outline, degraded);
+  // Respond immediately — outline + lesson content run in the background so
+  // nginx never times out and the UI shows live progress on AI Activity.
+  res
+    .status(201)
+    .json({ course_id: courseId, content_status: 'GENERATING', degraded: false, lessons: [] });
 
-  res.status(201).json({
-    course_id: courseId,
-    content_status: degraded ? 'FAILED' : 'OUTLINE_READY',
-    degraded,
-    lessons: (lessons as any[]).map((l) => ({
-      id: l.id,
-      title: l.title,
-      content_status: l.content_status,
-    })),
+  // Background pipeline: outline → lesson stubs → lesson content (all lessons).
+  setImmediate(async () => {
+    try {
+      const { data: outline, degraded } = await ai.generateCourseOutline({
+        title: parsed.data.title,
+        category: parsed.data.category,
+        difficulty: parsed.data.difficulty,
+        estimated_duration_hours: parsed.data.estimated_duration_hours ?? undefined,
+        tags: parsed.data.tags,
+        lesson_count: parsed.data.lesson_count ?? undefined,
+        target_audience: parsed.data.target_audience ?? undefined,
+      });
+      const lessons = await applyOutline(courseId, outline, degraded);
+
+      if (!degraded) {
+        for (const lesson of lessons as any[]) {
+          await generateLessonContentBackground(lesson.id).catch((err) =>
+            logger.error({ err, lessonId: lesson.id }, 'background lesson generation failed'),
+          );
+        }
+        await repo.courses.update(courseId, { content_status: 'READY' }).catch(() => {});
+      }
+    } catch (err) {
+      logger.error({ err, courseId }, 'background course outline generation failed');
+      await repo.courses.update(courseId, { content_status: 'FAILED' }).catch(() => {});
+    }
   });
 };
 
