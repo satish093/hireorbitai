@@ -4,6 +4,7 @@ import { sendInvitationLink } from './brevo.service';
 import { env } from '../config/env';
 import { logger } from '../config/logger';
 import { Role, httpError } from '../types';
+import { wireHierarchy } from './invitationHierarchy.service';
 
 interface CreateInvitationInput {
   email: string;
@@ -12,6 +13,10 @@ interface CreateInvitationInput {
   // Optional pre-assigned group. null == "No Group" path; the new user lands
   // with users.group_id = NULL at acceptance.
   groupId?: string | null;
+  // Parent assignment — auto-resolved or manually chosen by the inviter.
+  parentUserId?: string | null;
+  assignedMode?: 'auto' | 'manual';
+  assignedBy?: string | null;
 }
 
 /**
@@ -42,13 +47,42 @@ export async function createInvitation(input: CreateInvitationInput) {
       invited_by: input.invitedBy,
       group_id: input.groupId ?? null,
       expires_at: expiresAt,
+      parent_user_id: input.parentUserId ?? null,
+      assigned_mode: input.assignedMode ?? 'auto',
+      assigned_by: input.assignedBy ?? null,
     })
     .select()
     .single();
-  if (error) throw httpError(500, error.message);
+  if (error) {
+    // Schema may not have the new columns yet — retry without them
+    if (/column .* does not exist|schema cache/i.test(error.message)) {
+      const { data: legacy, error: legacyErr } = await db
+        .from('invitations')
+        .insert({
+          email: emailLc,
+          role: input.role,
+          token,
+          invited_by: input.invitedBy,
+          group_id: input.groupId ?? null,
+          expires_at: expiresAt,
+        })
+        .select()
+        .single();
+      if (legacyErr) throw httpError(500, legacyErr.message);
+      return buildResponse(legacy, emailLc, token, input);
+    }
+    throw httpError(500, error.message);
+  }
 
-  // Resolve who's inviting them, so the email reads "Satish invited you…"
-  // rather than the generic "A teammate invited you…".
+  return buildResponse(data, emailLc, token, input);
+}
+
+async function buildResponse(
+  data: Record<string, unknown>,
+  emailLc: string,
+  token: string,
+  input: CreateInvitationInput,
+) {
   let invitedByName: string | undefined;
   if (input.invitedBy) {
     const { data: inviter } = await db
@@ -56,7 +90,7 @@ export async function createInvitation(input: CreateInvitationInput) {
       .select('full_name, email')
       .eq('id', input.invitedBy)
       .maybeSingle();
-    if (inviter) invitedByName = inviter.full_name ?? inviter.email ?? undefined;
+    if (inviter) invitedByName = (inviter as any).full_name ?? (inviter as any).email ?? undefined;
   }
 
   const inviteUrl = `${env.frontendUrl}/invite/accept?token=${token}`;
@@ -104,10 +138,10 @@ export async function acceptInvitation(token: string, userId: string) {
   // while signed in as another user would have their role overwritten.
   const { data: actor } = await db.from('users').select('email, role').eq('id', userId).single();
   if (!actor) throw httpError(403, 'Caller not found');
-  if (actor.email.toLowerCase() !== invite.email.toLowerCase()) {
+  if ((actor as any).email.toLowerCase() !== invite.email.toLowerCase()) {
     throw httpError(
       403,
-      `This invitation is for ${invite.email}. Sign out and open the link in an incognito window, or send a new invite to ${actor.email}.`,
+      `This invitation is for ${invite.email}. Sign out and open the link in an incognito window, or send a new invite to ${(actor as any).email}.`,
     );
   }
 
@@ -121,6 +155,16 @@ export async function acceptInvitation(token: string, userId: string) {
     .from('invitations')
     .update({ status: 'ACCEPTED', accepted_at: new Date().toISOString() })
     .eq('id', invite.id);
+
+  // Wire the org-hierarchy relationships now that the user exists with their role
+  await wireHierarchy(userId, invite.role as Role, invite.parent_user_id ?? null).catch(
+    (err: unknown) => {
+      logger.warn(
+        { err, userId, role: invite.role, parentUserId: invite.parent_user_id },
+        'hierarchy wiring failed on invitation accept — user created, hierarchy needs manual fix',
+      );
+    },
+  );
 
   return { role: invite.role, group_id: invite.group_id ?? null };
 }

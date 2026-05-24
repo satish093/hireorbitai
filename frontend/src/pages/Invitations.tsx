@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Layout } from '../components/Layout';
 import { DataTable } from '../components/DataTable';
 import { StatusBadge } from '../components/StatusBadge';
@@ -10,6 +10,7 @@ import { Button } from '../components/Button';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { invalidate } from '../hooks/useInvalidate';
+import { ADMIN_TIER } from '../types';
 import toast from 'react-hot-toast';
 
 // Master role list for the invite dropdown. We gate SUPER_ADMIN at render
@@ -27,12 +28,23 @@ const ALL_INVITE_OPTIONS = [
   { value: 'SUPER_ADMIN', label: 'Super admin' },
 ];
 
+// Roles that require a parent in the hierarchy
+const ROLES_NEEDING_PARENT = new Set([
+  'CONSULTANT',
+  'RECRUITER',
+  'MANAGER',
+  'HR_MANAGER',
+  'DEVELOPER',
+]);
+
+type ParentOption = { id: string; full_name: string | null; email: string; role: string };
+
 export function Invitations() {
   const { profile } = useAuth();
+  const isAdmin = !!profile && (ADMIN_TIER as string[]).includes(profile.role);
+
   // Hide SUPER_ADMIN from the invite dropdown unless the inviter is itself
-  // a SUPER_ADMIN — backend rejects the post otherwise (see
-  // invitations.controller.ts), so showing it would just produce a
-  // confusing 403 on submit.
+  // a SUPER_ADMIN — backend rejects the post otherwise.
   const ROLE_OPTIONS =
     profile?.role === 'SUPER_ADMIN'
       ? ALL_INVITE_OPTIONS
@@ -40,16 +52,28 @@ export function Invitations() {
 
   const [rows, setRows] = useState<any[]>([]);
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState<{ email: string; role: string; group_id: string }>({
+  const [form, setForm] = useState<{
+    email: string;
+    role: string;
+    group_id: string;
+    parent_user_id: string;
+  }>({
     email: '',
     role: 'CONSULTANT',
-    group_id: '', // '' == No Group; converted to null at send-time
+    group_id: '',
+    parent_user_id: '',
   });
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
   const [groups, setGroups] = useState<{ id: string; name: string; unique_group_id?: string }[]>(
     [],
   );
+
+  // Parent resolution state
+  const [parentOptions, setParentOptions] = useState<ParentOption[]>([]);
+  const [autoParentId, setAutoParentId] = useState<string | null>(null); // null = no auto-parent
+  const [autoParentResolved, setAutoParentResolved] = useState(false);
+  const [manualOverride, setManualOverride] = useState(false);
 
   function load() {
     setLoading(true);
@@ -59,16 +83,67 @@ export function Invitations() {
       .catch((e) => toast.error(e?.response?.data?.error ?? 'Failed to load invitations'))
       .finally(() => setLoading(false));
   }
+
   useEffect(() => {
     load();
-    // Fetch groups once for the dropdown. Failure is non-fatal — the dropdown
-    // just shows "No Group" as the only option, matching the previous behavior
-    // before this feature existed.
     api
       .get('/user-groups')
       .then((r) => setGroups(r.data ?? []))
       .catch(() => {});
   }, []);
+
+  // Fetch available parents whenever the role changes
+  const fetchParents = useCallback(
+    async (role: string) => {
+      if (!ROLES_NEEDING_PARENT.has(role)) {
+        setParentOptions([]);
+        setAutoParentId(null);
+        setAutoParentResolved(true);
+        setManualOverride(false);
+        setForm((f) => ({ ...f, parent_user_id: '' }));
+        return;
+      }
+      try {
+        const r = await api.get<ParentOption[]>('/invitations/available-parents', {
+          params: { invited_role: role },
+        });
+        const opts = r.data ?? [];
+        setParentOptions(opts);
+
+        // Auto-assign: if the current user is in the list, pre-select them
+        const self = opts.find((o) => o.id === profile?.id);
+        if (self) {
+          setAutoParentId(self.id);
+          setManualOverride(false);
+          setForm((f) => ({ ...f, parent_user_id: self.id }));
+        } else {
+          setAutoParentId(null);
+          setManualOverride(false);
+          setForm((f) => ({ ...f, parent_user_id: opts.length === 1 ? opts[0].id : '' }));
+        }
+        setAutoParentResolved(true);
+      } catch {
+        setParentOptions([]);
+        setAutoParentId(null);
+        setAutoParentResolved(true);
+      }
+    },
+    [profile?.id],
+  );
+
+  // Run when modal opens or role changes
+  useEffect(() => {
+    if (open) {
+      setAutoParentResolved(false);
+      fetchParents(form.role);
+    }
+  }, [open, form.role, fetchParents]);
+
+  function handleRoleChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const newRole = e.target.value;
+    setManualOverride(false);
+    setForm((f) => ({ ...f, role: newRole, parent_user_id: '' }));
+  }
 
   async function send() {
     if (sending) return;
@@ -76,12 +151,18 @@ export function Invitations() {
       toast.error('Email is required');
       return;
     }
+    // Require parent if needed and not resolved
+    if (ROLES_NEEDING_PARENT.has(form.role) && !form.parent_user_id) {
+      toast.error('Please select a parent user for this role');
+      return;
+    }
     setSending(true);
     try {
-      const payload = {
+      const payload: Record<string, unknown> = {
         email: form.email,
         role: form.role,
         group_id: form.group_id || null,
+        parent_user_id: form.parent_user_id || null,
       };
       const r = await api.post('/invitations', payload);
       if (r.data?.email_sent) {
@@ -111,7 +192,8 @@ export function Invitations() {
         );
       }
       setOpen(false);
-      setForm({ email: '', role: 'CONSULTANT', group_id: '' });
+      setForm({ email: '', role: 'CONSULTANT', group_id: '', parent_user_id: '' });
+      setManualOverride(false);
       load();
       invalidate('invitations');
     } catch (e: any) {
@@ -141,6 +223,70 @@ export function Invitations() {
     } catch {
       window.prompt('Copy this invite link', url);
     }
+  }
+
+  // Parent field UI inside the modal
+  function renderParentField() {
+    if (!ROLES_NEEDING_PARENT.has(form.role)) return null;
+    if (!autoParentResolved) {
+      return <div className="text-xs text-muted py-1">Loading parent options…</div>;
+    }
+
+    // Auto-assigned to the inviter themselves
+    if (autoParentId && !manualOverride) {
+      const self = parentOptions.find((o) => o.id === autoParentId);
+      return (
+        <div className="flex items-center justify-between rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 px-3 py-2">
+          <div>
+            <span className="text-xs font-medium text-green-700 dark:text-green-400">
+              Auto-assigned to you
+            </span>
+            <span className="ml-1 text-xs text-muted">
+              ({self?.full_name ?? self?.email ?? ''} ·{' '}
+              {form.role === 'CONSULTANT' ? 'RECRUITER' : 'MANAGER'})
+            </span>
+          </div>
+          {isAdmin && (
+            <button
+              type="button"
+              className="text-xs text-brand-600 hover:underline ml-2 shrink-0"
+              onClick={() => {
+                setManualOverride(true);
+                setForm((f) => ({ ...f, parent_user_id: autoParentId }));
+              }}
+            >
+              Change
+            </button>
+          )}
+        </div>
+      );
+    }
+
+    // No options available
+    if (parentOptions.length === 0) {
+      return (
+        <div className="rounded-lg border border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-900/20 px-3 py-2 text-xs text-yellow-700 dark:text-yellow-400">
+          No eligible parent users found. Invite a manager-tier user first, or an admin can
+          override.
+        </div>
+      );
+    }
+
+    // Dropdown for manual/forced selection
+    return (
+      <SelectInput
+        label={`Parent user *`}
+        value={form.parent_user_id}
+        onChange={(e) => setForm((f) => ({ ...f, parent_user_id: e.target.value }))}
+        options={[
+          { value: '', label: 'Select parent…' },
+          ...parentOptions.map((o) => ({
+            value: o.id,
+            label: `${o.full_name ?? o.email} (${o.role})`,
+          })),
+        ]}
+      />
+    );
   }
 
   return (
@@ -203,7 +349,10 @@ export function Invitations() {
       />
       <Modal
         open={open}
-        onClose={() => setOpen(false)}
+        onClose={() => {
+          setOpen(false);
+          setManualOverride(false);
+        }}
         title="Invite user"
         description="A welcome email goes out with a one-time setup link."
         footer={
@@ -227,9 +376,10 @@ export function Invitations() {
           <SelectInput
             label="Role"
             value={form.role}
-            onChange={(e) => setForm({ ...form, role: e.target.value })}
+            onChange={handleRoleChange}
             options={ROLE_OPTIONS}
           />
+          {renderParentField()}
           <SelectInput
             label="Group"
             value={form.group_id}

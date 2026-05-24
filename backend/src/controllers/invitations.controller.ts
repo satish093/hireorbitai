@@ -3,6 +3,13 @@ import { z } from 'zod';
 import { db } from '../config/db';
 import { env } from '../config/env';
 import { createInvitation, acceptInvitation } from '../services/invitation.service';
+import {
+  resolveAutoParent,
+  isValidParentRole,
+  getExpectedParentRoles,
+  wireHierarchy,
+} from '../services/invitationHierarchy.service';
+import { canViewUser } from '../services/permission.service';
 import { validatePasswordStrength } from '../utils/password';
 import { httpError, ADMIN_TIER, Role } from '../types';
 
@@ -22,6 +29,8 @@ const createSchema = z.object({
   // Optional group pre-assignment. null / undefined / omitted == "No Group" —
   // the invited user lands with users.group_id = NULL.
   group_id: z.string().uuid().nullable().optional(),
+  // Optional manual parent override. Omit for auto-resolution from the inviter.
+  parent_user_id: z.string().uuid().nullable().optional(),
 });
 
 export const create: RequestHandler = async (req, res) => {
@@ -43,11 +52,53 @@ export const create: RequestHandler = async (req, res) => {
     throw httpError(403, 'Admin-tier roles can only be invited by an admin.');
   }
 
+  // ── Parent assignment ───────────────────────────────────────────────────
+  let parentUserId: string | null = null;
+  let assignedMode: 'auto' | 'manual' = 'auto';
+  let assignedBy: string | null = null;
+
+  if (parsed.data.parent_user_id) {
+    // Manual override — validate the caller has permission to assign this parent
+    const pId = parsed.data.parent_user_id;
+    const isAdmin = (ADMIN_TIER as Role[]).includes(req.user.role);
+    if (!isAdmin) {
+      const canSee = await canViewUser({ id: req.user.id, role: req.user.role }, pId);
+      if (!canSee) throw httpError(403, 'You do not have permission to assign this parent.');
+    }
+    // Validate the parent's role is appropriate for the invited role
+    const { data: parentRow } = await db
+      .from('users')
+      .select('id, role, is_active')
+      .eq('id', pId)
+      .maybeSingle();
+    const parent = parentRow as { id: string; role: Role; is_active: boolean | null } | null;
+    if (!parent || parent.is_active === false) throw httpError(404, 'Parent user not found.');
+    if (!isValidParentRole(requestedRole, parent.role)) {
+      const expected = getExpectedParentRoles(requestedRole);
+      throw httpError(
+        422,
+        `Invalid parent role. A ${requestedRole} must be placed under: ${expected?.join(', ') ?? 'none'}.`,
+      );
+    }
+    parentUserId = pId;
+    assignedMode = 'manual';
+    assignedBy = req.user.id;
+  } else {
+    // Auto-resolve from the inviter's position in the org tree
+    parentUserId = await resolveAutoParent(requestedRole, {
+      id: req.user.id,
+      role: req.user.role,
+    });
+  }
+
   const invitation = await createInvitation({
     email: parsed.data.email,
     role: parsed.data.role,
     invitedBy: req.user.id,
     groupId: parsed.data.group_id ?? null,
+    parentUserId,
+    assignedMode,
+    assignedBy,
   });
   res.status(201).json(invitation);
 };
@@ -77,6 +128,48 @@ export const accept: RequestHandler = async (req, res) => {
   if (!token) throw httpError(400, 'Missing token');
   const result = await acceptInvitation(token, req.user.id);
   res.json(result);
+};
+
+export const availableParents: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const invitedRole = String(req.query.invited_role ?? '') as Role;
+  const expectedRoles = getExpectedParentRoles(invitedRole);
+  if (!expectedRoles) return res.json([]);
+
+  const isAdmin = (ADMIN_TIER as Role[]).includes(req.user.role);
+  let callerGroupId: string | null = null;
+  if (!isAdmin) {
+    const { data: me } = await db
+      .from('users')
+      .select('group_id')
+      .eq('id', req.user.id)
+      .maybeSingle();
+    callerGroupId = (me as { group_id?: string | null } | null)?.group_id ?? null;
+  }
+
+  const { data, error } = await db
+    .from('users')
+    .select('id, full_name, email, role, group_id')
+    .in('role', expectedRoles as unknown as string[])
+    .neq('is_active', false);
+  if (error) throw httpError(500, error.message);
+
+  type ParentRow = {
+    id: string;
+    full_name: string | null;
+    email: string;
+    role: Role;
+    group_id: string | null;
+  };
+  let results = (data ?? []) as ParentRow[];
+  if (!isAdmin && callerGroupId) {
+    const adminRoles = ADMIN_TIER as Role[];
+    results = results.filter((u) => u.group_id === callerGroupId || adminRoles.includes(u.role));
+  }
+
+  res.json(
+    results.map((u) => ({ id: u.id, full_name: u.full_name, email: u.email, role: u.role })),
+  );
 };
 
 /**
@@ -199,10 +292,18 @@ export const setup: RequestHandler = async (req, res) => {
     throw httpError(500, upsertErr.message);
   }
 
-  // 5. Mark the invitation as accepted.
+  // 5. Wire org-hierarchy — non-fatal so account creation isn't blocked.
+  const newUserId = created.user!.id;
+  await wireHierarchy(newUserId, invite.role as Role, invite.parent_user_id ?? null).catch(
+    (err: unknown) => {
+      (req as any).log?.warn?.({ err, userId: newUserId }, 'hierarchy wiring failed on setup');
+    },
+  );
+
+  // 6. Mark the invitation as accepted.
   await db.from('invitations').update({ status: 'ACCEPTED', accepted_at: now }).eq('id', invite.id);
 
-  // 6. Issue a session right now — avoids a round-trip second login on the
+  // 7. Issue a session right now — avoids a round-trip second login on the
   //    client and the brief window where the just-created user hasn't been
   //    indexed for password lookup yet.
   const fresh = await db.auth.signInWithPassword({
