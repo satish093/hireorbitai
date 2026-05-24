@@ -152,6 +152,13 @@ const sections: Section[] = [
         roles: ALL_ROLES,
         flagKey: 'training',
       },
+      {
+        to: '/training/ai-activity',
+        label: 'AI activity',
+        icon: IconSparkles,
+        roles: MANAGER_TIER,
+        flagKey: 'training',
+      },
     ],
   },
   {

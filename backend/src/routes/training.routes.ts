@@ -128,6 +128,9 @@ trainingRouter.get('/reports', requireRole(...MANAGER_TIER), c.reports);
 // the "choose provider" modal when the server is already configured.
 trainingRouter.get('/ai/provider', c.aiProviderInfo);
 
+// ---- AI generation status — live activity feed (manager-tier) ----
+trainingRouter.get('/ai/generation-status', requireRole(...MANAGER_TIER), c.aiGenerationStatus);
+
 // ---- Claude CLI auth management (admin-tier only) ----
 // Refresh: runs `claude setup-token` — works when CLI is already logged in.
 trainingRouter.post(

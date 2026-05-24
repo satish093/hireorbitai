@@ -104,6 +104,9 @@ const AdminUsers = lazy(() =>
 const AdminAISettings = lazy(() =>
   import('./pages/AdminAISettings').then((m) => ({ default: m.AdminAISettings })),
 );
+const TrainingAIActivity = lazy(() =>
+  import('./pages/TrainingAIActivity').then((m) => ({ default: m.TrainingAIActivity })),
+);
 /** Legacy /admin/users/:id now opens the detail pane on the list page. */
 function AdminUserRedirect() {
   const { id } = useParams<{ id: string }>();
@@ -430,6 +433,14 @@ export default function App() {
           element={
             <ProtectedRoute allow={ADMIN_TIER}>
               <AdminAISettings />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/training/ai-activity"
+          element={
+            <ProtectedRoute allow={MANAGER_TIER}>
+              <TrainingAIActivity />
             </ProtectedRoute>
           }
         />

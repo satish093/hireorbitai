@@ -1357,3 +1357,63 @@ export const aiProviderInfo: RequestHandler = (_req, res) => {
 
   res.json({ provider });
 };
+
+// ---------------------------------------------------------------------------
+// AI generation status — live view of all course/lesson generation activity
+// ---------------------------------------------------------------------------
+export const aiGenerationStatus: RequestHandler = async (_req, res) => {
+  const { pool } = await import('../config/db');
+
+  const [courseRows, lessonRows, activeCourses, activeAndFailedLessons] = await Promise.all([
+    pool.query<{ content_status: string; count: string }>(
+      `SELECT coalesce(content_status, 'UNKNOWN') AS content_status, count(*)::int AS count
+       FROM training_courses GROUP BY content_status`,
+    ),
+    pool.query<{ content_status: string; count: string }>(
+      `SELECT coalesce(content_status, 'UNKNOWN') AS content_status, count(*)::int AS count
+       FROM training_lessons GROUP BY content_status`,
+    ),
+    pool.query(
+      `SELECT tc.id, tc.title, tc.category, tc.difficulty, tc.content_status, tc.updated_at,
+              count(tl.id)::int AS total_lessons,
+              count(tl.id) FILTER (WHERE tl.content_status = 'READY')::int AS ready_lessons,
+              count(tl.id) FILTER (WHERE tl.content_status = 'GENERATING')::int AS generating_lessons,
+              count(tl.id) FILTER (WHERE tl.content_status = 'FAILED')::int AS failed_lessons,
+              count(tl.id) FILTER (WHERE tl.content_status = 'PENDING')::int AS pending_lessons
+       FROM training_courses tc
+       LEFT JOIN training_lessons tl ON tl.course_id = tc.id
+       WHERE tc.content_status IN ('GENERATING','OUTLINE_READY','FAILED','PENDING')
+          OR EXISTS (
+            SELECT 1 FROM training_lessons tl2
+            WHERE tl2.course_id = tc.id
+              AND tl2.content_status IN ('GENERATING','FAILED','PENDING')
+          )
+       GROUP BY tc.id
+       ORDER BY tc.updated_at DESC
+       LIMIT 50`,
+    ),
+    pool.query(
+      `SELECT tl.id, tl.title, tl.content_status, tl.updated_at, tl.course_id,
+              tc.title AS course_title
+       FROM training_lessons tl
+       JOIN training_courses tc ON tc.id = tl.course_id
+       WHERE tl.content_status IN ('GENERATING','FAILED','PENDING')
+       ORDER BY tl.updated_at DESC
+       LIMIT 100`,
+    ),
+  ]);
+
+  const courseStats = Object.fromEntries(
+    courseRows.rows.map((r) => [r.content_status, Number(r.count)]),
+  );
+  const lessonStats = Object.fromEntries(
+    lessonRows.rows.map((r) => [r.content_status, Number(r.count)]),
+  );
+
+  res.json({
+    course_stats: courseStats,
+    lesson_stats: lessonStats,
+    active_courses: activeCourses.rows,
+    active_lessons: activeAndFailedLessons.rows,
+  });
+};
