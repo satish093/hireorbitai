@@ -250,11 +250,26 @@ export async function generateTrainingPlan(input: {
 // 2) generateInterviewQuestions
 // ---------------------------------------------------------------------------
 
-const InterviewQuestionsSchema = z.object({
-  technical: z.array(z.object({ question: z.string(), expected_signal: z.string() })),
-  behavioral: z.array(z.object({ question: z.string(), expected_signal: z.string() })),
-  scenarios: z.array(z.object({ situation: z.string(), question: z.string() })),
-});
+const InterviewQuestionsSchema = z
+  .object({
+    technical: z.array(
+      z.object({ question: z.string(), expected_signal: z.string().optional().default('') }),
+    ),
+    behavioral: z.array(
+      z.object({ question: z.string(), expected_signal: z.string().optional().default('') }),
+    ),
+    scenarios: z.array(
+      z.object({ situation: z.string(), question: z.string().optional().default('') }),
+    ),
+  })
+  .transform((d) => ({
+    technical: d.technical.filter((q) => q.question),
+    behavioral: d.behavioral.filter((q) => q.question),
+    scenarios: d.scenarios.filter((s) => s.situation && s.question) as {
+      situation: string;
+      question: string;
+    }[],
+  }));
 export type InterviewQuestions = z.infer<typeof InterviewQuestionsSchema>;
 
 const INTERVIEW_QUESTIONS_SYSTEM = `You are a principal-level technical interviewer at a FAANG-calibre firm. You write questions that reveal how candidates actually think, not just whether they've memorised vocabulary.
