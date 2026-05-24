@@ -62,6 +62,10 @@ services:
         value: /tmp/uploads
       - key: TRAINING_AI_PROVIDER
         value: stub
+      # Optional: set to a real sk-ant-… key to enable Anthropic AI on dev.
+      # Leave blank (sync:false, set in dashboard) for zero API spend.
+      - key: ANTHROPIC_API_KEY
+        sync: false
       - key: JOB_SOURCES_MOCK
         value: 'true'
 

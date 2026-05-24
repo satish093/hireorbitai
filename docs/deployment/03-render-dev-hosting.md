@@ -73,7 +73,8 @@ two halves point at each other (chicken-and-egg: create first, then fill URLs).
 | `FRONTEND_URL`                                        | `https://hireorbit-web-dev.onrender.com`                             |
 | `JWT_SECRET` / `COOKIE_SECRET` / `STORAGE_URL_SECRET` | click **Generate** (32+ chars each)                                  |
 | `UPLOADS_DIR`                                         | `/tmp/uploads` (ephemeral — fine for dev)                            |
-| `TRAINING_AI_PROVIDER`                                | `stub` (no Claude CLI on Render)                                     |
+| `TRAINING_AI_PROVIDER`                                | `stub` (zero API spend on dev; change to `api` + set key to enable)  |
+| `ANTHROPIC_API_KEY`                                   | (optional) `sk-ant-…` key — enables real AI matching/scoring on dev  |
 | `JOB_SOURCES_MOCK`                                    | `true` (zero API spend)                                              |
 | `BREVO_API_KEY`                                       | a real key, or a placeholder if you don't test email on dev          |
 | `PORT`                                                | leave unset — Render injects it; the app reads `process.env.PORT`    |

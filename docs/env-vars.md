@@ -55,22 +55,18 @@ All env vars are read from `backend/.env` (gitignored). Copy `backend/.env.examp
 
 ---
 
-## AI (Google Gemini)
+## AI (Anthropic / Claude)
 
-The primary AI provider for job matching, resume scoring, and general inference is Google Gemini. Anthropic/Claude keys are retained only for the optional training-content generation path.
+Anthropic Claude is the active AI provider for **all** AI features — job matching, resume scoring, ATS keyword matching, and training content generation. Set `ANTHROPIC_API_KEY` to enable; set `TRAINING_AI_PROVIDER=stub` to run with no API calls (returns editable placeholder content — useful for dev or cost control).
 
-| Variable                  | Description                                                                                                                     | Default                     | Required/Optional              |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | --------------------------- | ------------------------------ |
-| `GOOGLE_AI_API_KEY`       | Google AI (Gemini) API key. Required for job matching and resume-scoring features.                                              | —                           | **Required** (for AI features) |
-| `GEMINI_MODEL`            | Gemini model ID used for job matching / scoring calls                                                                           | `gemini-2.0-flash`          | Optional                       |
-| `TRAINING_AI_PROVIDER`    | How training-content generation reaches a model: `api` (Anthropic Messages API) or `stub` (returns editable stubs, no API call) | `api`                       | Optional                       |
-| `ANTHROPIC_API_KEY`       | Anthropic API key. Only needed when `TRAINING_AI_PROVIDER=api`.                                                                 | —                           | Optional                       |
-| `ANTHROPIC_MODEL`         | Anthropic model used for outline + quiz generation                                                                              | `claude-haiku-4-5-20251001` | Optional                       |
-| `TRAINING_CONTENT_MODEL`  | Anthropic model used for long-form lesson/capstone generation                                                                   | `claude-haiku-4-5-20251001` | Optional                       |
-| `CLAUDE_CODE_OAUTH_TOKEN` | OAuth token from `claude setup-token` (Max plan). Required in headless/VPS mode when `TRAINING_AI_PROVIDER=subscription`.       | —                           | Optional                       |
-| `CLAUDE_CLI_PATH`         | Path to the Claude Code CLI binary if not on `PATH`                                                                             | `claude`                    | Optional                       |
-| `AI_MAX_INPUT_CHARS`      | Max characters from free-text inputs (resume body, JD) sent to the model. ~6000 chars ≈ 1500 tokens.                            | `6000`                      | Optional                       |
-| `AI_MAX_JOB_DESC_CHARS`   | Per-job description character budget in the batch job-matcher call                                                              | `600`                       | Optional                       |
+| Variable                 | Description                                                                                            | Default                     | Required/Optional              |
+| ------------------------ | ------------------------------------------------------------------------------------------------------ | --------------------------- | ------------------------------ |
+| `ANTHROPIC_API_KEY`      | Anthropic API key (`sk-ant-…`). Required for job matching, resume scoring, and training generation.    | —                           | **Required** (for AI features) |
+| `ANTHROPIC_MODEL`        | Claude model for fast inference (ATS scoring, matching, quiz, outlines)                                | `claude-haiku-4-5-20251001` | Optional                       |
+| `TRAINING_CONTENT_MODEL` | Claude model for long-form generation (lesson bodies, capstone)                                        | `claude-haiku-4-5-20251001` | Optional                       |
+| `TRAINING_AI_PROVIDER`   | `api` — call Anthropic API with `ANTHROPIC_API_KEY`. `stub` — return placeholder content, no API call. | `api`                       | Optional                       |
+| `AI_MAX_INPUT_CHARS`     | Max characters from free-text inputs (resume body, JD) sent to the model. Lower = cheaper.             | `6000`                      | Optional                       |
+| `AI_MAX_JOB_DESC_CHARS`  | Per-job description character budget in the batch job-matcher call                                     | `600`                       | Optional                       |
 
 ---
 
