@@ -754,7 +754,6 @@ export function TrainingCourseDetails() {
 
       <AIProviderModal
         open={aiProviderOpen}
-        serverConfigured={serverAiProvider !== 'none' && serverAiProvider !== null}
         onClose={() => {
           setAiProviderOpen(false);
           setAiProviderAction(null);
