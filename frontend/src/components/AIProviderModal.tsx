@@ -84,7 +84,7 @@ export function AIProviderModal({ open, onConfirm, onClose, action = 'Generate' 
                   className="w-full text-sm bg-bg-sunken border border-border rounded-md px-2.5 py-1.5 text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent/40"
                 />
                 <a
-                  href="https://console.anthropic.com/settings/api-keys"
+                  href="https://console.anthropic.com/settings/keys"
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex items-center gap-1 text-xs text-accent hover:underline"
