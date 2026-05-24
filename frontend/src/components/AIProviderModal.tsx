@@ -98,12 +98,10 @@ export function AIProviderModal({ open, onConfirm, onClose, action = 'Generate' 
   }
 
   function handleConfirm() {
-    // Both options use the server key — 'api' mode sends no aiToken in the request body
     onConfirm({ mode: 'api' });
   }
 
   const oauthReady = oauthPhase === 'connected';
-  // API key option is always ready — the key is already in .env
   const canGenerate = mode === 'apikey' || oauthReady;
   const busy = oauthPhase === 'starting' || oauthPhase === 'polling' || oauthPhase === 'restarting';
 
@@ -119,11 +117,18 @@ export function AIProviderModal({ open, onConfirm, onClose, action = 'Generate' 
       title="Choose AI Provider"
       size="sm"
       footer={
-        <div className="flex justify-end gap-2">
-          <Button variant="outline" onClick={onClose} disabled={busy}>
+        /* Stack vertically on mobile (primary on top), row on sm+ */
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <Button variant="outline" onClick={onClose} disabled={busy} block className="sm:w-auto">
             Cancel
           </Button>
-          <Button variant="accent" onClick={handleConfirm} disabled={!canGenerate}>
+          <Button
+            variant="accent"
+            onClick={handleConfirm}
+            disabled={!canGenerate}
+            block
+            className="sm:w-auto"
+          >
             {action} →
           </Button>
         </div>
@@ -132,33 +137,33 @@ export function AIProviderModal({ open, onConfirm, onClose, action = 'Generate' 
       <div className="space-y-2">
         {/* ── OAuth option ── */}
         <div
-          className={`rounded-lg border p-3 transition-colors ${
+          className={`rounded-lg border p-3 sm:p-4 transition-colors ${
             mode === 'oauth' ? 'border-accent bg-accent/5' : 'border-border'
           }`}
         >
-          <label className="flex items-start gap-3 cursor-pointer">
+          <label className="flex items-start gap-2.5 sm:gap-3 cursor-pointer">
             <input
               type="radio"
               name="ai-mode"
               value="oauth"
               checked={mode === 'oauth'}
               onChange={() => setMode('oauth')}
-              className="mt-0.5 accent-[var(--accent)]"
+              className="mt-1 accent-[var(--accent)] shrink-0"
             />
             <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                 <span className="text-sm font-medium text-ink">Claude Max (OAuth)</span>
                 {oauthPhase === 'checking' && <span className="text-xs text-muted">Checking…</span>}
                 {oauthPhase === 'connected' && (
                   <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
                     Connected
                   </span>
                 )}
               </div>
-              <div className="text-xs text-muted mt-0.5">
+              <p className="text-xs text-muted mt-0.5">
                 Use your Claude Max subscription. No API credits needed.
-              </div>
+              </p>
 
               {mode === 'oauth' && (
                 <div className="mt-3 space-y-2">
@@ -167,7 +172,7 @@ export function AIProviderModal({ open, onConfirm, onClose, action = 'Generate' 
                       {oauthError && (
                         <p className="text-xs text-rose-600 dark:text-rose-400">{oauthError}</p>
                       )}
-                      <Button variant="outline" size="sm" onClick={handleConnect}>
+                      <Button variant="outline" size="sm" onClick={handleConnect} block>
                         Connect Claude Max
                       </Button>
                     </>
@@ -179,7 +184,7 @@ export function AIProviderModal({ open, onConfirm, onClose, action = 'Generate' 
 
                   {oauthPhase === 'awaiting_approval' && (
                     <div className="space-y-2">
-                      <div className="rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-3 py-2.5 space-y-1.5">
+                      <div className="rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-3 py-2.5 space-y-2">
                         <p className="text-xs font-medium text-amber-800 dark:text-amber-300">
                           Open this URL in your browser and approve the login:
                         </p>
@@ -187,12 +192,12 @@ export function AIProviderModal({ open, onConfirm, onClose, action = 'Generate' 
                           href={authUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="block text-xs break-all text-accent hover:underline"
+                          className="block text-xs break-all text-accent hover:underline leading-relaxed"
                         >
                           {authUrl}
                         </a>
                       </div>
-                      <Button variant="accent" size="sm" onClick={handleApproved}>
+                      <Button variant="accent" size="sm" onClick={handleApproved} block>
                         I&apos;ve approved — continue
                       </Button>
                     </div>
@@ -221,7 +226,7 @@ export function AIProviderModal({ open, onConfirm, onClose, action = 'Generate' 
 
         {/* ── API key option ── */}
         <label
-          className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+          className={`flex items-start gap-2.5 sm:gap-3 p-3 sm:p-4 rounded-lg border cursor-pointer transition-colors ${
             mode === 'apikey' ? 'border-accent bg-accent/5' : 'border-border hover:border-accent/40'
           }`}
         >
@@ -231,13 +236,13 @@ export function AIProviderModal({ open, onConfirm, onClose, action = 'Generate' 
             value="apikey"
             checked={mode === 'apikey'}
             onChange={() => setMode('apikey')}
-            className="mt-0.5 accent-[var(--accent)]"
+            className="mt-1 accent-[var(--accent)] shrink-0"
           />
           <div>
             <div className="text-sm font-medium text-ink">API key</div>
-            <div className="text-xs text-muted mt-0.5">
+            <p className="text-xs text-muted mt-0.5">
               Use the Anthropic API key configured on the server.
-            </div>
+            </p>
           </div>
         </label>
       </div>
