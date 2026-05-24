@@ -14,7 +14,7 @@ export function useResumeWorkspace() {
   const [consultantId, setConsultantId] = useState('');
   const [versions, setVersions] = useState<ResumeVersion[]>([]);
   const [activeId, setActiveId] = useState('');
-  const [mode, setMode] = useState<CenterMode>('preview');
+  const [mode, setMode] = useState<CenterMode>('profile');
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [historyKey, setHistoryKey] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -66,7 +66,7 @@ export function useResumeWorkspace() {
 
   useEffect(() => {
     setSessionId(null);
-    setMode('preview');
+    setMode('profile');
     reloadVersions();
   }, [reloadVersions]);
 
@@ -79,7 +79,7 @@ export function useResumeWorkspace() {
   const selectVersion = useCallback((id: string) => {
     setActiveId(id);
     setSessionId(null);
-    setMode('preview');
+    setMode('profile');
   }, []);
 
   const upload = useCallback(
