@@ -3,6 +3,7 @@ import { requireRole } from '../middleware/auth';
 import { MANAGER_TIER, ADMIN_TIER } from '../types';
 import * as c from '../controllers/training.controller';
 import * as w from '../controllers/trainingWorkspace.controller';
+import * as adminAI from '../controllers/adminAI.controller';
 
 export const trainingRouter = Router();
 
@@ -126,6 +127,22 @@ trainingRouter.get('/reports', requireRole(...MANAGER_TIER), c.reports);
 // Returns which server-side AI credential is active so the frontend can skip
 // the "choose provider" modal when the server is already configured.
 trainingRouter.get('/ai/provider', c.aiProviderInfo);
+
+// ---- Claude CLI auth management (admin-tier only) ----
+// Refresh: runs `claude setup-token` — works when CLI is already logged in.
+trainingRouter.post(
+  '/ai/claude-auth/refresh',
+  requireRole(...ADMIN_TIER),
+  adminAI.refreshClaudeToken,
+);
+// Re-login: spawns `claude auth login`, returns the auth URL to show in the UI.
+trainingRouter.post('/ai/claude-auth/start', requireRole(...ADMIN_TIER), adminAI.startClaudeLogin);
+// Poll for completion of a pending login session.
+trainingRouter.get(
+  '/ai/claude-auth/:sessionId/status',
+  requireRole(...ADMIN_TIER),
+  adminAI.getLoginStatus,
+);
 
 // ---- AI endpoints (manager-tier only — these spend Anthropic tokens) ----
 trainingRouter.post('/ai/generate-plan', requireRole(...MANAGER_TIER), c.aiGeneratePlan);

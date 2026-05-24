@@ -33,9 +33,7 @@
       "Bash(git clean -fd:*)",
       "Bash(git branch -D:*)",
       "Bash(rm -rf:*)",
-      "Bash(psql:*)",
-      "Bash(ssh:*)",
-      "Bash(scp:*)"
+      "Bash(psql:*)"
     ]
   },
   "hooks": {

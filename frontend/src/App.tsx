@@ -101,6 +101,9 @@ const DeactivatedAccounts = lazy(() =>
 const AdminUsers = lazy(() =>
   import('./pages/AdminUsers').then((m) => ({ default: m.AdminUsers })),
 );
+const AdminAISettings = lazy(() =>
+  import('./pages/AdminAISettings').then((m) => ({ default: m.AdminAISettings })),
+);
 /** Legacy /admin/users/:id now opens the detail pane on the list page. */
 function AdminUserRedirect() {
   const { id } = useParams<{ id: string }>();
@@ -419,6 +422,14 @@ export default function App() {
               <FeatureGuard feature="messages">
                 <Messages />
               </FeatureGuard>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/ai-settings"
+          element={
+            <ProtectedRoute allow={ADMIN_TIER}>
+              <AdminAISettings />
             </ProtectedRoute>
           }
         />
