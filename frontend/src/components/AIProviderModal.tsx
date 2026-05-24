@@ -5,7 +5,7 @@ import { api } from '../services/api';
 
 export type AIProviderConfig = { mode: 'api' } | { mode: 'oauth'; token: string };
 
-const STORAGE_KEY = 'ai_custom_token';
+const STORAGE_KEY = 'ai_oauth_token';
 
 interface Props {
   open: boolean;
@@ -23,7 +23,7 @@ export function AIProviderModal({
   action = 'Generate',
   serverConfigured = false,
 }: Props) {
-  const [mode, setMode] = useState<'api' | 'oauth'>('api');
+  const [mode, setMode] = useState<'api' | 'oauth'>(serverConfigured ? 'api' : 'oauth');
   const [token, setToken] = useState(() => localStorage.getItem(STORAGE_KEY) ?? '');
   const [checking, setChecking] = useState(false);
   const [checkError, setCheckError] = useState<string | null>(null);
@@ -31,9 +31,9 @@ export function AIProviderModal({
   useEffect(() => {
     if (!open) return;
     setCheckError(null);
-    // Pre-select "OAuth" if a saved token exists
+    // Pre-select oauth if a saved token exists, otherwise default to server key if configured
     if (localStorage.getItem(STORAGE_KEY)) setMode('oauth');
-    else if (serverConfigured) setMode('api');
+    else setMode(serverConfigured ? 'api' : 'oauth');
   }, [open, serverConfigured]);
 
   function handleTokenChange(v: string) {
@@ -48,10 +48,17 @@ export function AIProviderModal({
       onConfirm({ mode: 'api' });
       return;
     }
-    // OAuth path: validate the token first
+    // OAuth path: validate subscription before generating
     const trimmed = token.trim();
     if (trimmed.length < 10) {
-      setCheckError('Enter your Anthropic API key or OAuth token first.');
+      setCheckError('Enter your Claude Max OAuth token first.');
+      return;
+    }
+    if (!trimmed.startsWith('sk-ant-oat01-')) {
+      setCheckError(
+        'This must be a Claude Max OAuth token starting with sk-ant-oat01-. ' +
+          'API keys (sk-ant-api03-) are not supported here.',
+      );
       return;
     }
     setChecking(true);
@@ -61,17 +68,21 @@ export function AIProviderModal({
       if (r.data?.ok) {
         onConfirm({ mode: 'oauth', token: trimmed });
       } else {
-        setCheckError(r.data?.error ?? 'Token is invalid or has no active subscription.');
+        setCheckError(
+          'Subscription check failed — ' +
+            (r.data?.error ?? 'your Claude Max subscription may not be active.') +
+            ' Visit claude.ai/settings to check your plan.',
+        );
       }
     } catch {
-      setCheckError('Could not validate token — server unreachable.');
+      setCheckError('Could not reach the server to validate your token. Please try again.');
     } finally {
       setChecking(false);
     }
   }
 
   const canConfirm =
-    !checking && (mode === 'api' || (mode === 'oauth' && token.trim().length > 10));
+    !checking && (mode === 'api' || (mode === 'oauth' && token.trim().startsWith('sk-ant-oat01-')));
 
   return (
     <Modal
@@ -90,13 +101,13 @@ export function AIProviderModal({
             disabled={!canConfirm}
             loading={checking}
           >
-            {checking ? 'Checking…' : `${action} →`}
+            {checking ? 'Checking subscription…' : `${action} →`}
           </Button>
         </div>
       }
     >
       <div className="space-y-2">
-        {/* OAuth / personal API key option */}
+        {/* Claude Max OAuth token */}
         <label
           className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
             mode === 'oauth' ? 'border-accent bg-accent/5' : 'border-border hover:border-accent/40'
@@ -111,10 +122,10 @@ export function AIProviderModal({
             className="mt-0.5 accent-[var(--accent)]"
           />
           <div className="min-w-0 flex-1">
-            <div className="text-sm font-medium text-ink">My API Key / OAuth token</div>
+            <div className="text-sm font-medium text-ink">Claude Max OAuth token</div>
             <div className="text-xs text-muted mt-0.5">
-              Use your own Anthropic API key or a Claude Max subscription OAuth token. Billed to
-              your account. We&apos;ll verify it before generating.
+              Use your Claude Max subscription. We&apos;ll verify your subscription is active before
+              generating.
             </div>
             {mode === 'oauth' && (
               <div className="mt-2 space-y-1.5">
@@ -122,7 +133,7 @@ export function AIProviderModal({
                   type="password"
                   value={token}
                   onChange={(e) => handleTokenChange(e.target.value)}
-                  placeholder="sk-ant-api03-… or sk-ant-oat01-…"
+                  placeholder="sk-ant-oat01-…"
                   autoFocus
                   className="w-full text-sm bg-bg-sunken border border-border rounded-md px-2.5 py-1.5 text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent/40"
                 />
@@ -130,19 +141,19 @@ export function AIProviderModal({
                   <p className="text-xs text-rose-600 dark:text-rose-400">{checkError}</p>
                 )}
                 <a
-                  href="https://console.anthropic.com/settings/keys"
+                  href="https://claude.ai/settings"
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex items-center gap-1 text-xs text-accent hover:underline"
                 >
-                  Get your API key from console.anthropic.com →
+                  Manage your Claude Max subscription →
                 </a>
               </div>
             )}
           </div>
         </label>
 
-        {/* Server API key option */}
+        {/* Server key */}
         <label
           className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
             mode === 'api' ? 'border-accent bg-accent/5' : 'border-border hover:border-accent/40'
@@ -159,7 +170,7 @@ export function AIProviderModal({
           />
           <div>
             <div className="text-sm font-medium text-ink">
-              Server API key
+              Server key
               {serverConfigured && (
                 <span className="ml-1.5 text-[10px] font-semibold uppercase tracking-widest text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/30 px-1.5 py-0.5 rounded-full">
                   Configured
@@ -168,7 +179,7 @@ export function AIProviderModal({
             </div>
             <div className="text-xs text-muted mt-0.5">
               {serverConfigured
-                ? 'Use the API key or OAuth token already set up on the server.'
+                ? 'Use the OAuth token or API key already set up on the server.'
                 : 'No server key configured — go to AI Settings to set one up.'}
             </div>
           </div>
