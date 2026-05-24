@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { api } from '../services/api';
 
 interface GenerationStatus {
@@ -32,13 +32,32 @@ interface ActiveLesson {
   course_title: string;
 }
 
+interface FocusedLesson {
+  id: string;
+  title: string;
+  content_status: string | null;
+  lesson_order: number;
+  estimated_minutes: number | null;
+  summary: string | null;
+}
+
+interface FocusedCourse {
+  id: string;
+  title: string;
+  category: string;
+  difficulty: string;
+  content_status: string | null;
+  lessons: FocusedLesson[];
+}
+
 const STATUS_LABEL: Record<string, string> = {
-  GENERATING: 'Generating',
+  GENERATING: 'Generating…',
   READY: 'Ready',
   FAILED: 'Failed',
   PENDING: 'Pending',
   OUTLINE_READY: 'Outline ready',
   DRAFT: 'Draft',
+  NONE: 'Not started',
   UNKNOWN: 'Unknown',
 };
 
@@ -49,18 +68,20 @@ const STATUS_COLOR: Record<string, string> = {
   PENDING: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
   OUTLINE_READY: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
   DRAFT: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400',
+  NONE: 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-500',
 };
 
-function StatusPill({ status }: { status: string }) {
-  const cls = STATUS_COLOR[status] ?? STATUS_COLOR.DRAFT;
+function StatusPill({ status }: { status: string | null }) {
+  const s = status ?? 'NONE';
+  const cls = STATUS_COLOR[s] ?? STATUS_COLOR.NONE;
   return (
     <span
       className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${cls}`}
     >
-      {status === 'GENERATING' && (
-        <span className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse" />
+      {s === 'GENERATING' && (
+        <span className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse shrink-0" />
       )}
-      {STATUS_LABEL[status] ?? status}
+      {STATUS_LABEL[s] ?? s}
     </span>
   );
 }
@@ -76,21 +97,55 @@ function StatCard({ label, value, color }: { label: string; value: number; color
 
 function relativeTime(iso: string) {
   const diff = (Date.now() - new Date(iso).getTime()) / 1000;
+  if (diff < 5) return 'just now';
   if (diff < 60) return `${Math.round(diff)}s ago`;
   if (diff < 3600) return `${Math.round(diff / 60)}m ago`;
   if (diff < 86400) return `${Math.round(diff / 3600)}h ago`;
   return `${Math.round(diff / 86400)}d ago`;
 }
 
+function lessonStatusIcon(status: string | null) {
+  switch (status) {
+    case 'READY':
+      return (
+        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 text-xs font-bold shrink-0">
+          ✓
+        </span>
+      );
+    case 'GENERATING':
+      return (
+        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/40 shrink-0">
+          <span className="h-2.5 w-2.5 rounded-full bg-blue-500 animate-pulse" />
+        </span>
+      );
+    case 'FAILED':
+      return (
+        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/40 text-red-600 text-xs font-bold shrink-0">
+          ✕
+        </span>
+      );
+    default:
+      return (
+        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800 shrink-0">
+          <span className="h-1.5 w-1.5 rounded-full bg-zinc-400" />
+        </span>
+      );
+  }
+}
+
 export function TrainingAIActivity() {
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const focusCourseId = params.get('course');
+
   const [data, setData] = useState<GenerationStatus | null>(null);
+  const [focused, setFocused] = useState<FocusedCourse | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+  const [error, setError] = useState('');
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const fetch = useCallback(async () => {
+  const fetchStatus = useCallback(async () => {
     try {
       const { data: d } = await api.get<GenerationStatus>('/training/ai/generation-status');
       setData(d);
@@ -103,33 +158,80 @@ export function TrainingAIActivity() {
     }
   }, []);
 
-  useEffect(() => {
-    fetch();
-  }, [fetch]);
+  const fetchFocused = useCallback(async () => {
+    if (!focusCourseId) return;
+    try {
+      const { data: d } = await api.get<any>(`/training/courses/${focusCourseId}`);
+      setFocused({
+        id: d.id,
+        title: d.title,
+        category: d.category,
+        difficulty: d.difficulty,
+        content_status: d.content_status ?? null,
+        lessons: (d.lessons ?? [])
+          .slice()
+          .sort((a: any, b: any) => (a.lesson_order ?? 0) - (b.lesson_order ?? 0))
+          .map((l: any) => ({
+            id: l.id,
+            title: l.title,
+            content_status: l.content_status ?? null,
+            lesson_order: l.lesson_order ?? 0,
+            estimated_minutes: l.estimated_minutes ?? null,
+            summary: l.summary ?? null,
+          })),
+      });
+    } catch {
+      // non-fatal — focused panel just won't show
+    }
+  }, [focusCourseId]);
 
-  // Auto-refresh every 8s when something is actively GENERATING, else every 30s
+  const refresh = useCallback(async () => {
+    await Promise.all([fetchStatus(), fetchFocused()]);
+  }, [fetchStatus, fetchFocused]);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  // Poll faster when something is generating
   useEffect(() => {
     if (intervalRef.current) clearInterval(intervalRef.current);
     const hasActive =
+      focused?.lessons.some(
+        (l) => l.content_status === 'GENERATING' || l.content_status === 'PENDING',
+      ) ||
       data?.active_lessons.some((l) => l.content_status === 'GENERATING') ||
       data?.active_courses.some((c) => c.content_status === 'GENERATING');
-    intervalRef.current = setInterval(fetch, hasActive ? 8_000 : 30_000);
+    intervalRef.current = setInterval(refresh, hasActive ? 5_000 : 30_000);
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [fetch, data]);
+  }, [refresh, data, focused]);
 
   const courses = data?.course_stats ?? {};
   const lessons = data?.lesson_stats ?? {};
-
   const totalCourses = Object.values(courses).reduce((s, v) => s + v, 0);
   const totalLessons = Object.values(lessons).reduce((s, v) => s + v, 0);
   const generating = (courses.GENERATING ?? 0) + (lessons.GENERATING ?? 0);
   const failed = (courses.FAILED ?? 0) + (lessons.FAILED ?? 0);
 
+  const focusedReady = focused?.lessons.every(
+    (l) => l.content_status === 'READY' || l.content_status === 'FAILED',
+  );
+  const focusedReadyCount =
+    focused?.lessons.filter((l) => l.content_status === 'READY').length ?? 0;
+  const focusedFailedCount =
+    focused?.lessons.filter((l) => l.content_status === 'FAILED').length ?? 0;
+  const focusedGeneratingCount =
+    focused?.lessons.filter((l) => l.content_status === 'GENERATING').length ?? 0;
+  const focusedPendingCount =
+    focused?.lessons.filter((l) => l.content_status === 'PENDING').length ?? 0;
+  const focusedTotal = focused?.lessons.length ?? 0;
+
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
-      <div className="flex items-center justify-between">
+      {/* Header */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-semibold text-ink">Training AI Activity</h1>
           <p className="text-sm text-muted mt-0.5">
@@ -143,7 +245,7 @@ export function TrainingAIActivity() {
             </span>
           )}
           <button
-            onClick={fetch}
+            onClick={refresh}
             className="text-xs text-accent hover:underline disabled:opacity-50"
             disabled={loading}
           >
@@ -158,7 +260,122 @@ export function TrainingAIActivity() {
         </div>
       )}
 
-      {/* Summary stats */}
+      {/* ── FOCUSED COURSE PANEL ── */}
+      {focused && (
+        <div className="rounded-xl border-2 border-blue-200 dark:border-blue-800 bg-surface overflow-hidden">
+          {/* Course header */}
+          <div className="px-5 py-4 bg-blue-50 dark:bg-blue-950/30 border-b border-blue-200 dark:border-blue-800">
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <div className="min-w-0">
+                <div className="text-xs font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-1">
+                  {focusedGeneratingCount > 0
+                    ? `Generating · ${focusedGeneratingCount} lesson${focusedGeneratingCount !== 1 ? 's' : ''} in progress`
+                    : focusedPendingCount > 0
+                      ? `Queued · ${focusedPendingCount} lesson${focusedPendingCount !== 1 ? 's' : ''} pending`
+                      : focusedReady
+                        ? 'Generation complete'
+                        : 'Active'}
+                </div>
+                <div className="text-base font-semibold text-ink truncate">{focused.title}</div>
+                <div className="text-xs text-muted mt-0.5">
+                  {focused.category} · {focused.difficulty}
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <Link
+                  to={`/training/courses/${focused.id}`}
+                  className="text-xs text-accent hover:underline"
+                >
+                  Open course →
+                </Link>
+              </div>
+            </div>
+
+            {/* Progress bar */}
+            {focusedTotal > 0 && (
+              <div className="mt-3">
+                <div className="flex items-center justify-between text-xs text-muted mb-1">
+                  <span>
+                    {focusedReadyCount}/{focusedTotal} lessons ready
+                    {focusedGeneratingCount > 0 && (
+                      <span className="ml-2 text-blue-600 dark:text-blue-400">
+                        · {focusedGeneratingCount} generating
+                      </span>
+                    )}
+                    {focusedPendingCount > 0 && (
+                      <span className="ml-2 text-amber-600 dark:text-amber-400">
+                        · {focusedPendingCount} pending
+                      </span>
+                    )}
+                    {focusedFailedCount > 0 && (
+                      <span className="ml-2 text-red-600 dark:text-red-400">
+                        · {focusedFailedCount} failed
+                      </span>
+                    )}
+                  </span>
+                  <span>{Math.round((focusedReadyCount / focusedTotal) * 100)}%</span>
+                </div>
+                <div className="h-2 rounded-full bg-blue-200 dark:bg-blue-900 overflow-hidden">
+                  <div
+                    className="h-full bg-emerald-500 rounded-full transition-all duration-1000"
+                    style={{ width: `${Math.round((focusedReadyCount / focusedTotal) * 100)}%` }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Per-lesson list */}
+          <div className="divide-y divide-border">
+            {focused.lessons.map((lesson, idx) => (
+              <div key={lesson.id} className="flex items-center gap-3 px-5 py-3">
+                {lessonStatusIcon(lesson.content_status)}
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm text-ink truncate">
+                    <span className="text-xs text-muted mr-2">{idx + 1}.</span>
+                    {lesson.title}
+                  </div>
+                  {lesson.summary && lesson.content_status !== 'GENERATING' && (
+                    <div className="text-xs text-muted truncate mt-0.5">{lesson.summary}</div>
+                  )}
+                  {lesson.content_status === 'GENERATING' && (
+                    <div className="text-xs text-blue-600 dark:text-blue-400 mt-0.5 animate-pulse">
+                      AI is writing this lesson…
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  {lesson.estimated_minutes && (
+                    <span className="text-xs text-muted hidden sm:inline">
+                      {lesson.estimated_minutes}m
+                    </span>
+                  )}
+                  <StatusPill status={lesson.content_status} />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Footer — auto-navigate when done */}
+          {focusedReady && focusedTotal > 0 && (
+            <div className="px-5 py-3 bg-emerald-50 dark:bg-emerald-950/20 border-t border-emerald-200 dark:border-emerald-800 flex items-center justify-between gap-3">
+              <span className="text-sm text-emerald-700 dark:text-emerald-400">
+                {focusedFailedCount === 0
+                  ? `All ${focusedTotal} lessons generated successfully.`
+                  : `${focusedReadyCount} ready, ${focusedFailedCount} failed — retry failed lessons from the course page.`}
+              </span>
+              <button
+                className="text-xs text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-700 rounded-lg px-3 py-1.5 hover:bg-emerald-100 dark:hover:bg-emerald-900/30"
+                onClick={() => navigate(`/training/courses/${focused.id}`)}
+              >
+                Go to course →
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── SUMMARY STATS ── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <StatCard label="Total courses" value={totalCourses} color="text-ink" />
         <StatCard label="Total lessons" value={totalLessons} color="text-ink" />
@@ -174,7 +391,7 @@ export function TrainingAIActivity() {
         />
       </div>
 
-      {/* Course status breakdown */}
+      {/* Course breakdown */}
       <div className="rounded-xl border border-border bg-surface p-5 space-y-3">
         <div className="text-sm font-medium text-ink">Course status breakdown</div>
         <div className="flex flex-wrap gap-2">
@@ -195,7 +412,7 @@ export function TrainingAIActivity() {
         </div>
       </div>
 
-      {/* Lesson status breakdown */}
+      {/* Lesson breakdown */}
       <div className="rounded-xl border border-border bg-surface p-5 space-y-3">
         <div className="text-sm font-medium text-ink">Lesson status breakdown</div>
         <div className="flex flex-wrap gap-2">
@@ -216,12 +433,12 @@ export function TrainingAIActivity() {
         </div>
       </div>
 
-      {/* Active / failed lessons */}
+      {/* Active / failed lessons across all courses */}
       {data && data.active_lessons.length > 0 && (
         <div className="rounded-xl border border-border bg-surface overflow-hidden">
           <div className="px-5 py-3 border-b border-border">
             <span className="text-sm font-medium text-ink">
-              Lessons in progress / failed / pending
+              All in-progress / failed / pending lessons
             </span>
           </div>
           <div className="divide-y divide-border">
@@ -245,11 +462,11 @@ export function TrainingAIActivity() {
         </div>
       )}
 
-      {/* Active / failed courses */}
+      {/* Active courses */}
       {data && data.active_courses.length > 0 && (
         <div className="rounded-xl border border-border bg-surface overflow-hidden">
           <div className="px-5 py-3 border-b border-border">
-            <span className="text-sm font-medium text-ink">Courses with activity</span>
+            <span className="text-sm font-medium text-ink">Courses with active generation</span>
           </div>
           <div className="divide-y divide-border">
             {data.active_courses.map((c) => {
@@ -259,7 +476,7 @@ export function TrainingAIActivity() {
                 <div
                   key={c.id}
                   className="px-5 py-3 hover:bg-surface-hover cursor-pointer"
-                  onClick={() => navigate(`/training/courses/${c.id}`)}
+                  onClick={() => navigate(`/training/ai-activity?course=${c.id}`)}
                 >
                   <div className="flex items-center justify-between mb-1.5">
                     <div className="min-w-0">
@@ -280,7 +497,7 @@ export function TrainingAIActivity() {
                         />
                       </div>
                       <span className="text-xs text-muted whitespace-nowrap">
-                        {c.ready_lessons}/{c.total_lessons} lessons ready
+                        {c.ready_lessons}/{c.total_lessons} ready
                         {c.generating_lessons > 0 && ` · ${c.generating_lessons} generating`}
                         {c.failed_lessons > 0 && ` · ${c.failed_lessons} failed`}
                         {c.pending_lessons > 0 && ` · ${c.pending_lessons} pending`}
@@ -294,11 +511,15 @@ export function TrainingAIActivity() {
         </div>
       )}
 
-      {data && data.active_courses.length === 0 && data.active_lessons.length === 0 && !loading && (
-        <div className="rounded-xl border border-border bg-surface px-5 py-10 text-center">
-          <div className="text-sm text-muted">All lessons are ready — no active generations.</div>
-        </div>
-      )}
+      {data &&
+        data.active_courses.length === 0 &&
+        data.active_lessons.length === 0 &&
+        !focused &&
+        !loading && (
+          <div className="rounded-xl border border-border bg-surface px-5 py-10 text-center">
+            <div className="text-sm text-muted">All lessons are ready — no active generations.</div>
+          </div>
+        )}
     </div>
   );
 }

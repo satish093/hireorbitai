@@ -76,12 +76,7 @@ export function CreateTrainingCourse() {
           : [],
         target_audience: gen.target_audience.trim() || null,
       });
-      if (r.data?.degraded) {
-        toast('Outline stub created — AI was unavailable. Edit lessons manually.');
-      } else {
-        toast.success(`Course outline ready · ${r.data.lessons?.length ?? 0} lessons`);
-      }
-      nav(`/training/courses/${r.data.course_id}`);
+      nav(`/training/ai-activity?course=${r.data.course_id}`);
     } catch (e: any) {
       toast.error(e?.response?.data?.error ?? 'Generation failed');
     } finally {

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import toast from 'react-hot-toast';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import { Modal } from './Modal';
 import { Pill, PillTone } from './Pill';
@@ -173,20 +174,17 @@ export function CapstoneEditor({
   capstone: any | null;
   onChanged: () => void;
 }) {
+  const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
 
   async function generate() {
     setBusy(true);
-    try {
-      const r = await api.post(`/training/courses/${courseId}/generate-capstone`);
-      if (r.data?.degraded) toast('Capstone stub created — AI was unavailable, edit it manually.');
-      else toast.success('Capstone generated');
-      onChanged();
-    } catch (e: any) {
-      toast.error(e?.response?.data?.error ?? 'Something went wrong. Please try again.');
-    } finally {
-      setBusy(false);
-    }
+    api
+      .post(`/training/courses/${courseId}/generate-capstone`)
+      .then(() => onChanged())
+      .catch(() => {});
+    navigate(`/training/ai-activity?course=${courseId}`);
+    setBusy(false);
   }
 
   return (

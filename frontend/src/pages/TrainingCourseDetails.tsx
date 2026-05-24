@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Layout } from '../components/Layout';
 import { Modal } from '../components/Modal';
@@ -69,6 +69,7 @@ interface Course {
 
 export function TrainingCourseDetails() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const { profile } = useAuth();
   const isManager = !!profile && (MANAGER_TIER as string[]).includes(profile.role);
   // AI generation (course/lesson/capstone) is admin-only.
@@ -80,7 +81,7 @@ export function TrainingCourseDetails() {
   const [aiOpen, setAiOpen] = useState(false);
   const [aiContent, setAiContent] = useState('');
   const [aiBusy, setAiBusy] = useState(false);
-  const [gen, setGen] = useState<{ running: boolean; done: number; total: number }>({
+  const [gen, _setGen] = useState<{ running: boolean; done: number; total: number }>({
     running: false,
     done: 0,
     total: 0,
@@ -211,18 +212,9 @@ export function TrainingCourseDetails() {
     const body = aiToken ? { aiToken } : {};
 
     if (action.kind === 'one') {
-      const { lessonId } = action;
-      setGen({ running: true, done: 0, total: 1 });
-      try {
-        const r = await api.post(`/training/lessons/${lessonId}/generate-content`, body);
-        if (r.data?.degraded) toast('Generation failed for this lesson — try again.');
-        else toast.success('Lesson generated');
-        await load();
-      } catch (e: any) {
-        toast.error(e?.response?.data?.error ?? 'Something went wrong. Please try again.');
-      } finally {
-        setGen({ running: false, done: 0, total: 0 });
-      }
+      // Fire and redirect — XHR survives client-side navigation
+      api.post(`/training/lessons/${action.lessonId}/generate-content`, body).catch(() => {});
+      navigate(`/training/ai-activity?course=${id}`);
       return;
     }
 
@@ -232,32 +224,15 @@ export function TrainingCourseDetails() {
         toast('All lessons already have content.');
         return;
       }
-      setGen({ running: true, done: 0, total: lessonIds.length });
-      const { ok, failed } = await generateAllLessons(
-        lessonIds,
-        (done, total) => setGen({ running: true, done, total }),
-        aiToken,
-      );
-      setGen({ running: false, done: 0, total: 0 });
-      if (failed > 0)
-        toast(`${ok} lesson(s) generated · ${failed} failed — retry the failed ones.`);
-      else toast.success(`${ok} lesson(s) generated`);
-      await load();
+      // Fire all batches in background, redirect immediately
+      generateAllLessons(lessonIds, () => {}, aiToken).catch(() => {});
+      navigate(`/training/ai-activity?course=${id}`);
       return;
     }
 
     if (action.kind === 'enrich') {
-      setLifecycleBusy(true);
-      try {
-        const r = await api.post(`/training/courses/${id}/enrich`, body);
-        if (r.data?.degraded) toast('Enrich stub written — AI unavailable, edit manually.');
-        else toast.success('Course enriched');
-        await load();
-      } catch (e: any) {
-        toast.error(e?.response?.data?.error ?? 'Something went wrong. Please try again.');
-      } finally {
-        setLifecycleBusy(false);
-      }
+      api.post(`/training/courses/${id}/enrich`, body).catch(() => {});
+      navigate(`/training/ai-activity?course=${id}`);
     }
   }
 
