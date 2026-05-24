@@ -4,11 +4,12 @@ Production-safe deployment architecture: a **free Render dev environment** for
 testing, **production on the existing VPS + CloudPanel**, **two fully separated
 databases**, and a safe weekend release flow.
 
-> New here? Read these in order: **01 → 02 → 03 → 04**, then use **05/06/07** as
-> runbooks.
+> **Just want to deploy or reset production?** → [00 · Production Runbook](00-production-runbook.md) — self-contained, copy-paste steps.
+> New here (learning the architecture)? Read **01 → 02 → 03 → 04**, then use **05/06/07** as runbooks.
 
 | #   | Guide                                                        | What it covers                                                    |
 | --- | ------------------------------------------------------------ | ----------------------------------------------------------------- |
+| 00  | [**Production Runbook**](00-production-runbook.md)           | **Fresh VPS deploy + full data wipe — one self-contained doc**    |
 | 01  | [VPS + CloudPanel](01-vps-cloudpanel.md)                     | Site, Node app, Nginx, SSL, PM2, env vars                         |
 | 02  | [Databases](02-databases.md)                                 | `hireorbit_prod` (VPS) + `hireorbit_dev` (Neon), separation guard |
 | 03  | [Render dev hosting](03-render-dev-hosting.md)               | Free backend + frontend, env vars, deploy hooks                   |
