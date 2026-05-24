@@ -74,7 +74,7 @@ export function AIProviderModal({ open, onConfirm, onClose, action = 'Generate' 
               Use your own Anthropic API key or Claude.ai subscription token
             </div>
             {mode === 'oauth' && (
-              <div className="mt-2 space-y-1.5">
+              <div className="mt-2 space-y-2">
                 <input
                   type="password"
                   value={token}
@@ -83,22 +83,24 @@ export function AIProviderModal({ open, onConfirm, onClose, action = 'Generate' 
                   autoFocus
                   className="w-full text-sm bg-bg-sunken border border-border rounded-md px-2.5 py-1.5 text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent/40"
                 />
-                <a
-                  href="https://console.anthropic.com/settings/keys"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1 text-xs text-accent hover:underline"
-                >
-                  Get your API key from console.anthropic.com
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                    />
-                  </svg>
-                </a>
+                <div className="flex flex-col gap-1">
+                  <a
+                    href="https://console.anthropic.com/settings/oauth-tokens"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 text-xs text-accent hover:underline"
+                  >
+                    Get OAuth token (claude-…) →
+                  </a>
+                  <a
+                    href="https://console.anthropic.com/settings/keys"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 text-xs text-muted hover:underline"
+                  >
+                    Get API key (sk-ant-…) →
+                  </a>
+                </div>
               </div>
             )}
           </div>
