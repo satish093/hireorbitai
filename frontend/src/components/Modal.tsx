@@ -107,7 +107,7 @@ export function Modal({ open, onClose, title, description, children, footer, siz
       <div
         ref={dialogRef}
         tabIndex={-1}
-        className={`bg-surface rounded-2xl shadow-2xl ring-1 ring-slate-900/5 w-full ${SIZE_CLASS[size]} my-4 sm:my-8 flex flex-col max-h-[calc(100dvh-2rem)] sm:max-h-[calc(100dvh-4rem)] overflow-hidden animate-scale-in focus:outline-none`}
+        className={`bg-surface rounded-2xl shadow-2xl ring-1 ring-slate-900/5 w-full ${SIZE_CLASS[size]} my-4 sm:my-6 flex flex-col max-h-[calc(100dvh-4rem)] sm:max-h-[calc(100dvh-6rem)] overflow-hidden animate-scale-in focus:outline-none`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-5 sm:px-6 pt-5 pb-4 border-b border-border shrink-0">

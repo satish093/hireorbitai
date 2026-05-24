@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { ADMIN_TIER } from '../types';
 import { Button } from '../components/Button';
 import { ButtonGroup, ButtonGroupItem } from '../components/ButtonGroup';
+import { AIProviderModal } from '../components/AIProviderModal';
 
 const CATEGORIES = [
   'Java',
@@ -45,6 +46,7 @@ export function CreateTrainingCourse() {
   const isAdmin = !!profile && (ADMIN_TIER as string[]).includes(profile.role);
   const [mode, setMode] = useState<'ai' | 'manual'>(isAdmin ? 'ai' : 'manual');
   const [genBusy, setGenBusy] = useState(false);
+  const [providerOpen, setProviderOpen] = useState(false);
   const [gen, setGen] = useState({
     title: '',
     category: 'Java',
@@ -54,11 +56,16 @@ export function CreateTrainingCourse() {
     target_audience: '',
   });
 
-  async function generateWithAI() {
+  function requestGenerate() {
     if (!gen.title.trim()) {
       toast.error('Title required');
       return;
     }
+    setProviderOpen(true);
+  }
+
+  async function generateWithAI() {
+    setProviderOpen(false);
     setGenBusy(true);
     try {
       const r = await api.post('/training/courses/generate', {
@@ -151,6 +158,13 @@ export function CreateTrainingCourse() {
         { label: 'New' },
       ]}
     >
+      <AIProviderModal
+        open={providerOpen}
+        action="Generate Course"
+        onConfirm={() => generateWithAI()}
+        onClose={() => setProviderOpen(false)}
+      />
+
       <div className="max-w-2xl">
         <h1 className="text-2xl font-semibold tracking-tight mb-5">New training course</h1>
 
@@ -223,7 +237,7 @@ export function CreateTrainingCourse() {
               </Button>
               <Button
                 variant="accent"
-                onClick={generateWithAI}
+                onClick={requestGenerate}
                 disabled={genBusy}
                 loading={genBusy}
               >
