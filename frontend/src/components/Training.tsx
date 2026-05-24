@@ -210,8 +210,8 @@ export interface CourseCardData {
   tags?: string[];
   status: 'DRAFT' | 'ACTIVE' | 'ARCHIVED';
   content_status?: string | null;
-  lessons?: { count: number }[];
-  assignments?: { count: number }[];
+  lessons?: number | { count: number }[];
+  assignments?: number | { count: number }[];
 }
 
 // ---------------------------------------------------------------------------
@@ -483,7 +483,12 @@ export function TrainingCourseCard({
         )}
         <div className="mt-auto pt-3 flex items-center justify-between text-xs text-muted">
           <span>
-            {course.lessons?.[0]?.count ?? 0} lessons · {course.assignments?.[0]?.count ?? 0}{' '}
+            {(typeof course.lessons === 'number' ? course.lessons : course.lessons?.[0]?.count) ??
+              0}{' '}
+            lessons ·{' '}
+            {(typeof course.assignments === 'number'
+              ? course.assignments
+              : course.assignments?.[0]?.count) ?? 0}{' '}
             assigned
           </span>
           {typeof course.estimated_duration_hours === 'number' && (

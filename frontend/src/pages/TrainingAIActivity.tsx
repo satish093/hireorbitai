@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { Layout } from '../components/Layout';
 import { api } from '../services/api';
 
 interface GenerationStatus {
@@ -229,297 +230,308 @@ export function TrainingAIActivity() {
   const focusedTotal = focused?.lessons.length ?? 0;
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-ink">Training AI Activity</h1>
-          <p className="text-sm text-muted mt-0.5">
-            Live status of AI content generation across all courses and lessons.
-          </p>
+    <Layout
+      title="Training AI Activity"
+      crumbs={[
+        { label: 'Workspace', to: '/dashboard' },
+        { label: 'Training', to: '/training/courses' },
+        { label: 'AI Activity' },
+      ]}
+    >
+      <div className="max-w-4xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <h1 className="text-xl font-semibold text-ink">Training AI Activity</h1>
+            <p className="text-sm text-muted mt-0.5">
+              Live status of AI content generation across all courses and lessons.
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            {lastRefresh && (
+              <span className="text-xs text-muted">
+                Updated {relativeTime(lastRefresh.toISOString())}
+              </span>
+            )}
+            <button
+              onClick={refresh}
+              className="text-xs text-accent hover:underline disabled:opacity-50"
+              disabled={loading}
+            >
+              Refresh
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-3">
-          {lastRefresh && (
-            <span className="text-xs text-muted">
-              Updated {relativeTime(lastRefresh.toISOString())}
-            </span>
-          )}
-          <button
-            onClick={refresh}
-            className="text-xs text-accent hover:underline disabled:opacity-50"
-            disabled={loading}
-          >
-            Refresh
-          </button>
-        </div>
-      </div>
 
-      {error && (
-        <div className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 px-4 py-3 text-sm text-red-700 dark:text-red-300">
-          {error}
-        </div>
-      )}
+        {error && (
+          <div className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 px-4 py-3 text-sm text-red-700 dark:text-red-300">
+            {error}
+          </div>
+        )}
 
-      {/* ── FOCUSED COURSE PANEL ── */}
-      {focused && (
-        <div className="rounded-xl border-2 border-blue-200 dark:border-blue-800 bg-surface overflow-hidden">
-          {/* Course header */}
-          <div className="px-5 py-4 bg-blue-50 dark:bg-blue-950/30 border-b border-blue-200 dark:border-blue-800">
-            <div className="flex items-start justify-between gap-3 flex-wrap">
-              <div className="min-w-0">
-                <div className="text-xs font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-1">
-                  {focusedGeneratingCount > 0
-                    ? `Generating · ${focusedGeneratingCount} lesson${focusedGeneratingCount !== 1 ? 's' : ''} in progress`
-                    : focusedPendingCount > 0
-                      ? `Queued · ${focusedPendingCount} lesson${focusedPendingCount !== 1 ? 's' : ''} pending`
-                      : focusedReady
-                        ? 'Generation complete'
-                        : 'Active'}
+        {/* ── FOCUSED COURSE PANEL ── */}
+        {focused && (
+          <div className="rounded-xl border-2 border-blue-200 dark:border-blue-800 bg-surface overflow-hidden">
+            {/* Course header */}
+            <div className="px-5 py-4 bg-blue-50 dark:bg-blue-950/30 border-b border-blue-200 dark:border-blue-800">
+              <div className="flex items-start justify-between gap-3 flex-wrap">
+                <div className="min-w-0">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-1">
+                    {focusedGeneratingCount > 0
+                      ? `Generating · ${focusedGeneratingCount} lesson${focusedGeneratingCount !== 1 ? 's' : ''} in progress`
+                      : focusedPendingCount > 0
+                        ? `Queued · ${focusedPendingCount} lesson${focusedPendingCount !== 1 ? 's' : ''} pending`
+                        : focusedReady
+                          ? 'Generation complete'
+                          : 'Active'}
+                  </div>
+                  <div className="text-base font-semibold text-ink truncate">{focused.title}</div>
+                  <div className="text-xs text-muted mt-0.5">
+                    {focused.category} · {focused.difficulty}
+                  </div>
                 </div>
-                <div className="text-base font-semibold text-ink truncate">{focused.title}</div>
-                <div className="text-xs text-muted mt-0.5">
-                  {focused.category} · {focused.difficulty}
+                <div className="flex items-center gap-2 shrink-0">
+                  <Link
+                    to={`/training/courses/${focused.id}`}
+                    className="text-xs text-accent hover:underline"
+                  >
+                    Open course →
+                  </Link>
                 </div>
               </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <Link
-                  to={`/training/courses/${focused.id}`}
-                  className="text-xs text-accent hover:underline"
-                >
-                  Open course →
-                </Link>
-              </div>
+
+              {/* Progress bar */}
+              {focusedTotal > 0 && (
+                <div className="mt-3">
+                  <div className="flex items-center justify-between text-xs text-muted mb-1">
+                    <span>
+                      {focusedReadyCount}/{focusedTotal} lessons ready
+                      {focusedGeneratingCount > 0 && (
+                        <span className="ml-2 text-blue-600 dark:text-blue-400">
+                          · {focusedGeneratingCount} generating
+                        </span>
+                      )}
+                      {focusedPendingCount > 0 && (
+                        <span className="ml-2 text-amber-600 dark:text-amber-400">
+                          · {focusedPendingCount} pending
+                        </span>
+                      )}
+                      {focusedFailedCount > 0 && (
+                        <span className="ml-2 text-red-600 dark:text-red-400">
+                          · {focusedFailedCount} failed
+                        </span>
+                      )}
+                    </span>
+                    <span>{Math.round((focusedReadyCount / focusedTotal) * 100)}%</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-blue-200 dark:bg-blue-900 overflow-hidden">
+                    <div
+                      className="h-full bg-emerald-500 rounded-full transition-all duration-1000"
+                      style={{ width: `${Math.round((focusedReadyCount / focusedTotal) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* Progress bar */}
-            {focusedTotal > 0 && (
-              <div className="mt-3">
-                <div className="flex items-center justify-between text-xs text-muted mb-1">
-                  <span>
-                    {focusedReadyCount}/{focusedTotal} lessons ready
-                    {focusedGeneratingCount > 0 && (
-                      <span className="ml-2 text-blue-600 dark:text-blue-400">
-                        · {focusedGeneratingCount} generating
+            {/* Per-lesson list */}
+            <div className="divide-y divide-border">
+              {focused.lessons.map((lesson, idx) => (
+                <div key={lesson.id} className="flex items-center gap-3 px-5 py-3">
+                  {lessonStatusIcon(lesson.content_status)}
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm text-ink truncate">
+                      <span className="text-xs text-muted mr-2">{idx + 1}.</span>
+                      {lesson.title}
+                    </div>
+                    {lesson.summary && lesson.content_status !== 'GENERATING' && (
+                      <div className="text-xs text-muted truncate mt-0.5">{lesson.summary}</div>
+                    )}
+                    {lesson.content_status === 'GENERATING' && (
+                      <div className="text-xs text-blue-600 dark:text-blue-400 mt-0.5 animate-pulse">
+                        AI is writing this lesson…
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    {lesson.estimated_minutes && (
+                      <span className="text-xs text-muted hidden sm:inline">
+                        {lesson.estimated_minutes}m
                       </span>
                     )}
-                    {focusedPendingCount > 0 && (
-                      <span className="ml-2 text-amber-600 dark:text-amber-400">
-                        · {focusedPendingCount} pending
-                      </span>
-                    )}
-                    {focusedFailedCount > 0 && (
-                      <span className="ml-2 text-red-600 dark:text-red-400">
-                        · {focusedFailedCount} failed
-                      </span>
-                    )}
-                  </span>
-                  <span>{Math.round((focusedReadyCount / focusedTotal) * 100)}%</span>
+                    <StatusPill status={lesson.content_status} />
+                  </div>
                 </div>
-                <div className="h-2 rounded-full bg-blue-200 dark:bg-blue-900 overflow-hidden">
-                  <div
-                    className="h-full bg-emerald-500 rounded-full transition-all duration-1000"
-                    style={{ width: `${Math.round((focusedReadyCount / focusedTotal) * 100)}%` }}
-                  />
-                </div>
+              ))}
+            </div>
+
+            {/* Footer — auto-navigate when done */}
+            {focusedReady && focusedTotal > 0 && (
+              <div className="px-5 py-3 bg-emerald-50 dark:bg-emerald-950/20 border-t border-emerald-200 dark:border-emerald-800 flex items-center justify-between gap-3">
+                <span className="text-sm text-emerald-700 dark:text-emerald-400">
+                  {focusedFailedCount === 0
+                    ? `All ${focusedTotal} lessons generated successfully.`
+                    : `${focusedReadyCount} ready, ${focusedFailedCount} failed — retry failed lessons from the course page.`}
+                </span>
+                <button
+                  className="text-xs text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-700 rounded-lg px-3 py-1.5 hover:bg-emerald-100 dark:hover:bg-emerald-900/30"
+                  onClick={() => navigate(`/training/courses/${focused.id}`)}
+                >
+                  Go to course →
+                </button>
               </div>
             )}
           </div>
+        )}
 
-          {/* Per-lesson list */}
-          <div className="divide-y divide-border">
-            {focused.lessons.map((lesson, idx) => (
-              <div key={lesson.id} className="flex items-center gap-3 px-5 py-3">
-                {lessonStatusIcon(lesson.content_status)}
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm text-ink truncate">
-                    <span className="text-xs text-muted mr-2">{idx + 1}.</span>
-                    {lesson.title}
-                  </div>
-                  {lesson.summary && lesson.content_status !== 'GENERATING' && (
-                    <div className="text-xs text-muted truncate mt-0.5">{lesson.summary}</div>
-                  )}
-                  {lesson.content_status === 'GENERATING' && (
-                    <div className="text-xs text-blue-600 dark:text-blue-400 mt-0.5 animate-pulse">
-                      AI is writing this lesson…
-                    </div>
-                  )}
-                </div>
-                <div className="flex items-center gap-3 shrink-0">
-                  {lesson.estimated_minutes && (
-                    <span className="text-xs text-muted hidden sm:inline">
-                      {lesson.estimated_minutes}m
-                    </span>
-                  )}
-                  <StatusPill status={lesson.content_status} />
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Footer — auto-navigate when done */}
-          {focusedReady && focusedTotal > 0 && (
-            <div className="px-5 py-3 bg-emerald-50 dark:bg-emerald-950/20 border-t border-emerald-200 dark:border-emerald-800 flex items-center justify-between gap-3">
-              <span className="text-sm text-emerald-700 dark:text-emerald-400">
-                {focusedFailedCount === 0
-                  ? `All ${focusedTotal} lessons generated successfully.`
-                  : `${focusedReadyCount} ready, ${focusedFailedCount} failed — retry failed lessons from the course page.`}
-              </span>
-              <button
-                className="text-xs text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-700 rounded-lg px-3 py-1.5 hover:bg-emerald-100 dark:hover:bg-emerald-900/30"
-                onClick={() => navigate(`/training/courses/${focused.id}`)}
-              >
-                Go to course →
-              </button>
-            </div>
-          )}
+        {/* ── SUMMARY STATS ── */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <StatCard label="Total courses" value={totalCourses} color="text-ink" />
+          <StatCard label="Total lessons" value={totalLessons} color="text-ink" />
+          <StatCard
+            label="Generating now"
+            value={generating}
+            color={generating > 0 ? 'text-blue-600 dark:text-blue-400' : 'text-ink'}
+          />
+          <StatCard
+            label="Needs retry"
+            value={failed}
+            color={failed > 0 ? 'text-red-600 dark:text-red-400' : 'text-ink'}
+          />
         </div>
-      )}
 
-      {/* ── SUMMARY STATS ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatCard label="Total courses" value={totalCourses} color="text-ink" />
-        <StatCard label="Total lessons" value={totalLessons} color="text-ink" />
-        <StatCard
-          label="Generating now"
-          value={generating}
-          color={generating > 0 ? 'text-blue-600 dark:text-blue-400' : 'text-ink'}
-        />
-        <StatCard
-          label="Needs retry"
-          value={failed}
-          color={failed > 0 ? 'text-red-600 dark:text-red-400' : 'text-ink'}
-        />
-      </div>
-
-      {/* Course breakdown */}
-      <div className="rounded-xl border border-border bg-surface p-5 space-y-3">
-        <div className="text-sm font-medium text-ink">Course status breakdown</div>
-        <div className="flex flex-wrap gap-2">
-          {Object.entries(courses).length === 0 && !loading && (
-            <span className="text-xs text-muted">No courses yet.</span>
-          )}
-          {Object.entries(courses)
-            .sort((a, b) => b[1] - a[1])
-            .map(([status, count]) => (
-              <span
-                key={status}
-                className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1 text-xs"
-              >
-                <StatusPill status={status} />
-                <span className="font-semibold text-ink">{count}</span>
-              </span>
-            ))}
-        </div>
-      </div>
-
-      {/* Lesson breakdown */}
-      <div className="rounded-xl border border-border bg-surface p-5 space-y-3">
-        <div className="text-sm font-medium text-ink">Lesson status breakdown</div>
-        <div className="flex flex-wrap gap-2">
-          {Object.entries(lessons).length === 0 && !loading && (
-            <span className="text-xs text-muted">No lessons yet.</span>
-          )}
-          {Object.entries(lessons)
-            .sort((a, b) => b[1] - a[1])
-            .map(([status, count]) => (
-              <span
-                key={status}
-                className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1 text-xs"
-              >
-                <StatusPill status={status} />
-                <span className="font-semibold text-ink">{count}</span>
-              </span>
-            ))}
-        </div>
-      </div>
-
-      {/* Active / failed lessons across all courses */}
-      {data && data.active_lessons.length > 0 && (
-        <div className="rounded-xl border border-border bg-surface overflow-hidden">
-          <div className="px-5 py-3 border-b border-border">
-            <span className="text-sm font-medium text-ink">
-              All in-progress / failed / pending lessons
-            </span>
-          </div>
-          <div className="divide-y divide-border">
-            {data.active_lessons.map((l) => (
-              <div
-                key={l.id}
-                className="flex items-center justify-between px-5 py-3 hover:bg-surface-hover cursor-pointer"
-                onClick={() => navigate(`/training/courses/${l.course_id}`)}
-              >
-                <div className="min-w-0">
-                  <div className="text-sm font-medium text-ink truncate">{l.title}</div>
-                  <div className="text-xs text-muted truncate">{l.course_title}</div>
-                </div>
-                <div className="flex items-center gap-3 ml-4 shrink-0">
-                  <span className="text-xs text-muted">{relativeTime(l.updated_at)}</span>
-                  <StatusPill status={l.content_status} />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Active courses */}
-      {data && data.active_courses.length > 0 && (
-        <div className="rounded-xl border border-border bg-surface overflow-hidden">
-          <div className="px-5 py-3 border-b border-border">
-            <span className="text-sm font-medium text-ink">Courses with active generation</span>
-          </div>
-          <div className="divide-y divide-border">
-            {data.active_courses.map((c) => {
-              const pct =
-                c.total_lessons > 0 ? Math.round((c.ready_lessons / c.total_lessons) * 100) : 0;
-              return (
-                <div
-                  key={c.id}
-                  className="px-5 py-3 hover:bg-surface-hover cursor-pointer"
-                  onClick={() => navigate(`/training/ai-activity?course=${c.id}`)}
+        {/* Course breakdown */}
+        <div className="rounded-xl border border-border bg-surface p-5 space-y-3">
+          <div className="text-sm font-medium text-ink">Course status breakdown</div>
+          <div className="flex flex-wrap gap-2">
+            {Object.entries(courses).length === 0 && !loading && (
+              <span className="text-xs text-muted">No courses yet.</span>
+            )}
+            {Object.entries(courses)
+              .sort((a, b) => b[1] - a[1])
+              .map(([status, count]) => (
+                <span
+                  key={status}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1 text-xs"
                 >
-                  <div className="flex items-center justify-between mb-1.5">
-                    <div className="min-w-0">
-                      <span className="text-sm font-medium text-ink">{c.title}</span>
-                      <span className="ml-2 text-xs text-muted">{c.category}</span>
-                    </div>
-                    <div className="flex items-center gap-2 ml-4 shrink-0">
-                      <span className="text-xs text-muted">{relativeTime(c.updated_at)}</span>
-                      <StatusPill status={c.content_status} />
-                    </div>
-                  </div>
-                  {c.total_lessons > 0 && (
-                    <div className="flex items-center gap-3">
-                      <div className="flex-1 h-1.5 bg-zinc-200 dark:bg-zinc-700 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-emerald-500 rounded-full transition-all"
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                      <span className="text-xs text-muted whitespace-nowrap">
-                        {c.ready_lessons}/{c.total_lessons} ready
-                        {c.generating_lessons > 0 && ` · ${c.generating_lessons} generating`}
-                        {c.failed_lessons > 0 && ` · ${c.failed_lessons} failed`}
-                        {c.pending_lessons > 0 && ` · ${c.pending_lessons} pending`}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                  <StatusPill status={status} />
+                  <span className="font-semibold text-ink">{count}</span>
+                </span>
+              ))}
           </div>
         </div>
-      )}
 
-      {data &&
-        data.active_courses.length === 0 &&
-        data.active_lessons.length === 0 &&
-        !focused &&
-        !loading && (
-          <div className="rounded-xl border border-border bg-surface px-5 py-10 text-center">
-            <div className="text-sm text-muted">All lessons are ready — no active generations.</div>
+        {/* Lesson breakdown */}
+        <div className="rounded-xl border border-border bg-surface p-5 space-y-3">
+          <div className="text-sm font-medium text-ink">Lesson status breakdown</div>
+          <div className="flex flex-wrap gap-2">
+            {Object.entries(lessons).length === 0 && !loading && (
+              <span className="text-xs text-muted">No lessons yet.</span>
+            )}
+            {Object.entries(lessons)
+              .sort((a, b) => b[1] - a[1])
+              .map(([status, count]) => (
+                <span
+                  key={status}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1 text-xs"
+                >
+                  <StatusPill status={status} />
+                  <span className="font-semibold text-ink">{count}</span>
+                </span>
+              ))}
+          </div>
+        </div>
+
+        {/* Active / failed lessons across all courses */}
+        {data && data.active_lessons.length > 0 && (
+          <div className="rounded-xl border border-border bg-surface overflow-hidden">
+            <div className="px-5 py-3 border-b border-border">
+              <span className="text-sm font-medium text-ink">
+                All in-progress / failed / pending lessons
+              </span>
+            </div>
+            <div className="divide-y divide-border">
+              {data.active_lessons.map((l) => (
+                <div
+                  key={l.id}
+                  className="flex items-center justify-between px-5 py-3 hover:bg-surface-hover cursor-pointer"
+                  onClick={() => navigate(`/training/courses/${l.course_id}`)}
+                >
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium text-ink truncate">{l.title}</div>
+                    <div className="text-xs text-muted truncate">{l.course_title}</div>
+                  </div>
+                  <div className="flex items-center gap-3 ml-4 shrink-0">
+                    <span className="text-xs text-muted">{relativeTime(l.updated_at)}</span>
+                    <StatusPill status={l.content_status} />
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
-    </div>
+
+        {/* Active courses */}
+        {data && data.active_courses.length > 0 && (
+          <div className="rounded-xl border border-border bg-surface overflow-hidden">
+            <div className="px-5 py-3 border-b border-border">
+              <span className="text-sm font-medium text-ink">Courses with active generation</span>
+            </div>
+            <div className="divide-y divide-border">
+              {data.active_courses.map((c) => {
+                const pct =
+                  c.total_lessons > 0 ? Math.round((c.ready_lessons / c.total_lessons) * 100) : 0;
+                return (
+                  <div
+                    key={c.id}
+                    className="px-5 py-3 hover:bg-surface-hover cursor-pointer"
+                    onClick={() => navigate(`/training/ai-activity?course=${c.id}`)}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="min-w-0">
+                        <span className="text-sm font-medium text-ink">{c.title}</span>
+                        <span className="ml-2 text-xs text-muted">{c.category}</span>
+                      </div>
+                      <div className="flex items-center gap-2 ml-4 shrink-0">
+                        <span className="text-xs text-muted">{relativeTime(c.updated_at)}</span>
+                        <StatusPill status={c.content_status} />
+                      </div>
+                    </div>
+                    {c.total_lessons > 0 && (
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1 h-1.5 bg-zinc-200 dark:bg-zinc-700 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-emerald-500 rounded-full transition-all"
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                        <span className="text-xs text-muted whitespace-nowrap">
+                          {c.ready_lessons}/{c.total_lessons} ready
+                          {c.generating_lessons > 0 && ` · ${c.generating_lessons} generating`}
+                          {c.failed_lessons > 0 && ` · ${c.failed_lessons} failed`}
+                          {c.pending_lessons > 0 && ` · ${c.pending_lessons} pending`}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {data &&
+          data.active_courses.length === 0 &&
+          data.active_lessons.length === 0 &&
+          !focused &&
+          !loading && (
+            <div className="rounded-xl border border-border bg-surface px-5 py-10 text-center">
+              <div className="text-sm text-muted">
+                All lessons are ready — no active generations.
+              </div>
+            </div>
+          )}
+      </div>
+    </Layout>
   );
 }
