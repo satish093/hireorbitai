@@ -171,6 +171,7 @@ export function DeactivatedAccounts() {
           {
             key: 'group',
             header: 'Group',
+            hideOnMobile: true,
             render: (r: DeactivatedRow) => <GroupBadge groupId={r.group_id} />,
           },
           {
@@ -193,6 +194,7 @@ export function DeactivatedAccounts() {
           {
             key: 'status_changed_at',
             header: 'Changed',
+            hideOnMobile: true,
             render: (r: DeactivatedRow) => {
               const at = r.status_changed_at ?? r.updated_at;
               return at ? new Date(at).toLocaleString() : '—';
@@ -201,6 +203,7 @@ export function DeactivatedAccounts() {
           {
             key: 'last_seen_at',
             header: 'Last seen',
+            hideOnMobile: true,
             render: (r: DeactivatedRow) =>
               r.last_seen_at ? (
                 new Date(r.last_seen_at).toLocaleString()

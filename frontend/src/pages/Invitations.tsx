@@ -172,6 +172,7 @@ export function Invitations() {
           {
             key: 'expires_at',
             header: 'Expires',
+            hideOnMobile: true,
             render: (r: any) => (r.expires_at ? new Date(r.expires_at).toLocaleString() : '—'),
           },
           {

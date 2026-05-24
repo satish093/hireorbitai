@@ -30,26 +30,45 @@ export function Resumes() {
         }
         action={
           <>
-            <FileUpload
-              label={w.uploading ? 'Uploading…' : '+ Upload'}
-              accept=".pdf,.doc,.docx"
-              disabled={!w.consultantId}
-              onFile={w.upload}
-            />
-            <Button variant="outline" size="md" disabled={!active} onClick={w.duplicate}>
-              Duplicate
-            </Button>
-            <Button variant="outline" size="md" disabled={!active} onClick={w.download}>
-              Download
-            </Button>
-            <Button
-              variant="accent"
-              size="md"
-              disabled={!active}
-              onClick={() => setLauncherOpen(true)}
-            >
-              ✦ Tailor with AI
-            </Button>
+            {/* Two pairs so mobile shows 2 buttons per row, desktop stays flat. */}
+            <div className="flex gap-2 w-full sm:w-auto sm:contents">
+              <FileUpload
+                label={w.uploading ? 'Uploading…' : '+ Upload'}
+                accept=".pdf,.doc,.docx"
+                disabled={!w.consultantId}
+                onFile={w.upload}
+                className="flex-1 sm:flex-none"
+              />
+              <Button
+                variant="outline"
+                size="md"
+                disabled={!active}
+                onClick={w.duplicate}
+                className="flex-1 sm:flex-none"
+              >
+                Duplicate
+              </Button>
+            </div>
+            <div className="flex gap-2 w-full sm:w-auto sm:contents">
+              <Button
+                variant="outline"
+                size="md"
+                disabled={!active}
+                onClick={w.download}
+                className="flex-1 sm:flex-none"
+              >
+                Download
+              </Button>
+              <Button
+                variant="accent"
+                size="md"
+                disabled={!active}
+                onClick={() => setLauncherOpen(true)}
+                className="flex-1 sm:flex-none"
+              >
+                ✦ Tailor with AI
+              </Button>
+            </div>
           </>
         }
       />

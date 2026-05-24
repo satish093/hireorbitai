@@ -154,7 +154,7 @@ export function UserFilterBar({
         </button>
       )}
 
-      <div className="ml-auto flex items-center gap-2">
+      <div className="w-full sm:ml-auto sm:w-auto flex items-center gap-2">
         <span className="text-xs text-muted tabular-nums">
           {loading ? 'Loading…' : `${shown} of ${total.toLocaleString()}`}
         </span>

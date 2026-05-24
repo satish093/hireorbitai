@@ -241,13 +241,15 @@ export function Consultants() {
           {
             key: 'group',
             header: 'Group',
+            hideOnMobile: true,
             render: (c: ConsultantRow) => <GroupBadge groupId={c.user?.group_id ?? null} />,
           },
           { key: 'primary_skill', header: 'Primary skill' },
-          { key: 'visa_status', header: 'Visa' },
+          { key: 'visa_status', header: 'Visa', hideOnMobile: true },
           {
             key: 'experience',
             header: 'Exp',
+            hideOnMobile: true,
             render: (c: ConsultantRow) => `${c.total_experience_years ?? 0} yrs`,
           },
           {

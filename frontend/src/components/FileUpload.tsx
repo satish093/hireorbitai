@@ -1,13 +1,16 @@
 import { ChangeEvent, useRef, useState } from 'react';
+import clsx from 'clsx';
 
 interface Props {
   label?: string;
   accept?: string;
   disabled?: boolean;
   onFile: (file: File) => void;
+  /** Extra classes applied to the outer wrapper div (e.g. flex-1 for mobile stretch). */
+  className?: string;
 }
 
-export function FileUpload({ label = 'Upload file', accept, disabled, onFile }: Props) {
+export function FileUpload({ label = 'Upload file', accept, disabled, onFile, className }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState('');
 
@@ -21,12 +24,15 @@ export function FileUpload({ label = 'Upload file', accept, disabled, onFile }: 
   }
 
   return (
-    <div className="flex items-center gap-2">
+    <div className={clsx('flex items-center gap-2', className)}>
       <button
         type="button"
         disabled={disabled}
         onClick={() => !disabled && inputRef.current?.click()}
-        className={`h-9 inline-flex items-center gap-1.5 bg-ink text-bg text-sm font-medium px-3.5 rounded-lg shadow-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-90'}`}
+        className={clsx(
+          'h-9 flex-1 inline-flex items-center justify-center gap-1.5 bg-ink text-bg text-sm font-medium px-3.5 rounded-lg shadow-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+          disabled ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-90',
+        )}
       >
         <span aria-hidden="true">📎</span> {label}
       </button>

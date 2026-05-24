@@ -246,9 +246,10 @@ export function TaskFilterBar({
         </button>
       ))}
 
-      {/* Right: count · view switch · New task */}
-      <div className="ml-auto flex items-center gap-3">
-        <span className="text-[12px] font-mono text-muted whitespace-nowrap">
+      {/* Right: count · view switch · New task.
+          On mobile becomes a full-width second row so nothing overlaps. */}
+      <div className="w-full sm:ml-auto sm:w-auto flex items-center gap-2 sm:gap-3">
+        <span className="text-[12px] font-mono text-muted whitespace-nowrap mr-auto sm:mr-0">
           {shown} of {total}
         </span>
         <ButtonGroup>

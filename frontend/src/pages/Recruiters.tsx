@@ -131,10 +131,11 @@ export function Recruiters() {
                 </div>
               ),
           },
-          { key: 'team', header: 'Team' },
+          { key: 'team', header: 'Team', hideOnMobile: true },
           {
             key: 'group',
             header: 'Group',
+            hideOnMobile: true,
             render: (r: RecruiterRow) => <GroupBadge groupId={r.user?.group_id ?? null} />,
           },
           {
@@ -169,6 +170,7 @@ export function Recruiters() {
             key: 'target',
             header: 'Weekly target',
             align: 'right',
+            hideOnMobile: true,
             render: (r: RecruiterRow) => r.target_submissions_per_week ?? '—',
           },
           {

@@ -133,10 +133,17 @@ export function Applications() {
           },
           { key: 'job', header: 'Job', render: (a: any) => a.job?.title ?? '—' },
           { key: 'vendor', header: 'Vendor', render: (a: any) => a.vendor?.company_name ?? '—' },
-          { key: 'ats', header: 'ATS', align: 'right', render: (a: any) => a.ats_score ?? '—' },
+          {
+            key: 'ats',
+            header: 'ATS',
+            align: 'right',
+            hideOnMobile: true,
+            render: (a: any) => a.ats_score ?? '—',
+          },
           {
             key: 'date',
             header: 'Submitted',
+            hideOnMobile: true,
             render: (a: any) =>
               a.submitted_at ? new Date(a.submitted_at).toLocaleDateString() : '—',
           },

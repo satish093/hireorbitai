@@ -110,9 +110,15 @@ export function UserTable({
                 />
               </th>
               <SortHeader label="User" k="full_name" sort={sort} order={order} onSort={onSort} />
-              {columns.role && <th className="text-left font-medium text-muted px-3 py-2">Role</th>}
+              {columns.role && (
+                <th className="hidden sm:table-cell text-left font-medium text-muted px-3 py-2">
+                  Role
+                </th>
+              )}
               {columns.group && (
-                <th className="text-left font-medium text-muted px-3 py-2">Group</th>
+                <th className="hidden sm:table-cell text-left font-medium text-muted px-3 py-2">
+                  Group
+                </th>
               )}
               <th className="text-left font-medium text-muted px-3 py-2">Status</th>
               {columns.last_seen && (
@@ -122,10 +128,13 @@ export function UserTable({
                   sort={sort}
                   order={order}
                   onSort={onSort}
+                  className="hidden sm:table-cell"
                 />
               )}
               {columns.sessions && (
-                <th className="text-right font-medium text-muted px-3 py-2">Sessions</th>
+                <th className="hidden sm:table-cell text-right font-medium text-muted px-3 py-2">
+                  Sessions
+                </th>
               )}
               {columns.joined && (
                 <SortHeader
@@ -134,6 +143,7 @@ export function UserTable({
                   sort={sort}
                   order={order}
                   onSort={onSort}
+                  className="hidden sm:table-cell"
                 />
               )}
               <th className="w-10 px-2 py-2" />
@@ -200,12 +210,12 @@ export function UserTable({
                       </div>
                     </td>
                     {columns.role && (
-                      <td className="px-3 py-2.5">
+                      <td className="hidden sm:table-cell px-3 py-2.5">
                         <RoleChip role={u.role} />
                       </td>
                     )}
                     {columns.group && (
-                      <td className="px-3 py-2.5">
+                      <td className="hidden sm:table-cell px-3 py-2.5">
                         <GroupBadge group={u.group_id ? groupsById[u.group_id] : null} />
                       </td>
                     )}
@@ -213,7 +223,7 @@ export function UserTable({
                       <StatusPill status={s} reason={u.status_reason} />
                     </td>
                     {columns.last_seen && (
-                      <td className="px-3 py-2.5">
+                      <td className="hidden sm:table-cell px-3 py-2.5">
                         <span
                           className="text-xs text-ink-2 font-mono"
                           title={
@@ -225,14 +235,14 @@ export function UserTable({
                       </td>
                     )}
                     {columns.sessions && (
-                      <td className="px-3 py-2.5 text-right">
+                      <td className="hidden sm:table-cell px-3 py-2.5 text-right">
                         <span className="text-xs tabular-nums text-ink-2">
                           {u.session_count ?? 0}
                         </span>
                       </td>
                     )}
                     {columns.joined && (
-                      <td className="px-3 py-2.5">
+                      <td className="hidden sm:table-cell px-3 py-2.5">
                         <span className="text-xs text-muted">
                           {new Date(u.created_at).toLocaleDateString()}
                         </span>

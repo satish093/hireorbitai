@@ -90,9 +90,9 @@ export function TrainingCourses() {
         { label: 'Courses' },
       ]}
     >
-      <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
+      <div className="flex items-start justify-between mb-5 flex-wrap gap-3">
         <h1 className="text-2xl font-semibold tracking-tight">Courses</h1>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <select
             aria-label="Filter by status"
             value={filter.status}
