@@ -608,6 +608,14 @@ class QueryBuilder<T = any> implements PromiseLike<DbResponse<T>> {
     return sql;
   }
 
+  // Strips embedded join tokens (e.g. `lessons:table!fk(count)`) from
+  // selectExpr — they're PostgREST sugar that can't appear in a SQL RETURNING
+  // clause, which only accepts plain column names / *.
+  private returningExpr(): string {
+    const { parentCols } = parseSelect(this.selectExpr);
+    return parentCols === '*' ? '*' : parentCols;
+  }
+
   private buildInsertSQL(a: Args): string {
     const rows = Array.isArray(this.writePayload)
       ? this.writePayload
@@ -642,7 +650,7 @@ class QueryBuilder<T = any> implements PromiseLike<DbResponse<T>> {
         }
       }
     }
-    if (this.hasReturning) sql += ` RETURNING ${this.selectExpr === '*' ? '*' : this.selectExpr}`;
+    if (this.hasReturning) sql += ` RETURNING ${this.returningExpr()}`;
     else sql += ` RETURNING *`;
     return sql;
   }
@@ -654,14 +662,14 @@ class QueryBuilder<T = any> implements PromiseLike<DbResponse<T>> {
     const sets = cols.map((c) => `${qi(c)} = ${a.push(payload[c])}`).join(', ');
     let sql = `UPDATE ${qi(this.table)} SET ${sets}`;
     sql += this.buildWhere(a);
-    sql += ` RETURNING ${this.hasReturning ? (this.selectExpr === '*' ? '*' : this.selectExpr) : '*'}`;
+    sql += ` RETURNING ${this.hasReturning ? this.returningExpr() : '*'}`;
     return sql;
   }
 
   private buildDeleteSQL(a: Args): string {
     let sql = `DELETE FROM ${qi(this.table)}`;
     sql += this.buildWhere(a);
-    sql += ` RETURNING ${this.hasReturning ? (this.selectExpr === '*' ? '*' : this.selectExpr) : '*'}`;
+    sql += ` RETURNING ${this.hasReturning ? this.returningExpr() : '*'}`;
     return sql;
   }
 
