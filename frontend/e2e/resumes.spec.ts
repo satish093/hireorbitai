@@ -57,6 +57,23 @@ const MOCK_RESUME_VERSIONS = [
   },
 ];
 
+// Two consultants — triggers the SelectInput picker; no auto-select so
+// consultantId stays '' and the "Pick a consultant" empty state renders.
+const MOCK_TWO_CONSULTANTS = [
+  {
+    id: 'c-1',
+    marketing_status: 'ACTIVE',
+    recruiter_id: null,
+    user: { id: 'u-c1', full_name: 'Casey Consultant', email: 'consultant@test.local' },
+  },
+  {
+    id: 'c-2',
+    marketing_status: 'ACTIVE',
+    recruiter_id: null,
+    user: { id: 'u-c2', full_name: 'Dana Developer', email: 'dana@test.local' },
+  },
+];
+
 test.describe('Résumés page — loading and RBAC', () => {
   test('MANAGER sees resume versions after auto-select (single consultant)', async ({ page }) => {
     const errors = trackPageErrors(page);
@@ -131,6 +148,76 @@ test.describe('Résumés page — loading and RBAC', () => {
     });
     await page.goto('/resumes');
     await page.waitForLoadState('networkidle');
+
+    expect(errors).toHaveLength(0);
+  });
+
+  test('zero consultants — shows "No consultants yet" empty state with disabled upload', async ({
+    page,
+  }) => {
+    const errors = trackPageErrors(page);
+
+    await seedSession(page, MANAGER);
+    await mockApi(page, {
+      profile: MANAGER,
+      flags: {},
+      handlers: {
+        // Empty list → no auto-select → consultantId stays '' → empty state branch.
+        '/consultants': { json: [] },
+      },
+    });
+    await page.goto('/resumes');
+    await page.waitForLoadState('networkidle');
+
+    // EmptyState renders title in <h3>.
+    await expect(page.getByRole('heading', { name: 'No consultants yet' })).toBeVisible({
+      timeout: 8000,
+    });
+
+    // Description mentions "Invite a consultant".
+    await expect(page.getByText(/Invite a consultant/)).toBeVisible({ timeout: 8000 });
+
+    // "Go to Users" CTA is present.
+    await expect(page.getByRole('button', { name: 'Go to Users' })).toBeVisible({ timeout: 8000 });
+
+    // Upload button is disabled because consultantId is falsy.
+    await expect(page.locator('button:has-text("+ Upload")')).toBeDisabled();
+
+    await page.screenshot({ path: 'e2e-results/resumes-no-consultants.png' });
+
+    expect(errors).toHaveLength(0);
+  });
+
+  test('multiple consultants, none selected — shows "Pick a consultant" empty state with disabled upload', async ({
+    page,
+  }) => {
+    const errors = trackPageErrors(page);
+
+    await seedSession(page, MANAGER);
+    await mockApi(page, {
+      profile: MANAGER,
+      flags: {},
+      handlers: {
+        // Two consultants → no auto-select (only auto-selects when length === 1)
+        // → consultantId stays '' → "Pick a consultant" empty state.
+        '/consultants': { json: MOCK_TWO_CONSULTANTS },
+      },
+    });
+    await page.goto('/resumes');
+    await page.waitForLoadState('networkidle');
+
+    // SelectInput is rendered when consultants.length > 1.
+    await expect(page.getByLabel('Consultant')).toBeVisible({ timeout: 8000 });
+
+    // EmptyState renders the "Pick a consultant" title in <h3>.
+    await expect(page.getByRole('heading', { name: 'Pick a consultant' })).toBeVisible({
+      timeout: 8000,
+    });
+
+    // Upload button is disabled because consultantId is still ''.
+    await expect(page.locator('button:has-text("+ Upload")')).toBeDisabled();
+
+    await page.screenshot({ path: 'e2e-results/resumes-pick-consultant.png' });
 
     expect(errors).toHaveLength(0);
   });

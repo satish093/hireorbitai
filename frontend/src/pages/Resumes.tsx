@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { PageHeader } from '../components/PageHeader';
 import { Button } from '../components/Button';
@@ -12,6 +13,7 @@ import { useResumeWorkspace } from '../components/resumes/useResumeWorkspace';
 
 export function Resumes() {
   const w = useResumeWorkspace();
+  const navigate = useNavigate();
   const [launcherOpen, setLauncherOpen] = useState(false);
   const { active, versions, currentVersion, consultantId } = w;
 
@@ -75,6 +77,13 @@ export function Resumes() {
             w.consultants.length === 0
               ? 'No consultant profiles exist. Invite a consultant from the Users page first.'
               : 'Select a consultant above to open their resume versions and the tailoring workspace.'
+          }
+          action={
+            w.consultants.length === 0 ? (
+              <Button variant="accent" size="md" onClick={() => navigate('/admin/users')}>
+                Go to Users
+              </Button>
+            ) : undefined
           }
         />
       ) : (
