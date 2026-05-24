@@ -104,17 +104,19 @@ export function ReviewStatusPill({ status }: { status?: string | null }) {
 export async function generateAllLessons(
   lessonIds: string[],
   onProgress: (done: number, total: number, currentId: string) => void,
+  aiToken?: string,
 ): Promise<{ ok: number; failed: number }> {
   let ok = 0;
   let failed = 0;
   let done = 0;
   const BATCH = 3;
+  const body = aiToken ? { aiToken } : {};
 
   for (let i = 0; i < lessonIds.length; i += BATCH) {
     const batch = lessonIds.slice(i, i + BATCH);
     onProgress(done, lessonIds.length, batch[0] ?? '');
     const results = await Promise.allSettled(
-      batch.map((lid) => api.post(`/training/lessons/${lid}/generate-content`)),
+      batch.map((lid) => api.post(`/training/lessons/${lid}/generate-content`, body)),
     );
     for (const r of results) {
       done++;

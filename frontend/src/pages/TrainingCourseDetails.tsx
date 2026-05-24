@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Layout } from '../components/Layout';
 import { Modal } from '../components/Modal';
+import { AIProviderModal, type AIProviderConfig } from '../components/AIProviderModal';
 import { api } from '../services/api';
 import {
   CourseCategoryBadge,
@@ -87,6 +88,14 @@ export function TrainingCourseDetails() {
   const [publishing, setPublishing] = useState(false);
   const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
   const [lifecycleBusy, setLifecycleBusy] = useState(false);
+  // AI provider selection modal — queues an action until the user picks API or OAuth
+  const [aiProviderOpen, setAiProviderOpen] = useState(false);
+  const [aiProviderAction, setAiProviderAction] = useState<
+    | { kind: 'one'; lessonId: string }
+    | { kind: 'bulk'; lessonIds: string[] }
+    | { kind: 'enrich' }
+    | null
+  >(null);
   const [lessonForm, setLessonForm] = useState<any>({
     title: '',
     description: '',
@@ -164,33 +173,73 @@ export function TrainingCourseDetails() {
     }
   }
 
-  // Generate (or regenerate) content for the given lessons, one call at a time.
-  async function runGeneration(lessonIds: string[]) {
-    if (lessonIds.length === 0) {
-      toast('All lessons already have content.');
-      return;
-    }
-    setGen({ running: true, done: 0, total: lessonIds.length });
-    const { ok, failed } = await generateAllLessons(lessonIds, (done, total) =>
-      setGen({ running: true, done, total }),
-    );
-    setGen({ running: false, done: 0, total: 0 });
-    if (failed > 0) toast(`${ok} lesson(s) generated · ${failed} failed — retry the failed ones.`);
-    else toast.success(`${ok} lesson(s) generated`);
-    await load();
+  // Open the AI provider modal and queue an action; the modal calls back with
+  // the chosen provider config (OAuth or API) before we proceed.
+  function promptAndRun(action: typeof aiProviderAction) {
+    if (!action) return;
+    setAiProviderAction(action);
+    setAiProviderOpen(true);
   }
 
-  async function generateOneLesson(lessonId: string) {
-    setGen({ running: true, done: 0, total: 1 });
-    try {
-      const r = await api.post(`/training/lessons/${lessonId}/generate-content`);
-      if (r.data?.degraded) toast('Generation failed for this lesson — try again.');
-      else toast.success('Lesson generated');
-      await load();
-    } catch (e: any) {
-      toast.error(e?.response?.data?.error ?? 'Something went wrong. Please try again.');
-    } finally {
+  async function executeWithProvider(config: AIProviderConfig) {
+    setAiProviderOpen(false);
+    const aiToken = config.mode === 'oauth' ? config.token : undefined;
+    const body = aiToken ? { aiToken } : {};
+
+    if (!aiProviderAction) return;
+
+    if (aiProviderAction.kind === 'one') {
+      const { lessonId } = aiProviderAction;
+      setGen({ running: true, done: 0, total: 1 });
+      try {
+        const r = await api.post(`/training/lessons/${lessonId}/generate-content`, body);
+        if (r.data?.degraded) toast('Generation failed for this lesson — try again.');
+        else toast.success('Lesson generated');
+        await load();
+      } catch (e: any) {
+        toast.error(e?.response?.data?.error ?? 'Something went wrong. Please try again.');
+      } finally {
+        setGen({ running: false, done: 0, total: 0 });
+        setAiProviderAction(null);
+      }
+      return;
+    }
+
+    if (aiProviderAction.kind === 'bulk') {
+      const { lessonIds } = aiProviderAction;
+      if (lessonIds.length === 0) {
+        toast('All lessons already have content.');
+        setAiProviderAction(null);
+        return;
+      }
+      setGen({ running: true, done: 0, total: lessonIds.length });
+      const { ok, failed } = await generateAllLessons(
+        lessonIds,
+        (done, total) => setGen({ running: true, done, total }),
+        aiToken,
+      );
       setGen({ running: false, done: 0, total: 0 });
+      if (failed > 0)
+        toast(`${ok} lesson(s) generated · ${failed} failed — retry the failed ones.`);
+      else toast.success(`${ok} lesson(s) generated`);
+      await load();
+      setAiProviderAction(null);
+      return;
+    }
+
+    if (aiProviderAction.kind === 'enrich') {
+      setLifecycleBusy(true);
+      try {
+        const r = await api.post(`/training/courses/${id}/enrich`, body);
+        if (r.data?.degraded) toast('Enrich stub written — AI unavailable, edit manually.');
+        else toast.success('Course enriched');
+        await load();
+      } catch (e: any) {
+        toast.error(e?.response?.data?.error ?? 'Something went wrong. Please try again.');
+      } finally {
+        setLifecycleBusy(false);
+        setAiProviderAction(null);
+      }
     }
   }
 
@@ -220,18 +269,8 @@ export function TrainingCourseDetails() {
     }
   }
 
-  async function enrich() {
-    setLifecycleBusy(true);
-    try {
-      const r = await api.post(`/training/courses/${id}/enrich`);
-      if (r.data?.degraded) toast('Enrich stub written — AI unavailable, edit manually.');
-      else toast.success('Course enriched');
-      await load();
-    } catch (e: any) {
-      toast.error(e?.response?.data?.error ?? 'Something went wrong. Please try again.');
-    } finally {
-      setLifecycleBusy(false);
-    }
+  function enrich() {
+    promptAndRun({ kind: 'enrich' });
   }
 
   if (loading || !course)
@@ -507,7 +546,7 @@ export function TrainingCourseDetails() {
             {isAdmin && pendingLessonIds.length > 0 && (
               <Button
                 variant="accent"
-                onClick={() => runGeneration(pendingLessonIds)}
+                onClick={() => promptAndRun({ kind: 'bulk', lessonIds: pendingLessonIds })}
                 disabled={gen.running}
                 loading={gen.running}
               >
@@ -557,7 +596,7 @@ export function TrainingCourseDetails() {
                     <Button
                       variant="accent"
                       size="sm"
-                      onClick={() => generateOneLesson(l.id)}
+                      onClick={() => promptAndRun({ kind: 'one', lessonId: l.id })}
                       disabled={gen.running}
                     >
                       {status === 'READY'
@@ -717,6 +756,22 @@ export function TrainingCourseDetails() {
           />
         </label>
       </Modal>
+
+      <AIProviderModal
+        open={aiProviderOpen}
+        onClose={() => {
+          setAiProviderOpen(false);
+          setAiProviderAction(null);
+        }}
+        onConfirm={executeWithProvider}
+        action={
+          aiProviderAction?.kind === 'enrich'
+            ? 'Fill in materials'
+            : aiProviderAction?.kind === 'bulk'
+              ? `Write ${(aiProviderAction as { kind: 'bulk'; lessonIds: string[] }).lessonIds.length} lesson(s)`
+              : 'Generate'
+        }
+      />
     </Layout>
   );
 }

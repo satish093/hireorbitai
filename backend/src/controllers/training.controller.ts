@@ -1,4 +1,5 @@
 import { RequestHandler } from 'express';
+import crypto from 'node:crypto';
 import { z } from 'zod';
 import * as repo from '../repositories/training.repository';
 import * as svc from '../services/training.service';
@@ -717,6 +718,18 @@ export const generateLessonContent: RequestHandler = async (req, res) => {
   const { data: course } = await repo.courses.get(l.course_id);
   const c: any = course ?? {};
 
+  // Optional per-request Anthropic client when the caller supplies their own
+  // API key or Claude.ai OAuth token (aiToken in the request body).
+  // Tokens starting with "claude-" are OAuth; all others are API keys.
+  const { aiToken } = req.body as { aiToken?: unknown };
+  let customClient: import('@anthropic-ai/sdk').default | undefined;
+  if (typeof aiToken === 'string' && aiToken.length > 10) {
+    const isOAuth = aiToken.startsWith('claude-');
+    customClient = new (await import('@anthropic-ai/sdk')).default(
+      isOAuth ? { authToken: aiToken, maxRetries: 0 } : { apiKey: aiToken, maxRetries: 0 },
+    );
+  }
+
   await repo.lessons.update(l.id, { content_status: 'GENERATING' });
 
   let content: ai.LessonContent;
@@ -730,7 +743,7 @@ export const generateLessonContent: RequestHandler = async (req, res) => {
         lesson_summary: l.summary,
         lesson_objective: l.lesson_objective,
       },
-      { strict: true },
+      { strict: true, client: customClient },
     );
     content = result.data;
   } catch (err: any) {
@@ -1275,4 +1288,135 @@ export const complianceReport: RequestHandler = async (req, res) => {
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', `attachment; filename="training-compliance-${a.id}.csv"`);
   res.send(sections.join('\r\n'));
+};
+
+// ---------------------------------------------------------------------------
+// OAuth popup flow — allows admins to use their Claude.ai subscription token
+// instead of the server's API key for training AI generation.
+//
+// Flow:
+//   1. Frontend opens popup to GET /api/training/ai/oauth/start
+//   2. This handler generates PKCE, stores state, redirects to Claude.ai OAuth
+//   3. User logs in on Claude.ai and approves
+//   4. Claude.ai redirects to GET /api/training/ai/oauth/callback?code=...&state=...
+//   5. Callback exchanges code for token, sends it to the parent window via
+//      postMessage, then closes the popup.
+// ---------------------------------------------------------------------------
+
+// In-memory PKCE state store: state → { verifier, expiresAt }
+// TTL of 10 minutes; entries are cleaned up on use or expiry.
+const _oauthStates = new Map<string, { verifier: string; expiresAt: number }>();
+function _pruneOAuthStates() {
+  const now = Date.now();
+  for (const [k, v] of _oauthStates) if (v.expiresAt < now) _oauthStates.delete(k);
+}
+
+const ANTHROPIC_AUTH_URL = 'https://claude.ai/oauth/authorize';
+const ANTHROPIC_TOKEN_URL = 'https://api.anthropic.com/v1/oauth/token';
+
+export const aiOAuthStart: RequestHandler = async (req, res) => {
+  const clientId = process.env.ANTHROPIC_OAUTH_CLIENT_ID ?? '';
+  if (!clientId) {
+    res.status(503).send(
+      `<html><body style="font-family:sans-serif;padding:2rem">
+        <h2>OAuth not configured</h2>
+        <p>Set <code>ANTHROPIC_OAUTH_CLIENT_ID</code> and
+        <code>ANTHROPIC_OAUTH_CLIENT_SECRET</code> in <code>.env</code> first.</p>
+        <p>Register your app at <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a> → OAuth Applications.</p>
+      </body></html>`,
+    );
+    return;
+  }
+
+  _pruneOAuthStates();
+
+  // PKCE: generate verifier + challenge
+  const verifier = crypto.randomBytes(48).toString('base64url');
+  const challenge = crypto.createHash('sha256').update(verifier).digest('base64url');
+  const state = crypto.randomBytes(16).toString('hex');
+
+  _oauthStates.set(state, { verifier, expiresAt: Date.now() + 10 * 60_000 });
+
+  const redirectUri = `${process.env.APP_URL ?? ''}/api/training/ai/oauth/callback`;
+
+  const params = new URLSearchParams({
+    response_type: 'code',
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    scope: 'api:read api:write',
+    code_challenge: challenge,
+    code_challenge_method: 'S256',
+    state,
+  });
+
+  res.redirect(`${ANTHROPIC_AUTH_URL}?${params.toString()}`);
+};
+
+export const aiOAuthCallback: RequestHandler = async (req, res) => {
+  const { code, state, error: oauthError } = req.query as Record<string, string | undefined>;
+
+  const closeWithMessage = (payload: object) => {
+    const json = JSON.stringify(payload).replace(/</g, '\\u003c');
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(`<!DOCTYPE html><html><body><script>
+      try { window.opener.postMessage(${json}, '*'); } catch(e){}
+      window.close();
+    </script></body></html>`);
+  };
+
+  if (oauthError || !code || !state) {
+    closeWithMessage({ type: 'ai_oauth_error', error: oauthError ?? 'Missing code or state' });
+    return;
+  }
+
+  _pruneOAuthStates();
+  const stored = _oauthStates.get(state);
+  if (!stored || stored.expiresAt < Date.now()) {
+    closeWithMessage({ type: 'ai_oauth_error', error: 'Invalid or expired state — try again' });
+    return;
+  }
+  _oauthStates.delete(state);
+
+  const clientId = process.env.ANTHROPIC_OAUTH_CLIENT_ID ?? '';
+  const clientSecret = process.env.ANTHROPIC_OAUTH_CLIENT_SECRET ?? '';
+  const redirectUri = `${process.env.APP_URL ?? ''}/api/training/ai/oauth/callback`;
+
+  try {
+    const resp = await fetch(ANTHROPIC_TOKEN_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Accept: 'application/json',
+      },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: redirectUri,
+        client_id: clientId,
+        ...(clientSecret ? { client_secret: clientSecret } : {}),
+        code_verifier: stored.verifier,
+      }).toString(),
+    });
+
+    if (!resp.ok) {
+      const body = await resp.text();
+      logger.warn({ status: resp.status, body }, 'Anthropic OAuth token exchange failed');
+      closeWithMessage({
+        type: 'ai_oauth_error',
+        error: 'Token exchange failed — check server logs',
+      });
+      return;
+    }
+
+    const data = (await resp.json()) as { access_token?: string };
+    if (!data.access_token) {
+      closeWithMessage({ type: 'ai_oauth_error', error: 'No access_token in response' });
+      return;
+    }
+
+    closeWithMessage({ type: 'ai_oauth_complete', token: data.access_token });
+  } catch (err: any) {
+    logger.error({ err }, 'Anthropic OAuth token exchange threw');
+    closeWithMessage({ type: 'ai_oauth_error', error: 'Network error during token exchange' });
+  }
 };

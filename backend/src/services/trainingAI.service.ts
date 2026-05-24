@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { TextBlockParam } from '@anthropic-ai/sdk/resources/messages';
+import Anthropic from '@anthropic-ai/sdk';
 import {
   anthropic,
   ANTHROPIC_MODEL,
@@ -58,9 +59,13 @@ async function generateStructured<S extends z.ZodTypeAny>(
   schema: S,
   systemPrompt: string,
   userContent: string | TextBlockParam[],
-  opts: { model: string; maxTokens: number },
+  opts: { model: string; maxTokens: number; client?: Anthropic },
 ): Promise<z.infer<S>> {
-  if (!AI_AVAILABLE) {
+  const client = opts.client ?? anthropic;
+
+  // Skip the global AI_AVAILABLE check when the caller supplies their own client
+  // (user-provided key/token bypasses the server's env config).
+  if (!opts.client && !AI_AVAILABLE) {
     throw aiError(503, 'AI is not configured — ask your admin to set ANTHROPIC_API_KEY.');
   }
 
@@ -74,7 +79,7 @@ async function generateStructured<S extends z.ZodTypeAny>(
 
   for (const model of modelsToTry) {
     try {
-      const response = await anthropic.messages.create({
+      const response = await client.messages.create({
         model,
         max_tokens: opts.maxTokens,
         system: [cacheableBlock(systemPrompt, 0)],
@@ -628,7 +633,7 @@ Return valid JSON only. No prose outside the JSON.`;
 
 export async function generateLessonContent(
   input: LessonContentInput,
-  opts?: { strict?: boolean },
+  opts?: { strict?: boolean; client?: Anthropic },
 ): Promise<{ data: LessonContent; degraded: boolean }> {
   const contextLines = [
     `Course: ${input.course_title} (${input.category}, ${input.difficulty})`,
@@ -643,6 +648,7 @@ export async function generateLessonContent(
     generateStructured(LessonContentSchema, LESSON_CONTENT_SYSTEM, contextLines, {
       model: TRAINING_CONTENT_MODEL,
       maxTokens: 4096,
+      client: opts?.client,
     });
 
   if (opts?.strict) {

@@ -70,13 +70,24 @@ const envSchema = z.object({
 
   // --- Anthropic ---
   ANTHROPIC_API_KEY: optionalKey,
+  // OAuth access token for Claude.ai subscription mode (claude-... format).
+  // Obtained from console.anthropic.com → OAuth. Set TRAINING_AI_PROVIDER=oauth
+  // to use this instead of ANTHROPIC_API_KEY.
+  ANTHROPIC_OAUTH_TOKEN: optionalKey,
+  // OAuth 2.0 app credentials — required to support the browser popup OAuth flow
+  // (Training → Choose AI Provider → OAuth button). Register the app at
+  // console.anthropic.com → OAuth Applications; set redirect URI to
+  // {APP_URL}/api/training/ai/oauth/callback.
+  ANTHROPIC_OAUTH_CLIENT_ID: optionalKey,
+  ANTHROPIC_OAUTH_CLIENT_SECRET: optionalKey,
   ANTHROPIC_MODEL: z.string().default('claude-haiku-4-5-20251001'),
   // Heavier model for long-form training content generation (lesson bodies,
   // capstone). Outline + quiz calls stay on the cheaper ANTHROPIC_MODEL.
   TRAINING_CONTENT_MODEL: z.string().default('claude-haiku-4-5-20251001'),
-  // 'api' — use the Anthropic Messages API with ANTHROPIC_API_KEY (default).
-  // 'stub' — never call a model; always return editable stubs.
-  TRAINING_AI_PROVIDER: z.enum(['api', 'stub']).default('api'),
+  // 'api'   — use the Anthropic Messages API with ANTHROPIC_API_KEY (pay-per-token).
+  // 'oauth' — use a Claude.ai subscription OAuth token (ANTHROPIC_OAUTH_TOKEN).
+  // 'stub'  — never call a model; always return editable stubs.
+  TRAINING_AI_PROVIDER: z.enum(['api', 'oauth', 'stub']).default('api'),
   // --- Token-cost controls (API provider) ---
   // Free-text inputs (resume bodies, job descriptions) are clipped to this many
   // characters before being sent to the model — input tokens are the dominant
@@ -250,6 +261,9 @@ export const env = {
   },
   anthropic: {
     apiKey: e.ANTHROPIC_API_KEY,
+    oauthToken: e.ANTHROPIC_OAUTH_TOKEN,
+    oauthClientId: e.ANTHROPIC_OAUTH_CLIENT_ID,
+    oauthClientSecret: e.ANTHROPIC_OAUTH_CLIENT_SECRET,
     model: e.ANTHROPIC_MODEL,
     contentModel: e.TRAINING_CONTENT_MODEL,
     provider: e.TRAINING_AI_PROVIDER,
