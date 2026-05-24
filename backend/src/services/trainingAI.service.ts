@@ -49,6 +49,10 @@ function cacheableBlock(text: string, minChars = 4_096): TextBlockParam {
  * `systemPrompt` is always marked cacheable — it's large and stable.
  * `userContent` can be an array of blocks so callers can mark specific
  * parts (e.g. resume text) as cacheable independently.
+ *
+ * Model fallback: if `opts.model` returns a 400/404 model-availability error,
+ * the call is retried once with `ANTHROPIC_MODEL` (Haiku) so a mis-configured
+ * TRAINING_CONTENT_MODEL never permanently blocks generation.
  */
 async function generateStructured<S extends z.ZodTypeAny>(
   schema: S,
@@ -63,25 +67,47 @@ async function generateStructured<S extends z.ZodTypeAny>(
   const userBlocks: TextBlockParam[] =
     typeof userContent === 'string' ? [{ type: 'text', text: userContent }] : userContent;
 
-  let raw: string;
-  try {
-    const response = await anthropic.messages.create({
-      model: opts.model,
-      max_tokens: opts.maxTokens,
-      system: [cacheableBlock(systemPrompt, 0)],
-      messages: [{ role: 'user', content: userBlocks }],
-    });
-    const block = response.content[0];
-    raw = block?.type === 'text' ? block.text.trim() : '{}';
-    if (response.stop_reason === 'max_tokens') {
-      throw aiError(
-        502,
-        `AI response truncated (hit ${opts.maxTokens}-token limit) — try again or reduce input length.`,
-      );
+  const modelsToTry = opts.model !== ANTHROPIC_MODEL ? [opts.model, ANTHROPIC_MODEL] : [opts.model];
+
+  let raw: string | undefined;
+  let lastErr: unknown;
+
+  for (const model of modelsToTry) {
+    try {
+      const response = await anthropic.messages.create({
+        model,
+        max_tokens: opts.maxTokens,
+        system: [cacheableBlock(systemPrompt, 0)],
+        messages: [{ role: 'user', content: userBlocks }],
+      });
+      const block = response.content[0];
+      raw = block?.type === 'text' ? block.text.trim() : '{}';
+      if (response.stop_reason === 'max_tokens') {
+        throw aiError(
+          502,
+          `AI response truncated (hit ${opts.maxTokens}-token limit) — try again or reduce input length.`,
+        );
+      }
+      break;
+    } catch (err: any) {
+      if ((err as { isHttpError?: boolean }).isHttpError) throw err;
+      // Retry with fallback model on 400/404 model-availability errors
+      const isModelError =
+        (err?.status === 400 || err?.status === 404) && model !== ANTHROPIC_MODEL;
+      if (isModelError) {
+        lastErr = err;
+        logger.warn(
+          { model, fallback: ANTHROPIC_MODEL, errStatus: err?.status },
+          'training AI: model error, retrying with fallback model',
+        );
+        continue;
+      }
+      throw aiError(502, `AI request failed: ${err?.message ?? String(err)}`);
     }
-  } catch (err: any) {
-    if ((err as { isHttpError?: boolean }).isHttpError) throw err;
-    throw aiError(502, `AI request failed: ${err?.message ?? String(err)}`);
+  }
+
+  if (raw === undefined) {
+    throw aiError(502, `AI request failed: ${String(lastErr)}`);
   }
 
   let text = raw
@@ -537,14 +563,16 @@ function fallbackOutline(input: CourseOutlineInput, count: number): CourseOutlin
 
 const LessonContentSchema = z.object({
   content: z.string(),
-  practical_example: z.string(),
-  exercises: z.array(
-    z.object({
-      prompt: z.string(),
-      expected_outcome: z.string(),
-      hints: z.array(z.string()),
-    }),
-  ),
+  practical_example: z.string().nullable(),
+  exercises: z
+    .array(
+      z.object({
+        prompt: z.string(),
+        expected_outcome: z.string(),
+        hints: z.array(z.string()),
+      }),
+    )
+    .nullable(),
   key_takeaways: z.array(z.string()),
   quiz: z.array(
     z
@@ -579,7 +607,7 @@ CONTENT STRUCTURE (content field — Markdown):
 ### Introduction (1–2 short paragraphs: why this matters, what learners will know after)
 ### Core Concepts (## / ### subsections; use bullets and code blocks for technical content)
 ### [Additional subsections as needed]
-Target 350–550 words. No front-matter, no "In this lesson we will…" openers.
+Target 500–800 words. No front-matter, no "In this lesson we will…" openers.
 
 PRACTICAL EXAMPLE (practical_example — Markdown):
 One concrete, worked example. For technical topics: include a real code snippet with explanation.
@@ -600,6 +628,7 @@ Return valid JSON only. No prose outside the JSON.`;
 
 export async function generateLessonContent(
   input: LessonContentInput,
+  opts?: { strict?: boolean },
 ): Promise<{ data: LessonContent; degraded: boolean }> {
   const contextLines = [
     `Course: ${input.course_title} (${input.category}, ${input.difficulty})`,
@@ -610,23 +639,26 @@ export async function generateLessonContent(
     .filter(Boolean)
     .join('\n');
 
-  return safeGenerate(
-    'lesson-content',
-    () =>
-      generateStructured(LessonContentSchema, LESSON_CONTENT_SYSTEM, contextLines, {
-        model: TRAINING_CONTENT_MODEL,
-        maxTokens: 2500,
-      }),
-    () => ({
-      content: `## ${input.lesson_title}\n\n> ⚠️ Content generation failed — edit this lesson manually.\n\n${
-        input.lesson_objective ? `**Objective:** ${input.lesson_objective}\n` : ''
-      }`,
-      practical_example: '',
-      exercises: [],
-      key_takeaways: [],
-      quiz: [],
-    }),
-  );
+  const generate = () =>
+    generateStructured(LessonContentSchema, LESSON_CONTENT_SYSTEM, contextLines, {
+      model: TRAINING_CONTENT_MODEL,
+      maxTokens: 4096,
+    });
+
+  if (opts?.strict) {
+    const data = await generate();
+    return { data, degraded: false };
+  }
+
+  return safeGenerate('lesson-content', generate, () => ({
+    content: `## ${input.lesson_title}\n\n_Content generation failed — edit this lesson manually._${
+      input.lesson_objective ? `\n\n**Objective:** ${input.lesson_objective}` : ''
+    }`,
+    practical_example: null,
+    exercises: null,
+    key_takeaways: [],
+    quiz: [],
+  }));
 }
 
 // ---------------------------------------------------------------------------

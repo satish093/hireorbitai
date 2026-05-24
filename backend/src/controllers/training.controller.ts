@@ -718,14 +718,29 @@ export const generateLessonContent: RequestHandler = async (req, res) => {
   const c: any = course ?? {};
 
   await repo.lessons.update(l.id, { content_status: 'GENERATING' });
-  const { data: content, degraded } = await ai.generateLessonContent({
-    course_title: c.title ?? l.title,
-    category: c.category ?? 'General',
-    difficulty: c.difficulty ?? 'BEGINNER',
-    lesson_title: l.title,
-    lesson_summary: l.summary,
-    lesson_objective: l.lesson_objective,
-  });
+
+  let content: ai.LessonContent;
+  try {
+    const result = await ai.generateLessonContent(
+      {
+        course_title: c.title ?? l.title,
+        category: c.category ?? 'General',
+        difficulty: c.difficulty ?? 'BEGINNER',
+        lesson_title: l.title,
+        lesson_summary: l.summary,
+        lesson_objective: l.lesson_objective,
+      },
+      { strict: true },
+    );
+    content = result.data;
+  } catch (err: any) {
+    await repo.lessons.update(l.id, { content_status: 'FAILED' });
+    const status = err?.status === 503 ? 503 : 502;
+    throw httpError(
+      status,
+      err?.message ?? 'AI generation failed — check ANTHROPIC_API_KEY and try again.',
+    );
+  }
 
   const { data: updated, error: upErr } = await repo.lessons.update(l.id, {
     content: content.content,
@@ -733,13 +748,12 @@ export const generateLessonContent: RequestHandler = async (req, res) => {
     practical_example: content.practical_example,
     exercises: content.exercises,
     key_takeaways: content.key_takeaways,
-    content_status: degraded ? 'FAILED' : 'READY',
+    content_status: 'READY',
   });
   if (upErr) throw httpError(500, upErr.message);
 
-  // Replace this lesson's generated quiz questions.
   await repo.quizzes.removeForLesson(l.id);
-  if (content.quiz.length > 0) {
+  if (content.quiz && content.quiz.length > 0) {
     await repo.quizzes.createMany(
       content.quiz.map((q, i) => ({
         course_id: l.course_id,
@@ -753,7 +767,7 @@ export const generateLessonContent: RequestHandler = async (req, res) => {
       })),
     );
   }
-  res.json({ ...(updated as any), degraded });
+  res.json({ ...(updated as any), degraded: false });
 };
 
 // Non-destructive AI enrich: structure only, lessons untouched (admin-tier).
