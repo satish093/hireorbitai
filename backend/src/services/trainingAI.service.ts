@@ -658,7 +658,10 @@ QUIZ (2–4 questions — apply the Bloom's rubric: mix recall, application, ana
 - correct_answer must be copied EXACTLY from the options array
 - explanation cites the specific section of the lesson
 
-Return valid JSON only. No prose outside the JSON.`;
+Return valid JSON matching this exact structure — use these exact top-level keys, no wrapping object:
+{"content":"## Title\n...","practical_example":"...","exercises":[{"prompt":"...","expected_outcome":"...","hints":["..."]}],"key_takeaways":["..."],"quiz":[{"question":"...","options":["A","B","C","D"],"correct_answer":"A","explanation":"...","points":1}]}
+
+No prose outside the JSON.`;
 
 export async function generateLessonContent(
   input: LessonContentInput,
