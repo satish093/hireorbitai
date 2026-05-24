@@ -80,16 +80,15 @@ yellow "  Open it in your browser (on any PC), log in, and approve the request."
 yellow "  This terminal will wait until you confirm."
 echo ""
 
-# claude login stores credentials in ~/.claude/credentials.json
-# The --print-token flag (if available) outputs the token; fall back to reading
-# the credentials file manually.
-if claude login 2>&1; then
+# The auth subcommand in Claude Code CLI v2.x is `claude auth login`.
+# Running plain `claude login` launches the interactive TUI (wrong).
+if claude auth login 2>&1; then
   echo ""
   green "✓ Login successful"
 else
   echo ""
-  red "✗ claude login exited with an error."
-  echo "  Try running it manually:  claude login"
+  red "✗ 'claude auth login' failed."
+  echo "  Try running it manually:  claude auth login"
   exit 1
 fi
 
