@@ -22,6 +22,13 @@ interface SendArgs {
 }
 
 async function sendViaBrevo(args: SendArgs): Promise<void> {
+  if (env.email.brevoMock) {
+    logger.info(
+      { to: args.to.email, subject: args.subject, tag: args.tag },
+      '[BREVO_MOCK] email suppressed — would have sent',
+    );
+    return;
+  }
   if (!env.email.brevoKey || !env.email.brevoKey.startsWith('xkeysib-')) {
     throw new Error('BREVO_API_KEY is not configured (expected to start with "xkeysib-")');
   }

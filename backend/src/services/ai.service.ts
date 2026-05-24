@@ -34,6 +34,7 @@ import {
   jobMatchCache,
 } from './aiCache';
 import { normalizeSkills, diffSkills, extractKnownSkills } from './skillNorm';
+import { logger } from '../config/logger';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -139,7 +140,21 @@ async function callStructured<T extends z.ZodType>(
   }
 
   logAiUsage(callName, model, usageFrom(response));
-  return schema.parse(JSON.parse(text)) as z.infer<T>;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new Error(`AI returned malformed JSON for ${callName}`);
+  }
+  const result = schema.safeParse(parsed);
+  if (!result.success) {
+    logger.warn(
+      { issues: result.error.issues.slice(0, 3), callName },
+      'AI schema validation failed',
+    );
+    throw new Error(`AI returned an unexpected structure for ${callName} — please try again.`);
+  }
+  return result.data as z.infer<T>;
 }
 
 async function callText(

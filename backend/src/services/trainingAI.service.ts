@@ -270,13 +270,18 @@ export async function generateInterviewQuestions(input: {
 
 const QuizSchema = z.object({
   questions: z.array(
-    z.object({
-      question: z.string(),
-      options: z.array(z.string()).min(3).max(5),
-      correct_answer: z.string(),
-      explanation: z.string(),
-      points: z.preprocess((v) => (v == null ? 1 : v), z.number()),
-    }),
+    z
+      .object({
+        question: z.string(),
+        options: z.array(z.string()).min(3).max(5),
+        correct_answer: z.string(),
+        explanation: z.string(),
+        points: z.preprocess((v) => (v == null ? 1 : v), z.number()),
+      })
+      .refine((q) => q.options.includes(q.correct_answer), {
+        message: 'correct_answer must be one of the options',
+        path: ['correct_answer'],
+      }),
   ),
 });
 export type GeneratedQuiz = z.infer<typeof QuizSchema>;
@@ -542,13 +547,18 @@ const LessonContentSchema = z.object({
   ),
   key_takeaways: z.array(z.string()),
   quiz: z.array(
-    z.object({
-      question: z.string(),
-      options: z.array(z.string()).min(3).max(5),
-      correct_answer: z.string(),
-      explanation: z.string(),
-      points: z.preprocess((v) => (v == null ? 1 : v), z.number()),
-    }),
+    z
+      .object({
+        question: z.string(),
+        options: z.array(z.string()).min(3).max(5),
+        correct_answer: z.string(),
+        explanation: z.string(),
+        points: z.preprocess((v) => (v == null ? 1 : v), z.number()),
+      })
+      .refine((q) => q.options.includes(q.correct_answer), {
+        message: 'correct_answer must be one of the options',
+        path: ['correct_answer'],
+      }),
   ),
 });
 export type LessonContent = z.infer<typeof LessonContentSchema>;

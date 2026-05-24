@@ -92,7 +92,21 @@ const envSchema = z.object({
   // previous multi-provider EMAIL_PROVIDER switch + Resend/SendGrid keys
   // have been removed. If you need to swap providers in the future, do it
   // by editing brevo.service.ts — env stays Brevo-shaped.
-  BREVO_API_KEY: z.string().min(10, 'BREVO_API_KEY is required (xkeysib-...)'),
+  //
+  // BREVO_MOCK=true — dev/test shortcut. All outbound emails are logged via
+  // pino instead of sent. Set any dummy value (≥10 chars) for BREVO_API_KEY
+  // when mock mode is on; the key is never read by the HTTP client.
+  BREVO_MOCK: z
+    .string()
+    .optional()
+    .default('false')
+    .transform((v) => v === 'true' || v === '1'),
+  BREVO_API_KEY: z
+    .string()
+    .min(
+      10,
+      'BREVO_API_KEY is required (xkeysib-...) — use any 10+ char dummy when BREVO_MOCK=true',
+    ),
   BREVO_SENDER_EMAIL: z.string().email().default('noreply@hireorbitai.com'),
   BREVO_SENDER_NAME: z.string().min(1).default('HireOrbit AI'),
 
@@ -245,6 +259,7 @@ export const env = {
   email: {
     // Single provider — Brevo. Kept under env.email.* so callers in
     // services/brevo.service.ts read a stable shape.
+    brevoMock: e.BREVO_MOCK,
     brevoKey: e.BREVO_API_KEY,
     brevoSenderEmail: e.BREVO_SENDER_EMAIL,
     brevoSenderName: e.BREVO_SENDER_NAME,
