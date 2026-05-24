@@ -74,19 +74,24 @@ if [[ "$typed" != "$DBNAME" ]]; then
 fi
 
 # ---- Gate 4: backup BEFORE any destruction ----------------------------------
-echo "→ taking a full backup first (db + uploads)…"
-bash "$ROOT/scripts/backup.sh"
-STAMP_DIR="$(ls -1dt "${BACKUPS_DIR:-$HOME/backups}"/*/ 2>/dev/null | head -1 || true)"
-STAMP_DIR="${STAMP_DIR%/}"
-# Fail CLOSED: never DROP unless a non-empty DB dump is verifiably on disk.
-if [[ -z "$STAMP_DIR" || ! -s "$STAMP_DIR/db.sql.gz" ]]; then
-  echo "✗ Refusing to proceed: no verified DB backup found after backup.sh." >&2
-  echo "  Expected a non-empty db.sql.gz under ${BACKUPS_DIR:-$HOME/backups}/<stamp>/." >&2
-  exit 1
+STAMP=""
+if [[ "${SKIP_BACKUP:-false}" == "true" ]]; then
+  echo "⚠  SKIP_BACKUP=true — skipping backup. There is NO rollback if this goes wrong."
+else
+  echo "→ taking a full backup first (db + uploads)…"
+  bash "$ROOT/scripts/backup.sh"
+  STAMP_DIR="$(ls -1dt "${BACKUPS_DIR:-$HOME/backups}"/*/ 2>/dev/null | head -1 || true)"
+  STAMP_DIR="${STAMP_DIR%/}"
+  # Fail CLOSED: never DROP unless a non-empty DB dump is verifiably on disk.
+  if [[ -z "$STAMP_DIR" || ! -s "$STAMP_DIR/db.sql.gz" ]]; then
+    echo "✗ Refusing to proceed: no verified DB backup found after backup.sh." >&2
+    echo "  Expected a non-empty db.sql.gz under ${BACKUPS_DIR:-$HOME/backups}/<stamp>/." >&2
+    exit 1
+  fi
+  STAMP="$(basename "$STAMP_DIR")"
+  echo "  ✓ verified backup: $STAMP_DIR"
+  echo "    (rollback later with: bash scripts/restore.sh $STAMP all --force)"
 fi
-STAMP="$(basename "$STAMP_DIR")"
-echo "  ✓ verified backup: $STAMP_DIR"
-echo "    (rollback later with: bash scripts/restore.sh $STAMP all --force)"
 
 # ---- Wipe + rebuild ---------------------------------------------------------
 echo "→ DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
@@ -129,4 +134,6 @@ fi
 echo "  ✓ HTTP 200 — $(cat /tmp/reset_health.body)"
 echo "✓ production reset complete."
 echo "  Old uploads preserved alongside $UPLOADS_DIR (delete once verified)."
-echo "  Backup for rollback: ${STAMP_DIR:-<unknown>}"
+if [[ -n "$STAMP" ]]; then
+  echo "  Backup for rollback: $STAMP"
+fi
