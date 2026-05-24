@@ -1,9 +1,10 @@
 import { RequestHandler } from 'express';
 import { z } from 'zod';
 import { db } from '../config/db';
-import { httpError, MANAGER_TIER, OPERATOR_TIER, Role, ALL_ROLES } from '../types';
+import { httpError, ADMIN_TIER, MANAGER_TIER, Role, ALL_ROLES } from '../types';
 import * as authSvc from '../services/auth.service';
 import { assertOutranks } from './adminUsers.controller';
+import { canViewUser } from '../services/permission.service';
 
 /** Refuse to mutate an equal- or higher-ranked user. Loads the target's role
  *  and defers to the canonical rank ladder in adminUsers.controller. Without
@@ -29,20 +30,18 @@ const PROFILE_COLS_LEGACY =
 function isManagerTier(role: Role | undefined): boolean {
   return !!role && (MANAGER_TIER as Role[]).includes(role);
 }
-function isOperatorTier(role: Role | undefined): boolean {
-  return !!role && (OPERATOR_TIER as Role[]).includes(role);
-}
 
 /** Can the calling user view the target user's profile?
- *   - MANAGER_TIER / RECRUITER (= OPERATOR_TIER): yes, for anyone in the org.
- *   - CONSULTANT: only their own profile. */
+ *   - Admin tier: any active user in the workspace.
+ *   - Everyone else: only users reachable via their permission group
+ *     (same isolation rules as messaging — own recruiter/consultants chain). */
 async function canViewProfile(
   caller: { id: string; role: Role },
   targetUserId: string,
 ): Promise<boolean> {
   if (caller.id === targetUserId) return true;
-  if (isOperatorTier(caller.role)) return true;
-  return false;
+  if ((ADMIN_TIER as Role[]).includes(caller.role)) return true;
+  return canViewUser({ id: caller.id, role: caller.role }, targetUserId);
 }
 
 /** Can the calling user edit the target user's profile?

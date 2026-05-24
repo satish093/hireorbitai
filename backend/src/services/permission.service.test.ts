@@ -176,17 +176,35 @@ describe('permission.service — admin override', () => {
     expect(ok).toBe(false);
   });
 
-  it('MANAGER tier sees all active users in getAccessibleUserIds', async () => {
+  it('MANAGER sees their own recruiter/consultant subtree, not unrelated users', async () => {
     setupDb({
       users: [
-        { id: 'u-a', is_active: true },
-        { id: 'u-b', is_active: true },
-        { id: 'u-c', is_active: false },
+        { id: 'u-admin', role: 'SUPER_ADMIN', is_active: true },
+        { id: 'u-manager', role: 'MANAGER', is_active: true, reports_to: null },
+        { id: 'u-recruiter', is_active: true },
+        { id: 'u-consultant', is_active: true },
+        { id: 'u-unrelated', is_active: true },
+        { id: 'u-other-recruiter', is_active: true },
       ],
+      recruiters: [
+        { id: 'r-mine', user_id: 'u-recruiter', manager_id: 'u-manager' },
+        { id: 'r-other', user_id: 'u-other-recruiter', manager_id: null },
+      ],
+      recruiter_managers: [],
+      consultants: [{ recruiter_id: 'r-mine', user_id: 'u-consultant' }],
+      messages: [],
     });
     const ids = await getAccessibleUserIds({ id: 'u-manager', role: 'MANAGER' });
-    expect(ids.has('u-a')).toBe(true);
-    expect(ids.has('u-b')).toBe(true);
+    // Admin users always reachable
+    expect(ids.has('u-admin')).toBe(true);
+    // Their own recruiter is reachable
+    expect(ids.has('u-recruiter')).toBe(true);
+    // That recruiter's consultant is reachable
+    expect(ids.has('u-consultant')).toBe(true);
+    // Unrelated user is NOT reachable
+    expect(ids.has('u-unrelated')).toBe(false);
+    // Another manager's recruiter is NOT reachable
+    expect(ids.has('u-other-recruiter')).toBe(false);
     // Self never appears
     expect(ids.has('u-manager')).toBe(false);
   });

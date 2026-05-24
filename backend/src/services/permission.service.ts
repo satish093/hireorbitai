@@ -23,10 +23,11 @@
 
 import { db } from '../config/db';
 import { logger } from '../config/logger';
-import { ADMIN_TIER, MANAGER_TIER, type Role } from '../types';
+import { ADMIN_TIER, type Role } from '../types';
 
-const MGR_ROLES = MANAGER_TIER as readonly Role[];
 const ADMIN_ROLES = ADMIN_TIER as readonly Role[];
+// Sub-managers: see their own recruiter/consultant subtree only (not the whole workspace)
+const SUB_MGR_ROLES: Role[] = ['MANAGER', 'HR_MANAGER', 'DEVELOPER'];
 
 export interface PermissionCaller {
   id: string;
@@ -136,9 +137,8 @@ export async function getAccessibleUserIds(caller: PermissionCaller): Promise<Se
   const cached = cacheGet(caller);
   if (cached) return cached;
 
-  // Manager tier sees the whole workspace. Admin tier is a subset of
-  // manager tier so this also covers admin override.
-  if (MGR_ROLES.includes(caller.role)) {
+  // Admin tier (SUPER_ADMIN, CEO, CTO, DIRECTOR) sees the whole workspace.
+  if (ADMIN_ROLES.includes(caller.role)) {
     const { data } = await db
       .from('users')
       .select('id')
@@ -150,6 +150,63 @@ export async function getAccessibleUserIds(caller: PermissionCaller): Promise<Se
   }
 
   const peerIds = new Set<string>();
+
+  // Sub-manager tier (MANAGER, HR_MANAGER, DEVELOPER): scoped to their own
+  // recruiter/consultant subtree + admin users + reports-to chain.
+  // Two managers' invitees are fully isolated from each other.
+  if (SUB_MGR_ROLES.includes(caller.role)) {
+    // Admin tier users are always reachable (upward escalation path).
+    const { data: admins } = await db
+      .from('users')
+      .select('id')
+      .in('role', ADMIN_ROLES as unknown as string[])
+      .neq('is_active', false);
+    for (const a of (admins ?? []) as Array<{ id: string }>) peerIds.add(a.id);
+
+    // Recruiters this manager directly manages.
+    const { data: legacyRecs } = await db
+      .from('recruiters')
+      .select('id, user_id')
+      .eq('manager_id', caller.id);
+    const recruiterRowIds = new Set<string>();
+    for (const r of (legacyRecs ?? []) as Array<{ id: string; user_id: string | null }>) {
+      recruiterRowIds.add(r.id);
+      if (r.user_id) peerIds.add(r.user_id);
+    }
+
+    // Many-to-many junction (canonical for newer rows).
+    const { data: junctionRecs } = await db
+      .from('recruiter_managers')
+      .select('recruiter_id')
+      .eq('manager_id', caller.id);
+    const junctionRecruiterIds = (junctionRecs ?? []) as Array<{ recruiter_id: string }>;
+    if (junctionRecruiterIds.length > 0) {
+      const extraIds = junctionRecruiterIds
+        .map((r) => r.recruiter_id)
+        .filter((id) => !recruiterRowIds.has(id));
+      if (extraIds.length > 0) {
+        const { data: extraRecs } = await db
+          .from('recruiters')
+          .select('id, user_id')
+          .in('id', extraIds);
+        for (const r of (extraRecs ?? []) as Array<{ id: string; user_id: string | null }>) {
+          recruiterRowIds.add(r.id);
+          if (r.user_id) peerIds.add(r.user_id);
+        }
+      }
+    }
+
+    // Consultants of all those recruiters.
+    if (recruiterRowIds.size > 0) {
+      const { data: cons } = await db
+        .from('consultants')
+        .select('user_id')
+        .in('recruiter_id', [...recruiterRowIds]);
+      for (const c of (cons ?? []) as Array<{ user_id: string | null }>) {
+        if (c.user_id) peerIds.add(c.user_id);
+      }
+    }
+  }
 
   // Recruiter: my consultants + my managers (both legacy + junction table).
   if (caller.role === 'RECRUITER') {
@@ -258,8 +315,8 @@ export async function getAccessibleUserIds(caller: PermissionCaller): Promise<Se
  */
 export async function canMessageUser(caller: PermissionCaller, targetId: string): Promise<boolean> {
   if (!targetId || caller.id === targetId) return false;
-  if (ADMIN_ROLES.includes(caller.role) || MGR_ROLES.includes(caller.role)) {
-    // Manager-tier can message any active user. Cheap existence check.
+  if (ADMIN_ROLES.includes(caller.role)) {
+    // Admin tier can message any active user. Cheap existence check.
     const { data } = await db
       .from('users')
       .select('id, is_active')
