@@ -1302,12 +1302,48 @@ export const complianceReport: RequestHandler = async (req, res) => {
 
 // Returns which AI credential is active on the server so the frontend can
 // skip the "choose provider" modal when already configured.
-//   provider = 'subscription' → ANTHROPIC_OAUTH_TOKEN is set (Claude Max / subscription)
+//   provider = 'subscription' → OAuth token is available (env OR ~/.claude/credentials.json)
 //   provider = 'api'          → ANTHROPIC_API_KEY is set
-//   provider = 'none'         → neither key is set
+//   provider = 'none'         → neither key is found
 export const aiProviderInfo: RequestHandler = (_req, res) => {
-  const oauthToken = process.env.ANTHROPIC_OAUTH_TOKEN ?? '';
-  const apiKey = process.env.ANTHROPIC_API_KEY ?? '';
-  const provider = oauthToken.length > 10 ? 'subscription' : apiKey.length > 10 ? 'api' : 'none';
+  // Inline the same fallback logic from config/anthropic.ts so this route
+  // stays lightweight and doesn't pull the Anthropic SDK into test paths.
+  const {
+    ANTHROPIC_OAUTH_TOKEN = '',
+    ANTHROPIC_API_KEY = '',
+    TRAINING_AI_PROVIDER = 'api',
+  } = process.env;
+
+  let effectiveOauthToken = ANTHROPIC_OAUTH_TOKEN;
+  if (TRAINING_AI_PROVIDER === 'oauth' && effectiveOauthToken.length <= 10) {
+    // Fall back to ~/.claude/credentials.json (written by `claude login`)
+    try {
+      const { readFileSync, existsSync } = require('node:fs') as typeof import('fs');
+      const { homedir } = require('node:os') as typeof import('os');
+      const { join } = require('node:path') as typeof import('path');
+      const credsPath =
+        process.env.CLAUDE_CREDS_FILE ?? join(homedir(), '.claude', 'credentials.json');
+      if (existsSync(credsPath)) {
+        const parsed = JSON.parse(readFileSync(credsPath, 'utf8')) as Record<string, unknown>;
+        effectiveOauthToken =
+          (parsed.oauthToken as string | undefined) ||
+          (parsed.accessToken as string | undefined) ||
+          ((parsed.claudeAiOAuth as Record<string, unknown> | undefined)?.accessToken as
+            | string
+            | undefined) ||
+          '';
+      }
+    } catch {
+      // ignore — falls through to 'none'
+    }
+  }
+
+  const provider =
+    TRAINING_AI_PROVIDER === 'oauth' && effectiveOauthToken.length > 10
+      ? 'subscription'
+      : ANTHROPIC_API_KEY.length > 10
+        ? 'api'
+        : 'none';
+
   res.json({ provider });
 };
