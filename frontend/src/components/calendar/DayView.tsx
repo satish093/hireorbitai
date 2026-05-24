@@ -194,7 +194,7 @@ export function DayView({
   const bufferRows = computeBuffers(dayEvents);
 
   return (
-    <div className="flex flex-col lg:flex-row gap-4 items-start">
+    <div className="flex flex-col lg:flex-row gap-4 lg:items-start">
       {/* ── LEFT: time-grid card ── */}
       <div className="flex-1 min-w-0 rounded-none sm:rounded-xl border-y sm:border border-border bg-surface overflow-hidden">
         {/* Header */}
