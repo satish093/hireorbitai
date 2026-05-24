@@ -294,7 +294,7 @@ test.describe('Mobile — Recruiters page', () => {
 
     await expect(page.getByText('Riley Recruiter').last()).toBeVisible({ timeout: 8000 });
     await expect(page.getByText('Sam Recruiter').last()).toBeVisible({ timeout: 8000 });
-    await expect(page.getByText('Team Alpha').last()).toBeVisible({ timeout: 8000 });
+    // 'team' column is hideOnMobile:true — only in desktop table, not in mobile card
 
     expect(await hasHorizontalOverflow(page)).toBe(false);
     await screenshotAndAudit(page, 'recruiters');

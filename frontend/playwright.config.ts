@@ -33,6 +33,9 @@ export default defineConfig({
     actionTimeout: 10_000,
     screenshot: 'only-on-failure',
     video: 'off',
+    // Disable CSS animations/transitions so axe contrast audits see final colours,
+    // not mid-fade opacity blends (animate-fade-in-up starts from opacity:0).
+    reducedMotion: 'reduce',
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: {
