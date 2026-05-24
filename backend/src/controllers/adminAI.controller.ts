@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import Anthropic from '@anthropic-ai/sdk';
 import { httpError } from '../types';
 import { logger } from '../config/logger';
 
@@ -223,4 +224,33 @@ export const getLoginStatus: RequestHandler = (req, res) => {
   const session = loginSessions.get(req.params.sessionId);
   if (!session) return void res.json({ status: 'not_found' });
   res.json({ status: session.status, error: session.error });
+};
+
+/**
+ * Validate an admin-supplied AI token by making a 1-token test call.
+ * Returns { ok: true } on success or { ok: false, error: string } on failure.
+ * Body: { aiToken: string }
+ */
+export const checkAiToken: RequestHandler = async (req, res) => {
+  const { aiToken } = req.body as { aiToken?: unknown };
+  if (typeof aiToken !== 'string' || aiToken.trim().length < 10) {
+    throw httpError(400, 'aiToken is required');
+  }
+  const token = aiToken.trim();
+  const isOAuth = !token.startsWith('sk-');
+  const client = new Anthropic(
+    isOAuth ? { authToken: token, maxRetries: 0 } : { apiKey: token, maxRetries: 0 },
+  );
+  try {
+    await client.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 1,
+      messages: [{ role: 'user', content: 'hi' }],
+    });
+    res.json({ ok: true });
+  } catch (err: any) {
+    const msg: string = err?.error?.error?.message ?? err?.message ?? 'Token validation failed';
+    logger.warn({ action: 'ai_token_check_failed', err: msg }, 'admin: AI token check failed');
+    res.json({ ok: false, error: msg });
+  }
 };

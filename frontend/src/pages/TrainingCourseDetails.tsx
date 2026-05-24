@@ -89,8 +89,8 @@ export function TrainingCourseDetails() {
   const [publishing, setPublishing] = useState(false);
   const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
   const [lifecycleBusy, setLifecycleBusy] = useState(false);
-  // AI provider selection modal — queues an action until the user picks a key.
-  // Skipped automatically when the server already has a credential configured.
+  // AI provider selection modal — admins always see the chooser so they can pick
+  // between their personal key and the server key.
   const [aiProviderOpen, setAiProviderOpen] = useState(false);
   const [aiProviderAction, setAiProviderAction] = useState<
     | { kind: 'one'; lessonId: string }
@@ -186,16 +186,18 @@ export function TrainingCourseDetails() {
     }
   }
 
-  // Start an AI generation action. If the server already has a credential
-  // configured (subscription or API key), run immediately — no modal needed.
-  // Only show the modal when the server has no key at all.
+  // Start an AI generation action.
+  // Admins always see the provider chooser so they can pick between their own
+  // key and the server key. Non-admins use the server key directly.
   function promptAndRun(action: typeof aiProviderAction) {
     if (!action) return;
-    if (serverAiProvider === 'none' || serverAiProvider === null) {
+    if (isAdmin) {
+      setAiProviderAction(action);
+      setAiProviderOpen(true);
+    } else if (serverAiProvider === 'none' || serverAiProvider === null) {
       setAiProviderAction(action);
       setAiProviderOpen(true);
     } else {
-      // Server is configured — run directly, no modal
       runAction(action, { mode: 'api' });
     }
   }
@@ -752,6 +754,7 @@ export function TrainingCourseDetails() {
 
       <AIProviderModal
         open={aiProviderOpen}
+        serverConfigured={serverAiProvider !== 'none' && serverAiProvider !== null}
         onClose={() => {
           setAiProviderOpen(false);
           setAiProviderAction(null);
