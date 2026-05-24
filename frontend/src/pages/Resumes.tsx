@@ -31,6 +31,7 @@ export function Resumes() {
             <FileUpload
               label={w.uploading ? 'Uploading…' : '+ Upload'}
               accept=".pdf,.doc,.docx"
+              disabled={!w.consultantId}
               onFile={w.upload}
             />
             <Button variant="outline" size="md" disabled={!active} onClick={w.duplicate}>
@@ -69,8 +70,12 @@ export function Resumes() {
       {!consultantId ? (
         <EmptyState
           icon="🧑‍💼"
-          title="Pick a consultant"
-          description="Select a consultant above to open their resume versions and the tailoring workspace."
+          title={w.consultants.length === 0 ? 'No consultants yet' : 'Pick a consultant'}
+          description={
+            w.consultants.length === 0
+              ? 'No consultant profiles exist. Invite a consultant from the Users page first.'
+              : 'Select a consultant above to open their resume versions and the tailoring workspace.'
+          }
         />
       ) : (
         <>

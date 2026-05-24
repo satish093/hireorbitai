@@ -3,10 +3,11 @@ import { ChangeEvent, useRef, useState } from 'react';
 interface Props {
   label?: string;
   accept?: string;
+  disabled?: boolean;
   onFile: (file: File) => void;
 }
 
-export function FileUpload({ label = 'Upload file', accept, onFile }: Props) {
+export function FileUpload({ label = 'Upload file', accept, disabled, onFile }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState('');
 
@@ -23,8 +24,9 @@ export function FileUpload({ label = 'Upload file', accept, onFile }: Props) {
     <div className="flex items-center gap-2">
       <button
         type="button"
-        onClick={() => inputRef.current?.click()}
-        className="h-9 inline-flex items-center gap-1.5 bg-ink hover:opacity-90 text-bg text-sm font-medium px-3.5 rounded-lg shadow-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        disabled={disabled}
+        onClick={() => !disabled && inputRef.current?.click()}
+        className={`h-9 inline-flex items-center gap-1.5 bg-ink text-bg text-sm font-medium px-3.5 rounded-lg shadow-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-90'}`}
       >
         <span aria-hidden="true">📎</span> {label}
       </button>
