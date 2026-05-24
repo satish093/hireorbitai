@@ -194,7 +194,7 @@ export function AgendaView({
 
   if (allGroups.length === 0) {
     return (
-      <div className="rounded-xl border border-border bg-surface flex items-center justify-center py-20">
+      <div className="w-full flex items-center justify-center min-h-[65vh]">
         <div className="text-center space-y-2">
           <p className="text-4xl">📅</p>
           <p className="text-[14px] text-muted">Nothing scheduled</p>
@@ -258,7 +258,7 @@ export function AgendaView({
       </div>
 
       {/* ── Desktop: compact row list ──────────────────────────── */}
-      <div className="hidden sm:block rounded-xl border border-border bg-surface overflow-hidden">
+      <div className="hidden sm:block rounded-none sm:rounded-xl border-y sm:border border-border bg-surface overflow-hidden">
         {visibleGroups.map((group) => (
           <div key={group.day.toISOString()}>
             {/* Day header */}

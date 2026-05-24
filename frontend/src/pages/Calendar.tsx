@@ -233,7 +233,7 @@ export function Calendar({
 
       {/* ── Sidebar + main view ──────────────────────────────────── */}
       {/* pb-24 on mobile reserves space above the fixed bottom tab bar */}
-      <div className="flex flex-col md:flex-row gap-5 items-start pb-24 md:pb-0">
+      <div className="flex flex-col md:flex-row md:gap-5 md:items-start pb-24 md:pb-0">
         {/* Sidebar: hidden on mobile — use bottom tab bar + FAB instead */}
         <div className="hidden md:block">
           <CalendarSidebar
@@ -247,11 +247,11 @@ export function Calendar({
           />
         </div>
 
-        <div className="min-w-0 flex-1">
+        <div className="w-full min-w-0 flex-1">
           {loading ? (
             <SkeletonCard lines={8} />
           ) : (
-            <div className="relative">
+            <div className="relative w-full">
               {activeView}
               {selectedEvent && (
                 <div className="sticky bottom-0 z-10 mt-2 rounded-xl overflow-hidden border border-border shadow-md">

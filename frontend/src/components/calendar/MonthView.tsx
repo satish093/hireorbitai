@@ -96,7 +96,7 @@ export function MonthView({
   const cells = buildMonthGrid(anchor);
 
   return (
-    <div className="rounded-xl border border-border bg-surface overflow-hidden">
+    <div className="rounded-none sm:rounded-xl border-y sm:border border-border bg-surface overflow-hidden">
       {/* ── WEEKDAY HEADER ── */}
       <div className="grid grid-cols-7 border-b border-border">
         {WEEKDAY_LABELS.map((label, i) => (

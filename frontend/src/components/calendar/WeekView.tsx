@@ -59,7 +59,10 @@ export function WeekView({
     <div>
       {/* Scroll hint — mobile only */}
       <p className="md:hidden text-[10px] text-muted text-right px-1 pb-1 select-none">← swipe →</p>
-      <div className="rounded-xl border border-border bg-surface overflow-x-auto" tabIndex={0}>
+      <div
+        className="rounded-none sm:rounded-xl border-y sm:border border-border bg-surface overflow-x-auto"
+        tabIndex={0}
+      >
         {/* ── DAY HEADER ── */}
         <div className="flex border-b border-border sticky top-0 bg-surface z-10">
           {/* Gutter spacer */}

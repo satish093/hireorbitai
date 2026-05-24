@@ -196,7 +196,7 @@ export function DayView({
   return (
     <div className="flex flex-col lg:flex-row gap-4 items-start">
       {/* ── LEFT: time-grid card ── */}
-      <div className="flex-1 min-w-0 rounded-xl border border-border bg-surface overflow-hidden">
+      <div className="flex-1 min-w-0 rounded-none sm:rounded-xl border-y sm:border border-border bg-surface overflow-hidden">
         {/* Header */}
         <div className="px-4 py-3 border-b border-border flex items-baseline gap-2">
           <span className="font-mono text-sm font-semibold text-ink">{weekday}</span>
