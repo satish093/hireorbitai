@@ -1,3 +1,7 @@
+// Load .env before env.ts validates process.env. dotenv skips vars already
+// set in the environment (e.g. NODE_ENV injected by PM2) and silently
+// ignores a missing file (CI / test environments supply vars externally).
+import 'dotenv/config';
 import 'express-async-errors';
 import express from 'express';
 import cors from 'cors';
