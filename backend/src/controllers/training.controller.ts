@@ -159,7 +159,15 @@ export const createLesson: RequestHandler = async (req, res) => {
 export const updateLesson: RequestHandler = async (req, res) => {
   const parsed = lessonSchema.partial().safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
-  const { data, error } = await repo.lessons.update(req.params.id, parsed.data);
+  const patch = { ...parsed.data };
+  // exercises and key_takeaways are JSONB — serialize arrays before the update
+  if (patch.exercises !== undefined && patch.exercises !== null) {
+    patch.exercises = JSON.stringify(patch.exercises);
+  }
+  if (patch.key_takeaways !== undefined && patch.key_takeaways !== null) {
+    patch.key_takeaways = JSON.stringify(patch.key_takeaways);
+  }
+  const { data, error } = await repo.lessons.update(req.params.id, patch);
   if (error) throw httpError(500, error.message);
   res.json(data);
 };
@@ -765,12 +773,14 @@ export const generateLessonContent: RequestHandler = async (req, res) => {
     );
   }
 
+  // exercises and key_takeaways are JSONB columns — pg passes JS arrays as
+  // PostgreSQL array literals which JSONB rejects; serialise to JSON strings first.
   const { data: updated, error: upErr } = await repo.lessons.update(l.id, {
     content: content.content,
     content_format: 'markdown',
     practical_example: content.practical_example,
-    exercises: content.exercises,
-    key_takeaways: content.key_takeaways,
+    exercises: content.exercises != null ? JSON.stringify(content.exercises) : null,
+    key_takeaways: JSON.stringify(content.key_takeaways),
     content_status: 'READY',
   });
   if (upErr) throw httpError(500, upErr.message);
