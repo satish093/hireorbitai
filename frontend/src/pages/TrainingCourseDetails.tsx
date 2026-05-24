@@ -88,7 +88,8 @@ export function TrainingCourseDetails() {
   const [publishing, setPublishing] = useState(false);
   const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
   const [lifecycleBusy, setLifecycleBusy] = useState(false);
-  // AI provider selection modal — queues an action until the user picks API or OAuth
+  // AI provider selection modal — queues an action until the user picks a key.
+  // Skipped automatically when the server already has a credential configured.
   const [aiProviderOpen, setAiProviderOpen] = useState(false);
   const [aiProviderAction, setAiProviderAction] = useState<
     | { kind: 'one'; lessonId: string }
@@ -96,6 +97,8 @@ export function TrainingCourseDetails() {
     | { kind: 'enrich' }
     | null
   >(null);
+  // 'subscription' | 'api' | 'none' — fetched once on mount
+  const [serverAiProvider, setServerAiProvider] = useState<string | null>(null);
   const [lessonForm, setLessonForm] = useState<any>({
     title: '',
     description: '',
@@ -121,6 +124,15 @@ export function TrainingCourseDetails() {
   useEffect(() => {
     load(); /* eslint-disable-next-line */
   }, [id]);
+
+  // Check once whether the server already has an AI credential configured.
+  // If it does, skip the provider modal and generate directly.
+  useEffect(() => {
+    api
+      .get('/training/ai/provider')
+      .then((r) => setServerAiProvider(r.data?.provider ?? 'none'))
+      .catch(() => setServerAiProvider('none'));
+  }, []);
 
   async function addLesson() {
     if (!lessonForm.title.trim()) {
@@ -173,23 +185,33 @@ export function TrainingCourseDetails() {
     }
   }
 
-  // Open the AI provider modal and queue an action; the modal calls back with
-  // the chosen provider config (OAuth or API) before we proceed.
+  // Start an AI generation action. If the server already has a credential
+  // configured (subscription or API key), run immediately — no modal needed.
+  // Only show the modal when the server has no key at all.
   function promptAndRun(action: typeof aiProviderAction) {
     if (!action) return;
-    setAiProviderAction(action);
-    setAiProviderOpen(true);
+    if (serverAiProvider === 'none' || serverAiProvider === null) {
+      setAiProviderAction(action);
+      setAiProviderOpen(true);
+    } else {
+      // Server is configured — run directly, no modal
+      runAction(action, { mode: 'api' });
+    }
   }
 
   async function executeWithProvider(config: AIProviderConfig) {
     setAiProviderOpen(false);
+    if (!aiProviderAction) return;
+    runAction(aiProviderAction, config);
+    setAiProviderAction(null);
+  }
+
+  async function runAction(action: NonNullable<typeof aiProviderAction>, config: AIProviderConfig) {
     const aiToken = config.mode === 'oauth' ? config.token : undefined;
     const body = aiToken ? { aiToken } : {};
 
-    if (!aiProviderAction) return;
-
-    if (aiProviderAction.kind === 'one') {
-      const { lessonId } = aiProviderAction;
+    if (action.kind === 'one') {
+      const { lessonId } = action;
       setGen({ running: true, done: 0, total: 1 });
       try {
         const r = await api.post(`/training/lessons/${lessonId}/generate-content`, body);
@@ -200,16 +222,14 @@ export function TrainingCourseDetails() {
         toast.error(e?.response?.data?.error ?? 'Something went wrong. Please try again.');
       } finally {
         setGen({ running: false, done: 0, total: 0 });
-        setAiProviderAction(null);
       }
       return;
     }
 
-    if (aiProviderAction.kind === 'bulk') {
-      const { lessonIds } = aiProviderAction;
+    if (action.kind === 'bulk') {
+      const { lessonIds } = action;
       if (lessonIds.length === 0) {
         toast('All lessons already have content.');
-        setAiProviderAction(null);
         return;
       }
       setGen({ running: true, done: 0, total: lessonIds.length });
@@ -223,11 +243,10 @@ export function TrainingCourseDetails() {
         toast(`${ok} lesson(s) generated · ${failed} failed — retry the failed ones.`);
       else toast.success(`${ok} lesson(s) generated`);
       await load();
-      setAiProviderAction(null);
       return;
     }
 
-    if (aiProviderAction.kind === 'enrich') {
+    if (action.kind === 'enrich') {
       setLifecycleBusy(true);
       try {
         const r = await api.post(`/training/courses/${id}/enrich`, body);
@@ -238,7 +257,6 @@ export function TrainingCourseDetails() {
         toast.error(e?.response?.data?.error ?? 'Something went wrong. Please try again.');
       } finally {
         setLifecycleBusy(false);
-        setAiProviderAction(null);
       }
     }
   }

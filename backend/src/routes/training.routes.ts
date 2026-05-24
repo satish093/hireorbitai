@@ -122,6 +122,11 @@ trainingRouter.get('/assignments/:id/compliance-report', c.complianceReport);
 // ---- Reports (manager-tier only) ----
 trainingRouter.get('/reports', requireRole(...MANAGER_TIER), c.reports);
 
+// ---- AI provider info (any authed user, no token spend) ----
+// Returns which server-side AI credential is active so the frontend can skip
+// the "choose provider" modal when the server is already configured.
+trainingRouter.get('/ai/provider', c.aiProviderInfo);
+
 // ---- AI endpoints (manager-tier only — these spend Anthropic tokens) ----
 trainingRouter.post('/ai/generate-plan', requireRole(...MANAGER_TIER), c.aiGeneratePlan);
 trainingRouter.post(

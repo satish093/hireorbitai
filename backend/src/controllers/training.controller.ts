@@ -717,16 +717,27 @@ export const generateLessonContent: RequestHandler = async (req, res) => {
   const { data: course } = await repo.courses.get(l.course_id);
   const c: any = course ?? {};
 
-  // Optional per-request Anthropic client when the caller supplies their own
-  // API key or Claude.ai OAuth token (aiToken in the request body).
-  // Tokens starting with "claude-" are OAuth; all others are API keys.
+  // Build the Anthropic client for this request with the following priority:
+  //   1. aiToken from body (admin pasted their own key in the modal — explicit override)
+  //   2. ANTHROPIC_OAUTH_TOKEN (admin's Claude Max subscription) — admin-tier only
+  //   3. Fall through to the global client (ANTHROPIC_API_KEY or configured provider)
   const { aiToken } = req.body as { aiToken?: unknown };
-  let customClient: import('@anthropic-ai/sdk').default | undefined;
+  const AnthropicSDK = (await import('@anthropic-ai/sdk')).default;
+  let customClient: InstanceType<typeof AnthropicSDK> | undefined;
+
   if (typeof aiToken === 'string' && aiToken.length > 10) {
-    const isOAuth = aiToken.startsWith('claude-');
-    customClient = new (await import('@anthropic-ai/sdk')).default(
+    // Explicit key from the modal
+    const isOAuth = !aiToken.startsWith('sk-');
+    customClient = new AnthropicSDK(
       isOAuth ? { authToken: aiToken, maxRetries: 0 } : { apiKey: aiToken, maxRetries: 0 },
     );
+  } else {
+    // Auto-select: subscription token for admins if configured on the server
+    const oauthToken = process.env.ANTHROPIC_OAUTH_TOKEN ?? '';
+    if (oauthToken.length > 10) {
+      customClient = new AnthropicSDK({ authToken: oauthToken, maxRetries: 0 });
+    }
+    // else: fall through to global client (API key path)
   }
 
   await repo.lessons.update(l.id, { content_status: 'GENERATING' });
@@ -1287,4 +1298,16 @@ export const complianceReport: RequestHandler = async (req, res) => {
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', `attachment; filename="training-compliance-${a.id}.csv"`);
   res.send(sections.join('\r\n'));
+};
+
+// Returns which AI credential is active on the server so the frontend can
+// skip the "choose provider" modal when already configured.
+//   provider = 'subscription' → ANTHROPIC_OAUTH_TOKEN is set (Claude Max / subscription)
+//   provider = 'api'          → ANTHROPIC_API_KEY is set
+//   provider = 'none'         → neither key is set
+export const aiProviderInfo: RequestHandler = (_req, res) => {
+  const oauthToken = process.env.ANTHROPIC_OAUTH_TOKEN ?? '';
+  const apiKey = process.env.ANTHROPIC_API_KEY ?? '';
+  const provider = oauthToken.length > 10 ? 'subscription' : apiKey.length > 10 ? 'api' : 'none';
+  res.json({ provider });
 };
