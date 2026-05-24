@@ -1,83 +1,40 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Modal } from './Modal';
 import { Button } from './Button';
 
 export type AIProviderConfig = { mode: 'api' } | { mode: 'oauth'; token: string };
 
+const STORAGE_KEY = 'ai_custom_token';
+
 interface Props {
   open: boolean;
   onConfirm: (config: AIProviderConfig) => void;
   onClose: () => void;
-  /** Label for the confirm button, e.g. "Generate" or "Fill in materials". */
   action?: string;
 }
 
 export function AIProviderModal({ open, onConfirm, onClose, action = 'Generate' }: Props) {
   const [mode, setMode] = useState<'api' | 'oauth'>('api');
-  const [oauthToken, setOauthToken] = useState<string | null>(null);
-  const [oauthBusy, setOauthBusy] = useState(false);
-  const [oauthError, setOauthError] = useState<string | null>(null);
-  const popupRef = useRef<Window | null>(null);
+  const [token, setToken] = useState(() => localStorage.getItem(STORAGE_KEY) ?? '');
 
-  // Reset oauth state when modal opens/closes
   useEffect(() => {
-    if (!open) {
-      setOauthToken(null);
-      setOauthError(null);
-      setOauthBusy(false);
-    }
+    if (!open) return;
+    // Pre-select "OAuth" if a saved token exists
+    if (localStorage.getItem(STORAGE_KEY)) setMode('oauth');
   }, [open]);
 
-  // Listen for the postMessage from the OAuth callback page
-  useEffect(() => {
-    function handler(event: MessageEvent) {
-      if (!event.data || typeof event.data !== 'object') return;
-      const { type, token, error } = event.data as {
-        type?: string;
-        token?: string;
-        error?: string;
-      };
-      if (type === 'ai_oauth_complete' && token) {
-        setOauthToken(token);
-        setOauthBusy(false);
-        setOauthError(null);
-        popupRef.current?.close();
-      } else if (type === 'ai_oauth_error') {
-        setOauthError(error ?? 'OAuth failed — try again.');
-        setOauthBusy(false);
-        popupRef.current?.close();
-      }
-    }
-    window.addEventListener('message', handler);
-    return () => window.removeEventListener('message', handler);
-  }, []);
-
-  function openOAuthPopup() {
-    setOauthError(null);
-    setOauthToken(null);
-    setOauthBusy(true);
-    const popup = window.open(
-      '/api/training/ai/oauth/start',
-      'anthropic_oauth',
-      'width=600,height=720,left=200,top=100,resizable=yes,scrollbars=yes',
-    );
-    popupRef.current = popup;
-    // If popup was blocked, fall back gracefully
-    if (!popup) {
-      setOauthBusy(false);
-      setOauthError('Popup blocked — allow popups for this site and try again.');
-    }
+  function handleTokenChange(v: string) {
+    setToken(v);
+    if (v) localStorage.setItem(STORAGE_KEY, v);
+    else localStorage.removeItem(STORAGE_KEY);
   }
 
   function handleConfirm() {
-    if (mode === 'oauth' && oauthToken) {
-      onConfirm({ mode: 'oauth', token: oauthToken });
-    } else if (mode === 'api') {
-      onConfirm({ mode: 'api' });
-    }
+    if (mode === 'oauth') onConfirm({ mode: 'oauth', token });
+    else onConfirm({ mode: 'api' });
   }
 
-  const canConfirm = mode === 'api' || (mode === 'oauth' && !!oauthToken);
+  const canConfirm = mode === 'api' || (mode === 'oauth' && token.trim().length > 10);
 
   return (
     <Modal
@@ -97,7 +54,7 @@ export function AIProviderModal({ open, onConfirm, onClose, action = 'Generate' 
       }
     >
       <div className="space-y-2">
-        {/* OAuth option */}
+        {/* OAuth / My Key option */}
         <label
           className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
             mode === 'oauth' ? 'border-accent bg-accent/5' : 'border-border hover:border-accent/40'
@@ -114,39 +71,40 @@ export function AIProviderModal({ open, onConfirm, onClose, action = 'Generate' 
           <div className="min-w-0 flex-1">
             <div className="text-sm font-medium text-ink">OAuth</div>
             <div className="text-xs text-muted mt-0.5">
-              Log in with your Claude.ai subscription — no API key needed
+              Use your own Anthropic API key or Claude.ai subscription token
             </div>
             {mode === 'oauth' && (
-              <div className="mt-2">
-                {oauthToken ? (
-                  <div className="flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400">
-                    <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-                      <path
-                        fillRule="evenodd"
-                        d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                    Connected — ready to generate
-                  </div>
-                ) : (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={openOAuthPopup}
-                    loading={oauthBusy}
-                    disabled={oauthBusy}
-                  >
-                    {oauthBusy ? 'Connecting…' : 'Login with Claude.ai →'}
-                  </Button>
-                )}
-                {oauthError && <p className="text-xs text-red-500 mt-1.5">{oauthError}</p>}
+              <div className="mt-2 space-y-1.5">
+                <input
+                  type="password"
+                  value={token}
+                  onChange={(e) => handleTokenChange(e.target.value)}
+                  placeholder="sk-ant-… or claude-…"
+                  autoFocus
+                  className="w-full text-sm bg-bg-sunken border border-border rounded-md px-2.5 py-1.5 text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent/40"
+                />
+                <a
+                  href="https://console.anthropic.com/settings/api-keys"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-xs text-accent hover:underline"
+                >
+                  Get your API key from console.anthropic.com
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                    />
+                  </svg>
+                </a>
               </div>
             )}
           </div>
         </label>
 
-        {/* API option */}
+        {/* Server API key option */}
         <label
           className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
             mode === 'api' ? 'border-accent bg-accent/5' : 'border-border hover:border-accent/40'

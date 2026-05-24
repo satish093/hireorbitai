@@ -74,12 +74,6 @@ const envSchema = z.object({
   // Obtained from console.anthropic.com → OAuth. Set TRAINING_AI_PROVIDER=oauth
   // to use this instead of ANTHROPIC_API_KEY.
   ANTHROPIC_OAUTH_TOKEN: optionalKey,
-  // OAuth 2.0 app credentials — required to support the browser popup OAuth flow
-  // (Training → Choose AI Provider → OAuth button). Register the app at
-  // console.anthropic.com → OAuth Applications; set redirect URI to
-  // {APP_URL}/api/training/ai/oauth/callback.
-  ANTHROPIC_OAUTH_CLIENT_ID: optionalKey,
-  ANTHROPIC_OAUTH_CLIENT_SECRET: optionalKey,
   ANTHROPIC_MODEL: z.string().default('claude-haiku-4-5-20251001'),
   // Heavier model for long-form training content generation (lesson bodies,
   // capstone). Outline + quiz calls stay on the cheaper ANTHROPIC_MODEL.
@@ -262,8 +256,6 @@ export const env = {
   anthropic: {
     apiKey: e.ANTHROPIC_API_KEY,
     oauthToken: e.ANTHROPIC_OAUTH_TOKEN,
-    oauthClientId: e.ANTHROPIC_OAUTH_CLIENT_ID,
-    oauthClientSecret: e.ANTHROPIC_OAUTH_CLIENT_SECRET,
     model: e.ANTHROPIC_MODEL,
     contentModel: e.TRAINING_CONTENT_MODEL,
     provider: e.TRAINING_AI_PROVIDER,

@@ -131,12 +131,3 @@ trainingRouter.post(
 );
 trainingRouter.post('/ai/generate-quiz', requireRole(...MANAGER_TIER), c.aiGenerateQuiz);
 trainingRouter.post('/ai/skill-gap-analysis', requireRole(...MANAGER_TIER), c.aiSkillGap);
-
-// ---- OAuth popup flow for per-user Anthropic credentials ----
-// /start — opens in a popup (no role gate; role is validated by the admin's
-//           existing session before they can even open the training page).
-// /callback — OAuth redirect target; must be public (no requireAuth) because
-//             Anthropic redirects here before the user's session cookie is
-//             available in the popup context.
-trainingRouter.get('/ai/oauth/start', c.aiOAuthStart);
-trainingRouter.get('/ai/oauth/callback', c.aiOAuthCallback);
