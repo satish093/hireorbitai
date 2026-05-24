@@ -19,9 +19,11 @@ name: Dev (verify + deploy to Render)
 #     DEV_API_URL                 e.g. https://hireorbit-api-dev.onrender.com
 
 on:
-  push:
-    branches: [dev]
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      enabled:
+        description: 'Disabled — remove this input to re-enable'
+        required: true
 
 concurrency:
   group: dev-pipeline

@@ -16,9 +16,11 @@ name: Deploy to dev
 # dev database and PORT=3001.
 
 on:
-  push:
-    branches: [dev]
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      enabled:
+        description: 'Disabled — remove this input to re-enable'
+        required: true
 
 concurrency:
   group: deploy-dev
