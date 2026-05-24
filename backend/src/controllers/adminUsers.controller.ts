@@ -675,6 +675,44 @@ export const auditLog: RequestHandler = async (req, res) => {
 };
 
 // ---------------------------------------------------------------------------
+// GET /admin/audit
+//
+// Platform-wide audit log. Supports filtering by action, user_id, email,
+// and date range. Returns up to 200 rows per page (offset pagination).
+// ---------------------------------------------------------------------------
+export const globalAuditLog: RequestHandler = async (req, res) => {
+  const {
+    action,
+    user_id,
+    email,
+    from,
+    to,
+    limit: limitQ,
+    offset: offsetQ,
+  } = req.query as Record<string, string | undefined>;
+
+  const limitN = Math.min(Number(limitQ ?? 50), 200);
+  const offsetN = Number(offsetQ ?? 0);
+
+  let q = db
+    .from('auth_audit_logs')
+    .select('id, action, user_id, email, ip_address, user_agent, metadata, created_at')
+    .order('created_at', { ascending: false })
+    .limit(limitN);
+
+  if (offsetN > 0) q = q.range(offsetN, offsetN + limitN - 1);
+  if (action) q = q.eq('action', action);
+  if (user_id) q = q.eq('user_id', user_id);
+  if (email) q = q.eq('email', email.toLowerCase());
+  if (from) q = q.gte('created_at', from);
+  if (to) q = q.lte('created_at', to);
+
+  const { data, error } = await q;
+  if (error) throw httpError(500, error.message);
+  res.json(data ?? []);
+};
+
+// ---------------------------------------------------------------------------
 // POST /admin/users/bulk
 //
 // Apply one lifecycle action to many users. Each id is guarded independently

@@ -104,6 +104,9 @@ const AdminUsers = lazy(() =>
 const AdminAISettings = lazy(() =>
   import('./pages/AdminAISettings').then((m) => ({ default: m.AdminAISettings })),
 );
+const AdminAuditLog = lazy(() =>
+  import('./pages/AdminAuditLog').then((m) => ({ default: m.AdminAuditLog })),
+);
 const TrainingAIActivity = lazy(() =>
   import('./pages/TrainingAIActivity').then((m) => ({ default: m.TrainingAIActivity })),
 );
@@ -433,6 +436,14 @@ export default function App() {
           element={
             <ProtectedRoute allow={ADMIN_TIER}>
               <AdminAISettings />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/audit-log"
+          element={
+            <ProtectedRoute allow={ADMIN_TIER}>
+              <AdminAuditLog />
             </ProtectedRoute>
           }
         />

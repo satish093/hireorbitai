@@ -9,6 +9,7 @@ adminUsersRouter.use(requireAdmin);
 
 adminUsersRouter.get('/', c.list);
 adminUsersRouter.get('/kpi', c.kpi);
+adminUsersRouter.get('/audit', c.globalAuditLog);
 adminUsersRouter.post('/bulk', c.bulk);
 adminUsersRouter.get('/:id', c.get);
 adminUsersRouter.get('/:id/audit', c.auditLog);

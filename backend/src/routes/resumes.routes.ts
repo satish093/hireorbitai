@@ -1,8 +1,15 @@
 import { Router } from 'express';
 import { uploadResume } from '../middleware/upload';
 import * as c from '../controllers/resumes.controller';
+import { requireRole } from '../middleware/auth';
+import { OPERATOR_TIER } from '../types';
 
 export const resumesRouter = Router();
+
+// Resumes are only visible to RECRUITER and above — consultants cannot view
+// or download any resume, including their own. This prevents cross-user
+// data leakage: the only resource shared among all roles is training courses.
+resumesRouter.use(requireRole(...OPERATOR_TIER));
 
 resumesRouter.get('/consultant/:consultantId', c.listForConsultant);
 // PDF / DOC / DOCX only, max 10 MB. Multer's fileFilter rejects others

@@ -195,6 +195,7 @@ const sections: Section[] = [
       },
       { to: '/admin/features', label: 'Feature flags', icon: IconToggle, roles: OWNER_TIER },
       { to: '/admin/ai-settings', label: 'AI settings', icon: IconSparkles, roles: ADMIN_TIER },
+      { to: '/admin/audit-log', label: 'Audit log', icon: IconClipboard, roles: ADMIN_TIER },
     ],
   },
 ];

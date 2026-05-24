@@ -17,6 +17,7 @@ import {
 } from '../services/ai.service';
 import { extractResumeText } from '../services/resumeText.service';
 import { httpError, MANAGER_TIER } from '../types';
+import { audit } from '../services/audit.service';
 
 function isManagerTier(role?: string): boolean {
   return !!role && (MANAGER_TIER as string[]).includes(role);
@@ -90,6 +91,12 @@ export const deleteVersion: RequestHandler = async (req, _res, _next) => {
     // File already gone from storage — ignore
   }
 
+  audit({
+    action: 'resume_deleted',
+    user_id: caller.id,
+    req: _res.req,
+    metadata: { resume_id: id, consultant_id: resume.consultant_id },
+  });
   _res.status(204).end();
 };
 
@@ -233,6 +240,18 @@ export const upload: RequestHandler = async (req, res) => {
     ({ data, error } = await db.from('resumes').insert(insertBody).select().single());
   }
   if (error) throw httpError(500, error.message);
+
+  audit({
+    action: 'resume_uploaded',
+    user_id: req.user.id,
+    req,
+    metadata: {
+      resume_id: (data as any)?.id,
+      consultant_id,
+      file_name: file.originalname,
+      version: nextVersion,
+    },
+  });
   res.status(201).json(data);
 };
 
@@ -301,6 +320,12 @@ export const downloadUrl: RequestHandler = async (req, res) => {
   if (error || !data) throw httpError(404, 'Resume not found');
   await authorizeConsultantAccess(data.consultant_id, req.user);
   const url = await getResumeSignedUrl(data.storage_path);
+  audit({
+    action: 'resume_downloaded',
+    user_id: req.user.id,
+    req,
+    metadata: { resume_id: req.params.id, consultant_id: data.consultant_id },
+  });
   res.json({ url });
 };
 

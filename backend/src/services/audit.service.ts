@@ -37,7 +37,14 @@ export type AuditAction =
   | 'daily_digest_skipped'
   | 'messages_permission_denied'
   | 'work_auth_doc_uploaded'
-  | 'work_auth_doc_deleted';
+  | 'work_auth_doc_deleted'
+  | 'resume_uploaded'
+  | 'resume_downloaded'
+  | 'resume_deleted'
+  | 'resume_access_denied'
+  | 'training_course_accessed'
+  | 'training_lesson_accessed'
+  | 'data_access_denied';
 
 interface AuditInput {
   action: AuditAction;
