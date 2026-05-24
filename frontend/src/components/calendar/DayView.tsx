@@ -194,7 +194,7 @@ export function DayView({
   const bufferRows = computeBuffers(dayEvents);
 
   return (
-    <div className="flex gap-4 items-start">
+    <div className="flex flex-col lg:flex-row gap-4 items-start">
       {/* ── LEFT: time-grid card ── */}
       <div className="flex-1 min-w-0 rounded-xl border border-border bg-surface overflow-hidden">
         {/* Header */}
@@ -316,7 +316,7 @@ export function DayView({
       </div>
 
       {/* ── RIGHT: side panel ── */}
-      <div className="w-[320px] shrink-0 space-y-4">
+      <div className="w-full lg:w-[320px] lg:shrink-0 space-y-4">
         {/* Focus time card */}
         <div className="rounded-xl border border-border bg-surface p-4">
           <p className="text-[11px] font-mono uppercase tracking-wider text-muted mb-3">

@@ -66,7 +66,7 @@ export function WeekView({
           return (
             <div
               key={day.toISOString()}
-              className="flex-1 min-w-[120px] flex flex-col items-center justify-center py-2 gap-1"
+              className="flex-1 min-w-[72px] flex flex-col items-center justify-center py-2 gap-1"
             >
               <span
                 className={clsx(
@@ -119,7 +119,7 @@ export function WeekView({
           return (
             <div
               key={day.toISOString()}
-              className={clsx('relative flex-1 min-w-[120px]', isToday && 'bg-accent-soft')}
+              className={clsx('relative flex-1 min-w-[72px]', isToday && 'bg-accent-soft')}
             >
               {/* Horizontal hour gridlines */}
               {HOURS.map((h) => (
