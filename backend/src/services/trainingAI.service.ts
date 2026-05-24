@@ -438,7 +438,17 @@ export async function skillGapAnalysis(input: {
 const ResourceSchema = z.object({
   title: z.string(),
   url: z.string(),
-  type: z.enum(['DOC', 'VIDEO', 'ARTICLE', 'TOOL']),
+  // Accept any string from the model and normalise to the closest known type
+  type: z
+    .string()
+    .transform((v) => {
+      const u = v.toUpperCase();
+      if (u.includes('VIDEO') || u.includes('YOUTUBE')) return 'VIDEO';
+      if (u.includes('TOOL') || u.includes('PACKAGE') || u.includes('LIBRAR')) return 'TOOL';
+      if (u.includes('ARTICLE') || u.includes('BLOG') || u.includes('TUTORIAL')) return 'ARTICLE';
+      return 'DOC';
+    })
+    .pipe(z.enum(['DOC', 'VIDEO', 'ARTICLE', 'TOOL'])),
 });
 
 const CourseOutlineSchema = z.object({
@@ -677,7 +687,10 @@ const CapstoneSchema = z.object({
   questions: z.array(
     z.object({
       prompt: z.string(),
-      guidance: z.string().default(''),
+      guidance: z
+        .string()
+        .nullish()
+        .transform((v) => v ?? ''),
     }),
   ),
   rubric: z.array(z.object({ criterion: z.string(), weight: z.number() })),
@@ -780,7 +793,7 @@ export interface EnrichInput {
   existing_lesson_titles?: string[];
 }
 
-const ENRICH_SYSTEM = `An existing course already has its lessons written. Your job is to generate the surrounding STRUCTURE — overview, objectives, roadmap, resources, completion criteria, and a final capstone assessment — that frames those lessons into a coherent learning experience.
+const ENRICH_SYSTEM = `An existing course already has its lessons written. Your job is to generate the surrounding STRUCTURE that frames those lessons into a coherent learning experience.
 
 DO NOT rewrite, reorder, or invent new lessons. The lesson list is fixed.
 
@@ -790,7 +803,19 @@ DERIVATION RULES:
 - resources: choose references that directly support the lesson topics (official docs, well-known tutorials).
 - capstone: design a final assessment that integrates the skills from ALL lessons, not just the last one.
 
-Return valid JSON only.`;
+OUTPUT — return a single flat JSON object with EXACTLY these top-level keys (no wrapping parent key):
+{
+  "overview": "<Markdown string — 2–4 paragraphs>",
+  "learning_objectives": ["<string>"],
+  "skills_taught": ["<string>"],
+  "expected_outcomes": ["<string>"],
+  "roadmap": [{"phase":"<string>","duration_label":"<string>","focus_areas":["<string>"]}],
+  "resources": [{"title":"<string>","url":"<string>","type":"DOC|VIDEO|ARTICLE|TOOL"}],
+  "completion_criteria": {"minimum_time_minutes":<int>,"quiz_passing_score":<0-100>,"quiz_max_attempts":<int>,"requires_manager_approval":<bool>},
+  "capstone": {"assessment_type":"PRACTICAL_ASSIGNMENT|SHORT_ANSWER|MULTIPLE_CHOICE","instructions":"<Markdown>","questions":[{"prompt":"<string>","guidance":"<string>"}],"rubric":[{"criterion":"<string>","weight":<number>}]}
+}
+
+Return valid JSON only. No markdown fences, no prose outside the JSON.`;
 
 export async function enrichCourseMeta(
   input: EnrichInput,
