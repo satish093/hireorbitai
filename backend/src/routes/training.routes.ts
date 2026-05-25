@@ -38,6 +38,7 @@ trainingRouter.post(
   c.generateCapstone,
 );
 trainingRouter.post('/courses/:id/enrich', requireRole(...ADMIN_TIER), c.enrichCourse);
+trainingRouter.post('/courses/:id/retry', requireRole(...ADMIN_TIER), c.retryCourseGeneration);
 trainingRouter.post('/courses/:id/review', requireRole(...MANAGER_TIER), c.reviewCourse);
 trainingRouter.post('/courses/:id/publish', requireRole(...MANAGER_TIER), c.publishCourse);
 

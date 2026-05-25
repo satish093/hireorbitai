@@ -290,6 +290,7 @@ export function TrainingCourseDetails() {
   const pendingLessonIds = sortedLessons
     .filter((l) => (l.content_status ?? 'READY') !== 'READY')
     .map((l) => l.id);
+  const allLessonIds = sortedLessons.map((l) => l.id);
   const allReady = sortedLessons.length > 0 && pendingLessonIds.length === 0;
 
   return (
@@ -538,14 +539,23 @@ export function TrainingCourseDetails() {
         <h2 className="text-lg font-semibold tracking-tight">Lessons ({course.lessons.length})</h2>
         {isManager && (
           <div className="flex items-center gap-2">
-            {isAdmin && pendingLessonIds.length > 0 && (
+            {isAdmin && sortedLessons.length > 0 && (
               <Button
                 variant="accent"
-                onClick={() => promptAndRun({ kind: 'bulk', lessonIds: pendingLessonIds })}
+                onClick={() =>
+                  promptAndRun({
+                    kind: 'bulk',
+                    lessonIds: pendingLessonIds.length > 0 ? pendingLessonIds : allLessonIds,
+                  })
+                }
                 disabled={gen.running}
                 loading={gen.running}
               >
-                {gen.running ? 'Writing…' : `✦ Write ${pendingLessonIds.length} lesson(s) with AI`}
+                {gen.running
+                  ? 'Writing…'
+                  : pendingLessonIds.length > 0
+                    ? `✦ Write ${pendingLessonIds.length} lesson(s) with AI`
+                    : `↺ Regenerate all ${sortedLessons.length} lessons`}
               </Button>
             )}
             <Button variant="outline" onClick={() => setLessonOpen(true)}>

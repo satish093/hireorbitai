@@ -146,6 +146,7 @@ export function TrainingAIActivity() {
   const [loading, setLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [error, setError] = useState('');
+  const [retrying, setRetrying] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   type FeedKind = 'info' | 'ok' | 'err' | 'done';
@@ -215,6 +216,35 @@ export function TrainingAIActivity() {
   const refresh = useCallback(async () => {
     await Promise.all([fetchStatus(), fetchFocused()]);
   }, [fetchStatus, fetchFocused]);
+
+  const retryGeneration = useCallback(
+    async (courseId: string, force = false) => {
+      setRetrying(true);
+      try {
+        const { data: r } = await api.post<{ queued: number; fixed: boolean }>(
+          `/training/courses/${courseId}/retry`,
+          { force },
+        );
+        if (r.fixed) {
+          pushFeed('Course status corrected — all lessons were already complete.', 'ok');
+        } else {
+          pushFeed(
+            `Queued ${r.queued} lesson${r.queued === 1 ? '' : 's'} for regeneration.`,
+            'info',
+          );
+        }
+        await refresh();
+      } catch (e: any) {
+        pushFeed(
+          `Retry failed: ${e?.response?.data?.error ?? e?.message ?? 'unknown error'}`,
+          'err',
+        );
+      } finally {
+        setRetrying(false);
+      }
+    },
+    [pushFeed, refresh],
+  );
 
   useEffect(() => {
     refresh();
@@ -316,7 +346,42 @@ export function TrainingAIActivity() {
                     {focused.category} · {focused.difficulty}
                   </div>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+                  {/* Fix status: course stuck as FAILED but all lessons done */}
+                  {focused.content_status === 'FAILED' &&
+                    focusedReadyCount === focusedTotal &&
+                    focusedTotal > 0 && (
+                      <button
+                        onClick={() => retryGeneration(focused.id, false)}
+                        disabled={retrying}
+                        className="text-xs text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-700 rounded-lg px-2.5 py-1 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 disabled:opacity-50"
+                      >
+                        {retrying ? 'Fixing…' : 'Fix status'}
+                      </button>
+                    )}
+                  {/* Retry: there are failed or pending lessons */}
+                  {(focusedFailedCount > 0 || focusedPendingCount > 0) &&
+                    focused.content_status !== 'GENERATING' && (
+                      <button
+                        onClick={() => retryGeneration(focused.id, false)}
+                        disabled={retrying}
+                        className="text-xs text-red-700 dark:text-red-400 border border-red-300 dark:border-red-700 rounded-lg px-2.5 py-1 hover:bg-red-50 dark:hover:bg-red-950/30 disabled:opacity-50"
+                      >
+                        {retrying
+                          ? 'Queuing…'
+                          : `Retry ${focusedFailedCount + focusedPendingCount} lesson${focusedFailedCount + focusedPendingCount === 1 ? '' : 's'}`}
+                      </button>
+                    )}
+                  {/* Regenerate all: all lessons ready, allow re-run with improved prompts */}
+                  {focusedReady && focused.content_status === 'READY' && focusedTotal > 0 && (
+                    <button
+                      onClick={() => retryGeneration(focused.id, true)}
+                      disabled={retrying}
+                      className="text-xs text-muted border border-border rounded-lg px-2.5 py-1 hover:bg-surface-hover disabled:opacity-50"
+                    >
+                      {retrying ? 'Queuing…' : '↺ Regenerate all'}
+                    </button>
+                  )}
                   <Link
                     to={`/training/courses/${focused.id}`}
                     className="text-xs text-accent hover:underline"
@@ -539,6 +604,11 @@ export function TrainingAIActivity() {
               {data.active_courses.map((c) => {
                 const pct =
                   c.total_lessons > 0 ? Math.round((c.ready_lessons / c.total_lessons) * 100) : 0;
+                const stuckDone =
+                  c.content_status === 'FAILED' &&
+                  c.ready_lessons === c.total_lessons &&
+                  c.total_lessons > 0;
+                const hasFailedLessons = c.failed_lessons > 0 || c.pending_lessons > 0;
                 return (
                   <div
                     key={c.id}
@@ -553,6 +623,30 @@ export function TrainingAIActivity() {
                       <div className="flex items-center gap-2 ml-4 shrink-0">
                         <span className="text-xs text-muted">{relativeTime(c.updated_at)}</span>
                         <StatusPill status={c.content_status} />
+                        {stuckDone && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              retryGeneration(c.id, false);
+                            }}
+                            disabled={retrying}
+                            className="text-[11px] text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-600 rounded px-1.5 py-0.5 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 disabled:opacity-50"
+                          >
+                            Fix
+                          </button>
+                        )}
+                        {!stuckDone && hasFailedLessons && c.content_status !== 'GENERATING' && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              retryGeneration(c.id, false);
+                            }}
+                            disabled={retrying}
+                            className="text-[11px] text-red-700 dark:text-red-400 border border-red-300 dark:border-red-600 rounded px-1.5 py-0.5 hover:bg-red-50 dark:hover:bg-red-950/30 disabled:opacity-50"
+                          >
+                            Retry
+                          </button>
+                        )}
                       </div>
                     </div>
                     {c.total_lessons > 0 && (

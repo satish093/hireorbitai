@@ -1542,6 +1542,65 @@ export const aiProviderInfo: RequestHandler = (_req, res) => {
 };
 
 // ---------------------------------------------------------------------------
+// Retry course generation — re-queue failed/pending lessons (or all with force).
+// ---------------------------------------------------------------------------
+export const retryCourseGeneration: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const courseId = req.params.id;
+  const force = req.body?.force === true;
+  const userId = req.user.id;
+
+  const { pool } = await import('../config/db');
+
+  const { rows: lessonRows } = await pool.query<{ id: string; title: string }>(
+    force
+      ? `SELECT id, title FROM training_lessons WHERE course_id = $1 ORDER BY lesson_order`
+      : `SELECT id, title FROM training_lessons WHERE course_id = $1
+         AND content_status NOT IN ('READY','GENERATING') ORDER BY lesson_order`,
+    [courseId],
+  );
+
+  if (lessonRows.length === 0) {
+    // Nothing to generate — auto-fix status if it's wrong.
+    await repo.courses.update(courseId, { content_status: 'READY' }).catch(() => {});
+    return res.json({ queued: 0, fixed: true });
+  }
+
+  const ids = lessonRows.map((r) => r.id);
+  await pool.query(`UPDATE training_lessons SET content_status = 'PENDING' WHERE id = ANY($1)`, [
+    ids,
+  ]);
+  await repo.courses.update(courseId, { content_status: 'GENERATING' }).catch(() => {});
+
+  const total = lessonRows.length;
+  setImmediate(async () => {
+    await publishToUser(userId, 'training:outline-ready', {
+      courseId,
+      lessonCount: total,
+    }).catch(() => {});
+    for (let i = 0; i < lessonRows.length; i++) {
+      await generateLessonContentBackground(lessonRows[i]!.id, userId, i + 1, total).catch((e) =>
+        logger.error({ err: e, lessonId: lessonRows[i]!.id }, 'retry lesson gen failed'),
+      );
+    }
+    // Sync final course status based on lesson outcomes.
+    await pool
+      .query(
+        `UPDATE training_courses tc SET content_status =
+          CASE WHEN NOT EXISTS (
+            SELECT 1 FROM training_lessons WHERE course_id = tc.id AND content_status != 'READY'
+          ) THEN 'READY' ELSE 'FAILED' END
+         WHERE tc.id = $1`,
+        [courseId],
+      )
+      .catch(() => {});
+    await publishToUser(userId, 'training:course-ready', { courseId }).catch(() => {});
+  });
+
+  res.json({ queued: total, fixed: false });
+};
+
+// ---------------------------------------------------------------------------
 // AI generation status — live view of all course/lesson generation activity
 // ---------------------------------------------------------------------------
 export const aiGenerationStatus: RequestHandler = async (_req, res) => {
