@@ -3,13 +3,27 @@ import { z } from 'zod';
 import * as repo from '../repositories/training.repository';
 import * as svc from '../services/training.service';
 import * as ai from '../services/trainingAI.service';
-import { httpError, MANAGER_TIER } from '../types';
+import { httpError, MANAGER_TIER, ADMIN_TIER } from '../types';
 import { logger } from '../config/logger';
 import { evaluateAchievements, logStudyMinutes } from '../services/trainingAchievements.service';
 import { publishToUser } from '../services/realtime.service';
 
 function isManagerTier(role?: string): boolean {
   return !!role && (MANAGER_TIER as string[]).includes(role);
+}
+
+function isAdminTier(role?: string): boolean {
+  return !!role && (ADMIN_TIER as string[]).includes(role);
+}
+
+/** Assert caller may mutate this course (owner or admin-tier). Returns 404 on failure. */
+async function assertCourseOwner(courseId: string, callerId: string, callerRole: string) {
+  const { data, error } = await repo.courses.getOwner(courseId);
+  if (error || !data) throw httpError(404, 'Course not found');
+  const row = data as { id: string; created_by: string | null };
+  if (row.created_by !== callerId && !isAdminTier(callerRole)) {
+    throw httpError(404, 'Course not found');
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -101,6 +115,8 @@ export const createCourse: RequestHandler = async (req, res) => {
 };
 
 export const updateCourse: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  await assertCourseOwner(req.params.id, req.user.id, req.user.role);
   const parsed = courseSchema.partial().safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
   // Keep the editorial lifecycle in sync with a direct status edit (the manual
@@ -121,6 +137,8 @@ export const updateCourse: RequestHandler = async (req, res) => {
 };
 
 export const deleteCourse: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  await assertCourseOwner(req.params.id, req.user.id, req.user.role);
   const { error } = await repo.courses.remove(req.params.id);
   if (error) throw httpError(500, error.message);
   res.json({ ok: true });
@@ -150,6 +168,8 @@ const lessonSchema = z.object({
 });
 
 export const createLesson: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  await assertCourseOwner(req.params.id, req.user.id, req.user.role);
   const parsed = lessonSchema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
   const { data, error } = await repo.lessons.create({ ...parsed.data, course_id: req.params.id });
@@ -158,6 +178,10 @@ export const createLesson: RequestHandler = async (req, res) => {
 };
 
 export const updateLesson: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const { data: lesson, error: lErr } = await repo.lessons.get(req.params.id);
+  if (lErr || !lesson) throw httpError(404, 'Lesson not found');
+  await assertCourseOwner((lesson as any).course_id, req.user.id, req.user.role);
   const parsed = lessonSchema.partial().safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
   const patch = { ...parsed.data };
@@ -174,6 +198,10 @@ export const updateLesson: RequestHandler = async (req, res) => {
 };
 
 export const deleteLesson: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const { data: lesson, error: lErr } = await repo.lessons.get(req.params.id);
+  if (lErr || !lesson) throw httpError(404, 'Lesson not found');
+  await assertCourseOwner((lesson as any).course_id, req.user.id, req.user.role);
   const { error } = await repo.lessons.remove(req.params.id);
   if (error) throw httpError(500, error.message);
   res.json({ ok: true });
@@ -398,10 +426,12 @@ const quizQuestionSchema = z
   .strict();
 
 export const createLessonQuizQuestion: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
   const parsed = quizQuestionSchema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
   const { data: lesson, error: lErr } = await repo.lessons.get(req.params.id);
   if (lErr || !lesson) throw httpError(404, 'Lesson not found');
+  await assertCourseOwner((lesson as any).course_id, req.user.id, req.user.role);
   // correct_answer must be one of the options.
   if (!parsed.data.options.includes(parsed.data.correct_answer)) {
     throw httpError(400, 'correct_answer must match one of the options');
@@ -416,6 +446,10 @@ export const createLessonQuizQuestion: RequestHandler = async (req, res) => {
 };
 
 export const updateQuizQuestion: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const { data: quiz, error: qLoadErr } = await repo.quizzes.get(req.params.id);
+  if (qLoadErr || !quiz) throw httpError(404, 'Quiz question not found');
+  await assertCourseOwner((quiz as any).course_id, req.user.id, req.user.role);
   const parsed = quizQuestionSchema.partial().safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
   if (
@@ -431,6 +465,10 @@ export const updateQuizQuestion: RequestHandler = async (req, res) => {
 };
 
 export const deleteQuizQuestion: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const { data: quiz, error: qErr } = await repo.quizzes.get(req.params.id);
+  if (qErr || !quiz) throw httpError(404, 'Quiz question not found');
+  await assertCourseOwner((quiz as any).course_id, req.user.id, req.user.role);
   const { error } = await repo.quizzes.remove(req.params.id);
   if (error) throw httpError(500, error.message);
   res.json({ ok: true });

@@ -16,6 +16,10 @@ const ASSIGNMENT_SELECT =
 
 // ===== COURSES =====
 export const courses = {
+  /** Lightweight fetch — only id + created_by, no lesson/quiz joins. */
+  async getOwner(id: string) {
+    return db.from('training_courses').select('id, created_by').eq('id', id).maybeSingle();
+  },
   async list(filter: { status?: string; category?: string } = {}) {
     let qb = db
       .from('training_courses')
