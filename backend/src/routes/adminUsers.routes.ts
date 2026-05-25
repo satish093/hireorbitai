@@ -1,10 +1,14 @@
 import { Router } from 'express';
-import { requireAdmin } from '../middleware/auth';
+import { requireAdmin, requireRole } from '../middleware/auth';
+import { MANAGER_TIER } from '../types';
 import * as c from '../controllers/adminUsers.controller';
 
 export const adminUsersRouter = Router();
 
-// Every route here requires the admin tier (SUPER_ADMIN / CEO / CTO / DIRECTOR).
+// Role change: accessible to MANAGER_TIER+ (group restrictions enforced in handler)
+adminUsersRouter.patch('/:id/role', requireRole(...MANAGER_TIER), c.setRole);
+
+// Everything else requires admin tier
 adminUsersRouter.use(requireAdmin);
 
 adminUsersRouter.get('/', c.list);

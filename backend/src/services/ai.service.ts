@@ -263,11 +263,15 @@ async function callGroqStructured<T extends z.ZodType>(
     );
     throw new Error(`Groq returned unexpected structure for ${callName} — please try again.`);
   }
+  logAiUsage(callName, model, {
+    input_tokens: completion.usage?.prompt_tokens ?? 0,
+    output_tokens: completion.usage?.completion_tokens ?? 0,
+  });
   return result.data as z.infer<T>;
 }
 
 async function callGroqText(
-  _callName: string,
+  callName: string,
   systemPrompt: string,
   userContent: string,
   maxTokens = 600,
@@ -284,6 +288,10 @@ async function callGroqText(
     ],
     temperature: 0.4,
     max_tokens: maxTokens,
+  });
+  logAiUsage(callName, model, {
+    input_tokens: completion.usage?.prompt_tokens ?? 0,
+    output_tokens: completion.usage?.completion_tokens ?? 0,
   });
   return completion.choices[0]?.message?.content?.trim() ?? '';
 }

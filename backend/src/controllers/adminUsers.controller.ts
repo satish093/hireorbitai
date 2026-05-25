@@ -1,7 +1,7 @@
 import { RequestHandler } from 'express';
 import { z } from 'zod';
 import { db, pool } from '../config/db';
-import { httpError, ALL_ROLES, Role } from '../types';
+import { httpError, ALL_ROLES, ADMIN_TIER, Role } from '../types';
 import { audit } from '../services/audit.service';
 import { requestPasswordReset } from '../services/auth.service';
 import { logger } from '../config/logger';
@@ -832,4 +832,67 @@ export const bulk: RequestHandler = async (req, res) => {
     metadata: { action, requested: ids.length, ok: results.filter((r) => r.ok).length },
   });
   res.json({ results });
+};
+
+/**
+ * PATCH /admin/users/:id/role
+ *
+ * Change a single user's role.
+ *
+ * Access tiers:
+ *  - ADMIN_TIER  → can change any user whose role they outrank
+ *  - MANAGER_TIER (non-admin) → same rank check PLUS both users must be in
+ *    the same group (group-scoped delegation)
+ */
+export const setRole: RequestHandler = async (req, res) => {
+  const actor = req.user!;
+  const targetId = req.params.id;
+
+  const { role: newRole } = z
+    .object({ role: z.enum(ALL_ROLES as [Role, ...Role[]]) })
+    .parse(req.body);
+
+  if (actor.id === targetId) throw httpError(400, 'You cannot change your own role');
+
+  // Load target
+  const { data: target } = await db
+    .from('users')
+    .select('id, email, role, group_id')
+    .eq('id', targetId)
+    .maybeSingle();
+  if (!target) throw httpError(404, 'Not found');
+
+  const row = target as { id: string; email: string; role: Role; group_id: string | null };
+
+  assertOutranks(actor, row.role); // can't touch equal/higher users
+  assertOutranks(actor, newRole); // can't promote to your own tier or above
+
+  // Non-admin managers are restricted to their own group
+  if (!ADMIN_TIER.includes(actor.role as Role)) {
+    // Load actor's group_id from DB (not always in the JWT)
+    const { data: actorRow } = await db
+      .from('users')
+      .select('group_id')
+      .eq('id', actor.id)
+      .maybeSingle();
+    const actorGroupId = (actorRow as { group_id: string | null } | null)?.group_id ?? null;
+
+    if (!actorGroupId || actorGroupId !== row.group_id) {
+      throw httpError(403, 'You can only change roles of users in your group');
+    }
+  }
+
+  const prev = row.role;
+  const { error } = await db.from('users').update({ role: newRole }).eq('id', targetId);
+  if (error) throw httpError(500, 'Database error');
+
+  audit({
+    action: 'admin_role_changed',
+    user_id: targetId,
+    email: row.email,
+    req,
+    metadata: { from: prev, to: newRole, by: actor.id },
+  });
+
+  res.json({ ok: true, role: newRole });
 };

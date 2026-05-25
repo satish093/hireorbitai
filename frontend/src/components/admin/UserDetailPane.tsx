@@ -12,6 +12,7 @@ import { EmptyState } from '../EmptyState';
 import { GroupBadge, RoleChip, StatusPill } from './UserBits';
 import { ConfirmDialog, type ConfirmSpec } from './ConfirmDialog';
 import { useUserDetail } from './useUserDetail';
+import { ALL_ROLES, type Role } from '@hireorbitai/shared';
 import {
   AUDIT_DOT,
   auditTone,
@@ -85,15 +86,18 @@ export function UserDetailPane({
     return m;
   }, [groups]);
 
-  // Local editors for group + admin notes (preserved from the old detail page).
+  // Local editors for group + role + admin notes.
   const [groupId, setGroupId] = useState('');
+  const [role, setRole] = useState<Role | ''>('');
   const [notes, setNotes] = useState('');
   const [savingGroup, setSavingGroup] = useState(false);
+  const [savingRole, setSavingRole] = useState(false);
   const [savingNotes, setSavingNotes] = useState(false);
   useEffect(() => {
     setGroupId(user?.group_id ?? '');
+    setRole((user?.role as Role) ?? '');
     setNotes(user?.admin_notes ?? '');
-  }, [user?.id, user?.group_id, user?.admin_notes]);
+  }, [user?.id, user?.group_id, user?.role, user?.admin_notes]);
 
   const isSelf = !!me && me.id === userId;
   const name = user?.full_name ?? user?.email ?? 'this user';
@@ -244,6 +248,22 @@ export function UserDetailPane({
     }
   }
 
+  async function saveRole() {
+    if (!user || savingRole || !role) return;
+    setSavingRole(true);
+    try {
+      await api.patch(`/admin/users/${user.id}/role`, { role });
+      setUser({ ...user, role });
+      toast.success(`Role changed to ${role}`);
+      onChanged();
+      invalidate('users');
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error ?? 'Role change failed');
+    } finally {
+      setSavingRole(false);
+    }
+  }
+
   async function saveNotes() {
     if (!user || savingNotes) return;
     setSavingNotes(true);
@@ -373,6 +393,25 @@ export function UserDetailPane({
                     onClick={saveGroup}
                     loading={savingGroup}
                     disabled={groupId === (user.group_id ?? '')}
+                  >
+                    Save
+                  </Button>
+                </div>
+
+                <div className="flex items-end gap-2">
+                  <div className="flex-1">
+                    <SelectInput
+                      label="Role"
+                      value={role}
+                      onChange={(e) => setRole(e.target.value as Role)}
+                      options={ALL_ROLES.map((r) => ({ value: r, label: r }))}
+                    />
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={saveRole}
+                    loading={savingRole}
+                    disabled={isSelf || role === user.role}
                   >
                     Save
                   </Button>
