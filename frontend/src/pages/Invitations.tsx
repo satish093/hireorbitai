@@ -13,9 +13,6 @@ import { invalidate } from '../hooks/useInvalidate';
 import { ADMIN_TIER } from '../types';
 import toast from 'react-hot-toast';
 
-// Master role list for the invite dropdown. We gate SUPER_ADMIN at render
-// time below — only an existing SUPER_ADMIN sees that option, matching the
-// backend check in invitations.controller.ts that 403s otherwise.
 const ALL_INVITE_OPTIONS = [
   { value: 'CONSULTANT', label: 'Consultant' },
   { value: 'RECRUITER', label: 'Recruiter' },
@@ -28,23 +25,17 @@ const ALL_INVITE_OPTIONS = [
   { value: 'SUPER_ADMIN', label: 'Super admin' },
 ];
 
-// Roles that require a parent in the hierarchy
-const ROLES_NEEDING_PARENT = new Set([
-  'CONSULTANT',
-  'RECRUITER',
-  'MANAGER',
-  'HR_MANAGER',
-  'DEVELOPER',
-]);
+type ParentUser = { id: string; full_name: string | null; email: string; role: string };
 
-type ParentOption = { id: string; full_name: string | null; email: string; role: string };
+type ParentsResponse = {
+  auto_parent: ParentUser | null;
+  candidates: ParentUser[];
+};
 
 export function Invitations() {
   const { profile } = useAuth();
   const isAdmin = !!profile && (ADMIN_TIER as string[]).includes(profile.role);
 
-  // Hide SUPER_ADMIN from the invite dropdown unless the inviter is itself
-  // a SUPER_ADMIN — backend rejects the post otherwise.
   const ROLE_OPTIONS =
     profile?.role === 'SUPER_ADMIN'
       ? ALL_INVITE_OPTIONS
@@ -57,11 +48,13 @@ export function Invitations() {
     role: string;
     group_id: string;
     parent_user_id: string;
+    manual_override: boolean;
   }>({
     email: '',
     role: 'CONSULTANT',
     group_id: '',
     parent_user_id: '',
+    manual_override: false,
   });
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -69,11 +62,11 @@ export function Invitations() {
     [],
   );
 
-  // Parent resolution state
-  const [parentOptions, setParentOptions] = useState<ParentOption[]>([]);
-  const [autoParentId, setAutoParentId] = useState<string | null>(null); // null = no auto-parent
-  const [autoParentResolved, setAutoParentResolved] = useState(false);
-  const [manualOverride, setManualOverride] = useState(false);
+  // Server-resolved parent state — the frontend never computes this itself.
+  const [parentsResp, setParentsResp] = useState<ParentsResponse | null>(null);
+  const [parentsLoading, setParentsLoading] = useState(false);
+  // When an admin clicks "Change", show the full dropdown with override mode.
+  const [showOverride, setShowOverride] = useState(false);
 
   function load() {
     setLoading(true);
@@ -92,57 +85,39 @@ export function Invitations() {
       .catch(() => {});
   }, []);
 
-  // Fetch available parents whenever the role changes
-  const fetchParents = useCallback(
-    async (role: string) => {
-      if (!ROLES_NEEDING_PARENT.has(role)) {
-        setParentOptions([]);
-        setAutoParentId(null);
-        setAutoParentResolved(true);
-        setManualOverride(false);
-        setForm((f) => ({ ...f, parent_user_id: '' }));
-        return;
+  // Ask the server to resolve the parent whenever the role changes.
+  // The server is the sole source of truth for auto_parent.
+  const fetchParents = useCallback(async (role: string) => {
+    setParentsLoading(true);
+    setParentsResp(null);
+    setShowOverride(false);
+    setForm((f) => ({ ...f, parent_user_id: '', manual_override: false }));
+    try {
+      const r = await api.get<ParentsResponse>('/invitations/available-parents', {
+        params: { invited_role: role },
+      });
+      const resp = r.data;
+      setParentsResp(resp);
+      // Pre-fill parent_user_id with the server-resolved auto_parent (if any).
+      if (resp.auto_parent) {
+        setForm((f) => ({ ...f, parent_user_id: resp.auto_parent!.id }));
+      } else if (resp.candidates.length === 1) {
+        setForm((f) => ({ ...f, parent_user_id: resp.candidates[0]!.id }));
       }
-      try {
-        const r = await api.get<ParentOption[]>('/invitations/available-parents', {
-          params: { invited_role: role },
-        });
-        const opts = r.data ?? [];
-        setParentOptions(opts);
-
-        // Auto-assign: if the current user is in the list, pre-select them
-        const self = opts.find((o) => o.id === profile?.id);
-        if (self) {
-          setAutoParentId(self.id);
-          setManualOverride(false);
-          setForm((f) => ({ ...f, parent_user_id: self.id }));
-        } else {
-          setAutoParentId(null);
-          setManualOverride(false);
-          setForm((f) => ({ ...f, parent_user_id: opts.length === 1 ? opts[0].id : '' }));
-        }
-        setAutoParentResolved(true);
-      } catch {
-        setParentOptions([]);
-        setAutoParentId(null);
-        setAutoParentResolved(true);
-      }
-    },
-    [profile?.id],
-  );
-
-  // Run when modal opens or role changes
-  useEffect(() => {
-    if (open) {
-      setAutoParentResolved(false);
-      fetchParents(form.role);
+    } catch {
+      setParentsResp({ auto_parent: null, candidates: [] });
+    } finally {
+      setParentsLoading(false);
     }
+  }, []);
+
+  // Re-fetch when modal opens or role changes.
+  useEffect(() => {
+    if (open) fetchParents(form.role);
   }, [open, form.role, fetchParents]);
 
   function handleRoleChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    const newRole = e.target.value;
-    setManualOverride(false);
-    setForm((f) => ({ ...f, role: newRole, parent_user_id: '' }));
+    setForm((f) => ({ ...f, role: e.target.value, parent_user_id: '', manual_override: false }));
   }
 
   async function send() {
@@ -151,10 +126,12 @@ export function Invitations() {
       toast.error('Email is required');
       return;
     }
-    // Require parent if needed and not resolved
-    if (ROLES_NEEDING_PARENT.has(form.role) && !form.parent_user_id) {
-      toast.error('Please select a parent user for this role');
-      return;
+    // Require parent if the server returned candidates (role needs a parent).
+    if (parentsResp && (parentsResp.auto_parent || parentsResp.candidates.length > 0)) {
+      if (!form.parent_user_id) {
+        toast.error('Please select a parent user for this role');
+        return;
+      }
     }
     setSending(true);
     try {
@@ -164,6 +141,8 @@ export function Invitations() {
         group_id: form.group_id || null,
         parent_user_id: form.parent_user_id || null,
       };
+      if (form.manual_override) payload.manual_override = true;
+
       const r = await api.post('/invitations', payload);
       if (r.data?.email_sent) {
         toast.success('Invitation email sent');
@@ -192,8 +171,14 @@ export function Invitations() {
         );
       }
       setOpen(false);
-      setForm({ email: '', role: 'CONSULTANT', group_id: '', parent_user_id: '' });
-      setManualOverride(false);
+      setForm({
+        email: '',
+        role: 'CONSULTANT',
+        group_id: '',
+        parent_user_id: '',
+        manual_override: false,
+      });
+      setShowOverride(false);
       load();
       invalidate('invitations');
     } catch (e: any) {
@@ -225,34 +210,37 @@ export function Invitations() {
     }
   }
 
-  // Parent field UI inside the modal
+  // Parent field — frontend only renders what the server resolved.
   function renderParentField() {
-    if (!ROLES_NEEDING_PARENT.has(form.role)) return null;
-    if (!autoParentResolved) {
-      return <div className="text-xs text-muted py-1">Loading parent options…</div>;
+    // No parent needed for this role (admin tier).
+    if (parentsResp && !parentsResp.auto_parent && parentsResp.candidates.length === 0) {
+      return null;
     }
 
-    // Auto-assigned to the inviter themselves
-    if (autoParentId && !manualOverride) {
-      const self = parentOptions.find((o) => o.id === autoParentId);
+    if (parentsLoading || !parentsResp) {
+      return <div className="text-xs text-muted py-1">Resolving parent…</div>;
+    }
+
+    // Server resolved an auto-parent — show green chip unless admin chose to override.
+    if (parentsResp.auto_parent && !showOverride) {
+      const ap = parentsResp.auto_parent;
       return (
         <div className="flex items-center justify-between rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 px-3 py-2">
           <div>
             <span className="text-xs font-medium text-green-700 dark:text-green-400">
-              Auto-assigned to you
+              Auto-assigned
             </span>
-            <span className="ml-1 text-xs text-muted">
-              ({self?.full_name ?? self?.email ?? ''} ·{' '}
-              {form.role === 'CONSULTANT' ? 'RECRUITER' : 'MANAGER'})
+            <span className="ml-1.5 text-xs text-muted">
+              {ap.full_name ?? ap.email} · {ap.role}
             </span>
           </div>
-          {isAdmin && (
+          {isAdmin && parentsResp.candidates.length > 1 && (
             <button
               type="button"
               className="text-xs text-brand-600 hover:underline ml-2 shrink-0"
               onClick={() => {
-                setManualOverride(true);
-                setForm((f) => ({ ...f, parent_user_id: autoParentId }));
+                setShowOverride(true);
+                setForm((f) => ({ ...f, manual_override: true }));
               }}
             >
               Change
@@ -262,17 +250,16 @@ export function Invitations() {
       );
     }
 
-    // No options available
-    if (parentOptions.length === 0) {
+    // No auto-parent or admin override — show required dropdown.
+    if (parentsResp.candidates.length === 0) {
       return (
         <div className="rounded-lg border border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-900/20 px-3 py-2 text-xs text-yellow-700 dark:text-yellow-400">
-          No eligible parent users found. Invite a manager-tier user first, or an admin can
-          override.
+          No eligible parent users found for this role. Invite a{' '}
+          {parentsResp.auto_parent?.role ?? 'higher-tier'} user first, or contact an admin.
         </div>
       );
     }
 
-    // Dropdown for manual/forced selection
     return (
       <SelectInput
         label={`Parent user *`}
@@ -280,7 +267,7 @@ export function Invitations() {
         onChange={(e) => setForm((f) => ({ ...f, parent_user_id: e.target.value }))}
         options={[
           { value: '', label: 'Select parent…' },
-          ...parentOptions.map((o) => ({
+          ...parentsResp.candidates.map((o) => ({
             value: o.id,
             label: `${o.full_name ?? o.email} (${o.role})`,
           })),
@@ -351,7 +338,7 @@ export function Invitations() {
         open={open}
         onClose={() => {
           setOpen(false);
-          setManualOverride(false);
+          setShowOverride(false);
         }}
         title="Invite user"
         description="A welcome email goes out with a one-time setup link."
@@ -361,7 +348,7 @@ export function Invitations() {
               Cancel
             </Button>
             <Button onClick={send} loading={sending}>
-              {sending ? 'Sending' : 'Send invite'}
+              {sending ? 'Sending…' : 'Send invite'}
             </Button>
           </>
         }

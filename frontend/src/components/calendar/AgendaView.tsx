@@ -128,7 +128,7 @@ function MobileEventCard({
       {/* Meta row */}
       <div className="mt-2 ml-4 flex flex-wrap items-center gap-x-3 gap-y-1">
         {/* Time + duration */}
-        <span className={clsx('text-[13px] font-medium', tone.text)}>{fmtTime(ev.start)}</span>
+        <span className="text-[13px] font-medium text-ink-2">{fmtTime(ev.start)}</span>
         <span className="text-[12px] text-muted font-mono">{fmtDuration(ev.durationMin)}</span>
 
         {/* Attendee */}
@@ -214,9 +214,7 @@ export function AgendaView({
               <div
                 className={clsx(
                   'w-10 h-10 rounded-full grid place-items-center shrink-0 font-mono text-[15px] font-bold',
-                  sameDay(group.day, new Date())
-                    ? 'bg-accent text-white'
-                    : 'bg-bg-sunken text-muted',
+                  sameDay(group.day, new Date()) ? 'bg-accent text-bg' : 'bg-bg-sunken text-muted',
                 )}
               >
                 {group.day.getDate()}
@@ -274,7 +272,6 @@ export function AgendaView({
               return (
                 <div
                   key={ev.id}
-                  role="button"
                   tabIndex={0}
                   onClick={() => onSelect(ev.id)}
                   onKeyDown={(e) => {

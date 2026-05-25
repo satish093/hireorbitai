@@ -1,74 +1,190 @@
 /**
  * Canonical invitation hierarchy logic.
  *
- * Single source of truth for:
- *   - Which parent roles are valid for each invited role
- *   - Automatic parent resolution from the inviter's position in the org tree
- *   - Wiring hierarchy relationships (consultants.recruiter_id,
- *     recruiter_managers, users.reports_to) when an invitation is accepted
+ * Rank-based flexible hierarchy:
+ *   CONSULTANT  → RECRUITER  (rank ≥ 2) — MANAGER / HR_MANAGER / admin-tier all valid too
+ *   RECRUITER   → MANAGER    (rank ≥ 4) — HR_MANAGER / admin-tier also valid
+ *   MANAGER     → HR_MANAGER (rank ≥ 5) — admin-tier also valid
+ *   HR_MANAGER  → DIRECTOR   (rank ≥ 6) — CTO / CEO / SUPER_ADMIN also valid
+ *   DEVELOPER   → MANAGER    (rank ≥ 4) — HR_MANAGER / admin-tier also valid
  *
- * Pure functions (getExpectedParentRoles, isValidParentRole) are unit-testable
- * without DB access. Async functions (resolveAutoParent, wireHierarchy) receive
- * the db shim so they can be mocked in tests.
+ * Admin-tier roles (SUPER_ADMIN, CEO, CTO, DIRECTOR) require no parent.
+ *
+ * Auto-assignment algorithm (in order):
+ *   1. Inviter rank ≥ required parent rank → inviter becomes the parent.
+ *   2. Walk inviter's hierarchy upward (reports_to + recruiter_managers)
+ *      until a user with sufficient rank is found.
+ *   3. Workspace search: if exactly one active user holds the default parent
+ *      role → auto-assign.  Multiple or zero → null (manual selection needed).
+ *
+ * Manual override: SUPER_ADMIN may bypass hierarchy entirely by setting
+ * manual_override=true on the invitation request.  Lower roles can manually
+ * choose any parent that passes isAllowedParent() within their authority.
  */
 
 import { db } from '../config/db';
 import type { Role } from '../types';
 
-/**
- * Maps an invited role to the set of roles that are valid parents.
- * ADMIN_TIER roles are intentionally absent — they don't require a parent.
- */
-export const PARENT_ROLE_MAP: Partial<Record<Role, Role[]>> = {
-  CONSULTANT: ['RECRUITER'],
-  RECRUITER: ['MANAGER', 'HR_MANAGER', 'DIRECTOR', 'CTO', 'CEO', 'SUPER_ADMIN'],
-  MANAGER: ['HR_MANAGER', 'DIRECTOR', 'CTO', 'CEO', 'SUPER_ADMIN'],
-  HR_MANAGER: ['DIRECTOR', 'CTO', 'CEO', 'SUPER_ADMIN'],
-  DEVELOPER: ['MANAGER', 'HR_MANAGER', 'DIRECTOR', 'CTO', 'CEO', 'SUPER_ADMIN'],
+// ---------------------------------------------------------------------------
+// Rank table — single source of truth for authority ordering
+// ---------------------------------------------------------------------------
+
+export const ROLE_RANK: Record<Role, number> = {
+  SUPER_ADMIN: 9,
+  CEO: 8,
+  CTO: 7,
+  DIRECTOR: 6,
+  HR_MANAGER: 5,
+  MANAGER: 4,
+  DEVELOPER: 3,
+  RECRUITER: 2,
+  CONSULTANT: 1,
 };
 
-/** Returns the expected parent roles for an invited role, or null if no parent is needed. */
-export function getExpectedParentRoles(invitedRole: Role): Role[] | null {
-  return PARENT_ROLE_MAP[invitedRole] ?? null;
+/**
+ * Minimum-rank parent role for each invited role.
+ * Admin-tier roles are absent — they need no parent.
+ */
+const DEFAULT_PARENT_ROLE: Partial<Record<Role, Role>> = {
+  CONSULTANT: 'RECRUITER', // rank 2 minimum
+  RECRUITER: 'MANAGER', // rank 4 minimum
+  MANAGER: 'HR_MANAGER', // rank 5 minimum
+  HR_MANAGER: 'DIRECTOR', // rank 6 minimum (lowest admin-tier above HR_MANAGER)
+  DEVELOPER: 'MANAGER', // rank 4 minimum
+};
+
+// ---------------------------------------------------------------------------
+// Pure rank helpers
+// ---------------------------------------------------------------------------
+
+export function getRoleRank(role: Role): number {
+  return ROLE_RANK[role] ?? 0;
 }
 
-/** Returns true if parentRole is a valid parent for invitedRole. */
-export function isValidParentRole(invitedRole: Role, parentRole: Role): boolean {
-  const expected = getExpectedParentRoles(invitedRole);
-  if (!expected) return true; // no parent required for admin-tier roles
-  return expected.includes(parentRole);
+export function isHigherThan(roleA: Role, roleB: Role): boolean {
+  return getRoleRank(roleA) > getRoleRank(roleB);
+}
+
+/** Actor strictly outranks target. */
+export function canManageRole(actorRole: Role, targetRole: Role): boolean {
+  return getRoleRank(actorRole) > getRoleRank(targetRole);
+}
+
+// ---------------------------------------------------------------------------
+// Parent-role helpers
+// ---------------------------------------------------------------------------
+
+/** Returns the default (minimum) parent role for an invited role, or null for admin-tier. */
+export function getDefaultParentRole(invitedRole: Role): Role | null {
+  return DEFAULT_PARENT_ROLE[invitedRole] ?? null;
 }
 
 /**
- * Tries to determine the correct parent user automatically.
+ * Any role whose rank ≥ the default parent's rank is a valid parent.
+ * For admin-tier invited roles (no parent required) always returns true.
+ */
+export function isAllowedParent(invitedRole: Role, parentRole: Role): boolean {
+  const defaultParent = getDefaultParentRole(invitedRole);
+  if (!defaultParent) return true; // admin-tier: no parent required
+  return getRoleRank(parentRole) >= getRoleRank(defaultParent);
+}
+
+/** Backward-compat alias — delegates to isAllowedParent. */
+export function isValidParentRole(invitedRole: Role, parentRole: Role): boolean {
+  return isAllowedParent(invitedRole, parentRole);
+}
+
+/**
+ * Returns the default parent role as a single-item array for error messages.
+ * Returns null for admin-tier roles that need no parent.
+ */
+export function getExpectedParentRoles(invitedRole: Role): Role[] | null {
+  const def = getDefaultParentRole(invitedRole);
+  return def ? [def] : null;
+}
+
+/**
+ * Returns every role whose rank satisfies the parent requirement for invitedRole.
+ * Used to build the candidates list in availableParents.
+ */
+export function getAllValidParentRoles(invitedRole: Role): Role[] | null {
+  const defaultParent = getDefaultParentRole(invitedRole);
+  if (!defaultParent) return null;
+  const minRank = getRoleRank(defaultParent);
+  return (Object.keys(ROLE_RANK) as Role[]).filter((r) => getRoleRank(r) >= minRank);
+}
+
+/**
+ * The inviter can become the parent if their rank ≥ the minimum required parent rank.
+ */
+export function canInviterBecomeParent(invitedRole: Role, inviterRole: Role): boolean {
+  return isAllowedParent(invitedRole, inviterRole);
+}
+
+/**
+ * Can the actor manually choose chosenParentRole as the parent for invitedRole?
+ *   SUPER_ADMIN: always yes.
+ *   Others: the chosen parent must pass isAllowedParent AND the actor must
+ *           outrank the invited role.
+ */
+export function canManualOverride(
+  actorRole: Role,
+  invitedRole: Role,
+  chosenParentRole: Role,
+): boolean {
+  if (actorRole === 'SUPER_ADMIN') return true;
+  if (!isAllowedParent(invitedRole, chosenParentRole)) return false;
+  return canManageRole(actorRole, invitedRole);
+}
+
+// ---------------------------------------------------------------------------
+// Async resolution helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Server-side auto-parent resolution.  Never call this from the frontend.
  *
  * Resolution order:
- *   1. If the inviter's own role is in the expected parent roles → inviter is the parent.
- *   2. Otherwise walk the inviter's hierarchy upward — first via users.reports_to,
- *      then via recruiter_managers / recruiters.manager_id — until a user with an
- *      expected parent role is found.
- *   3. If none is found → returns null (caller must require manual selection).
+ *   1. Inviter rank ≥ default parent rank → inviter is the parent.
+ *   2. Walk inviter's hierarchy upward (reports_to + recruiter_managers)
+ *      until a user with sufficient rank is found.
+ *   3. Workspace search: if exactly one active user holds the default parent
+ *      role → auto-assign.  Multiple or zero → return null.
  */
 export async function resolveAutoParent(
   invitedRole: Role,
   inviter: { id: string; role: Role },
 ): Promise<string | null> {
-  const expected = getExpectedParentRoles(invitedRole);
-  if (!expected) return null; // no parent needed
+  const defaultParent = getDefaultParentRole(invitedRole);
+  if (!defaultParent) return null; // admin-tier: no parent needed
 
-  // Case 1: inviter IS the right kind of parent
-  if (expected.includes(inviter.role)) return inviter.id;
+  // Case 1: inviter rank ≥ required parent rank → inviter becomes the parent
+  if (canInviterBecomeParent(invitedRole, inviter.role)) return inviter.id;
 
-  // Case 2: inviter is above the expected tier → walk up their hierarchy
-  return _findParentUpHierarchy(inviter.id, expected);
+  // Case 2: walk inviter's hierarchy upward
+  const walked = await _findParentUpHierarchy(inviter.id, defaultParent);
+  if (walked) return walked;
+
+  // Case 3: workspace search — auto-assign only when exactly one candidate
+  const { data } = await db
+    .from('users')
+    .select('id')
+    .eq('role', defaultParent as string)
+    .eq('is_active', true);
+  const candidates = (data ?? []) as Array<{ id: string }>;
+  if (candidates.length === 1) return candidates[0]!.id;
+
+  return null;
 }
 
-/** Walk up the org tree from userId to find the first user with one of expectedRoles. */
+/** Walk up the org tree from userId, returning the first user with rank ≥ minRank. */
 async function _findParentUpHierarchy(
   userId: string,
-  expectedRoles: Role[],
+  defaultParentRole: Role,
 ): Promise<string | null> {
-  // Check reports_to chain (works for managers whose HR mgr is set)
+  const minRank = getRoleRank(defaultParentRole);
+
+  // reports_to chain (managers, HR managers, etc.)
   const { data: user } = await db.from('users').select('reports_to').eq('id', userId).maybeSingle();
   const reportsTo = (user as { reports_to?: string | null } | null)?.reports_to;
   if (reportsTo) {
@@ -78,10 +194,10 @@ async function _findParentUpHierarchy(
       .eq('id', reportsTo)
       .maybeSingle();
     const p = parent as { id: string; role: Role } | null;
-    if (p && expectedRoles.includes(p.role)) return p.id;
+    if (p && getRoleRank(p.role) >= minRank) return p.id;
   }
 
-  // For recruiters: check legacy manager_id + recruiter_managers junction
+  // For recruiters: check legacy manager_id on recruiters row
   const { data: rec } = await db
     .from('recruiters')
     .select('id, manager_id')
@@ -96,9 +212,10 @@ async function _findParentUpHierarchy(
       .eq('id', recRow.manager_id)
       .maybeSingle();
     const m = mgr as { id: string; role: Role } | null;
-    if (m && expectedRoles.includes(m.role)) return m.id;
+    if (m && getRoleRank(m.role) >= minRank) return m.id;
   }
 
+  // For recruiters: check recruiter_managers junction
   if (recRow?.id) {
     const { data: junction } = await db
       .from('recruiter_managers')
@@ -113,22 +230,23 @@ async function _findParentUpHierarchy(
         .eq('id', mgrs[0]!.manager_id)
         .maybeSingle();
       const m = mgr as { id: string; role: Role } | null;
-      if (m && expectedRoles.includes(m.role)) return m.id;
+      if (m && getRoleRank(m.role) >= minRank) return m.id;
     }
   }
 
   return null;
 }
 
+// ---------------------------------------------------------------------------
+// Hierarchy wiring (called after account creation)
+// ---------------------------------------------------------------------------
+
 /**
  * Wires the new user into the org hierarchy based on their invited role and
- * the designated parent. Called from both the setup (new account) and accept
- * (role-upgrade) flows after the user row exists.
+ * the designated parent.  Called after the user row exists.
  *
- * Failures are intentionally non-fatal — the outer caller wraps this in a
- * try/catch so a missing profile row or unapplied migration doesn't break the
- * account-creation path. The user is created correctly; admins can manually
- * fix the hierarchy if needed.
+ * Non-fatal by design — callers wrap this in try/catch so a missing profile
+ * row or unapplied migration doesn't break the account-creation path.
  */
 export async function wireHierarchy(
   newUserId: string,
@@ -138,7 +256,7 @@ export async function wireHierarchy(
   if (!parentUserId) return;
 
   if (invitedRole === 'CONSULTANT') {
-    // Find the parent's recruiters row to get the recruiter UUID
+    // Attempt to wire consultant → recruiter row if parent is a recruiter
     const { data: rec } = await db
       .from('recruiters')
       .select('id')
@@ -146,13 +264,17 @@ export async function wireHierarchy(
       .maybeSingle();
     const recRow = rec as { id: string } | null;
     if (recRow) {
-      await db
-        .from('consultants')
-        .upsert({ user_id: newUserId, recruiter_id: recRow.id }, { onConflict: 'user_id' });
+      try {
+        await db
+          .from('consultants')
+          .upsert({ user_id: newUserId, recruiter_id: recRow.id }, { onConflict: 'user_id' });
+      } catch {
+        // parent may not be a recruiter (e.g. manager as parent) — graceful skip
+      }
     }
     await db.from('users').update({ reports_to: parentUserId }).eq('id', newUserId);
   } else if (invitedRole === 'RECRUITER') {
-    // Create or update the recruiters profile row
+    // Create / update the recruiter's profile row
     const { data: rec } = await db
       .from('recruiters')
       .upsert({ user_id: newUserId, manager_id: parentUserId }, { onConflict: 'user_id' })
@@ -160,7 +282,6 @@ export async function wireHierarchy(
       .single();
     const recRow = rec as { id: string } | null;
     if (recRow) {
-      // Wire the recruiter_managers junction (is_primary = true for the first manager)
       try {
         await db
           .from('recruiter_managers')
@@ -169,7 +290,7 @@ export async function wireHierarchy(
             { onConflict: 'recruiter_id,manager_id' },
           );
       } catch {
-        // Migration may not be applied yet — graceful degradation
+        // recruiter_managers migration may not be applied yet — graceful degradation
       }
     }
     await db.from('users').update({ reports_to: parentUserId }).eq('id', newUserId);

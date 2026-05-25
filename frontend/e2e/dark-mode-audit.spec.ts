@@ -41,12 +41,14 @@ async function setupManagerPage(page: Page, extra: Record<string, { json: unknow
   });
 }
 
-/** Inject dark mode and wait one paint cycle for computed styles to settle. */
+/** Inject dark mode and wait two paint cycles for computed styles to settle. */
 async function enableDarkMode(page: Page) {
   await page.evaluate(() => {
     document.documentElement.setAttribute('data-theme', 'dark');
   });
-  await page.evaluate(() => new Promise<void>((r) => requestAnimationFrame(() => r())));
+  await page.evaluate(
+    () => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))),
+  );
 }
 
 async function auditPage(
@@ -147,6 +149,7 @@ test.describe('Dark mode — Desktop', () => {
     await setupManagerPage(page);
     await page.goto('/interviews');
     await page.waitForLoadState('load');
+    await expect(page.getByText('Phone Screen').first()).toBeVisible({ timeout: 8000 });
     await enableDarkMode(page);
     const v = await auditPage(page, 'dark-desktop-interviews');
     expect(v, `${v.length} violation(s) on dark desktop /interviews`).toHaveLength(0);
@@ -296,7 +299,7 @@ test.describe('Dark mode — Mobile', () => {
   test('interviews — dark mode mobile', async ({ page }) => {
     await setupManagerPage(page);
     await page.goto('/interviews');
-    await page.waitForLoadState('load');
+    await page.waitForLoadState('networkidle');
     await enableDarkMode(page);
     const v = await auditPage(page, 'dark-mobile-interviews');
     expect(v, `${v.length} violation(s) on dark mobile /interviews`).toHaveLength(0);

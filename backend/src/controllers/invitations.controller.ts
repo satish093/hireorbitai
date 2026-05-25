@@ -5,8 +5,9 @@ import { env } from '../config/env';
 import { createInvitation, acceptInvitation } from '../services/invitation.service';
 import {
   resolveAutoParent,
-  isValidParentRole,
+  isAllowedParent,
   getExpectedParentRoles,
+  getAllValidParentRoles,
   wireHierarchy,
 } from '../services/invitationHierarchy.service';
 import { canViewUser } from '../services/permission.service';
@@ -29,8 +30,11 @@ const createSchema = z.object({
   // Optional group pre-assignment. null / undefined / omitted == "No Group" —
   // the invited user lands with users.group_id = NULL.
   group_id: z.string().uuid().nullable().optional(),
-  // Optional manual parent override. Omit for auto-resolution from the inviter.
+  // Parent assignment. Omit for server-side auto-resolution.
   parent_user_id: z.string().uuid().nullable().optional(),
+  // Admin-tier only: bypass strict hierarchy validation for the parent.
+  // Ignored (and rejected) for non-admin callers.
+  manual_override: z.boolean().optional(),
 });
 
 export const create: RequestHandler = async (req, res) => {
@@ -57,15 +61,18 @@ export const create: RequestHandler = async (req, res) => {
   let assignedMode: 'auto' | 'manual' = 'auto';
   let assignedBy: string | null = null;
 
+  const isAdminCaller = (ADMIN_TIER as Role[]).includes(req.user.role);
+
   if (parsed.data.parent_user_id) {
-    // Manual override — validate the caller has permission to assign this parent
     const pId = parsed.data.parent_user_id;
-    const isAdmin = (ADMIN_TIER as Role[]).includes(req.user.role);
-    if (!isAdmin) {
+
+    // Non-admins must be able to see the target user via the permission service.
+    if (!isAdminCaller) {
       const canSee = await canViewUser({ id: req.user.id, role: req.user.role }, pId);
       if (!canSee) throw httpError(403, 'You do not have permission to assign this parent.');
     }
-    // Validate the parent's role is appropriate for the invited role
+
+    // Load the target parent user.
     const { data: parentRow } = await db
       .from('users')
       .select('id, role, is_active')
@@ -73,18 +80,22 @@ export const create: RequestHandler = async (req, res) => {
       .maybeSingle();
     const parent = parentRow as { id: string; role: Role; is_active: boolean | null } | null;
     if (!parent || parent.is_active === false) throw httpError(404, 'Parent user not found.');
-    if (!isValidParentRole(requestedRole, parent.role)) {
+
+    // Hierarchy check — SUPER_ADMIN with manual_override=true may bypass entirely.
+    const bypassHierarchy = parsed.data.manual_override === true && req.user.role === 'SUPER_ADMIN';
+    if (!bypassHierarchy && !isAllowedParent(requestedRole, parent.role)) {
       const expected = getExpectedParentRoles(requestedRole);
       throw httpError(
         422,
-        `Invalid parent role. A ${requestedRole} must be placed under: ${expected?.join(', ') ?? 'none'}.`,
+        `Invalid parent role. A ${requestedRole} requires a parent at or above the ${expected?.join(', ') ?? 'admin'} level.`,
       );
     }
+
     parentUserId = pId;
     assignedMode = 'manual';
     assignedBy = req.user.id;
   } else {
-    // Auto-resolve from the inviter's position in the org tree
+    // Server-side auto-resolution — frontend never guesses the parent.
     parentUserId = await resolveAutoParent(requestedRole, {
       id: req.user.id,
       role: req.user.role,
@@ -103,11 +114,16 @@ export const create: RequestHandler = async (req, res) => {
   res.status(201).json(invitation);
 };
 
-export const list: RequestHandler = async (_req, res) => {
-  const { data, error } = await db
-    .from('invitations')
-    .select('*')
-    .order('created_at', { ascending: false });
+export const list: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const isAdmin = (ADMIN_TIER as Role[]).includes(req.user.role);
+
+  // Non-admins only see invitations they created — prevents token leakage
+  // across groups and IDOR-style enumeration of other managers' invite links.
+  let query = db.from('invitations').select('*').order('created_at', { ascending: false });
+  if (!isAdmin) query = (query as any).eq('invited_by', req.user.id);
+
+  const { data, error } = await query;
   if (error) throw httpError(500, error.message);
   // Surface the accept URL for PENDING invitations so managers can copy the
   // link manually if the email failed to send. Use frontendUrl — the same
@@ -130,46 +146,71 @@ export const accept: RequestHandler = async (req, res) => {
   res.json(result);
 };
 
+/**
+ * Returns the server-resolved auto-parent plus the full candidate list for the
+ * given invited_role. The frontend must NOT compute the parent — it only renders
+ * what this endpoint returns.
+ *
+ * Response shape:
+ *   { auto_parent: ParentUser | null, candidates: ParentUser[] }
+ *
+ * auto_parent is non-null when the server can unambiguously resolve a single
+ * parent (inviter IS the required role, or exactly one candidate in scope).
+ * When null the frontend must show a required dropdown from candidates.
+ */
 export const availableParents: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   const invitedRole = String(req.query.invited_role ?? '') as Role;
-  const expectedRoles = getExpectedParentRoles(invitedRole);
-  if (!expectedRoles) return res.json([]);
+  const validParentRoles = getAllValidParentRoles(invitedRole);
+
+  // Roles that need no parent (admin tier) — nothing to show.
+  if (!validParentRoles) return res.json({ auto_parent: null, candidates: [] });
+
+  type ParentUser = { id: string; full_name: string | null; email: string; role: Role };
 
   const isAdmin = (ADMIN_TIER as Role[]).includes(req.user.role);
-  let callerGroupId: string | null = null;
+
+  // 1. Fetch all active users whose role satisfies the parent rank requirement.
+  const { data, error } = await db
+    .from('users')
+    .select('id, full_name, email, role, group_id')
+    .in('role', validParentRoles as unknown as string[])
+    .eq('is_active', true);
+  if (error) throw httpError(500, error.message);
+
+  type ParentRow = ParentUser & { group_id: string | null };
+  let all = (data ?? []) as ParentRow[];
+
+  // 2. Scope to same group for non-admins (admins see workspace-wide).
   if (!isAdmin) {
     const { data: me } = await db
       .from('users')
       .select('group_id')
       .eq('id', req.user.id)
       .maybeSingle();
-    callerGroupId = (me as { group_id?: string | null } | null)?.group_id ?? null;
+    const callerGroupId = (me as { group_id?: string | null } | null)?.group_id ?? null;
+    if (callerGroupId) {
+      const adminRoles = ADMIN_TIER as Role[];
+      all = all.filter((u) => u.group_id === callerGroupId || adminRoles.includes(u.role));
+    }
   }
 
-  const { data, error } = await db
-    .from('users')
-    .select('id, full_name, email, role, group_id')
-    .in('role', expectedRoles as unknown as string[])
-    .neq('is_active', false);
-  if (error) throw httpError(500, error.message);
+  const candidates: ParentUser[] = all.map((u) => ({
+    id: u.id,
+    full_name: u.full_name,
+    email: u.email,
+    role: u.role,
+  }));
 
-  type ParentRow = {
-    id: string;
-    full_name: string | null;
-    email: string;
-    role: Role;
-    group_id: string | null;
-  };
-  let results = (data ?? []) as ParentRow[];
-  if (!isAdmin && callerGroupId) {
-    const adminRoles = ADMIN_TIER as Role[];
-    results = results.filter((u) => u.group_id === callerGroupId || adminRoles.includes(u.role));
-  }
+  // 3. Server-side auto-resolution — the only source of truth for the frontend.
+  const autoId = await resolveAutoParent(invitedRole, {
+    id: req.user.id,
+    role: req.user.role,
+  });
+  // The resolved ID must be in the scoped candidates list to be surfaced.
+  const auto_parent = autoId ? (candidates.find((c) => c.id === autoId) ?? null) : null;
 
-  res.json(
-    results.map((u) => ({ id: u.id, full_name: u.full_name, email: u.email, role: u.role })),
-  );
+  res.json({ auto_parent, candidates });
 };
 
 /**
@@ -329,7 +370,18 @@ export const setup: RequestHandler = async (req, res) => {
 };
 
 export const revoke: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
   const { id } = req.params;
+  const isAdmin = (ADMIN_TIER as Role[]).includes(req.user.role);
+  const { data: inv } = await db
+    .from('invitations')
+    .select('id, invited_by')
+    .eq('id', id)
+    .maybeSingle();
+  if (!inv) throw httpError(404, 'Invitation not found');
+  if (!isAdmin && (inv as any).invited_by !== req.user.id) {
+    throw httpError(404, 'Invitation not found');
+  }
   const { error } = await db.from('invitations').update({ status: 'REVOKED' }).eq('id', id);
   if (error) throw httpError(500, error.message);
   res.json({ ok: true });

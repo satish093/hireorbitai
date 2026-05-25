@@ -143,15 +143,16 @@ Every controller that touches a column added by a late-arrival migration has ret
 - **Logger** — pino with redaction in `config/logger.ts`. Use `req.log` inside handlers; it inherits requestId.
 - **Commit messages** — Conventional Commits (`feat`, `fix`, `chore`, `docs`, `refactor`, `perf`, `test`, `build`, `ci`, `revert`, `release`). The commit-msg hook warns but doesn't enforce (set `HIREORBITAI_STRICT_COMMITS=1` to enforce).
 
-## Deploy story
+## VPS / SSH access policy
 
-- `chore/full-refactor` and other working branches: free for development.
-- Push to **`main`** to trigger `.github/workflows/deploy-production.yml` — SSH-deploys to the VPS via `scripts/update.sh` (git pull + build + PM2 reload + smoke).
-- After deploy, apply any pending SQL migrations:
-  ```bash
-  set -a; source ~/hireorbitai/backend/.env; set +a
-  psql "$DATABASE_URL" -f ~/hireorbitai/database/<file>.sql
-  ```
+Claude may SSH into the server to run read-only diagnostics, inspect logs, and execute tests.
+
+- Prefer SSH key authentication over password authentication.
+- Do not ask the user to paste passwords into chat.
+- If SSH is blocked by Claude Code permissions, deny-lists, hooks, or approval settings, do not retry repeatedly.
+- Explain that SSH was denied by local permissions or repository rules, then ask the user to run the command manually and paste the output.
+- For production verification, run tests and log checks before making changes.
+- Use `pm2 logs`, `pm2 status`, and related diagnostics when investigating server issues.
 - PM2 ecosystem at `backend/ecosystem.config.cjs`; logs at `~/.pm2/logs/` on the VPS.
 
 ## Pitfalls
