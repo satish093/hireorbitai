@@ -81,21 +81,19 @@ export function ResumePreview({
 
   if (loading) {
     return (
-      <div className="rounded-2xl overflow-hidden bg-gradient-to-b from-slate-100 to-slate-200 dark:from-slate-600 dark:to-slate-700 p-6 sm:p-10 flex justify-center">
-        <div className="bg-white w-full max-w-[720px] rounded-sm px-10 py-12 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.08),0_12px_32px_-4px_rgba(0,0,0,0.14)]">
-          <div className="flex flex-col items-center mb-8 gap-2">
-            <Skeleton className="h-7 w-48" />
-            <Skeleton className="h-2.5 w-px bg-indigo-300" />
-            <Skeleton className="h-3 w-64" />
-          </div>
-          <Skeleton className="h-3 w-24 mb-4" />
-          <Skeleton className="h-3 w-full mb-2" />
-          <Skeleton className="h-3 w-5/6 mb-2" />
-          <Skeleton className="h-3 w-4/6 mb-6" />
-          <Skeleton className="h-3 w-24 mb-4" />
-          <Skeleton className="h-3 w-full mb-2" />
-          <Skeleton className="h-3 w-3/4" />
+      <div className="bg-white rounded-xl border border-slate-200 shadow-md px-8 sm:px-12 py-8 sm:py-10">
+        <div className="flex flex-col items-center mb-8 gap-2">
+          <Skeleton className="h-7 w-48" />
+          <Skeleton className="h-2.5 w-px bg-indigo-300" />
+          <Skeleton className="h-3 w-64" />
         </div>
+        <Skeleton className="h-3 w-24 mb-4" />
+        <Skeleton className="h-3 w-full mb-2" />
+        <Skeleton className="h-3 w-5/6 mb-2" />
+        <Skeleton className="h-3 w-4/6 mb-6" />
+        <Skeleton className="h-3 w-24 mb-4" />
+        <Skeleton className="h-3 w-full mb-2" />
+        <Skeleton className="h-3 w-3/4" />
       </div>
     );
   }
@@ -146,16 +144,13 @@ export function ResumePreview({
         </Button>
       </div>
 
-      {/* Tray — gradient neutral bg so the white paper stands out */}
-      <div className="overflow-y-auto max-h-[72vh] bg-gradient-to-b from-slate-200 to-slate-300 dark:from-slate-600 dark:to-slate-700 rounded-2xl p-5 sm:p-8 flex justify-center">
-        {/* Paper — always white regardless of app theme; matches what will print */}
-        <div
-          ref={paperRef}
-          className={`bg-white text-slate-900 w-full max-w-[720px] rounded-[2px] shadow-[0_2px_4px_rgba(0,0,0,0.06),0_8px_24px_-4px_rgba(0,0,0,0.16),0_0_0_1px_rgba(0,0,0,0.04)] px-10 sm:px-14 py-10 sm:py-12 print:!bg-white print:!text-slate-900 print:shadow-none print:max-w-none print:px-0 print:py-0 transition-opacity duration-300 ${refreshing ? 'opacity-60' : 'opacity-100'}`}
-          style={{ fontFamily: "'Helvetica Neue', Arial, ui-sans-serif, system-ui, sans-serif" }}
-        >
-          <MarkdownView md={body ?? ''} />
-        </div>
+      {/* Paper — scrollable document; always white so PDF export matches screen */}
+      <div
+        ref={paperRef}
+        className={`overflow-y-auto max-h-[72vh] bg-white text-slate-900 w-full rounded-xl border border-slate-200 shadow-md px-8 sm:px-12 py-8 sm:py-10 print:!bg-white print:!text-slate-900 print:shadow-none print:border-none print:overflow-visible print:max-h-none print:px-0 print:py-0 transition-opacity duration-300 ${refreshing ? 'opacity-60' : 'opacity-100'}`}
+        style={{ fontFamily: "'Helvetica Neue', Arial, ui-sans-serif, system-ui, sans-serif" }}
+      >
+        <MarkdownView md={body ?? ''} />
       </div>
     </div>
   );
