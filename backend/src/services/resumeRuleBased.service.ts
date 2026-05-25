@@ -368,16 +368,34 @@ export function parseResumeProfileRuleBased(text: string): ResumeProfile {
   const webMatch = text.match(/https?:\/\/(?!(?:www\.)?linkedin)[^\s<>"'\)]+/i);
   const website = webMatch?.[0] ?? null;
 
-  // --- Name: first line matching "FirstName Lastname" that isn't contact info ---
-  const NAME_RE = /^[A-Z][a-z]+(?:\s+[A-Z][a-z]*\.?){1,3}$/;
+  // --- Name: first line that looks like a personal name, not contact info ---
+  // Title Case: "John Smith", "Mary Jane Watson"
+  const NAME_TITLE_RE = /^[A-Z][a-z]+(?:\s+[A-Z][a-z]*\.?){1,3}$/;
+  // ALL CAPS (common in some PDF extractors): "JOHN SMITH"
+  const NAME_ALLCAPS_RE = /^[A-Z]+(?:\s+[A-Z]+\.?){1,3}$/;
+  // CamelCase-concatenated (pdf.js drops the space for large display fonts): "HaydenSmith"
+  const NAME_CAMEL_RE = /^[A-Z][a-z]+(?:[A-Z][a-z]+){1,3}$/;
   let name: string | null = null;
   for (const line of text.split('\n').map((l) => l.trim())) {
-    if (!line) continue;
+    if (!line || line.length > 50) continue;
     if (email && line.includes(email)) continue;
     if (phone && line.includes(phone)) continue;
     if (line.includes('http') || line.includes('linkedin')) continue;
-    if (NAME_RE.test(line) && line.length < 50) {
+    if (NAME_TITLE_RE.test(line)) {
       name = line;
+      break;
+    }
+    if (NAME_ALLCAPS_RE.test(line) && line.split(/\s+/).length >= 2) {
+      // Convert ALL CAPS to Title Case: "JOHN SMITH" → "John Smith"
+      name = line
+        .split(/\s+/)
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+        .join(' ');
+      break;
+    }
+    if (NAME_CAMEL_RE.test(line)) {
+      // Split CamelCase: "HaydenSmith" → "Hayden Smith"
+      name = line.replace(/([A-Z])/g, ' $1').trim();
       break;
     }
   }
@@ -419,12 +437,77 @@ export function parseResumeProfileRuleBased(text: string): ResumeProfile {
   const summarySection = sections.find((s) => /summary|profile|objective/i.test(s.heading));
   const summary = summarySection?.content.trim() || null;
 
-  // --- Location (simple heuristic: "City, ST" pattern in header) ---
+  // --- Location (heuristic: "City, ST" or "City, ST ZIP" in header) ---
+  // Validated against known US state/territory abbreviations to avoid matching
+  // job-title fragments like "Management, VE" (VE is not a US state).
+  const US_STATES = new Set([
+    'AL',
+    'AK',
+    'AZ',
+    'AR',
+    'CA',
+    'CO',
+    'CT',
+    'DE',
+    'FL',
+    'GA',
+    'HI',
+    'ID',
+    'IL',
+    'IN',
+    'IA',
+    'KS',
+    'KY',
+    'LA',
+    'ME',
+    'MD',
+    'MA',
+    'MI',
+    'MN',
+    'MS',
+    'MO',
+    'MT',
+    'NE',
+    'NV',
+    'NH',
+    'NJ',
+    'NM',
+    'NY',
+    'NC',
+    'ND',
+    'OH',
+    'OK',
+    'OR',
+    'PA',
+    'RI',
+    'SC',
+    'SD',
+    'TN',
+    'TX',
+    'UT',
+    'VT',
+    'VA',
+    'WA',
+    'WV',
+    'WI',
+    'WY',
+    'DC',
+    'PR',
+    'GU',
+    'VI',
+    'AS',
+    'MP',
+  ]);
   const headerSec = sections.find((s) => s.heading === 'header');
   let location: string | null = null;
   if (headerSec) {
-    const locM = headerSec.content.match(/[A-Z][a-z]+,\s*[A-Z]{2}(?:\s+\d{5})?/);
-    location = locM?.[0] ?? null;
+    const locCandidates = [
+      ...headerSec.content.matchAll(
+        /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*),\s*([A-Z]{2})(?:\s+\d{5}(?:-\d{4})?)?/g,
+      ),
+    ];
+    const validLoc = locCandidates.find((m) => US_STATES.has(m[2]!));
+    location = validLoc ? validLoc[0].trim() : null;
   }
 
   // --- Experiences ---

@@ -601,9 +601,55 @@ EXTRACTION RULES:
 
 Return valid JSON matching the schema. No markdown, no explanation.`;
 
+async function parseResumeProfileWithGemini(text: string): Promise<ResumeProfile | null> {
+  if (!GEMINI_ENABLED || !geminiClient) return null;
+  try {
+    const model = geminiClient.getGenerativeModel({
+      model: GEMINI_MODEL,
+      generationConfig: { responseMimeType: 'application/json' } as object,
+    });
+    const prompt = `${_PARSE_PROFILE_SYSTEM}
+
+JSON SCHEMA TO RETURN:
+{
+  "name": string | null,
+  "email": string | null,
+  "phone": string | null,
+  "location": string | null,
+  "linkedin_url": string | null,
+  "website": string | null,
+  "summary": string | null,
+  "total_years_experience": number | null,
+  "age": number | null,
+  "skills": string[],
+  "experiences": [{ "company": string, "title": string, "start_date": string|null, "end_date": string|null, "is_current": boolean, "description": string|null }],
+  "education": [{ "institution": string, "degree": string|null, "field": string|null, "graduation_year": number|null }],
+  "certifications": string[],
+  "languages": string[]
+}
+
+RESUME TEXT:
+${text}`;
+    const result = await model.generateContent(prompt);
+    const raw = result.response.text();
+    const parsed: unknown = JSON.parse(raw);
+    return ResumeProfileSchema.parse(parsed);
+  } catch (err) {
+    logger.warn(
+      { err: (err as Error).message },
+      'Gemini profile extraction failed — falling back to rule-based',
+    );
+    return null;
+  }
+}
+
 export async function parseResumeProfile(resumeText: string): Promise<ResumeProfile> {
   const clipped = clip(resumeText);
-  return withCache(resumeProfileCache, clipped, async () => parseResumeProfileRuleBased(clipped));
+  return withCache(resumeProfileCache, clipped, async () => {
+    const gemini = await parseResumeProfileWithGemini(clipped);
+    if (gemini) return gemini;
+    return parseResumeProfileRuleBased(clipped);
+  });
 }
 
 // atsScore, AtsScoreSchema, AtsScoreResult are re-exported at the top of this
