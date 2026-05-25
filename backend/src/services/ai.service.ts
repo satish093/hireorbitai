@@ -759,9 +759,23 @@ export async function extractJobRequirements(input: {
   location?: string | null;
 }): Promise<JobRequirements> {
   const clippedDesc = clip(input.description);
-  return withCache(jobRequirementsCache, { title: input.title, desc: clippedDesc }, async () =>
-    extractJobRequirementsRuleBased({ ...input, description: clippedDesc }),
-  );
+  return withCache(jobRequirementsCache, { title: input.title, desc: clippedDesc }, async () => {
+    if (clippedDesc) {
+      const userContent = `Job title: ${input.title}\nLocation: ${input.location ?? 'not specified'}\n\nJob description:\n${clippedDesc}`;
+      try {
+        return await callGeminiStructuredWithFallback(
+          'extractJobRequirements',
+          _EXTRACT_JOB_SYSTEM,
+          userContent,
+          JobRequirementsSchema,
+          1024,
+        );
+      } catch {
+        // All AI providers failed — fall through to rule-based.
+      }
+    }
+    return extractJobRequirementsRuleBased({ ...input, description: clippedDesc });
+  });
 }
 
 // ---------------------------------------------------------------------------
