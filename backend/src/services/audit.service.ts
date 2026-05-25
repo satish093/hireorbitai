@@ -45,7 +45,12 @@ export type AuditAction =
   | 'training_course_accessed'
   | 'training_lesson_accessed'
   | 'data_access_denied'
-  | 'consultant_recruiter_assigned';
+  | 'consultant_recruiter_assigned'
+  | 'ai_resume_scored'
+  | 'ai_ats_scored'
+  | 'ai_vendor_email_generated'
+  | 'ai_resume_profile_parsed'
+  | 'ai_feature_error';
 
 interface AuditInput {
   action: AuditAction;
