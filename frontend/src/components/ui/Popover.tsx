@@ -59,7 +59,7 @@ export function Popover({
             className={[
               // z-50 = the app's top chrome tier (modals/drawers). Portaled to
               // the end of <body>, so it reliably overlays page content.
-              'z-50 max-h-[calc(100dvh-1rem)] overflow-y-auto',
+              'z-50 max-h-[calc(100dvh-1rem)] overflow-y-auto animate-scale-in',
               'bg-bg-elev border border-border rounded-lg shadow-btn-hover p-2 min-w-[220px]',
               panelClassName ?? '',
             ]

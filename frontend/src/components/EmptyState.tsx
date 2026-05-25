@@ -22,7 +22,7 @@ export function EmptyState({ icon, title, description, action, compact, classNam
   return (
     <div
       className={clsx(
-        'flex flex-col items-center justify-center text-center',
+        'flex flex-col items-center justify-center text-center animate-scale-in',
         compact ? 'py-8 px-4' : 'py-14 px-6 bg-surface border border-border rounded-xl',
         className,
       )}

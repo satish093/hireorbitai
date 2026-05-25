@@ -119,7 +119,7 @@ export function GroupBadge({ groupId, compact, hideEmpty, className }: GroupBadg
   if (compact) {
     return (
       <span
-        className={`inline-block w-2 h-2 rounded-full ${className ?? ''}`.trim()}
+        className={`inline-block w-2 h-2 rounded-full animate-fade-in ${className ?? ''}`.trim()}
         style={{ background: color }}
         title={`${g.name}${g.unique_group_id ? ` (${g.unique_group_id})` : ''}`}
       />
@@ -127,7 +127,7 @@ export function GroupBadge({ groupId, compact, hideEmpty, className }: GroupBadg
   }
   return (
     <span
-      className={`inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded text-[11px] font-medium ${className ?? ''}`.trim()}
+      className={`inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded text-[11px] font-medium animate-fade-in ${className ?? ''}`.trim()}
       style={{ background: `${color}1A`, color }}
       title={g.unique_group_id ?? undefined}
     >
