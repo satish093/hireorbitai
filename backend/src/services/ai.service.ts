@@ -456,6 +456,26 @@ async function callGroqTextWithFallback(
   ]);
 }
 
+/** Gemini-primary structured: Gemini → Groq → Anthropic
+ *  Use for analysis/scoring tasks where reasoning over context beats raw speed. */
+async function callGeminiStructuredWithFallback<T extends z.ZodType>(
+  callName: string,
+  systemPrompt: string,
+  userContent: string,
+  schema: T,
+  maxTokens = 2048,
+): Promise<z.infer<T>> {
+  return callWithProviders(callName, [
+    ...(GEMINI_ENABLED
+      ? [() => callGeminiStructured(callName, systemPrompt, userContent, schema, maxTokens)]
+      : []),
+    ...(GROQ_ENABLED
+      ? [() => callGroqStructured(callName, systemPrompt, userContent, schema, maxTokens)]
+      : []),
+    () => callStructured(callName, systemPrompt, userContent, schema, maxTokens),
+  ]);
+}
+
 // ---------------------------------------------------------------------------
 // Resume scoring — rubric-based, 5 dimensions × 20 pts
 // ---------------------------------------------------------------------------
@@ -477,7 +497,7 @@ export const ResumeScoreSchema = z.object({
 });
 export type ResumeScoreResult = z.infer<typeof ResumeScoreSchema>;
 
-const _SCORE_RESUME_SYSTEM = `You are a senior technical recruiter and certified resume coach with 15+ years of experience placing engineers and consultants. Score resumes with the rigour of a top-tier staffing agency reviewer.
+const SCORE_RESUME_SYSTEM = `You are a senior technical recruiter and certified resume coach with 15+ years of experience placing engineers and consultants. Score resumes with the rigour of a top-tier staffing agency reviewer.
 
 SCORING RUBRIC — 5 dimensions × 20 points = 100 total:
 
@@ -517,7 +537,19 @@ RESPONSE FORMAT — return JSON only:
 
 export async function scoreResume(resumeText: string): Promise<ResumeScoreResult> {
   const clipped = clip(resumeText);
-  return withCache(resumeScoreCache, clipped, async () => scoreResumeRuleBased(clipped));
+  return withCache(resumeScoreCache, clipped, async () => {
+    try {
+      return await callGeminiStructuredWithFallback(
+        'scoreResume',
+        SCORE_RESUME_SYSTEM,
+        clipped,
+        ResumeScoreSchema,
+        800,
+      );
+    } catch {
+      return scoreResumeRuleBased(clipped);
+    }
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -709,7 +741,7 @@ export const SkillMatchSchema = z.object({
 });
 export type SkillMatchResult = z.infer<typeof SkillMatchSchema>;
 
-const _SKILL_MATCH_SYSTEM = `You are a technical skills assessor for a staffing agency. Score how well a consultant's resume matches a job posting.
+const SKILL_MATCH_SYSTEM = `You are a technical skills assessor for a staffing agency. Score how well a consultant's resume matches a job posting.
 
 SCORING MODEL:
 overall_score = round(skill_match × 0.60 + seniority_match × 0.25 + industry_match × 0.15)
@@ -751,7 +783,27 @@ export async function scoreResumeAgainstJob(input: {
   return withCache(
     skillMatchCache,
     { resume: clippedResume, title: input.job.title, skills: normSkills },
-    () => scoreResumeAgainstJobRuleBased({ ...input, resumeText: clippedResume }),
+    async () => {
+      const userContent = `Job title: ${input.job.title}
+Seniority: ${input.job.job_seniority ?? 'Not specified'}
+Min years required: ${input.job.min_years_of_experience ?? 'Not specified'}
+Required skills: ${normSkills.join(', ')}
+${input.job.description ? `\nJob description:\n${clip(input.job.description, 1500)}` : ''}
+
+=== CANDIDATE RESUME ===
+${clippedResume}`;
+      try {
+        return await callGeminiStructuredWithFallback(
+          'scoreResumeAgainstJob',
+          SKILL_MATCH_SYSTEM,
+          userContent,
+          SkillMatchSchema,
+          1024,
+        );
+      } catch {
+        return scoreResumeAgainstJobRuleBased({ ...input, resumeText: clippedResume });
+      }
+    },
   );
 }
 
@@ -1030,7 +1082,7 @@ export const JobMatchListSchema = z.object({
 });
 export type JobMatchResult = z.infer<typeof JobMatchListSchema>['matches'][number];
 
-const _JOB_MATCH_SYSTEM = `You are ranking job opportunities for a specific consultant. Your scores feed directly into the consultant's recommended-jobs feed — accuracy matters more than generosity.
+const JOB_MATCH_SYSTEM = `You are ranking job opportunities for a specific consultant. Your scores feed directly into the consultant's recommended-jobs feed — accuracy matters more than generosity.
 
 SCORING BANDS:
 85–100 = Strong Match: most required skills are clearly evidenced; seniority fits within ±0 levels; location/remote aligns.
@@ -1072,7 +1124,37 @@ export async function matchJobsForConsultant(
     jobs: jobs.map((j) => j.id + j.title),
   };
 
-  return withCache(jobMatchCache, cacheKeyData, () =>
-    matchJobsForConsultantRuleBased(consultantProfile, jobs),
-  );
+  return withCache(jobMatchCache, cacheKeyData, async () => {
+    const jobsBlock = jobs
+      .map(
+        (j) =>
+          `Job ID: ${j.id}
+Title: ${j.title}
+Location: ${j.location ?? 'Not specified'}
+Required skills: ${(j.required_skills ?? []).join(', ')}
+${j.description ? `Description: ${clip(j.description, 400)}` : ''}`,
+      )
+      .join('\n\n---\n\n');
+
+    const userContent = `Consultant skills: ${normProfileSkills.join(', ')}
+Experience: ${consultantProfile.experienceYears} years
+${consultantProfile.preferredLocations?.length ? `Preferred locations: ${consultantProfile.preferredLocations.join(', ')}` : ''}
+${consultantProfile.resume_excerpt ? `\nResume excerpt:\n${clip(consultantProfile.resume_excerpt, 1500)}` : ''}
+
+=== JOBS TO RANK ===
+${jobsBlock}`;
+
+    try {
+      const result = await callGeminiStructuredWithFallback(
+        'matchJobsForConsultant',
+        JOB_MATCH_SYSTEM,
+        userContent,
+        JobMatchListSchema,
+        1500,
+      );
+      return result.matches;
+    } catch {
+      return matchJobsForConsultantRuleBased(consultantProfile, jobs);
+    }
+  });
 }
