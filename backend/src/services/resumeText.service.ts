@@ -70,7 +70,14 @@ async function extractPdfWithGemini(buffer: Buffer): Promise<string | null> {
           parts: [
             { inlineData: { mimeType: 'application/pdf', data: base64 } },
             {
-              text: 'Extract the complete text from this resume. Output only the raw text, preserving line breaks, section headings, and structure. No commentary.',
+              text: `Extract this resume and format it as clean Markdown:
+- Candidate name → # Name
+- Section headings (Experience, Education, Skills, Summary, etc.) → ## Section
+- Job titles / degree entries → ### Title at Company  (or ### Degree at Institution)
+- All bullet points → - item
+- All other text as plain paragraphs
+
+Output only the Markdown. No commentary, no code fences.`,
             },
           ],
         },
@@ -105,7 +112,14 @@ async function extractImageWithGemini(buffer: Buffer, mimetype: string): Promise
               },
             },
             {
-              text: 'This is a resume image. Extract all the text exactly as written, preserving line breaks, section headings, and structure. Output only the raw text, no commentary.',
+              text: `Extract this resume image and format it as clean Markdown:
+- Candidate name → # Name
+- Section headings (Experience, Education, Skills, Summary, etc.) → ## Section
+- Job titles / degree entries → ### Title at Company  (or ### Degree at Institution)
+- All bullet points → - item
+- All other text as plain paragraphs
+
+Output only the Markdown. No commentary, no code fences.`,
             },
           ],
         },
@@ -143,7 +157,14 @@ async function extractImageWithClaude(buffer: Buffer, mimetype: string): Promise
             },
             {
               type: 'text',
-              text: 'This is a resume image. Extract all the text exactly as written, preserving line breaks, section headings, and structure. Output only the raw text, no commentary.',
+              text: `Extract this resume image and format it as clean Markdown:
+- Candidate name → # Name
+- Section headings (Experience, Education, Skills, Summary, etc.) → ## Section
+- Job titles / degree entries → ### Title at Company  (or ### Degree at Institution)
+- All bullet points → - item
+- All other text as plain paragraphs
+
+Output only the Markdown. No commentary, no code fences.`,
             },
           ],
         },

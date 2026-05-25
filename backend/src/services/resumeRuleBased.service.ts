@@ -376,7 +376,10 @@ export function parseResumeProfileRuleBased(text: string): ResumeProfile {
   // CamelCase-concatenated (pdf.js drops the space for large display fonts): "HaydenSmith"
   const NAME_CAMEL_RE = /^[A-Z][a-z]+(?:[A-Z][a-z]+){1,3}$/;
   let name: string | null = null;
-  for (const line of text.split('\n').map((l) => l.trim())) {
+  for (const raw of text.split('\n').map((l) => l.trim())) {
+    if (!raw || raw.length > 60) continue;
+    // Strip markdown heading markers: "# Hayden Smith" → "Hayden Smith"
+    const line = raw.replace(/^#{1,3}\s+/, '');
     if (!line || line.length > 50) continue;
     if (email && line.includes(email)) continue;
     if (phone && line.includes(phone)) continue;
