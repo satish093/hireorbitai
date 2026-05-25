@@ -539,7 +539,7 @@ export async function scoreResume(resumeText: string): Promise<ResumeScoreResult
   const clipped = clip(resumeText);
   return withCache(resumeScoreCache, clipped, async () => {
     try {
-      return await callGeminiStructuredWithFallback(
+      return await callGroqStructuredWithFallback(
         'scoreResume',
         SCORE_RESUME_SYSTEM,
         clipped,
@@ -648,9 +648,22 @@ ${text}`;
 export async function parseResumeProfile(resumeText: string): Promise<ResumeProfile> {
   const clipped = clip(resumeText);
   return withCache(resumeProfileCache, clipped, async () => {
+    // 1. Gemini — best structured extraction (free tier)
     const gemini = await parseResumeProfileWithGemini(clipped);
     if (gemini) return gemini;
-    return parseResumeProfileRuleBased(clipped);
+    // 2. Groq — free fallback using the same schema
+    try {
+      return await callGroqStructuredWithFallback(
+        'parseResumeProfile',
+        _PARSE_PROFILE_SYSTEM,
+        `RESUME TEXT:\n${clipped}`,
+        ResumeProfileSchema,
+        1500,
+      );
+    } catch {
+      // 3. Rule-based — always available, no AI required
+      return parseResumeProfileRuleBased(clipped);
+    }
   });
 }
 
@@ -765,7 +778,7 @@ export async function extractJobRequirements(input: {
     if (clippedDesc) {
       const userContent = `Job title: ${input.title}\nLocation: ${input.location ?? 'not specified'}\n\nJob description:\n${clippedDesc}`;
       try {
-        return await callGeminiStructuredWithFallback(
+        return await callGroqStructuredWithFallback(
           'extractJobRequirements',
           _EXTRACT_JOB_SYSTEM,
           userContent,
@@ -855,7 +868,7 @@ ${input.job.description ? `\nJob description:\n${clip(input.job.description, 150
 === CANDIDATE RESUME ===
 ${clippedResume}`;
       try {
-        return await callGeminiStructuredWithFallback(
+        return await callGroqStructuredWithFallback(
           'scoreResumeAgainstJob',
           SKILL_MATCH_SYSTEM,
           userContent,
@@ -1207,7 +1220,7 @@ ${consultantProfile.resume_excerpt ? `\nResume excerpt:\n${clip(consultantProfil
 ${jobsBlock}`;
 
     try {
-      const result = await callGeminiStructuredWithFallback(
+      const result = await callGroqStructuredWithFallback(
         'matchJobsForConsultant',
         JOB_MATCH_SYSTEM,
         userContent,
