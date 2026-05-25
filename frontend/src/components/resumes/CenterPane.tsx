@@ -2,6 +2,7 @@ import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { Button } from '../Button';
 import { Modal } from '../Modal';
+import { AiLoadingOverlay } from '../AiLoadingOverlay';
 import { EmptyState } from '../EmptyState';
 import { api } from '../../services/api';
 import { ResumePreview } from './ResumePreview';
@@ -24,8 +25,8 @@ interface Props {
 }
 
 const TABS: { id: CenterMode; label: string }[] = [
-  { id: 'preview', label: 'Preview' },
   { id: 'profile', label: 'Profile' },
+  { id: 'preview', label: 'Preview' },
   { id: 'edit', label: 'Edit' },
   { id: 'diff', label: 'Diff vs prev' },
 ];
@@ -116,6 +117,12 @@ export function CenterPane({
 
   return (
     <div className="bg-surface border border-border rounded-2xl flex flex-col overflow-hidden">
+      <AiLoadingOverlay
+        open={reextracting}
+        title="Re-extracting resume"
+        stages={['Reading the file…', 'Extracting text…', 'Re-scoring against ATS…']}
+        note="Large PDFs can take up to a minute."
+      />
       {/* ── Header ── */}
       <div className="border-b border-border">
         {/* Row 1: version meta + action buttons */}
