@@ -68,6 +68,10 @@ const envSchema = z.object({
     .min(3600)
     .default(60 * 60 * 24 * 30),
 
+  // --- Groq (free tier — resume tailoring + job copilot) ---
+  // Get a free key at console.groq.com — no credit card required.
+  GROQ_API_KEY: optionalKey,
+
   // --- Anthropic ---
   ANTHROPIC_API_KEY: optionalKey,
   // OAuth access token for Claude.ai subscription mode (claude-... format).
@@ -252,6 +256,9 @@ export const env = {
     secret: e.JWT_SECRET,
     accessTtlSeconds: e.JWT_ACCESS_TTL_SECONDS,
     refreshTtlSeconds: e.JWT_REFRESH_TTL_SECONDS,
+  },
+  groq: {
+    apiKey: e.GROQ_API_KEY || undefined,
   },
   anthropic: {
     apiKey: e.ANTHROPIC_API_KEY,

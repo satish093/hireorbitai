@@ -23,6 +23,7 @@ import {
   AI_MAX_INPUT_CHARS,
   AI_MAX_JOB_DESC_CHARS,
 } from '../config/anthropic';
+import { groqClient, GROQ_MODEL, GROQ_FAST_MODEL, GROQ_ENABLED } from '../config/groq';
 import { logAiUsage } from './aiUsage';
 import {
   withCache,
@@ -30,11 +31,21 @@ import {
   resumeProfileCache,
   jobRequirementsCache,
   skillMatchCache,
-  atsScoreCache,
   jobMatchCache,
 } from './aiCache';
 import { normalizeSkills, diffSkills, extractKnownSkills } from './skillNorm';
 import { logger } from '../config/logger';
+import {
+  scoreResumeRuleBased,
+  parseResumeProfileRuleBased,
+  extractJobRequirementsRuleBased,
+  scoreResumeAgainstJobRuleBased,
+  matchJobsForConsultantRuleBased,
+} from './resumeRuleBased.service';
+// atsScore lives in its own module to avoid a circular dependency with the
+// rule-based service (which also needs atsScore as a scoring primitive).
+export { atsScore, AtsScoreSchema } from './atsScore.service';
+export type { AtsScoreResult } from './atsScore.service';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -176,6 +187,111 @@ async function callText(
 }
 
 // ---------------------------------------------------------------------------
+// Groq helpers — used for resume tailoring and job copilot (free tier)
+// ---------------------------------------------------------------------------
+
+/** JSON extractor reused from callStructured — strips markdown fences and
+ *  finds the outermost JSON object/array in a model response. */
+function extractJson(raw: string): string {
+  let text = raw
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```\s*$/, '')
+    .trim();
+  const start = text.search(/[\[{]/);
+  if (start >= 0) {
+    const opener = text[start];
+    const closer = opener === '{' ? '}' : ']';
+    let depth = 0,
+      inStr = false,
+      esc = false;
+    for (let i = start; i < text.length; i++) {
+      const ch = text[i];
+      if (esc) {
+        esc = false;
+        continue;
+      }
+      if (ch === '\\' && inStr) {
+        esc = true;
+        continue;
+      }
+      if (ch === '"') {
+        inStr = !inStr;
+        continue;
+      }
+      if (inStr) continue;
+      if (ch === opener) depth++;
+      else if (ch === closer && --depth === 0) {
+        text = text.slice(start, i + 1);
+        break;
+      }
+    }
+    if (depth !== 0) text = text.slice(start);
+  }
+  return text;
+}
+
+async function callGroqStructured<T extends z.ZodType>(
+  callName: string,
+  systemPrompt: string,
+  userContent: string,
+  schema: T,
+  maxTokens = 2048,
+  model = GROQ_MODEL,
+): Promise<z.infer<T>> {
+  if (!GROQ_ENABLED || !groqClient) {
+    throw new Error(`${callName} requires GROQ_API_KEY to be configured`);
+  }
+  const completion = await groqClient.chat.completions.create({
+    model,
+    messages: [
+      { role: 'system', content: systemPrompt + '\n\nReturn valid JSON only, no markdown fences.' },
+      { role: 'user', content: userContent },
+    ],
+    response_format: { type: 'json_object' },
+    temperature: 0.3,
+    max_tokens: maxTokens,
+  });
+  const raw = completion.choices[0]?.message?.content?.trim() ?? '{}';
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(extractJson(raw));
+  } catch {
+    throw new Error(`Groq returned malformed JSON for ${callName}`);
+  }
+  const result = schema.safeParse(parsed);
+  if (!result.success) {
+    logger.warn(
+      { issues: result.error.issues.slice(0, 3), callName },
+      'Groq schema validation failed',
+    );
+    throw new Error(`Groq returned unexpected structure for ${callName} — please try again.`);
+  }
+  return result.data as z.infer<T>;
+}
+
+async function callGroqText(
+  _callName: string,
+  systemPrompt: string,
+  userContent: string,
+  maxTokens = 600,
+  model = GROQ_FAST_MODEL,
+): Promise<string> {
+  if (!GROQ_ENABLED || !groqClient) {
+    throw new Error('Job copilot requires GROQ_API_KEY to be configured');
+  }
+  const completion = await groqClient.chat.completions.create({
+    model,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userContent },
+    ],
+    temperature: 0.4,
+    max_tokens: maxTokens,
+  });
+  return completion.choices[0]?.message?.content?.trim() ?? '';
+}
+
+// ---------------------------------------------------------------------------
 // Resume scoring — rubric-based, 5 dimensions × 20 pts
 // ---------------------------------------------------------------------------
 
@@ -236,15 +352,7 @@ RESPONSE FORMAT — return JSON only:
 
 export async function scoreResume(resumeText: string): Promise<ResumeScoreResult> {
   const clipped = clip(resumeText);
-  return withCache(resumeScoreCache, clipped, () =>
-    callStructured(
-      'scoreResume',
-      SCORE_RESUME_SYSTEM,
-      [cacheableBlock(`RESUME TO SCORE:\n\n${clipped}`)],
-      ResumeScoreSchema,
-      800,
-    ),
-  );
+  return withCache(resumeScoreCache, clipped, async () => scoreResumeRuleBased(clipped));
 }
 
 // ---------------------------------------------------------------------------
@@ -298,79 +406,11 @@ Return valid JSON matching the schema. No markdown, no explanation.`;
 
 export async function parseResumeProfile(resumeText: string): Promise<ResumeProfile> {
   const clipped = clip(resumeText);
-  return withCache(resumeProfileCache, clipped, async () => {
-    const raw = await callStructured(
-      'parseResumeProfile',
-      PARSE_PROFILE_SYSTEM,
-      [
-        cacheableBlock(`RESUME:\n\n${clipped}`),
-        {
-          type: 'text',
-          text: `Fields: name, email, phone, location, linkedin_url, website, summary, total_years_experience, age, skills (string[]), experiences ({ company, title, start_date, end_date, is_current, description }[]), education ({ institution, degree, field, graduation_year }[]), certifications (string[]), languages (string[])`,
-        },
-      ],
-      ResumeProfileSchema,
-      1500,
-    );
-    // Normalise extracted skills before returning so downstream consumers get clean labels.
-    return { ...raw, skills: normalizeSkills(raw.skills) };
-  });
+  return withCache(resumeProfileCache, clipped, async () => parseResumeProfileRuleBased(clipped));
 }
 
-// ---------------------------------------------------------------------------
-// ATS keyword score vs a job description
-// ---------------------------------------------------------------------------
-
-export const AtsScoreSchema = z.object({
-  score: z.number(),
-  matched_keywords: z.array(z.string()),
-  missing_keywords: z.array(z.string()),
-  summary: z.string(),
-});
-export type AtsScoreResult = z.infer<typeof AtsScoreSchema>;
-
-/**
- * Keyword-based ATS scorer — no AI call required.
- *
- * Strategy: scan both the JD and the resume for any skill that appears in
- * the canonical alias table (skillNorm.ts). Compare the two sets. The score
- * is (matched / jdSkills) × 100. This is fast, deterministic, free, and
- * cached — identical inputs skip even the CPU work.
- */
-export async function atsScore(
-  resumeText: string,
-  jobDescription: string,
-): Promise<AtsScoreResult> {
-  const clippedResume = clip(resumeText);
-  const clippedJd = clip(jobDescription);
-
-  return withCache(atsScoreCache, { r: clippedResume, jd: clippedJd }, async () => {
-    const jdSkills = extractKnownSkills(clippedJd);
-    const resumeSkillSet = new Set(extractKnownSkills(clippedResume).map((s) => s.toLowerCase()));
-
-    const matched: string[] = [];
-    const missing: string[] = [];
-    for (const skill of jdSkills) {
-      if (resumeSkillSet.has(skill.toLowerCase())) {
-        matched.push(skill);
-      } else {
-        missing.push(skill);
-      }
-    }
-
-    const total = jdSkills.length || 1;
-    const score = Math.round((matched.length / total) * 100);
-
-    const gapPhrase =
-      missing.length === 0
-        ? 'All identified technical requirements are covered.'
-        : `Key gaps: ${missing.slice(0, 3).join(', ')}${missing.length > 3 ? ` and ${missing.length - 3} more` : ''}.`;
-
-    const summary = `Resume matches ${matched.length} of ${total} technical skills detected in the job description. ${gapPhrase}`;
-
-    return { score, matched_keywords: matched, missing_keywords: missing, summary };
-  });
-}
+// atsScore, AtsScoreSchema, AtsScoreResult are re-exported at the top of this
+// file from ./atsScore.service — see the import block.
 
 // ---------------------------------------------------------------------------
 // Vendor submission email
@@ -474,22 +514,9 @@ export async function extractJobRequirements(input: {
   location?: string | null;
 }): Promise<JobRequirements> {
   const clippedDesc = clip(input.description);
-  return withCache(jobRequirementsCache, { title: input.title, desc: clippedDesc }, async () => {
-    const raw = await callStructured(
-      'extractJobRequirements',
-      EXTRACT_JOB_SYSTEM,
-      [
-        {
-          type: 'text',
-          text: `Job title: ${input.title}\nLocation: ${input.location ?? '(not provided)'}\nExisting skill tags: ${(input.required_skills ?? []).join(', ') || '(none)'}`,
-        },
-        cacheableBlock(`Job description:\n${clippedDesc || '(no description provided)'}`),
-      ],
-      JobRequirementsSchema,
-      1200,
-    );
-    return { ...raw, required_skills: normalizeSkills(raw.required_skills) };
-  });
+  return withCache(jobRequirementsCache, { title: input.title, desc: clippedDesc }, async () =>
+    extractJobRequirementsRuleBased({ ...input, description: clippedDesc }),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -553,33 +580,11 @@ export async function scoreResumeAgainstJob(input: {
   };
 }): Promise<SkillMatchResult> {
   const clippedResume = clip(input.resumeText);
-  const clippedJd = clip(input.job.description);
-  // Normalise required skills before passing to the model so "ReactJS" and
-  // "React" don't generate two separate scoring rows.
   const normSkills = normalizeSkills(input.job.required_skills ?? []);
-
   return withCache(
     skillMatchCache,
     { resume: clippedResume, title: input.job.title, skills: normSkills },
-    () =>
-      callStructured(
-        'scoreResumeAgainstJob',
-        SKILL_MATCH_SYSTEM,
-        [
-          cacheableBlock(`RESUME:\n${clippedResume}`),
-          {
-            type: 'text',
-            text: `JOB: ${input.job.title}
-Seniority: ${input.job.job_seniority ?? 'unspecified'}
-Min experience: ${input.job.min_years_of_experience ?? 'unspecified'} years
-Required skills (normalised): ${normSkills.join(', ') || '(see JD)'}
-JD:
-${clippedJd || '(none)'}`,
-          },
-        ],
-        SkillMatchSchema,
-        1600,
-      ),
+    () => scoreResumeAgainstJobRuleBased({ ...input, resumeText: clippedResume }),
   );
 }
 
@@ -626,7 +631,7 @@ export async function jobCopilot(input: {
     : '\n\n(No resume on file — answer from the job context and note where a resume would help.)';
 
   const userContent = `${jobBlock}${resumeBlock}\n\n=== CANDIDATE QUESTION ===\n${input.question}`;
-  const text = await callText('jobCopilot', JOB_COPILOT_SYSTEM, userContent, 600);
+  const text = await callGroqText('jobCopilot', JOB_COPILOT_SYSTEM, userContent, 600);
   return text || 'Unable to generate an answer. Try rephrasing your question.';
 }
 
@@ -714,14 +719,7 @@ export async function tailorResumeForJob(input: {
       ? '\n=== AGGRESSIVE MODE ===\nRe-surface skills buried in older roles. Expand abbreviations to full JD forms. Maximise keyword density while staying truthful. Prioritise ATS score over brevity.'
       : '';
 
-  return callStructured(
-    'tailorResumeForJob',
-    TAILOR_RESUME_SYSTEM,
-    [
-      cacheableBlock(`=== ORIGINAL RESUME ===\n${clip(input.resumeText)}`),
-      {
-        type: 'text',
-        text: `=== TARGET ROLE ===
+  const userContent = `=== ORIGINAL RESUME ===\n${clip(input.resumeText)}\n\n=== TARGET ROLE ===
 Title: ${input.job.title}
 Company: ${input.job.company ?? '(not specified)'}
 Required skills (normalised): ${normSkills.join(', ') || '(see JD)'}
@@ -731,11 +729,14 @@ JD:
 ${clip(input.job.description) || '(none)'}
 
 Sections to rewrite: ${sectionList}
-Keywords to weave in: ${keywordList}${aggressiveAddendum}`,
-      },
-    ],
+Keywords to weave in: ${keywordList}${aggressiveAddendum}`;
+
+  return callGroqStructured(
+    'tailorResumeForJob',
+    TAILOR_RESUME_SYSTEM,
+    userContent,
     TailoredResumeSchema,
-    3500,
+    4096,
   );
 }
 
@@ -775,18 +776,14 @@ export async function tailorResumeForJobStructured(input: {
     input.sections.length > 0 ? input.sections.join(', ') : 'all sections that need work';
   const keywordList = input.keywords.length > 0 ? input.keywords.join(', ') : '(infer from JD)';
 
-  return callStructured(
-    'tailorResumeForJobStructured',
+  const structuredSystem =
     TAILOR_RESUME_SYSTEM +
-      `\n\nADDITIONAL OUTPUT REQUIRED — produce a per-section diff list:
+    `\n\nADDITIONAL OUTPUT REQUIRED — produce a per-section diff list:
 "edits": ONE entry per section changed or added. Each:
   { "section": "<heading name>", "before_text": "<original verbatim or null if new section>", "after_text": "<rewritten — wrap changed tokens in **double asterisks**>", "ai_reason": "<one concise sentence>" }
-"ai_summary": one-sentence plain-English overview of the whole tailoring pass.`,
-    [
-      cacheableBlock(`=== ORIGINAL RESUME ===\n${clip(input.resumeText)}`),
-      {
-        type: 'text',
-        text: `=== TARGET ROLE ===
+"ai_summary": one-sentence plain-English overview of the whole tailoring pass.`;
+
+  const userContent = `=== ORIGINAL RESUME ===\n${clip(input.resumeText)}\n\n=== TARGET ROLE ===
 Title: ${input.job.title}
 Company: ${input.job.company ?? '(not specified)'}
 Required skills (normalised): ${normSkills.join(', ') || '(see JD)'}
@@ -796,9 +793,12 @@ JD:
 ${clip(input.job.description) || '(none)'}
 
 Sections to rewrite: ${sectionList}
-Keywords to weave in: ${keywordList}`,
-      },
-    ],
+Keywords to weave in: ${keywordList}`;
+
+  return callGroqStructured(
+    'tailorResumeForJobStructured',
+    structuredSystem,
+    userContent,
     TailorSessionSchema,
     4096,
   );
@@ -855,54 +855,13 @@ export async function matchJobsForConsultant(
   if (jobs.length === 0) return [];
 
   const normProfileSkills = normalizeSkills(consultantProfile.skills);
-  const hasResume =
-    !!consultantProfile.resume_excerpt && consultantProfile.resume_excerpt.trim().length > 50;
-
-  const slimJobs = jobs.map((j) => ({
-    id: j.id,
-    title: j.title,
-    required_skills: normalizeSkills(j.required_skills ?? []),
-    location: j.location ?? null,
-    description: clip(j.description, AI_MAX_JOB_DESC_CHARS),
-  }));
-
-  // Pre-compute skill diffs deterministically so the model has pre-normalised data.
-  const jobContextLines = slimJobs.map((j) => {
-    const { matched, missing } = diffSkills(j.required_skills, normProfileSkills);
-    return `${JSON.stringify({ ...j, _matched: matched.length, _missing: missing.length })}`;
-  });
-
   const cacheKeyData = {
     skills: normProfileSkills,
     years: consultantProfile.experienceYears,
-    jobs: slimJobs.map((j) => j.id + j.title),
+    jobs: jobs.map((j) => j.id + j.title),
   };
 
-  const result = await withCache(jobMatchCache, cacheKeyData, () =>
-    callStructured(
-      'matchJobsForConsultant',
-      JOB_MATCH_SYSTEM,
-      [
-        hasResume
-          ? cacheableBlock(`=== CONSULTANT RESUME ===\n${clip(consultantProfile.resume_excerpt!)}`)
-          : ({
-              type: 'text',
-              text: '(No resume on file — score against curated skills only, cap at 79)',
-            } as TextBlockParam),
-        {
-          type: 'text',
-          text: `=== CONSULTANT PROFILE ===
-Skills (normalised): ${normProfileSkills.join(', ') || '(none listed)'}
-Years of experience: ${consultantProfile.experienceYears}
-Preferred locations: ${(consultantProfile.preferredLocations ?? []).join(', ') || '(any / flexible)'}
-
-=== JOBS TO RANK ===
-${jobContextLines.join('\n')}`,
-        },
-      ],
-      JobMatchListSchema,
-      900,
-    ),
+  return withCache(jobMatchCache, cacheKeyData, () =>
+    matchJobsForConsultantRuleBased(consultantProfile, jobs),
   );
-  return result.matches;
 }
