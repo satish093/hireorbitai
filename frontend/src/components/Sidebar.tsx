@@ -212,6 +212,63 @@ function ChevronIcon({ open }: { open: boolean }) {
   );
 }
 
+/**
+ * When a role sees at most this many nav items total, skip the section
+ * headings and render one flat list — grouping a short list just adds noise.
+ * Longer lists (recruiters, managers, admins) keep the grouped headings.
+ */
+const FLAT_THRESHOLD = 8;
+
+/** A single nav row. Module-level so it isn't recreated each render. */
+function NavItem({ item, badge }: { item: Item; badge?: number }) {
+  const Icon = item.icon;
+  return (
+    <NavLink
+      to={item.to}
+      data-tour={`nav-${item.to}`}
+      className={({ isActive }) =>
+        clsx(
+          'group relative flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-sm transition-all duration-200 ease-out',
+          isActive
+            ? 'bg-brand-50 text-brand-700 font-medium'
+            : 'text-ink hover:bg-hover hover:text-ink hover:translate-x-0.5',
+        )
+      }
+    >
+      {({ isActive }) => (
+        <>
+          <span
+            aria-hidden="true"
+            className={clsx(
+              'absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-r-full bg-brand-600 origin-center transition-transform duration-200 ease-out',
+              isActive ? 'scale-y-100' : 'scale-y-0',
+            )}
+          />
+          <Icon
+            size={17}
+            className={clsx(
+              'shrink-0 transition-colors',
+              isActive ? 'text-brand-600' : 'text-muted group-hover:text-ink',
+            )}
+          />
+          <span className="flex-1 truncate">{item.label}</span>
+          {typeof badge === 'number' && badge > 0 && (
+            <span
+              key={badge}
+              className={clsx(
+                'text-[10px] font-semibold px-1.5 py-0.5 rounded-full tabular-nums animate-pop',
+                isActive ? 'bg-brand-600 text-white' : 'bg-hover text-ink',
+              )}
+            >
+              {badge}
+            </span>
+          )}
+        </>
+      )}
+    </NavLink>
+  );
+}
+
 const COLLAPSE_KEY = 'hireorbit-nav-collapsed';
 
 function loadCollapsed(): Set<string> {
@@ -374,95 +431,86 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps = {}
 
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto p-3 space-y-4">
-          {sections.map((section) => {
-            const visible = section.items.filter((i) => {
-              if (role && !i.roles.includes(role)) return false;
-              if (i.flagKey && flags[i.flagKey] === false) return false;
-              return true;
-            });
-            if (visible.length === 0) return null;
+          {(() => {
+            // Resolve which sections/items this role can see.
+            const visibleSections = sections
+              .map((section) => ({
+                ...section,
+                items: section.items.filter((i) => {
+                  if (role && !i.roles.includes(role)) return false;
+                  if (i.flagKey && flags[i.flagKey] === false) return false;
+                  return true;
+                }),
+              }))
+              .filter((section) => section.items.length > 0);
 
-            // Auto-expand a collapsible section when the active route belongs to it.
-            const hasActive = visible.some((i) => location.pathname.startsWith(i.to));
-            const isOpen = !section.collapsible || hasActive || !collapsed.has(section.heading);
+            const totalItems = visibleSections.reduce((n, s) => n + s.items.length, 0);
 
-            return (
-              <div key={section.heading}>
-                {section.collapsible ? (
-                  <button
-                    type="button"
-                    onClick={() => toggleSection(section.heading)}
-                    className="w-full flex items-center justify-between px-2 mb-1.5 group"
-                    aria-expanded={isOpen}
-                  >
-                    <span className="text-[10px] font-semibold tracking-widest text-muted uppercase group-hover:text-ink transition-colors">
+            // Short nav (e.g. consultants) → one flat list, no headings.
+            if (totalItems <= FLAT_THRESHOLD) {
+              return (
+                <div className="space-y-0.5">
+                  {visibleSections.flatMap((section) =>
+                    section.items.map((i) => (
+                      <NavItem
+                        key={i.to}
+                        item={i}
+                        badge={i.badgeKey ? counts[i.badgeKey] : undefined}
+                      />
+                    )),
+                  )}
+                </div>
+              );
+            }
+
+            // Long nav → grouped headings with smooth collapse.
+            return visibleSections.map((section) => {
+              const hasActive = section.items.some((i) => location.pathname.startsWith(i.to));
+              const isOpen = !section.collapsible || hasActive || !collapsed.has(section.heading);
+
+              return (
+                <div key={section.heading}>
+                  {section.collapsible ? (
+                    <button
+                      type="button"
+                      onClick={() => toggleSection(section.heading)}
+                      className="w-full flex items-center justify-between px-2 mb-1.5 group"
+                      aria-expanded={isOpen}
+                    >
+                      <span className="text-[10px] font-semibold tracking-widest text-muted uppercase group-hover:text-ink transition-colors">
+                        {section.heading}
+                      </span>
+                      <ChevronIcon open={isOpen} />
+                    </button>
+                  ) : (
+                    <div className="px-2 mb-1.5 text-[10px] font-semibold tracking-widest text-muted uppercase">
                       {section.heading}
-                    </span>
-                    <ChevronIcon open={isOpen} />
-                  </button>
-                ) : (
-                  <div className="px-2 mb-1.5 text-[10px] font-semibold tracking-widest text-muted uppercase">
-                    {section.heading}
-                  </div>
-                )}
+                    </div>
+                  )}
 
-                {isOpen && (
-                  <div className="space-y-0.5">
-                    {visible.map((i) => {
-                      const badge = i.badgeKey ? counts[i.badgeKey] : undefined;
-                      const Icon = i.icon;
-                      return (
-                        <NavLink
-                          key={i.to}
-                          to={i.to}
-                          data-tour={`nav-${i.to}`}
-                          className={({ isActive }) =>
-                            clsx(
-                              'group relative flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-sm transition-all duration-200 ease-out',
-                              isActive
-                                ? 'bg-brand-50 text-brand-700 font-medium'
-                                : 'text-ink hover:bg-hover hover:text-ink hover:translate-x-0.5',
-                            )
-                          }
-                        >
-                          {({ isActive }) => (
-                            <>
-                              <span
-                                aria-hidden="true"
-                                className={clsx(
-                                  'absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-r-full bg-brand-600 origin-center transition-transform duration-200 ease-out',
-                                  isActive ? 'scale-y-100' : 'scale-y-0',
-                                )}
-                              />
-                              <Icon
-                                size={17}
-                                className={clsx(
-                                  'shrink-0 transition-colors',
-                                  isActive ? 'text-brand-600' : 'text-muted group-hover:text-ink',
-                                )}
-                              />
-                              <span className="flex-1 truncate">{i.label}</span>
-                              {typeof badge === 'number' && badge > 0 && (
-                                <span
-                                  key={badge}
-                                  className={clsx(
-                                    'text-[10px] font-semibold px-1.5 py-0.5 rounded-full tabular-nums animate-pop',
-                                    isActive ? 'bg-brand-600 text-white' : 'bg-hover text-ink',
-                                  )}
-                                >
-                                  {badge}
-                                </span>
-                              )}
-                            </>
-                          )}
-                        </NavLink>
-                      );
-                    })}
+                  {/* grid-rows 0fr→1fr animates the collapse height smoothly. */}
+                  <div
+                    className={clsx(
+                      'grid transition-[grid-template-rows] duration-200 ease-out',
+                      isOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]',
+                    )}
+                  >
+                    <div className="overflow-hidden min-h-0">
+                      <div className="space-y-0.5">
+                        {section.items.map((i) => (
+                          <NavItem
+                            key={i.to}
+                            item={i}
+                            badge={i.badgeKey ? counts[i.badgeKey] : undefined}
+                          />
+                        ))}
+                      </div>
+                    </div>
                   </div>
-                )}
-              </div>
-            );
-          })}
+                </div>
+              );
+            });
+          })()}
         </nav>
 
         {/* User card */}

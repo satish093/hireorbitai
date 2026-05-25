@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect } from 'react';
 import { Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { AppChrome } from './components/AppChrome';
 import { FeatureGuard } from './hooks/useFeatureFlags';
 import { RealtimeNotifications } from './components/RealtimeNotifications';
 import { ProductTour } from './components/ProductTour';
@@ -242,381 +243,385 @@ export default function App() {
           }
         />
 
-        <Route
-          path="/onboarding/consultant"
-          element={
-            <ProtectedRoute bypassOnboarding>
-              <ConsultantOnboarding />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/onboarding/recruiter"
-          element={
-            <ProtectedRoute bypassOnboarding>
-              <RecruiterOnboarding />
-            </ProtectedRoute>
-          }
-        />
+        {/* Persistent app shell — the sidebar lives in <AppChrome> and stays
+            mounted across every navigation below (no more reload/scroll jump). */}
+        <Route element={<AppChrome />}>
+          <Route
+            path="/onboarding/consultant"
+            element={
+              <ProtectedRoute bypassOnboarding>
+                <ConsultantOnboarding />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/onboarding/recruiter"
+            element={
+              <ProtectedRoute bypassOnboarding>
+                <RecruiterOnboarding />
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <DashboardRouter />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/consultants"
-          element={
-            <ProtectedRoute allow={OPERATOR_TIER}>
-              <Consultants />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/recruiters"
-          element={
-            <ProtectedRoute allow={MANAGER_TIER}>
-              <Recruiters />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/jobs"
-          element={
-            <ProtectedRoute>
-              <JobSearch />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/jobs/:id"
-          element={
-            <ProtectedRoute>
-              <JobDetail />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/applications"
-          element={
-            <ProtectedRoute allow={OPERATOR_TIER}>
-              <Applications />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/interviews"
-          element={
-            <ProtectedRoute>
-              <FeatureGuard feature="interviews">
-                <Interviews />
-              </FeatureGuard>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/calendar"
-          element={
-            <ProtectedRoute>
-              <Calendar />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/resumes"
-          element={
-            <ProtectedRoute allow={OPERATOR_TIER}>
-              <Resumes />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/vendors"
-          element={
-            <ProtectedRoute allow={OPERATOR_TIER}>
-              <Vendors />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/clients"
-          element={
-            <ProtectedRoute allow={OPERATOR_TIER}>
-              <Clients />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/reminders"
-          element={
-            <ProtectedRoute>
-              <FeatureGuard feature="reminders">
-                <Reminders />
-              </FeatureGuard>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/ai-email"
-          element={
-            <ProtectedRoute allow={OPERATOR_TIER}>
-              <FeatureGuard feature="ai_email">
-                <AIEmail />
-              </FeatureGuard>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/ai-usage"
-          element={
-            <ProtectedRoute allow={MANAGER_TIER}>
-              <AIUsage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/reports"
-          element={
-            <ProtectedRoute allow={MANAGER_TIER}>
-              <FeatureGuard feature="reports">
-                <Reports />
-              </FeatureGuard>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/invitations"
-          element={
-            <ProtectedRoute allow={MANAGER_TIER}>
-              <Invitations />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/tasks"
-          element={
-            <ProtectedRoute>
-              <FeatureGuard feature="tasks">
-                <Tasks />
-              </FeatureGuard>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/tasks/me"
-          element={
-            <ProtectedRoute>
-              <FeatureGuard feature="tasks">
-                <TasksAssignedToMe />
-              </FeatureGuard>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/tasks/:id"
-          element={
-            <ProtectedRoute>
-              <FeatureGuard feature="tasks">
-                <TaskDetail />
-              </FeatureGuard>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/messages"
-          element={
-            <ProtectedRoute>
-              <FeatureGuard feature="messages">
-                <Messages />
-              </FeatureGuard>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/ai-settings"
-          element={
-            <ProtectedRoute allow={ADMIN_TIER}>
-              <AdminAISettings />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/audit-log"
-          element={
-            <ProtectedRoute allow={ADMIN_TIER}>
-              <AdminAuditLog />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/training/ai-activity"
-          element={
-            <ProtectedRoute allow={MANAGER_TIER}>
-              <TrainingAIActivity />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/features"
-          element={
-            <ProtectedRoute allow={OWNER_TIER}>
-              <FeatureFlags />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/groups"
-          element={
-            <ProtectedRoute allow={MANAGER_TIER}>
-              <UserGroups />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/deactivated"
-          element={
-            <ProtectedRoute allow={ADMIN_TIER}>
-              <DeactivatedAccounts />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/users"
-          element={
-            <ProtectedRoute allow={ADMIN_TIER}>
-              <AdminUsers />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/users/:id"
-          element={
-            <ProtectedRoute allow={ADMIN_TIER}>
-              <AdminUserRedirect />
-            </ProtectedRoute>
-          }
-        />
-        {/* Profile page. Access is controlled server-side: operator-tier sees everyone,
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <DashboardRouter />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/consultants"
+            element={
+              <ProtectedRoute allow={OPERATOR_TIER}>
+                <Consultants />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/recruiters"
+            element={
+              <ProtectedRoute allow={MANAGER_TIER}>
+                <Recruiters />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/jobs"
+            element={
+              <ProtectedRoute>
+                <JobSearch />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/jobs/:id"
+            element={
+              <ProtectedRoute>
+                <JobDetail />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/applications"
+            element={
+              <ProtectedRoute allow={OPERATOR_TIER}>
+                <Applications />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/interviews"
+            element={
+              <ProtectedRoute>
+                <FeatureGuard feature="interviews">
+                  <Interviews />
+                </FeatureGuard>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/calendar"
+            element={
+              <ProtectedRoute>
+                <Calendar />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/resumes"
+            element={
+              <ProtectedRoute allow={OPERATOR_TIER}>
+                <Resumes />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/vendors"
+            element={
+              <ProtectedRoute allow={OPERATOR_TIER}>
+                <Vendors />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/clients"
+            element={
+              <ProtectedRoute allow={OPERATOR_TIER}>
+                <Clients />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/reminders"
+            element={
+              <ProtectedRoute>
+                <FeatureGuard feature="reminders">
+                  <Reminders />
+                </FeatureGuard>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/ai-email"
+            element={
+              <ProtectedRoute allow={OPERATOR_TIER}>
+                <FeatureGuard feature="ai_email">
+                  <AIEmail />
+                </FeatureGuard>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/ai-usage"
+            element={
+              <ProtectedRoute allow={MANAGER_TIER}>
+                <AIUsage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/reports"
+            element={
+              <ProtectedRoute allow={MANAGER_TIER}>
+                <FeatureGuard feature="reports">
+                  <Reports />
+                </FeatureGuard>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/invitations"
+            element={
+              <ProtectedRoute allow={MANAGER_TIER}>
+                <Invitations />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/tasks"
+            element={
+              <ProtectedRoute>
+                <FeatureGuard feature="tasks">
+                  <Tasks />
+                </FeatureGuard>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/tasks/me"
+            element={
+              <ProtectedRoute>
+                <FeatureGuard feature="tasks">
+                  <TasksAssignedToMe />
+                </FeatureGuard>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/tasks/:id"
+            element={
+              <ProtectedRoute>
+                <FeatureGuard feature="tasks">
+                  <TaskDetail />
+                </FeatureGuard>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/messages"
+            element={
+              <ProtectedRoute>
+                <FeatureGuard feature="messages">
+                  <Messages />
+                </FeatureGuard>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/ai-settings"
+            element={
+              <ProtectedRoute allow={ADMIN_TIER}>
+                <AdminAISettings />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/audit-log"
+            element={
+              <ProtectedRoute allow={ADMIN_TIER}>
+                <AdminAuditLog />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/training/ai-activity"
+            element={
+              <ProtectedRoute allow={MANAGER_TIER}>
+                <TrainingAIActivity />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/features"
+            element={
+              <ProtectedRoute allow={OWNER_TIER}>
+                <FeatureFlags />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/groups"
+            element={
+              <ProtectedRoute allow={MANAGER_TIER}>
+                <UserGroups />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/deactivated"
+            element={
+              <ProtectedRoute allow={ADMIN_TIER}>
+                <DeactivatedAccounts />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/users"
+            element={
+              <ProtectedRoute allow={ADMIN_TIER}>
+                <AdminUsers />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/users/:id"
+            element={
+              <ProtectedRoute allow={ADMIN_TIER}>
+                <AdminUserRedirect />
+              </ProtectedRoute>
+            }
+          />
+          {/* Profile page. Access is controlled server-side: operator-tier sees everyone,
           consultants only see their own. */}
-        <Route
-          path="/users/:id"
-          element={
-            <ProtectedRoute>
-              <UserProfile />
-            </ProtectedRoute>
-          }
-        />
+          <Route
+            path="/users/:id"
+            element={
+              <ProtectedRoute>
+                <UserProfile />
+              </ProtectedRoute>
+            }
+          />
 
-        {/* Training / LMS module. Manager-tier manages courses; everyone authed
+          {/* Training / LMS module. Manager-tier manages courses; everyone authed
           can view their own assignments under /training/my. */}
-        <Route
-          path="/training"
-          element={
-            <ProtectedRoute>
-              <FeatureGuard feature="training">
-                <MyTraining />
-              </FeatureGuard>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/training/courses"
-          element={
-            <ProtectedRoute allow={MANAGER_TIER}>
-              <FeatureGuard feature="training">
-                <TrainingCourses />
-              </FeatureGuard>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/training/courses/new"
-          element={
-            <ProtectedRoute allow={MANAGER_TIER}>
-              <FeatureGuard feature="training">
-                <CreateTrainingCourse />
-              </FeatureGuard>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/training/courses/:id"
-          element={
-            <ProtectedRoute allow={MANAGER_TIER}>
-              <FeatureGuard feature="training">
-                <TrainingCourseDetails />
-              </FeatureGuard>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/training/courses/:id/edit"
-          element={
-            <ProtectedRoute allow={MANAGER_TIER}>
-              <FeatureGuard feature="training">
-                <EditTrainingCourse />
-              </FeatureGuard>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/training/assignments"
-          element={
-            <ProtectedRoute allow={MANAGER_TIER}>
-              <FeatureGuard feature="training">
-                <TrainingAssignments />
-              </FeatureGuard>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/training/assignments/:id"
-          element={
-            <ProtectedRoute>
-              <FeatureGuard feature="training">
-                <LessonViewer />
-              </FeatureGuard>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/training/assignments/:id/plan"
-          element={
-            <ProtectedRoute>
-              <FeatureGuard feature="training">
-                <TrainingPlanView />
-              </FeatureGuard>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/training/assignments/:id/quiz"
-          element={
-            <ProtectedRoute>
-              <FeatureGuard feature="training">
-                <QuizPage />
-              </FeatureGuard>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/training/reports"
-          element={
-            <ProtectedRoute allow={MANAGER_TIER}>
-              <FeatureGuard feature="training">
-                <TrainingReports />
-              </FeatureGuard>
-            </ProtectedRoute>
-          }
-        />
-        {/* Legacy student route — folded into the unified /training workspace. */}
-        <Route path="/training/my" element={<Navigate to="/training" replace />} />
-        <Route path="/training/my/*" element={<Navigate to="/training" replace />} />
+          <Route
+            path="/training"
+            element={
+              <ProtectedRoute>
+                <FeatureGuard feature="training">
+                  <MyTraining />
+                </FeatureGuard>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/training/courses"
+            element={
+              <ProtectedRoute allow={MANAGER_TIER}>
+                <FeatureGuard feature="training">
+                  <TrainingCourses />
+                </FeatureGuard>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/training/courses/new"
+            element={
+              <ProtectedRoute allow={MANAGER_TIER}>
+                <FeatureGuard feature="training">
+                  <CreateTrainingCourse />
+                </FeatureGuard>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/training/courses/:id"
+            element={
+              <ProtectedRoute allow={MANAGER_TIER}>
+                <FeatureGuard feature="training">
+                  <TrainingCourseDetails />
+                </FeatureGuard>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/training/courses/:id/edit"
+            element={
+              <ProtectedRoute allow={MANAGER_TIER}>
+                <FeatureGuard feature="training">
+                  <EditTrainingCourse />
+                </FeatureGuard>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/training/assignments"
+            element={
+              <ProtectedRoute allow={MANAGER_TIER}>
+                <FeatureGuard feature="training">
+                  <TrainingAssignments />
+                </FeatureGuard>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/training/assignments/:id"
+            element={
+              <ProtectedRoute>
+                <FeatureGuard feature="training">
+                  <LessonViewer />
+                </FeatureGuard>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/training/assignments/:id/plan"
+            element={
+              <ProtectedRoute>
+                <FeatureGuard feature="training">
+                  <TrainingPlanView />
+                </FeatureGuard>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/training/assignments/:id/quiz"
+            element={
+              <ProtectedRoute>
+                <FeatureGuard feature="training">
+                  <QuizPage />
+                </FeatureGuard>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/training/reports"
+            element={
+              <ProtectedRoute allow={MANAGER_TIER}>
+                <FeatureGuard feature="training">
+                  <TrainingReports />
+                </FeatureGuard>
+              </ProtectedRoute>
+            }
+          />
+          {/* Legacy student route — folded into the unified /training workspace. */}
+          <Route path="/training/my" element={<Navigate to="/training" replace />} />
+          <Route path="/training/my/*" element={<Navigate to="/training" replace />} />
 
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        </Route>
       </Routes>
     </Suspense>
   );
