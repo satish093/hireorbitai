@@ -127,10 +127,17 @@ export default {
           '0%, 100%': { backgroundPosition: '0% 50%' },
           '50%': { backgroundPosition: '100% 50%' },
         },
+        // Fast page-level entrance — used on <main key={pathname}> so every
+        // route change plays a snappy fade+rise instead of the slower fade-in-up.
+        'page-enter': {
+          '0%': { opacity: '0', transform: 'translateY(10px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
       },
       animation: {
         'fade-in': 'fade-in 200ms ease-out both',
         'fade-in-up': 'fade-in-up 240ms cubic-bezier(0.22, 1, 0.36, 1) both',
+        'page-enter': 'page-enter 140ms cubic-bezier(0.22, 1, 0.36, 1) both',
         'fade-in-down': 'fade-in-down 240ms cubic-bezier(0.22, 1, 0.36, 1) both',
         'scale-in': 'scale-in 180ms cubic-bezier(0.22, 1, 0.36, 1) both',
         'slide-in-right': 'slide-in-right 220ms cubic-bezier(0.22, 1, 0.36, 1) both',

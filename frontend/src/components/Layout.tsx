@@ -40,7 +40,7 @@ export function Layout({
         <Header title={title} crumbs={crumbs} onMenuClick={() => setNavOpen(true)} />
         <main
           key={loc.pathname}
-          className="flex-1 p-4 sm:p-6 lg:p-8 overflow-auto animate-fade-in-up"
+          className="flex-1 p-4 sm:p-6 lg:p-8 overflow-auto animate-page-enter"
           tabIndex={0}
         >
           {children}
