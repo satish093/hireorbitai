@@ -133,11 +133,17 @@ export default {
           '0%': { opacity: '0', transform: 'translateY(10px)' },
           '100%': { opacity: '1', transform: 'translateY(0)' },
         },
+        // Paired exit — old page lifts slightly and fades before new one enters.
+        'page-exit': {
+          '0%': { opacity: '1', transform: 'translateY(0)' },
+          '100%': { opacity: '0', transform: 'translateY(-6px)' },
+        },
       },
       animation: {
         'fade-in': 'fade-in 200ms ease-out both',
         'fade-in-up': 'fade-in-up 240ms cubic-bezier(0.22, 1, 0.36, 1) both',
         'page-enter': 'page-enter 140ms cubic-bezier(0.22, 1, 0.36, 1) both',
+        'page-exit': 'page-exit 100ms cubic-bezier(0.22, 1, 0.36, 1) both',
         'fade-in-down': 'fade-in-down 240ms cubic-bezier(0.22, 1, 0.36, 1) both',
         'scale-in': 'scale-in 180ms cubic-bezier(0.22, 1, 0.36, 1) both',
         'slide-in-right': 'slide-in-right 220ms cubic-bezier(0.22, 1, 0.36, 1) both',

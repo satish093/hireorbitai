@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useState } from 'react';
+import { ReactNode, useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
@@ -17,33 +17,53 @@ export function Layout({
   crumbs?: Crumb[];
   children: ReactNode;
 }) {
-  // Use the location key so each route change retriggers the page-enter
-  // animation. Without `key`, React reuses the same DOM node and the
-  // animation only plays on the first mount.
   const loc = useLocation();
-
-  // Mobile sidebar lives as a slide-over overlay; desktop renders it inline.
-  // State is lifted here so the Header's hamburger can toggle it without
-  // wiring a context just for that.
   const [navOpen, setNavOpen] = useState(false);
 
-  // Close the mobile nav whenever the route changes so the user isn't left
-  // staring at the overlay after tapping a link.
+  // Snapshot of the page currently on screen. Holds the previous page's
+  // content during the exit animation so it stays visible while fading out.
+  const [snap, setSnap] = useState<{ path: string; children: ReactNode }>({
+    path: loc.pathname,
+    children,
+  });
+  const [leaving, setLeaving] = useState(false);
+
+  // Always reflects the latest incoming props. Read by handleExitEnd so it
+  // grabs the most recent children even if the user navigated multiple times
+  // before the exit animation finished.
+  const latestRef = useRef({ path: loc.pathname, children });
+  latestRef.current = { path: loc.pathname, children };
+
   useEffect(() => {
     setNavOpen(false);
   }, [loc.pathname]);
+
+  useEffect(() => {
+    if (loc.pathname === snap.path) return;
+    setLeaving(true);
+  }, [loc.pathname, snap.path]);
+
+  const handleExitEnd = (e: React.AnimationEvent<HTMLElement>) => {
+    // Ignore animationend events bubbling up from staggered children.
+    if (e.target !== e.currentTarget) return;
+    setSnap(latestRef.current);
+    setLeaving(false);
+  };
 
   return (
     <div className="flex min-h-dvh bg-bg text-ink">
       <Sidebar mobileOpen={navOpen} onMobileClose={() => setNavOpen(false)} />
       <div className="flex-1 flex flex-col min-w-0">
         <Header title={title} crumbs={crumbs} onMenuClick={() => setNavOpen(true)} />
+        {/* key={snap.path} remounts <main> when the snapshot swaps, which
+            re-triggers animate-page-enter on the incoming page. */}
         <main
-          key={loc.pathname}
-          className="flex-1 p-4 sm:p-6 lg:p-8 overflow-auto animate-page-enter"
+          key={snap.path}
+          className={`flex-1 p-4 sm:p-6 lg:p-8 overflow-auto ${leaving ? 'animate-page-exit' : 'animate-page-enter'}`}
+          onAnimationEnd={leaving ? handleExitEnd : undefined}
           tabIndex={0}
         >
-          {children}
+          {snap.children}
         </main>
       </div>
     </div>
