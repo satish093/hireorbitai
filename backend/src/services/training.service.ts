@@ -150,7 +150,7 @@ async function snapshotCourse(
     snapshot,
     published_by: userId,
   });
-  if (error || !ver) throw httpError(500, error?.message ?? 'Failed to snapshot course');
+  if (error || !ver) throw httpError(500, 'Failed to snapshot course');
   return { id: (ver as any).id as string, version_number };
 }
 

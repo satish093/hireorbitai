@@ -34,7 +34,7 @@ async function assertCourseOwner(courseId: string, callerId: string, callerRole:
 export const listCourses: RequestHandler = async (req, res) => {
   const { status, category } = req.query as Record<string, string | undefined>;
   const { data, error } = await repo.courses.list({ status, category });
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json(data ?? []);
 };
 
@@ -112,7 +112,7 @@ export const createCourse: RequestHandler = async (req, res) => {
   const parsed = courseSchema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
   const { data, error } = await repo.courses.create({ ...parsed.data, created_by: req.user.id });
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.status(201).json(data);
 };
 
@@ -134,7 +134,7 @@ export const updateCourse: RequestHandler = async (req, res) => {
           : 'DRAFT';
   }
   const { data, error } = await repo.courses.update(req.params.id, patch);
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json(data);
 };
 
@@ -142,7 +142,7 @@ export const deleteCourse: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   await assertCourseOwner(req.params.id, req.user.id, req.user.role);
   const { error } = await repo.courses.remove(req.params.id);
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json({ ok: true });
 };
 
@@ -175,7 +175,7 @@ export const createLesson: RequestHandler = async (req, res) => {
   const parsed = lessonSchema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
   const { data, error } = await repo.lessons.create({ ...parsed.data, course_id: req.params.id });
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.status(201).json(data);
 };
 
@@ -195,7 +195,7 @@ export const updateLesson: RequestHandler = async (req, res) => {
     patch.key_takeaways = JSON.stringify(patch.key_takeaways);
   }
   const { data, error } = await repo.lessons.update(req.params.id, patch);
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json(data);
 };
 
@@ -205,7 +205,7 @@ export const deleteLesson: RequestHandler = async (req, res) => {
   if (lErr || !lesson) throw httpError(404, 'Lesson not found');
   await assertCourseOwner((lesson as any).course_id, req.user.id, req.user.role);
   const { error } = await repo.lessons.remove(req.params.id);
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json({ ok: true });
 };
 
@@ -239,7 +239,7 @@ export const listAssignments: RequestHandler = async (req, res) => {
     status,
     assigned_to_user_id: user_id,
   });
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json(data ?? []);
 };
 
@@ -247,7 +247,7 @@ export const myTraining: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   await svc.flagOverdue();
   const { data, error } = await repo.assignments.listForUser(req.user.id);
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json(data ?? []);
 };
 
@@ -311,7 +311,7 @@ export const updateAssignment: RequestHandler = async (req, res) => {
   const patch: any = { ...parsed.data };
   if (patch.supervisor_email === '') patch.supervisor_email = null;
   const { data, error } = await repo.assignments.update(req.params.id, patch);
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json(data);
 };
 
@@ -371,7 +371,7 @@ export const recordUpload: RequestHandler = async (req, res) => {
     assignment_id: req.params.id,
     uploaded_by: req.user.id,
   });
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.status(201).json(data);
 };
 
@@ -392,7 +392,7 @@ export const addFeedback: RequestHandler = async (req, res) => {
     assignment_id: req.params.id,
     created_by: req.user.id,
   });
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.status(201).json(data);
 };
 
@@ -404,14 +404,14 @@ export const addFeedback: RequestHandler = async (req, res) => {
 // detail embed (manager-only route).
 export const listQuiz: RequestHandler = async (req, res) => {
   const { data, error } = await repo.quizzes.listByCourse(req.params.id);
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json(data ?? []);
 };
 
 // GET /lessons/:id/quiz — per-lesson knowledge check, answer-stripped.
 export const listLessonQuiz: RequestHandler = async (req, res) => {
   const { data, error } = await repo.quizzes.listByLesson(req.params.id);
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json(data ?? []);
 };
 
@@ -443,7 +443,7 @@ export const createLessonQuizQuestion: RequestHandler = async (req, res) => {
     lesson_id: req.params.id,
     course_id: (lesson as any).course_id,
   });
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.status(201).json(data);
 };
 
@@ -462,7 +462,7 @@ export const updateQuizQuestion: RequestHandler = async (req, res) => {
     throw httpError(400, 'correct_answer must match one of the options');
   }
   const { data, error } = await repo.quizzes.update(req.params.id, parsed.data);
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json(data);
 };
 
@@ -472,7 +472,7 @@ export const deleteQuizQuestion: RequestHandler = async (req, res) => {
   if (qErr || !quiz) throw httpError(404, 'Quiz question not found');
   await assertCourseOwner((quiz as any).course_id, req.user.id, req.user.role);
   const { error } = await repo.quizzes.remove(req.params.id);
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json({ ok: true });
 };
 
@@ -713,7 +713,7 @@ async function applyOutline(
     content_status: 'PENDING',
   }));
   const { data: lessons, error } = await repo.lessons.createMany(lessonRows);
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   return lessons ?? [];
 }
 
@@ -1138,7 +1138,7 @@ export const listEvaluations: RequestHandler = async (req, res) => {
     throw httpError(404, 'Not found');
   }
   const { data, error } = await repo.evaluations.listForAssignment(req.params.id);
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json(data ?? []);
 };
 
@@ -1151,7 +1151,7 @@ export const createEvaluation: RequestHandler = async (req, res) => {
     assignment_id: req.params.id,
     created_by: req.user!.id,
   });
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.status(201).json(data);
 };
 
@@ -1163,7 +1163,7 @@ export const updateEvaluation: RequestHandler = async (req, res) => {
   if (!existing) throw httpError(404, 'Evaluation not found');
   await assertCanWriteEval(req, (existing as any).assignment_id, (existing as any).kind);
   const { data, error } = await repo.evaluations.update(req.params.evalId, parsed.data);
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json(data);
 };
 
@@ -1171,7 +1171,7 @@ export const deleteEvaluation: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   if (!isManagerTier(req.user.role)) throw httpError(403, 'Manager-tier only');
   const { error } = await repo.evaluations.remove(req.params.evalId);
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json({ ok: true });
 };
 
@@ -1239,7 +1239,7 @@ export const acknowledge: RequestHandler = async (req, res) => {
     ip_address: req.ip ?? null,
     user_agent: req.headers['user-agent'] ?? null,
   });
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   await svc.recalcAssignmentStatus(req.params.id);
   res.status(201).json(data);
 };
@@ -1296,7 +1296,7 @@ export const authorFinalAssessment: RequestHandler = async (req, res) => {
     questions: parsed.data.questions ?? null,
     approval_status: 'PENDING',
   });
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   await svc.recalcAssignmentStatus(req.params.id);
   res.status(201).json(data);
 };
@@ -1322,7 +1322,7 @@ export const submitFinalAssessment: RequestHandler = async (req, res) => {
     submitted_at: new Date().toISOString(),
     approval_status: 'SUBMITTED',
   });
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   await svc.recalcAssignmentStatus(req.params.id);
   res.json(data);
 };
@@ -1344,7 +1344,7 @@ export const gradeFinalAssessment: RequestHandler = async (req, res) => {
     patch.approved_at = new Date().toISOString();
   }
   const { data, error } = await repo.finalAssessments.update((existing as any).data.id, patch);
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   await svc.recalcAssignmentStatus(req.params.id);
   res.json(data);
 };
@@ -1364,7 +1364,7 @@ const supervisionSchema = z.object({
 export const listSupervisionNotes: RequestHandler = async (req, res) => {
   await assertCanReadAssignment(req, req.params.id);
   const { data, error } = await repo.supervisionNotes.listForAssignment(req.params.id);
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json(data ?? []);
 };
 
@@ -1379,7 +1379,7 @@ export const addSupervisionNote: RequestHandler = async (req, res) => {
     assignment_id: req.params.id,
     trainer_user_id: req.user.id,
   });
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.status(201).json(data);
 };
 
@@ -1389,7 +1389,7 @@ export const updateSupervisionNote: RequestHandler = async (req, res) => {
   const parsed = supervisionSchema.partial().safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
   const { data, error } = await repo.supervisionNotes.update(req.params.noteId, parsed.data);
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json(data);
 };
 
@@ -1397,7 +1397,7 @@ export const deleteSupervisionNote: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   if (!isManagerTier(req.user.role)) throw httpError(403, 'Manager-tier only');
   const { error } = await repo.supervisionNotes.remove(req.params.noteId);
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json({ ok: true });
 };
 

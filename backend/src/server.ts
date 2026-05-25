@@ -116,7 +116,12 @@ app.use(compression());
 app.use(
   pinoHttp({
     logger,
-    genReqId: (req) => (req.headers['x-request-id'] as string) ?? crypto.randomUUID(),
+    genReqId: (req) => {
+      const clientId = req.headers['x-request-id'];
+      return typeof clientId === 'string' && /^[a-zA-Z0-9_-]{1,64}$/.test(clientId)
+        ? clientId
+        : crypto.randomUUID();
+    },
     autoLogging: {
       ignore: (req) => req.url === '/health' || req.url === '/ready',
     },
@@ -240,7 +245,7 @@ app.use('/api/invitations/setup', authLimiter);
 // same per-session keying as the global limiter.
 const aiLimiter = rateLimit({
   windowMs: 5 * 60 * 1000,
-  max: Math.max(1, Number(process.env.AI_RATE_LIMIT_MAX ?? 30)),
+  max: env.aiRateLimitMax,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
   keyGenerator: rateLimitKey,
@@ -271,7 +276,6 @@ const healthHandler: import('express').RequestHandler = (_req, res) => {
     ok: true,
     service: 'hireorbit-api',
     uptimeSeconds: Math.round(process.uptime()),
-    nodeEnv: env.nodeEnv,
   });
 };
 const readyHandler: import('express').RequestHandler = async (_req, res) => {

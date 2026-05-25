@@ -24,7 +24,7 @@ const EMBED = '*, user:users!user_id(id, full_name, email, phone, avatar_url, ro
 
 export async function findById(id: string): Promise<RecruiterRow | null> {
   const { data, error } = await db.from('recruiters').select(EMBED).eq('id', id).maybeSingle();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   return (data as RecruiterRow | null) ?? null;
 }
 
@@ -40,7 +40,7 @@ export async function findByUserId(userId: string): Promise<RecruiterRow | null>
     .select(EMBED)
     .eq('user_id', userId)
     .maybeSingle();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   return (data as RecruiterRow | null) ?? null;
 }
 
@@ -49,7 +49,7 @@ export async function listAll(): Promise<RecruiterRow[]> {
     .from('recruiters')
     .select(EMBED)
     .order('created_at', { ascending: false });
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   return (data as RecruiterRow[]) ?? [];
 }
 
@@ -59,13 +59,13 @@ export async function listForManager(managerId: string): Promise<RecruiterRow[]>
     .select(EMBED)
     .eq('manager_id', managerId)
     .order('created_at', { ascending: false });
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   return (data as RecruiterRow[]) ?? [];
 }
 
 export async function create(payload: Partial<RecruiterRow>): Promise<RecruiterRow> {
   const { data, error } = await db.from('recruiters').insert(payload).select(EMBED).single();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   return data as RecruiterRow;
 }
 
@@ -76,7 +76,7 @@ export async function updateById(id: string, patch: Partial<RecruiterRow>): Prom
     .eq('id', id)
     .select(EMBED)
     .single();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   if (!data) throw httpError(404, 'Recruiter not found');
   return data as RecruiterRow;
 }

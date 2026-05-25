@@ -2,6 +2,7 @@ import { RequestHandler } from 'express';
 import { z } from 'zod';
 import { db } from '../config/db';
 import { httpError, ADMIN_TIER, MANAGER_TIER, Role, ALL_ROLES } from '../types';
+import { logger } from '../config/logger';
 import * as authSvc from '../services/auth.service';
 import { assertOutranks } from './adminUsers.controller';
 import { canViewUser } from '../services/permission.service';
@@ -71,7 +72,7 @@ export const get: RequestHandler = async (req, res) => {
       .eq('id', req.params.id)
       .maybeSingle());
   }
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   if (!data) throw httpError(404, 'User not found');
 
   // Enrich with role-specific context (consultant + recruiter linkage), so
@@ -221,7 +222,7 @@ export const update: RequestHandler = async (req, res) => {
       .select(PROFILE_COLS_LEGACY)
       .single());
   }
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json(data);
 };
 
@@ -294,7 +295,7 @@ async function assertNotLastSuperAdmin(targetId: string): Promise<void> {
     .select('id', { count: 'exact', head: true })
     .eq('role', 'SUPER_ADMIN')
     .eq('is_active', true);
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   if ((count ?? 0) <= 1) {
     throw httpError(
       409,
@@ -374,7 +375,7 @@ export const remove: RequestHandler = async (req, res) => {
     // user can no longer log in (no profile row → 403 in login()).
     // The orphan auth row should be cleaned up manually.
 
-    console.warn(`auth user delete failed for ${targetId}:`, authErr.message);
+    logger.warn({ err: authErr, userId: targetId }, 'auth user delete failed');
   }
 
   res.json({ ok: true });
@@ -425,6 +426,6 @@ export const listDeactivated: RequestHandler = async (req, res) => {
     if (role) legacy = legacy.eq('role', role);
     ({ data, error } = await legacy);
   }
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json(data ?? []);
 };

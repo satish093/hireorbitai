@@ -32,7 +32,7 @@ async function authorizeConsultantAccess(
     .select('id, user_id, recruiter_id')
     .eq('id', consultantId)
     .maybeSingle();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   if (!cons) throw httpError(404, 'Not found');
   const row = cons as ConsultantOwnerRow;
 
@@ -88,7 +88,7 @@ export const list: RequestHandler = async (req, res) => {
       res.json([]);
       return;
     }
-    throw httpError(500, error.message);
+    throw httpError(500, 'Database error');
   }
   res.json(data ?? []);
 };
@@ -137,7 +137,7 @@ export const upload: RequestHandler = async (req, res) => {
       .from(WORK_AUTH_BUCKET)
       .remove([storagePath])
       .catch(() => {});
-    throw httpError(500, error.message);
+    throw httpError(500, 'Database error');
   }
 
   audit({
@@ -164,7 +164,7 @@ export const downloadUrl: RequestHandler = async (req, res) => {
     .eq('id', req.params.docId)
     .eq('consultant_id', req.params.consultantId)
     .maybeSingle();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   if (!doc) throw httpError(404, 'Not found');
 
   const { data: urlData, error: urlErr } = await db.storage
@@ -188,7 +188,7 @@ export const remove: RequestHandler = async (req, res) => {
     .eq('id', req.params.docId)
     .eq('consultant_id', req.params.consultantId)
     .maybeSingle();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   if (!doc) throw httpError(404, 'Not found');
   const row = doc as { id: string; storage_path: string; doc_type: string };
 

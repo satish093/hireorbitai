@@ -24,7 +24,7 @@ export const list: RequestHandler = async (req, res) => {
   let qb = db.from('clients').select('*');
   if (q) qb = qb.ilike('company_name', `%${q}%`);
   const { data, error } = await qb.order('created_at', { ascending: false });
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json(data);
 };
 
@@ -43,7 +43,7 @@ export const create: RequestHandler = async (req, res) => {
     .insert({ ...parsed.data, created_by: req.user.id })
     .select()
     .single();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.status(201).json(data);
 };
 
@@ -57,12 +57,12 @@ export const update: RequestHandler = async (req, res) => {
     .eq('id', req.params.id)
     .select()
     .single();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json(data);
 };
 
 export const remove: RequestHandler = async (req, res) => {
   const { error } = await db.from('clients').delete().eq('id', req.params.id);
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json({ ok: true });
 };

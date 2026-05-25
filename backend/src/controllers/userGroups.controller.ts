@@ -2,6 +2,7 @@ import { RequestHandler } from 'express';
 import { z } from 'zod';
 import { db } from '../config/db';
 import { httpError } from '../types';
+import { logger } from '../config/logger';
 import { audit } from '../services/audit.service';
 
 // 7-char hex color (e.g. "#6366F1"). Empty/missing is accepted and falls
@@ -53,7 +54,7 @@ export const list: RequestHandler = async (_req, res) => {
       res.json([]);
       return;
     }
-    throw httpError(500, error.message);
+    throw httpError(500, 'Database error');
   }
   // Member counts in a single query — guarded against the migration not yet
   // having added users.group_id (also non-fatal, counts just stay zero).
@@ -104,7 +105,7 @@ export const create: RequestHandler = async (req, res) => {
     // Log the raw error server-side so we can diagnose if the front-end
     // toast still doesn't make the cause obvious.
 
-    console.error('[user_groups.create] database error:', error);
+    logger.error({ err: error }, '[user_groups.create] database error');
     if (/duplicate key|unique/i.test(error.message)) {
       throw httpError(409, `A group with slug "${parsed.data.slug.toLowerCase()}" already exists.`);
     }
@@ -177,7 +178,7 @@ export const remove: RequestHandler = async (req, res) => {
   const { error } = await db.from('user_groups').delete().eq('id', req.params.id);
   if (error) {
     const hint = migrationHint(error);
-    throw hint ?? httpError(500, error.message);
+    throw hint ?? httpError(500, 'Database error');
   }
   if (before) {
     audit({
@@ -221,7 +222,7 @@ export const assignOne: RequestHandler = async (req, res) => {
     .single();
   if (error) {
     const hint = migrationHint(error);
-    throw hint ?? httpError(500, error.message);
+    throw hint ?? httpError(500, 'Database error');
   }
 
   // Pick the action verb that best describes the transition:
@@ -265,7 +266,7 @@ export const setMembers: RequestHandler = async (req, res) => {
     .in('id', parsed.data.user_ids);
   if (error) {
     const hint = migrationHint(error);
-    throw hint ?? httpError(500, error.message);
+    throw hint ?? httpError(500, 'Database error');
   }
   // One audit row per user — the activity log on each user's detail page
   // can then surface the bulk move alongside the rest of their history.

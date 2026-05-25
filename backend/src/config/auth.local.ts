@@ -95,7 +95,7 @@ function verifyAccessToken(token: string): JwtPayload {
 // ---------------------------------------------------------------------------
 async function issueRefreshToken(userId: string): Promise<string> {
   const raw = randomBytes(48).toString('base64url');
-  const hash = await bcrypt.hash(raw, 10);
+  const hash = await bcrypt.hash(raw, 12);
   const expires = new Date(Date.now() + env.jwt.refreshTtlSeconds * 1000).toISOString();
   await pool.query(
     `INSERT INTO public.auth_sessions (id, user_id, refresh_hash, issued_at, expires_at)
@@ -264,7 +264,7 @@ export const admin = {
     email_confirm?: boolean;
     user_metadata?: Record<string, unknown>;
   }): Promise<AuthResp<{ user: AuthUser | null }>> {
-    const hash = await bcrypt.hash(args.password, 10);
+    const hash = await bcrypt.hash(args.password, 12);
     const id = randomUUID();
     // Normalize email to lowercase before storing. The login lookup
     // (loadUserByEmail) compares against a lowercased input via `.eq`, so a
@@ -316,7 +316,7 @@ export const admin = {
   ): Promise<AuthResp<{ user: AuthUser | null }>> {
     try {
       if (args.password) {
-        const hash = await bcrypt.hash(args.password, 10);
+        const hash = await bcrypt.hash(args.password, 12);
         await pool.query(
           `UPDATE public.users SET password_hash = $1, last_password_changed_at = now(), updated_at = now() WHERE id = $2`,
           [hash, userId],

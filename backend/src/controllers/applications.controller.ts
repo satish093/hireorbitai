@@ -48,7 +48,7 @@ async function loadAndAuthorize(
     .select('id, recruiter_id, consultant_id')
     .eq('id', applicationId)
     .maybeSingle();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   if (!data) throw httpError(404, 'Application not found');
   const row = data as ApplicationOwnership;
 
@@ -102,7 +102,7 @@ export const list: RequestHandler = async (req, res) => {
 
   if (status) qb = qb.eq('status', status);
   const { data, error } = await qb.order('submitted_at', { ascending: false });
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json(data);
 };
 
@@ -143,7 +143,7 @@ export const checkDuplicate: RequestHandler = async (req, res) => {
     .eq('job_id', job_id);
   if (vendor_id) qb = qb.eq('vendor_id', vendor_id);
   const { data, error } = await qb;
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json({ duplicate: (data?.length ?? 0) > 0, matches: data });
 };
 
@@ -217,7 +217,7 @@ export const create: RequestHandler = async (req, res) => {
   // the column allowlist. The `_force` rename signals "intentionally unused".
   const { force: _force, ...insertBody } = body;
   const { data, error } = await db.from('applications').insert(insertBody).select().single();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.status(201).json(data);
 };
 
@@ -255,7 +255,7 @@ export const update: RequestHandler = async (req, res) => {
         "ARCHIVED isn't in the application_status enum yet — apply database/applications-archived-status.sql to the database, then retry.",
       );
     }
-    throw httpError(500, error.message);
+    throw httpError(500, 'Database error');
   }
   res.json(data);
 };
@@ -353,11 +353,9 @@ export const fromJob: RequestHandler = async (req, res) => {
   }
 
   if (error) {
-    console.error(
-      '[applications.fromJob] database error:',
-      error,
-      'payload keys:',
-      Object.keys(insertBody),
+    req.log.error(
+      { err: error, payloadKeys: Object.keys(insertBody) },
+      '[applications.fromJob] database error',
     );
     const code = (error as any).code ?? '';
     if (code === '23505' || /duplicate|unique/i.test(error.message)) {
@@ -467,7 +465,7 @@ export const appendEvent: RequestHandler = async (req, res) => {
       'application_events table missing — apply database/apply-flow-tables.sql to the database.',
     );
   }
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.status(201).json(data);
 };
 
@@ -485,7 +483,7 @@ export const listEvents: RequestHandler = async (req, res) => {
       res.json([]);
       return;
     }
-    throw httpError(500, error.message);
+    throw httpError(500, 'Database error');
   }
   res.json(data ?? []);
 };
@@ -511,10 +509,10 @@ export async function logEvent(opts: {
       created_by: opts.created_by ?? null,
     });
     if (error && !/application_events|schema cache/i.test(error.message)) {
-      console.warn('[application_events.log] insert failed:', error.message);
+      console.warn('[application_events.log] insert failed (table missing or schema mismatch)');
     }
-  } catch (e) {
-    console.warn('[application_events.log] threw:', e);
+  } catch {
+    /* fire-and-forget audit; swallow */
   }
 }
 
@@ -535,6 +533,6 @@ export const runAtsScore: RequestHandler = async (req, res) => {
     .eq('id', req.params.id)
     .select()
     .single();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json(data);
 };

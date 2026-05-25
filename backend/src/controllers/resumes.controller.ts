@@ -17,6 +17,7 @@ import {
 } from '../services/ai.service';
 import { extractResumeText } from '../services/resumeText.service';
 import { httpError, MANAGER_TIER } from '../types';
+import { logger } from '../config/logger';
 import { audit } from '../services/audit.service';
 
 function isManagerTier(role?: string): boolean {
@@ -139,7 +140,7 @@ export const listForConsultant: RequestHandler = async (req, res) => {
       .eq('consultant_id', req.params.consultantId)
       .order('version', { ascending: false }));
   }
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json(data);
 };
 
@@ -198,12 +199,12 @@ export const upload: RequestHandler = async (req, res) => {
       aiScore = scoreResult.value.score;
       aiFeedback = scoreResult.value;
     } else {
-      console.warn('Resume AI scoring failed:', scoreResult.reason);
+      logger.warn({ err: scoreResult.reason }, 'Resume AI scoring failed');
     }
     if (profileResult.status === 'fulfilled') {
       parsedProfile = profileResult.value;
     } else {
-      console.warn('Resume profile parse failed:', profileResult.reason);
+      logger.warn({ err: profileResult.reason }, 'Resume profile parse failed');
     }
     // Keep the raw text on ai_feedback so /jobs/:id/skill-match-for-me can
     // score against this resume later without the client having to re-paste.
@@ -239,7 +240,7 @@ export const upload: RequestHandler = async (req, res) => {
     delete insertBody.parsed_profile;
     ({ data, error } = await db.from('resumes').insert(insertBody).select().single());
   }
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
 
   audit({
     action: 'resume_uploaded',
@@ -269,7 +270,7 @@ export const reextract: RequestHandler = async (req, res) => {
     .select('id, consultant_id, storage_path, mime_type, file_name, ai_feedback')
     .eq('id', req.params.id)
     .maybeSingle();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   if (!row) throw httpError(404, 'Resume not found');
   const resume = row as any;
   await authorizeConsultantAccess(resume.consultant_id, req.user);
@@ -296,7 +297,7 @@ export const reextract: RequestHandler = async (req, res) => {
   } catch (e) {
     // Non-fatal — the text is still saved; the user can score on demand.
 
-    console.warn('Re-extract AI scoring failed:', e);
+    logger.warn({ err: e }, 'Re-extract AI scoring failed');
   }
 
   const patch: any = { ai_feedback: aiFeedback, ai_score: aiScore, body_text: text };
@@ -348,7 +349,7 @@ export const score: RequestHandler = async (req, res) => {
     .eq('id', req.params.id)
     .select()
     .single();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json(data);
 };
 
@@ -370,7 +371,7 @@ export const setCurrent: RequestHandler = async (req, res) => {
     .eq('id', id)
     .select()
     .single();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json(data);
 };
 
@@ -598,7 +599,7 @@ export const tailorForJob: RequestHandler = async (req, res) => {
     delete insertRow.body_text;
     ({ data, error } = await db.from('resumes').insert(insertRow).select().single());
   }
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
 
   // Persist a first-class customization row so we can later query "all
   // customizations for job X" or "all customizations by recruiter Y" cheaply.
@@ -787,7 +788,7 @@ export const listTailorSessions: RequestHandler = async (req, res) => {
       res.json([]);
       return;
     }
-    throw httpError(500, error.message);
+    throw httpError(500, 'Database error');
   }
   res.json(data ?? []);
 };
@@ -801,7 +802,7 @@ export const getTailorSession: RequestHandler = async (req, res) => {
     .eq('id', req.params.sessionId)
     .maybeSingle();
   if (error && MISSING_TABLE.test(error.message)) throw httpError(404, 'Tailor session not found');
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   if (!session) throw httpError(404, 'Tailor session not found');
   // Authorize against the session's OWN resume — closes cross-consultant IDOR.
   await loadResumeForCaller((session as any).resume_id, req.user);
@@ -1000,7 +1001,7 @@ export const patchTailorEdit: RequestHandler = async (req, res) => {
     .eq('id', (edit as any).id)
     .select(EDIT_COLS)
     .single();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json(data);
 };
 
@@ -1085,7 +1086,7 @@ export const applyTailorSession: RequestHandler = async (req, res) => {
     delete insertRow.body_text;
     ({ data: created, error } = await db.from('resumes').insert(insertRow).select().single());
   }
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
 
   await db
     .from('resume_tailor_sessions')

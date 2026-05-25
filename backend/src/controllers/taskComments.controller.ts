@@ -25,7 +25,7 @@ export const list: RequestHandler = async (req, res) => {
     .select(SELECT_WITH_AUTHOR)
     .eq('task_id', taskId)
     .order('created_at', { ascending: true });
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json(data);
 };
 
@@ -43,7 +43,7 @@ export const create: RequestHandler = async (req, res) => {
     .insert({ task_id: taskId, author_id: req.user.id, body })
     .select(SELECT_WITH_AUTHOR)
     .single();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.status(201).json(data);
 };
 
@@ -58,6 +58,6 @@ export const remove: RequestHandler = async (req, res) => {
   const canDelete = isManagerLike(req.user.role) || c.author_id === req.user.id;
   if (!canDelete) throw httpError(403, 'Forbidden');
   const { error } = await db.from('task_comments').delete().eq('id', req.params.id);
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json({ ok: true });
 };

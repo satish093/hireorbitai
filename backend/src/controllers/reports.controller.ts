@@ -46,7 +46,7 @@ export const upsertDaily: RequestHandler = async (req, res) => {
     .upsert(parsed.data, { onConflict: 'recruiter_id,activity_date' })
     .select()
     .single();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json(data);
 };
 
@@ -75,7 +75,7 @@ export const listDaily: RequestHandler = async (req, res) => {
   if (from) qb = qb.gte('activity_date', from);
   if (to) qb = qb.lte('activity_date', to);
   const { data, error } = await qb.order('activity_date', { ascending: false });
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json(data);
 };
 
@@ -415,7 +415,7 @@ export const userTime: RequestHandler = async (req, res) => {
         'user_activity_daily table missing — apply database/user-activity-tracking.sql to the database.',
       );
     }
-    throw httpError(500, error.message);
+    throw httpError(500, 'Database error');
   }
 
   // Lookup user metadata (name, email, role, last_seen_at).

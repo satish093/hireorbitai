@@ -44,7 +44,7 @@ export const listSources: RequestHandler = async (_req, res) => {
     .select('*')
     .order('source')
     .order('display_name');
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json(data);
 };
 
@@ -86,7 +86,7 @@ export const createSource: RequestHandler = async (req, res) => {
     })
     .select()
     .single();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.status(201).json(data);
 };
 
@@ -103,13 +103,13 @@ export const updateSource: RequestHandler = async (req, res) => {
     .eq('id', req.params.id)
     .select()
     .single();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json(data);
 };
 
 export const deleteSource: RequestHandler = async (req, res) => {
   const { error } = await db.from('source_companies').delete().eq('id', req.params.id);
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json({ ok: true });
 };
 

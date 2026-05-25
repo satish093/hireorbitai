@@ -42,7 +42,7 @@ async function loadOwnView(viewId: string, userId: string) {
     .select('id, user_id')
     .eq('id', viewId)
     .maybeSingle();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   if (!data || data.user_id !== userId) throw httpError(404, 'View not found');
   return data;
 }
@@ -54,7 +54,7 @@ export const list: RequestHandler = async (req, res) => {
     .select(SELECT_COLS)
     .eq('user_id', req.user.id)
     .order('created_at', { ascending: true });
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json(data ?? []);
 };
 
@@ -74,7 +74,7 @@ export const create: RequestHandler = async (req, res) => {
     })
     .select(SELECT_COLS)
     .single();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.status(201).json(data);
 };
 
@@ -97,7 +97,7 @@ export const update: RequestHandler = async (req, res) => {
     .eq('id', req.params.id)
     .select(SELECT_COLS)
     .single();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json(data);
 };
 
@@ -105,6 +105,6 @@ export const remove: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   await loadOwnView(req.params.id, req.user.id);
   const { error } = await db.from('task_views').delete().eq('id', req.params.id);
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json({ ok: true });
 };

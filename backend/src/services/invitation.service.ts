@@ -71,7 +71,7 @@ export async function createInvitation(input: CreateInvitationInput) {
       if (legacyErr) throw httpError(500, legacyErr.message);
       return buildResponse(legacy, emailLc, token, input);
     }
-    throw httpError(500, error.message);
+    throw httpError(500, 'Database error');
   }
 
   return buildResponse(data, emailLc, token, input);

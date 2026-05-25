@@ -28,7 +28,7 @@ export interface ApplicationRow {
 /** Find one application; null if not found. */
 export async function findById(id: string): Promise<ApplicationRow | null> {
   const { data, error } = await db.from('applications').select('*').eq('id', id).maybeSingle();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   return (data as ApplicationRow | null) ?? null;
 }
 
@@ -53,14 +53,14 @@ export async function listForConsultant(
     .eq('consultant_id', consultantId);
   if (opts?.status) q = q.eq('status', opts.status);
   const { data, error } = await q.order('submitted_at', { ascending: false });
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   return (data as ApplicationRow[]) ?? [];
 }
 
 /** Insert + return the inserted row. */
 export async function create(payload: Partial<ApplicationRow>): Promise<ApplicationRow> {
   const { data, error } = await db.from('applications').insert(payload).select().single();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   return data as ApplicationRow;
 }
 
@@ -75,7 +75,7 @@ export async function updateById(
     .eq('id', id)
     .select()
     .single();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   if (!data) throw httpError(404, 'Application not found');
   return data as ApplicationRow;
 }
@@ -83,5 +83,5 @@ export async function updateById(
 /** Hard delete (legacy callsite — prefer archiving). */
 export async function deleteById(id: string): Promise<void> {
   const { error } = await db.from('applications').delete().eq('id', id);
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
 }

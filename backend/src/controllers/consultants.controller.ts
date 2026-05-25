@@ -68,7 +68,7 @@ export const list: RequestHandler = async (req, res) => {
   }
 
   const { data, error } = await q;
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
 
   // Bench matches: `?matchFor=:jobId` scores the (already role-scoped) list of
   // consultants against a job's required skills and returns the strong matches.
@@ -197,7 +197,7 @@ export const onboard: RequestHandler = async (req, res) => {
         .single());
     }
   }
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json(data);
 };
 
@@ -241,7 +241,7 @@ export const update: RequestHandler = async (req, res) => {
     .eq('id', req.params.id)
     .select()
     .single();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json(data);
 };
 
@@ -274,7 +274,7 @@ export const assignRecruiter: RequestHandler = async (req, res) => {
     .eq('id', req.params.id)
     .select()
     .single();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
 
   // Invalidate permission caches for old recruiter, new recruiter, and the consultant.
   if (oldCons.recruiter_id) {
@@ -326,6 +326,6 @@ export const setMarketingStatus: RequestHandler = async (req, res) => {
     .eq('id', req.params.id)
     .select()
     .single();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json(data);
 };

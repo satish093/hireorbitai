@@ -39,7 +39,7 @@ const EMBED = '*, user:users!user_id(id, full_name, email, phone, avatar_url, ro
 
 export async function findById(id: string): Promise<ConsultantRow | null> {
   const { data, error } = await db.from('consultants').select(EMBED).eq('id', id).maybeSingle();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   return (data as ConsultantRow | null) ?? null;
 }
 
@@ -55,7 +55,7 @@ export async function findByUserId(userId: string): Promise<ConsultantRow | null
     .select(EMBED)
     .eq('user_id', userId)
     .maybeSingle();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   return (data as ConsultantRow | null) ?? null;
 }
 
@@ -64,7 +64,7 @@ export async function listAll(): Promise<ConsultantRow[]> {
     .from('consultants')
     .select(EMBED)
     .order('created_at', { ascending: false });
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   return (data as ConsultantRow[]) ?? [];
 }
 
@@ -74,7 +74,7 @@ export async function listForRecruiter(recruiterId: string): Promise<ConsultantR
     .select(EMBED)
     .eq('recruiter_id', recruiterId)
     .order('created_at', { ascending: false });
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   return (data as ConsultantRow[]) ?? [];
 }
 
@@ -84,13 +84,13 @@ export async function listActive(): Promise<ConsultantRow[]> {
     .select(EMBED)
     .eq('marketing_status', 'ACTIVE')
     .order('created_at', { ascending: false });
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   return (data as ConsultantRow[]) ?? [];
 }
 
 export async function create(payload: Partial<ConsultantRow>): Promise<ConsultantRow> {
   const { data, error } = await db.from('consultants').insert(payload).select(EMBED).single();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   return data as ConsultantRow;
 }
 
@@ -104,7 +104,7 @@ export async function updateById(
     .eq('id', id)
     .select(EMBED)
     .single();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   if (!data) throw httpError(404, 'Consultant not found');
   return data as ConsultantRow;
 }

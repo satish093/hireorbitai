@@ -65,7 +65,7 @@ export const list: RequestHandler = async (_req, res) => {
       res.json([]);
       return;
     }
-    throw httpError(500, error.message);
+    throw httpError(500, 'Database error');
   }
   res.json(data ?? []);
 };
@@ -112,7 +112,7 @@ export const listOverrides: RequestHandler = async (_req, res) => {
       res.json([]);
       return;
     }
-    throw httpError(500, error.message);
+    throw httpError(500, 'Database error');
   }
   res.json(data ?? []);
 };
@@ -132,7 +132,7 @@ export const setGroupOverride: RequestHandler = async (req, res) => {
       .delete()
       .eq('group_id', groupId)
       .eq('key', key);
-    if (error) throw httpError(500, error.message);
+    if (error) throw httpError(500, 'Database error');
   } else {
     const { error } = await db.from('group_feature_flags').upsert(
       {
@@ -144,7 +144,7 @@ export const setGroupOverride: RequestHandler = async (req, res) => {
       },
       { onConflict: 'group_id,key' },
     );
-    if (error) throw httpError(500, error.message);
+    if (error) throw httpError(500, 'Database error');
   }
   invalidateCache();
   res.json({ ok: true });

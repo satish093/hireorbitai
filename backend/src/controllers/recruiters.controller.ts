@@ -37,7 +37,7 @@ export const list: RequestHandler = async (_req, res) => {
     res.json(fallback.data);
     return;
   }
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json(data);
 };
 
@@ -83,7 +83,7 @@ export const onboard: RequestHandler = async (req, res) => {
     .upsert({ user_id: req.user.id, ...recruiterRow }, { onConflict: 'user_id' })
     .select()
     .single();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json(data);
 };
 
@@ -145,7 +145,7 @@ export const addManager: RequestHandler = async (req, res) => {
       .eq('id', recruiterId)
       .select()
       .single();
-    if (error) throw httpError(500, error.message);
+    if (error) throw httpError(500, 'Database error');
     res.status(201).json({
       ...data,
       _degraded:
@@ -176,7 +176,7 @@ export const addManager: RequestHandler = async (req, res) => {
     )
     .select()
     .single();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
 
   if (wantPrimary) {
     await db
@@ -215,7 +215,7 @@ export const removeManager: RequestHandler = async (req, res) => {
     .delete()
     .eq('recruiter_id', recruiterId)
     .eq('manager_id', managerId);
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
 
   if (removed?.is_primary) {
     const { data: next } = await db
@@ -257,7 +257,7 @@ export const setPrimaryManager: RequestHandler = async (req, res) => {
       .from('recruiters')
       .update({ manager_id: managerId })
       .eq('id', recruiterId);
-    if (error) throw httpError(500, error.message);
+    if (error) throw httpError(500, 'Database error');
     res.json({ ok: true, _degraded: true });
     return;
   }

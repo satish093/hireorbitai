@@ -25,7 +25,7 @@ export const list: RequestHandler = async (req, res) => {
     .select(`*, uploader:users!uploaded_by ( id, email, full_name )`)
     .eq('task_id', taskId)
     .order('created_at', { ascending: false });
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
 
   const withUrls = await Promise.all(
     (data ?? []).map(async (a: any) => {
@@ -64,7 +64,7 @@ export const upload: RequestHandler = async (req, res) => {
     })
     .select()
     .single();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.status(201).json(data);
 };
 
@@ -82,6 +82,6 @@ export const remove: RequestHandler = async (req, res) => {
 
   await db.storage.from(BUCKET).remove([row.storage_path]);
   const { error } = await db.from('task_attachments').delete().eq('id', row.id);
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json({ ok: true });
 };

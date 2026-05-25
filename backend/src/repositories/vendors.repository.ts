@@ -23,7 +23,7 @@ export interface VendorRow {
 
 export async function findById(id: string): Promise<VendorRow | null> {
   const { data, error } = await db.from('vendors').select('*').eq('id', id).maybeSingle();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   return (data as VendorRow | null) ?? null;
 }
 
@@ -38,24 +38,24 @@ export async function listAll(): Promise<VendorRow[]> {
     .from('vendors')
     .select('*')
     .order('company_name', { ascending: true });
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   return (data as VendorRow[]) ?? [];
 }
 
 export async function create(payload: Partial<VendorRow>): Promise<VendorRow> {
   const { data, error } = await db.from('vendors').insert(payload).select().single();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   return data as VendorRow;
 }
 
 export async function updateById(id: string, patch: Partial<VendorRow>): Promise<VendorRow> {
   const { data, error } = await db.from('vendors').update(patch).eq('id', id).select().single();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   if (!data) throw httpError(404, 'Vendor not found');
   return data as VendorRow;
 }
 
 export async function deleteById(id: string): Promise<void> {
   const { error } = await db.from('vendors').delete().eq('id', id);
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
 }

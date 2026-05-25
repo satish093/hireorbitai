@@ -148,6 +148,8 @@ const envSchema = z.object({
     .min(1000)
     .default(15 * 60 * 1000),
   RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(3000),
+  // Per-user AI endpoint limit (per 5 min). Lower this if Anthropic/Groq costs spike.
+  AI_RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(30),
 
   // --- Trust proxy (set to 1 behind Nginx/CloudPanel, 0 if direct) ---
   TRUST_PROXY: z.coerce.number().int().min(0).max(10).default(1),
@@ -249,6 +251,7 @@ export const env = {
     windowMs: e.RATE_LIMIT_WINDOW_MS,
     max: e.RATE_LIMIT_MAX,
   },
+  aiRateLimitMax: e.AI_RATE_LIMIT_MAX,
   database: {
     url: e.DATABASE_URL,
     ssl: e.DATABASE_SSL,

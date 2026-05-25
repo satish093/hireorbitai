@@ -44,7 +44,10 @@ export const pool = new Pool({
 });
 
 pool.on('error', (err) => {
-  console.error('[pg-pool] idle client error:', err);
+  // Lazy import avoids a circular dep with env.ts (which db.ts also loads).
+  import('./logger')
+    .then(({ logger }) => logger.error({ err }, '[pg-pool] idle client error'))
+    .catch(() => {});
 });
 
 // ---------------------------------------------------------------------------

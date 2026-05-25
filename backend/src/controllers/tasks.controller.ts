@@ -28,7 +28,7 @@ function isManagerLike(role?: string): boolean {
 // we re-fetch the row with joins here for the response.
 async function taskWithJoins(id: string) {
   const { data, error } = await db.from('tasks').select(SELECT_WITH_JOINS).eq('id', id).single();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   return data;
 }
 
@@ -56,7 +56,7 @@ export const list: RequestHandler = async (req, res) => {
   const { data, error } = await qb
     .order('order_index', { ascending: true })
     .order('created_at', { ascending: false });
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json(data);
 };
 
@@ -106,7 +106,7 @@ export const create: RequestHandler = async (req, res) => {
     delete payload.tags;
     ({ data, error } = await db.from('tasks').insert(payload).select('*').single());
   }
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.status(201).json(await taskWithJoins((data as { id: string }).id));
 };
 
@@ -172,7 +172,7 @@ export const update: RequestHandler = async (req, res) => {
     }
     ({ error } = await db.from('tasks').update(allowed).eq('id', id).select('*').single());
   }
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json(await taskWithJoins(id));
 };
 
@@ -200,7 +200,7 @@ export const updateStatus: RequestHandler = async (req, res) => {
     .eq('id', req.params.id)
     .select('*')
     .single();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json(await taskWithJoins(req.params.id));
 };
 
@@ -209,7 +209,7 @@ export const remove: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   if (!isManagerLike(req.user.role)) throw httpError(403, 'Forbidden');
   const { error } = await db.from('tasks').delete().eq('id', req.params.id);
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json({ ok: true });
 };
 
@@ -219,7 +219,7 @@ export const assignedToMe: RequestHandler = async (req, res) => {
   let qb = db.from('tasks').select(SELECT_WITH_JOINS).eq('assignee_id', req.user.id);
   qb = applyFilters(qb, req.query as Record<string, any>);
   const { data, error } = await qb.order('due_at', { ascending: true, nullsFirst: false });
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json(data);
 };
 
@@ -259,7 +259,7 @@ export const teamTasks: RequestHandler = async (req, res) => {
   if (assigneeIds) qb = qb.in('assignee_id', assigneeIds);
   qb = applyFilters(qb, req.query as Record<string, any>);
   const { data, error } = await qb.order('due_at', { ascending: true, nullsFirst: false });
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json(data);
 };
 
@@ -275,7 +275,7 @@ export const metrics: RequestHandler = async (req, res) => {
     completed_at: string | null;
   }
   const { data, error } = await db.from('tasks').select('status, priority, due_at, completed_at');
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   const rows = (data ?? []) as MetricsRow[];
 
   // Seed with every enum value so the UI doesn't have to defend against missing
@@ -364,7 +364,7 @@ async function assertCanAccessTask(
     .select('id, assignee_id, created_by')
     .eq('id', taskId)
     .maybeSingle();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   const task = data as AccessibleTask | null;
   if (!task) throw httpError(404, 'Task not found');
   const allowed =
@@ -431,7 +431,7 @@ export const listSubtasks: RequestHandler = async (req, res) => {
     .order('created_at', { ascending: true });
   if (error) {
     if (isMissingRelation(error.message)) return res.json([]);
-    throw httpError(500, error.message);
+    throw httpError(500, 'Database error');
   }
   res.json(data ?? []);
 };
@@ -451,7 +451,7 @@ export const createSubtask: RequestHandler = async (req, res) => {
     })
     .select('*')
     .single();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   await recordActivity(req, req.params.id, 'subtask_added', { label: parsed.data.label });
   res.status(201).json(data);
 };
@@ -481,7 +481,7 @@ export const updateSubtask: RequestHandler = async (req, res) => {
     .eq('id', req.params.id)
     .select('*')
     .single();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
 
   // Log a completion event only when done flips from falsey to true.
   if (parsed.data.done === true && !existing.done) {
@@ -504,7 +504,7 @@ export const removeSubtask: RequestHandler = async (req, res) => {
   await assertCanAccessTask(req.user, existing.task_id);
 
   const { error } = await db.from('task_subtasks').delete().eq('id', req.params.id);
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json({ ok: true });
 };
 
@@ -525,7 +525,7 @@ export const listActivity: RequestHandler = async (req, res) => {
     .limit(limit);
   if (error) {
     if (isMissingRelation(error.message)) return res.json([]);
-    throw httpError(500, error.message);
+    throw httpError(500, 'Database error');
   }
   res.json(data ?? []);
 };
@@ -548,7 +548,7 @@ export const createComment: RequestHandler = async (req, res) => {
     })
     .select('*')
     .single();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
 
   // Re-fetch with the actor embedded for the response. Best-effort: if the
   // embed select fails for any reason, fall back to the bare inserted row.

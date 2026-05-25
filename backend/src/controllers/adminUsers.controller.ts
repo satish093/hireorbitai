@@ -180,7 +180,7 @@ export const list: RequestHandler = async (req, res) => {
   }
 
   const { data, error, count } = await query;
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
 
   // Enrich each row with its live (non-expired) session count for the table's
   // Sessions column. One grouped query over only the page's ids — cheap, and
@@ -336,7 +336,7 @@ export const revokeAllSessions: RequestHandler = async (req, res) => {
   const { id } = req.params;
   const target = await loadTargetOrThrow({ role: req.user.role }, id);
   const { error } = await db.auth.admin.signOut(id, 'global');
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   audit({
     action: 'admin_sessions_revoked_all',
     user_id: id,
@@ -360,7 +360,7 @@ export const forcePasswordChange: RequestHandler = async (req, res) => {
     throw httpError(400, 'Use your own account settings to change your password.');
   const target = await loadTargetOrThrow({ role: req.user.role }, id);
   const { error } = await db.from('users').update({ must_change_password: true }).eq('id', id);
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   await db.auth.admin.signOut(id, 'global').catch(() => {});
   audit({
     action: 'admin_user_force_password_change',
@@ -398,7 +398,7 @@ export const impersonate: RequestHandler = async (req, res) => {
 
   const { data, error } = await db.auth.admin.createSessionForUser(id);
   if (error || !data?.session) {
-    throw httpError(500, error?.message ?? 'Failed to start impersonation');
+    throw httpError(500, 'Failed to start impersonation');
   }
   audit({
     action: 'admin_user_impersonated',
@@ -426,7 +426,7 @@ export const impersonate: RequestHandler = async (req, res) => {
 export const get: RequestHandler = async (req, res) => {
   const { id } = req.params;
   const { data, error } = await db.from('users').select('*').eq('id', id).maybeSingle();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   if (!data) throw httpError(404, 'User not found');
 
   // Role-specific context (consultants/recruiters joins) — same enrichment
@@ -526,7 +526,7 @@ export const setStatus: RequestHandler = async (req, res) => {
     .eq('id', id)
     .select('id, email, status, status_reason, status_changed_at')
     .single();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
 
   // Revoke ALL of the user's refresh tokens whenever they leave the active
   // state. Without this, a still-valid access token (TTL up to 1h) could
@@ -582,7 +582,7 @@ export const setGroup: RequestHandler = async (req, res) => {
     .eq('id', id)
     .select('id, email, group_id')
     .single();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
 
   const from = beforeRow.group_id ?? null;
   const to = parsed.data.group_id;
@@ -622,7 +622,7 @@ export const setNotes: RequestHandler = async (req, res) => {
     .eq('id', id)
     .select('id, admin_notes')
     .single();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json(data);
 };
 
@@ -673,7 +673,7 @@ export const auditLog: RequestHandler = async (req, res) => {
     .eq('user_id', id)
     .order('created_at', { ascending: false })
     .limit(200);
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json(data ?? []);
 };
 
@@ -711,7 +711,7 @@ export const globalAuditLog: RequestHandler = async (req, res) => {
   if (to) q = q.lte('created_at', to);
 
   const { data, error } = await q;
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json(data ?? []);
 };
 
@@ -773,7 +773,7 @@ export const bulk: RequestHandler = async (req, res) => {
         if (!newRole) throw httpError(400, 'A role is required.');
         assertOutranks(actor, newRole); // can't promote to a tier you don't outrank
         const { error } = await db.from('users').update({ role: newRole }).eq('id', id);
-        if (error) throw httpError(500, error.message);
+        if (error) throw httpError(500, 'Database error');
         audit({
           action: 'admin_role_changed',
           user_id: id,
@@ -786,7 +786,7 @@ export const bulk: RequestHandler = async (req, res) => {
           .from('users')
           .update({ group_id: payload?.group_id ?? null })
           .eq('id', id);
-        if (error) throw httpError(500, error.message);
+        if (error) throw httpError(500, 'Database error');
         audit({
           action: payload?.group_id ? 'group_user_moved' : 'group_user_removed',
           user_id: id,
@@ -807,7 +807,7 @@ export const bulk: RequestHandler = async (req, res) => {
             is_active: false,
           })
           .eq('id', id);
-        if (error) throw httpError(500, error.message);
+        if (error) throw httpError(500, 'Database error');
         await db.auth.admin.signOut(id, 'global').catch(() => {});
         audit({
           action: 'admin_user_deactivated',

@@ -192,7 +192,7 @@ export const list: RequestHandler = async (req, res) => {
   if (publisher) qb = qb.eq('publisher', publisher);
 
   const { data, error } = await qb.order('created_at', { ascending: false });
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
 
   let rows = (data ?? []) as any[];
   // Post-filters (don't push to PostgREST — see buildJobFunctionMatcher).
@@ -254,7 +254,7 @@ export const create: RequestHandler = async (req, res) => {
     .insert({ ...parsed.data, created_by: req.user.id })
     .select()
     .single();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.status(201).json(data);
 };
 
@@ -268,7 +268,7 @@ export const update: RequestHandler = async (req, res) => {
     .eq('id', req.params.id)
     .select()
     .single();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json(data);
 };
 
@@ -291,7 +291,7 @@ export const getNote: RequestHandler = async (req, res) => {
     .maybeSingle();
   if (error) {
     if (NOTE_MISSING.test(error.message)) throw httpError(404, 'No note');
-    throw httpError(500, error.message);
+    throw httpError(500, 'Database error');
   }
   if (!data) throw httpError(404, 'Job not found');
   const row = data as {
@@ -326,7 +326,7 @@ export const setNote: RequestHandler = async (req, res) => {
     .eq('id', req.params.id);
   if (error) {
     if (NOTE_MISSING.test(error.message)) throw httpError(503, 'Note storage not migrated yet');
-    throw httpError(500, error.message);
+    throw httpError(500, 'Database error');
   }
   const author = (req.user as { full_name?: string }).full_name ?? null;
   res.json({ body: parsed.data.body, author, updated_at });
@@ -335,7 +335,7 @@ export const setNote: RequestHandler = async (req, res) => {
 export const remove: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   const { error } = await db.from('jobs').delete().eq('id', req.params.id);
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json({ ok: true });
 };
 
@@ -425,7 +425,7 @@ export const recommended: RequestHandler = async (req, res) => {
     Math.min(5000, Number(process.env.JOBS_RECOMMENDED_MAX ?? 2000)),
   );
   const { data: jobs, error } = await qb.limit(fetchLimit);
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
 
   let ranked = jobs ?? [];
   if (fnMatcher) ranked = ranked.filter((j: any) => fnMatcher(j.title ?? ''));
@@ -534,10 +534,7 @@ export const recommended: RequestHandler = async (req, res) => {
       });
       res.setHeader('x-match-ai', 'ok');
     } catch (e: any) {
-      console.warn(
-        '[jobs.recommended] AI ranker failed; baseline scores retained:',
-        e?.message ?? e,
-      );
+      req.log.warn({ err: e }, '[jobs.recommended] AI ranker failed; baseline scores retained');
       res.setHeader('x-match-ai', `error: ${String(e?.message ?? e).slice(0, 120)}`);
     }
   }
@@ -578,7 +575,7 @@ export const liked: RequestHandler = async (req, res) => {
     .select(`job:jobs(${JOB_SELECT})`)
     .eq('user_id', req.user.id)
     .order('created_at', { ascending: false });
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   const jobs = (data ?? []).map((r: any) => r.job).filter(Boolean);
   // All entries are liked by definition.
   res.json(jobs.map((j: any) => ({ ...j, liked: true })));
@@ -627,7 +624,7 @@ export const applied: RequestHandler = async (req, res) => {
       .eq('consultant_id', consultantId)
       .order('submitted_at', { ascending: false }));
   }
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   const jobs = (data ?? [])
     .filter((r: any) => r.job)
     .map((r: any) => ({
@@ -654,7 +651,7 @@ export const like: RequestHandler = async (req, res) => {
   const { error } = await db
     .from('liked_jobs')
     .upsert({ user_id: req.user.id, job_id: req.params.id });
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json({ ok: true, liked: true });
 };
 
@@ -665,7 +662,7 @@ export const unlike: RequestHandler = async (req, res) => {
     .delete()
     .eq('user_id', req.user.id)
     .eq('job_id', req.params.id);
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json({ ok: true, liked: false });
 };
 
@@ -742,7 +739,7 @@ export const enrichPending: RequestHandler = async (req, res) => {
     .is('requirements', null)
     .eq('is_active', true)
     .limit(limit);
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   if (!pending || pending.length === 0) {
     res.json({ enriched: 0, total_pending: 0 });
     return;
@@ -979,7 +976,7 @@ export const importByUrl: RequestHandler = async (req, res) => {
       .select()
       .single());
   }
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.status(201).json(data);
 };
 

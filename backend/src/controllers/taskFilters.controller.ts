@@ -47,7 +47,7 @@ async function assertOwner(filterId: string, userId: string): Promise<void> {
     .select('id, user_id')
     .eq('id', filterId)
     .maybeSingle();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   if (!data) throw httpError(404, 'Filter not found');
   if (data.user_id !== userId) throw httpError(403, 'Forbidden');
 }
@@ -58,7 +58,7 @@ async function clearOtherDefaults(userId: string, exceptId?: string): Promise<vo
   let qb = db.from('task_filters').update({ is_default: false }).eq('user_id', userId);
   if (exceptId) qb = qb.neq('id', exceptId);
   const { error } = await qb.eq('is_default', true);
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
 }
 
 export const list: RequestHandler = async (req, res) => {
@@ -69,7 +69,7 @@ export const list: RequestHandler = async (req, res) => {
     .eq('user_id', req.user.id)
     .order('is_default', { ascending: false })
     .order('created_at', { ascending: false });
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json(data ?? []);
 };
 
@@ -96,7 +96,7 @@ export const create: RequestHandler = async (req, res) => {
     if (/task_filters_user_name_unique|duplicate key/i.test(error.message)) {
       throw httpError(409, 'A filter with that name already exists.');
     }
-    throw httpError(500, error.message);
+    throw httpError(500, 'Database error');
   }
   res.status(201).json(data);
 };
@@ -124,7 +124,7 @@ export const update: RequestHandler = async (req, res) => {
     if (/task_filters_user_name_unique|duplicate key/i.test(error.message)) {
       throw httpError(409, 'A filter with that name already exists.');
     }
-    throw httpError(500, error.message);
+    throw httpError(500, 'Database error');
   }
   res.json(data);
 };
@@ -133,6 +133,6 @@ export const remove: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   await assertOwner(req.params.id, req.user.id);
   const { error } = await db.from('task_filters').delete().eq('id', req.params.id);
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json({ ok: true });
 };

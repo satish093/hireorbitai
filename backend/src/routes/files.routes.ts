@@ -3,6 +3,24 @@ import { createReadStream, promises as fs } from 'node:fs';
 import { resolveOnDisk, verifyDownloadSignature } from '../config/storage.local';
 import { httpError } from '../types';
 
+// Allowlist of MIME types permitted to be served with their declared content-type.
+// Any type not in this list is downgraded to application/octet-stream so the
+// browser downloads the file rather than rendering potentially hostile content.
+const MIME_ALLOWLIST = new Set([
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+  'text/plain',
+]);
+
 export const filesRouter = Router();
 
 /**
@@ -35,12 +53,15 @@ filesRouter.get('/:bucket/*', async (req, res, next) => {
     try {
       const meta = await fs.readFile(fullPath + '.meta', 'utf8');
       const parsed = JSON.parse(meta) as { contentType?: string };
-      if (parsed.contentType) contentType = parsed.contentType;
+      if (parsed.contentType && MIME_ALLOWLIST.has(parsed.contentType)) {
+        contentType = parsed.contentType;
+      }
     } catch {
       /* no meta, use default */
     }
     res.setHeader('Content-Type', contentType);
     res.setHeader('Content-Length', String(stat.size));
+    res.setHeader('Content-Disposition', 'attachment');
     res.setHeader('Cache-Control', 'private, max-age=0, must-revalidate');
     createReadStream(fullPath).pipe(res);
   } catch (err) {

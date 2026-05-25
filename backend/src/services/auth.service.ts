@@ -55,13 +55,13 @@ async function loadUserByEmail(email: string): Promise<UserRow | null> {
     .select(USER_ROW_COLS)
     .eq('email', norm)
     .maybeSingle();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   return data as UserRow | null;
 }
 
 async function loadUserById(id: string): Promise<UserRow | null> {
   const { data, error } = await db.from('users').select(USER_ROW_COLS).eq('id', id).maybeSingle();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   return data as UserRow | null;
 }
 
@@ -457,7 +457,7 @@ export async function completePasswordReset(args: {
     .select('id,user_id,expires_at,used_at')
     .eq('token_hash', tokenHash)
     .maybeSingle();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
 
   if (!row) {
     audit({
@@ -698,7 +698,7 @@ export async function setUserStatus(args: {
     .eq('id', targetId)
     .select('id, email, status, status_reason, is_active')
     .single();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
 
   // Revoke ALL refresh tokens whenever the user leaves the active state.
   // The access-token TTL is short (≤ 1h by default) so the in-flight token

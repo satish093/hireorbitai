@@ -37,7 +37,7 @@ export interface JobRow {
 
 export async function findById(id: string): Promise<JobRow | null> {
   const { data, error } = await db.from('jobs').select('*').eq('id', id).maybeSingle();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   return (data as JobRow | null) ?? null;
 }
 
@@ -55,7 +55,7 @@ export async function listActive(opts?: { limit?: number }): Promise<JobRow[]> {
     .order('posted_at', { ascending: false, nullsFirst: false });
   if (opts?.limit) q = q.limit(opts.limit);
   const { data, error } = await q;
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   return (data as JobRow[]) ?? [];
 }
 
@@ -67,11 +67,11 @@ export async function findByExternal(source: string, externalId: string): Promis
     .eq('source', source)
     .eq('external_id', externalId)
     .maybeSingle();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   return (data as JobRow | null) ?? null;
 }
 
 export async function deactivateById(id: string): Promise<void> {
   const { error } = await db.from('jobs').update({ is_active: false }).eq('id', id);
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
 }

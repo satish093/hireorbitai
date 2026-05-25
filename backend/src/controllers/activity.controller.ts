@@ -126,7 +126,7 @@ export const feed: RequestHandler = async (req, res) => {
   const events: ActivityEvent[] = [];
   if (appsAllowed) {
     const { data, error } = await q;
-    if (error) throw httpError(500, error.message);
+    if (error) throw httpError(500, 'Database error');
     for (const a of (data ?? []) as AppRow[]) events.push(appToEvent(a));
   }
 

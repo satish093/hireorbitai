@@ -35,7 +35,7 @@ async function assertOwner(reminderId: string, userId: string): Promise<void> {
     .select('id, owner_id')
     .eq('id', reminderId)
     .maybeSingle();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   if (!data) throw httpError(404, 'Reminder not found');
   if (data.owner_id !== userId) throw httpError(403, 'Forbidden');
 }
@@ -46,7 +46,7 @@ export const list: RequestHandler = async (req, res) => {
   let qb = db.from('reminders').select('*').eq('owner_id', req.user.id);
   if (status) qb = qb.eq('status', status);
   const { data, error } = await qb.order('due_at', { ascending: true });
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json(data);
 };
 
@@ -59,7 +59,7 @@ export const create: RequestHandler = async (req, res) => {
     .insert({ ...parsed.data, owner_id: req.user.id })
     .select()
     .single();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.status(201).json(data);
 };
 
@@ -74,7 +74,7 @@ export const update: RequestHandler = async (req, res) => {
     .eq('id', req.params.id)
     .select()
     .single();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json(data);
 };
 
@@ -87,7 +87,7 @@ export const complete: RequestHandler = async (req, res) => {
     .eq('id', req.params.id)
     .select()
     .single();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json(data);
 };
 
@@ -95,6 +95,6 @@ export const remove: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   await assertOwner(req.params.id, req.user.id);
   const { error } = await db.from('reminders').delete().eq('id', req.params.id);
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json({ ok: true });
 };

@@ -124,7 +124,7 @@ export const list: RequestHandler = async (req, res) => {
   if (!isAdmin) query = (query as any).eq('invited_by', req.user.id);
 
   const { data, error } = await query;
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   // Surface the accept URL for PENDING invitations so managers can copy the
   // link manually if the email failed to send. Use frontendUrl — the same
   // base that the email body uses (invitation.service.ts) — so the copied
@@ -176,7 +176,7 @@ export const availableParents: RequestHandler = async (req, res) => {
     .select('id, full_name, email, role, group_id')
     .in('role', validParentRoles as unknown as string[])
     .eq('is_active', true);
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
 
   type ParentRow = ParentUser & { group_id: string | null };
   let all = (data ?? []) as ParentRow[];
@@ -383,6 +383,6 @@ export const revoke: RequestHandler = async (req, res) => {
     throw httpError(404, 'Invitation not found');
   }
   const { error } = await db.from('invitations').update({ status: 'REVOKED' }).eq('id', id);
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json({ ok: true });
 };

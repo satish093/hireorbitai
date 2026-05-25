@@ -41,7 +41,7 @@ async function loadAndAuthorize(
     .select('id, consultant_id, created_by')
     .eq('id', interviewId)
     .maybeSingle();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   if (!data) throw httpError(404, 'Interview not found');
   const row = data as InterviewOwnership;
 
@@ -219,7 +219,7 @@ export const list: RequestHandler = async (req, res) => {
   if (from) qb = qb.gte('scheduled_at', from);
   if (to) qb = qb.lte('scheduled_at', to);
   const { data, error } = await qb.order('scheduled_at', { ascending: true });
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   // Strip internal recruiter/manager feedback from consultant-facing responses.
   if (req.user.role === 'CONSULTANT') {
     const rows = ((data ?? []) as Record<string, unknown>[]).map(
@@ -242,7 +242,7 @@ export const schedule: RequestHandler = async (req, res) => {
     .insert({ ...parsed.data, created_by: req.user.id })
     .select()
     .single();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   await syncInterviewReminders(data as Parameters<typeof syncInterviewReminders>[0]);
   res.status(201).json(data);
 };
@@ -258,7 +258,7 @@ export const scheduleMock: RequestHandler = async (req, res) => {
     .insert({ ...parsed.data, type: 'MOCK', is_mock: true, created_by: req.user.id })
     .select()
     .single();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   await syncInterviewReminders(data as Parameters<typeof syncInterviewReminders>[0]);
   res.status(201).json(data);
 };
@@ -275,7 +275,7 @@ export const update: RequestHandler = async (req, res) => {
     .eq('id', req.params.id)
     .select()
     .single();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   // Reschedule / cancel: regenerate the lead-time reminders for the new
   // date (or clear them if the interview is no longer SCHEDULED).
   await syncInterviewReminders(data as Parameters<typeof syncInterviewReminders>[0]);
@@ -319,7 +319,7 @@ export const conflicts: RequestHandler = async (req, res) => {
   if (to) qb = qb.lte('scheduled_at', to);
 
   const { data, error } = await qb.order('scheduled_at', { ascending: true });
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
 
   type Raw = {
     id: string;
@@ -398,7 +398,7 @@ export const next: RequestHandler = async (req, res) => {
   }
 
   const { data, error } = await qb.order('scheduled_at', { ascending: true }).limit(1);
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   const rows = (data ?? []) as Record<string, unknown>[];
   if (rows.length === 0) {
     res.json(null);
@@ -438,6 +438,6 @@ export const submitFeedback: RequestHandler = async (req, res) => {
     .eq('id', req.params.id)
     .select()
     .single();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json(data);
 };

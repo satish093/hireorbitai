@@ -34,7 +34,7 @@ export const getGoals: RequestHandler = async (req, res) => {
       .eq('recruiter_id', recId);
     if (error) {
       // Table not migrated yet → fall back to defaults rather than 500.
-      if (!MISSING.test(error.message)) throw httpError(500, error.message);
+      if (!MISSING.test(error.message)) throw httpError(500, 'Database error');
     } else {
       for (const g of (data ?? []) as { goal_type: string; target: number }[]) {
         if ((GOAL_TYPES as readonly string[]).includes(g.goal_type)) {
@@ -70,7 +70,7 @@ export const setGoals: RequestHandler = async (req, res) => {
       );
     if (error) {
       if (MISSING.test(error.message)) throw httpError(503, 'Goals storage not migrated yet');
-      throw httpError(500, error.message);
+      throw httpError(500, 'Database error');
     }
   }
   res.json({ ok: true });

@@ -69,14 +69,7 @@ async function bumpActivity(userId: string, isoDate: string, addSeconds: number)
  */
 export const requireAuth: RequestHandler = async (req, _res, next) => {
   const header = req.headers.authorization ?? '';
-  // Browser EventSource and <img> tags cannot set custom headers, so we
-  // also accept ?token=<jwt> on the query string. Same JWT validation,
-  // same revocation path; the only difference is the carrier. HTTPS
-  // protects the token in transit, and the JWT itself is short-lived
-  // (1h TTL by default).
-  const token =
-    (header.startsWith('Bearer ') ? header.slice(7) : null) ??
-    (typeof req.query.token === 'string' ? req.query.token : null);
+  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
   if (!token) throw httpError(401, 'Missing bearer token');
 
   const { data, error } = await db.auth.getUser(token);

@@ -10,7 +10,7 @@ import * as authSvc from '../services/auth.service';
 export const me: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   const { data: user, error } = await db.from('users').select('*').eq('id', req.user.id).single();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
 
   let consultant_id: string | null = null;
   let recruiter_id: string | null = null;
@@ -70,7 +70,7 @@ export const syncProfile: RequestHandler = async (req, res) => {
     .upsert(patch, { onConflict: 'id' })
     .select()
     .single();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json(data);
 };
 
@@ -97,7 +97,7 @@ export const completeTour: RequestHandler = async (req, res) => {
       res.json({ ok: true, persisted: false });
       return;
     }
-    throw httpError(500, error.message);
+    throw httpError(500, 'Database error');
   }
   res.json({ ok: true, persisted: true });
 };
@@ -120,7 +120,7 @@ export const setJobAlerts: RequestHandler = async (req, res) => {
       res.json({ ok: true, persisted: false });
       return;
     }
-    throw httpError(500, error.message);
+    throw httpError(500, 'Database error');
   }
   res.json({ ok: true, persisted: true });
 };

@@ -72,7 +72,7 @@ export const directory: RequestHandler = async (req, res) => {
       .in('id', Array.from(peerIds))
       .order('full_name'));
   }
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json(data);
 };
 
@@ -102,7 +102,7 @@ export const conversations: RequestHandler = async (req, res) => {
       .or(`sender_id.eq.${me},recipient_id.eq.${me}`)
       .order('created_at', { ascending: false }));
   }
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
 
   const buckets = new Map<
     string,
@@ -136,7 +136,7 @@ export const unreadCount: RequestHandler = async (req, res) => {
     .eq('recipient_id', req.user.id)
     .is('read_at', null)
     .is('deleted_at', null);
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json({ unread: count ?? 0 });
 };
 
@@ -185,7 +185,7 @@ export const thread: RequestHandler = async (req, res) => {
       .is('deleted_at', null)
       .order('created_at', { ascending: true }));
   }
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json(data ?? []);
 };
 
@@ -217,7 +217,7 @@ export const markRead: RequestHandler = async (req, res) => {
     .eq('recipient_id', me)
     .eq('sender_id', other)
     .is('read_at', null);
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   res.json({ ok: true });
 };
 
@@ -293,7 +293,7 @@ export const send: RequestHandler = async (req, res) => {
       .eq('id', inserted.id)
       .single());
   }
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   // Fan out to both ends. Recipient gets the message:new event for inbox /
   // active-thread updates; sender gets it too so a second tab on the
   // sender's side mirrors the new message without a poll cycle.
@@ -324,7 +324,7 @@ export const remove: RequestHandler = async (req, res) => {
     .is('deleted_at', null)
     .select('id, sender_id, recipient_id')
     .maybeSingle();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   if (!updated) {
     // Either the row doesn't exist, isn't ours, or was already deleted.
     // All three should look identical to a caller to avoid an oracle.
@@ -356,7 +356,7 @@ export const edit: RequestHandler = async (req, res) => {
     .is('deleted_at', null)
     .select(msgSelect())
     .maybeSingle();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   if (!data) throw httpError(404, 'Message not found');
   // Push the edited body to both ends so live tabs reflect the update.
   const m = data as { recipient_id: string; sender_id: string };

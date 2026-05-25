@@ -44,7 +44,7 @@ const THIN_COLS = 'id, email, role, group_id, must_change_password, status' as c
 /** Find by id; returns null if not found. */
 export async function findById(id: string): Promise<UserRow | null> {
   const { data, error } = await db.from('users').select('*').eq('id', id).maybeSingle();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   return (data as UserRow | null) ?? null;
 }
 
@@ -62,7 +62,7 @@ export async function findByEmail(email: string): Promise<UserRow | null> {
     .select('*')
     .ilike('email', email.trim())
     .maybeSingle();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   return (data as UserRow | null) ?? null;
 }
 
@@ -74,7 +74,7 @@ export async function findThinForAuth(
   'id' | 'email' | 'role' | 'group_id' | 'must_change_password' | 'status'
 > | null> {
   const { data, error } = await db.from('users').select(THIN_COLS).eq('id', id).maybeSingle();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   return data as Pick<
     UserRow,
     'id' | 'email' | 'role' | 'group_id' | 'must_change_password' | 'status'
@@ -91,7 +91,7 @@ export async function recordSuccessfulLogin(id: string): Promise<void> {
       last_login_at: new Date().toISOString(),
     })
     .eq('id', id);
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
 }
 
 /** Bump `failed_login_attempts`; optionally arm `locked_until`. */
@@ -103,7 +103,7 @@ export async function recordFailedLogin(args: {
   const patch: Record<string, unknown> = { failed_login_attempts: args.attempts };
   if (args.lockUntil !== undefined) patch.locked_until = args.lockUntil?.toISOString() ?? null;
   const { error } = await db.from('users').update(patch).eq('id', args.id);
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
 }
 
 /** Clear must_change_password + stamp last_password_changed_at. */
@@ -117,7 +117,7 @@ export async function recordPasswordRotation(id: string): Promise<void> {
       locked_until: null,
     })
     .eq('id', id);
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
 }
 
 /**
@@ -146,7 +146,7 @@ export async function setStatus(args: {
     .eq('id', args.id)
     .select('*')
     .single();
-  if (error) throw httpError(500, error.message);
+  if (error) throw httpError(500, 'Database error');
   if (!data) throw httpError(404, 'User not found');
 
   // Bump session_version on a non-active transition — every existing access
