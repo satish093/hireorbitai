@@ -76,6 +76,9 @@ const envSchema = z.object({
   // Get a free key at aistudio.google.com — 15 req/min, 1M tokens/day, no card.
   GEMINI_API_KEY: optionalKey,
   GEMINI_MODEL: z.string().default('gemini-2.0-flash'),
+  // Hard stop before the 1M free-tier daily token cap. Gemini calls will fail
+  // over to the next provider in the chain once this is reached.
+  GEMINI_DAILY_TOKEN_LIMIT: z.coerce.number().int().min(1).default(950_000),
 
   // --- Anthropic ---
   ANTHROPIC_API_KEY: optionalKey,
@@ -271,6 +274,7 @@ export const env = {
   gemini: {
     apiKey: e.GEMINI_API_KEY || undefined,
     model: e.GEMINI_MODEL,
+    dailyTokenLimit: e.GEMINI_DAILY_TOKEN_LIMIT,
   },
   anthropic: {
     apiKey: e.ANTHROPIC_API_KEY,

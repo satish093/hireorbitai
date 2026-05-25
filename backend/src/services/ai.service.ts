@@ -31,6 +31,7 @@ import {
 } from './aiCache';
 import { normalizeSkills } from './skillNorm';
 import { logger } from '../config/logger';
+import { env } from '../config/env';
 import {
   scoreResumeRuleBased,
   parseResumeProfileRuleBased,
@@ -288,6 +289,48 @@ async function callGroqText(
 }
 
 // ---------------------------------------------------------------------------
+// Gemini daily token quota (free tier = 1M tokens/day; hard-stop at 950k)
+// ---------------------------------------------------------------------------
+
+const geminiQuota = { date: '', tokens: 0 };
+
+function geminiUtcDate(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function checkGeminiQuota(): void {
+  const today = geminiUtcDate();
+  if (geminiQuota.date !== today) {
+    geminiQuota.date = today;
+    geminiQuota.tokens = 0;
+  }
+  const limit = env.gemini.dailyTokenLimit;
+  if (geminiQuota.tokens >= limit) {
+    logger.warn(
+      { gemini_quota: { used: geminiQuota.tokens, limit, date: today } },
+      'gemini.quota daily token limit reached — falling back to next provider',
+    );
+    throw new Error(`Gemini daily token quota (${limit.toLocaleString()}) reached`);
+  }
+}
+
+function recordGeminiTokens(input: number, output: number): void {
+  const today = geminiUtcDate();
+  if (geminiQuota.date !== today) {
+    geminiQuota.date = today;
+    geminiQuota.tokens = 0;
+  }
+  geminiQuota.tokens += input + output;
+  const limit = env.gemini.dailyTokenLimit;
+  if (geminiQuota.tokens > limit * 0.9) {
+    logger.warn(
+      { gemini_quota: { used: geminiQuota.tokens, limit, date: today } },
+      'gemini.quota >90% of daily token limit consumed',
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Gemini helpers
 // ---------------------------------------------------------------------------
 
@@ -301,6 +344,7 @@ async function callGeminiStructured<T extends z.ZodType>(
   if (!GEMINI_ENABLED || !geminiClient) {
     throw new Error(`${callName} requires GEMINI_API_KEY to be configured`);
   }
+  checkGeminiQuota();
   const model = geminiClient.getGenerativeModel({
     model: GEMINI_MODEL,
     systemInstruction: systemPrompt + '\n\nReturn valid JSON only, no markdown fences.',
@@ -308,9 +352,12 @@ async function callGeminiStructured<T extends z.ZodType>(
   const result = await model.generateContent(userContent);
   const raw = result.response.text();
   const usage = result.response.usageMetadata;
+  const inputTok = usage?.promptTokenCount ?? 0;
+  const outputTok = usage?.candidatesTokenCount ?? 0;
+  recordGeminiTokens(inputTok, outputTok);
   logAiUsage(callName, GEMINI_MODEL, {
-    input_tokens: usage?.promptTokenCount ?? 0,
-    output_tokens: usage?.candidatesTokenCount ?? 0,
+    input_tokens: inputTok,
+    output_tokens: outputTok,
   });
   let parsed: unknown;
   try {
@@ -338,15 +385,19 @@ async function callGeminiText(
   if (!GEMINI_ENABLED || !geminiClient) {
     throw new Error(`${callName} requires GEMINI_API_KEY to be configured`);
   }
+  checkGeminiQuota();
   const model = geminiClient.getGenerativeModel({
     model: GEMINI_MODEL,
     systemInstruction: systemPrompt,
   });
   const result = await model.generateContent(userContent);
   const usage = result.response.usageMetadata;
+  const inputTok = usage?.promptTokenCount ?? 0;
+  const outputTok = usage?.candidatesTokenCount ?? 0;
+  recordGeminiTokens(inputTok, outputTok);
   logAiUsage(callName, GEMINI_MODEL, {
-    input_tokens: usage?.promptTokenCount ?? 0,
-    output_tokens: usage?.candidatesTokenCount ?? 0,
+    input_tokens: inputTok,
+    output_tokens: outputTok,
   });
   return result.response.text();
 }
