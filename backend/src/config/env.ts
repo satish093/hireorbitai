@@ -68,6 +68,10 @@ const envSchema = z.object({
     .min(3600)
     .default(60 * 60 * 24 * 30),
 
+  // --- LlamaParse (free tier — PDF extraction, 1,000 pages/day) ---
+  // Get a free key at cloud.llamaindex.ai — no credit card required.
+  LLAMA_CLOUD_API_KEY: optionalKey,
+
   // --- Groq (free tier — resume tailoring + job copilot) ---
   // Get a free key at console.groq.com — no credit card required.
   GROQ_API_KEY: optionalKey,
@@ -267,6 +271,9 @@ export const env = {
     secret: e.JWT_SECRET,
     accessTtlSeconds: e.JWT_ACCESS_TTL_SECONDS,
     refreshTtlSeconds: e.JWT_REFRESH_TTL_SECONDS,
+  },
+  llamaCloud: {
+    apiKey: e.LLAMA_CLOUD_API_KEY || undefined,
   },
   groq: {
     apiKey: e.GROQ_API_KEY || undefined,

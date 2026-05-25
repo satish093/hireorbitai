@@ -1,6 +1,7 @@
 import { extractText, getDocumentProxy } from 'unpdf';
 import { geminiClient, GEMINI_ENABLED, GEMINI_MODEL, withGeminiRetry } from '../config/gemini';
 import { anthropic, ANTHROPIC_ENABLED } from '../config/anthropic';
+import { LLAMAPARSE_ENABLED, LLAMAPARSE_API_KEY, LLAMAPARSE_BASE_URL } from '../config/llamaparse';
 import { logger } from '../config/logger';
 
 /**
@@ -52,6 +53,66 @@ function isImage(mimetype: string, name: string): boolean {
     ['image/jpeg', 'image/png', 'image/webp'].includes(mimetype) ||
     /\.(jpe?g|png|webp)$/i.test(name)
   );
+}
+
+/**
+ * Use LlamaParse to extract resume text (free tier, 1,000 pages/day).
+ * Uploads the PDF, polls until the job finishes, returns markdown.
+ * Returns null on any failure so the caller can fall back to Gemini / unpdf.
+ */
+async function extractPdfWithLlamaParse(buffer: Buffer): Promise<string | null> {
+  if (!LLAMAPARSE_ENABLED) return null;
+  try {
+    const formData = new FormData();
+    formData.append('file', new Blob([buffer], { type: 'application/pdf' }), 'resume.pdf');
+    formData.append('result_type', 'markdown');
+    formData.append(
+      'parsing_instruction',
+      'Extract this resume. Preserve all sections: contact info, summary, experience, education, skills, certifications. Keep bullet points and dates.',
+    );
+
+    const uploadResp = await fetch(`${LLAMAPARSE_BASE_URL}/upload`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${LLAMAPARSE_API_KEY}` },
+      body: formData,
+    });
+
+    if (!uploadResp.ok) {
+      logger.warn({ status: uploadResp.status }, 'LlamaParse upload failed — trying Gemini');
+      return null;
+    }
+
+    const { id: jobId } = (await uploadResp.json()) as { id: string };
+
+    // Poll up to 60 s (30 × 2 s)
+    for (let i = 0; i < 30; i++) {
+      await new Promise<void>((r) => setTimeout(r, 2_000));
+
+      const statusResp = await fetch(`${LLAMAPARSE_BASE_URL}/job/${jobId}`, {
+        headers: { Authorization: `Bearer ${LLAMAPARSE_API_KEY}` },
+      });
+      const { status } = (await statusResp.json()) as { status: string };
+
+      if (status === 'SUCCESS') {
+        const mdResp = await fetch(`${LLAMAPARSE_BASE_URL}/job/${jobId}/result/markdown`, {
+          headers: { Authorization: `Bearer ${LLAMAPARSE_API_KEY}` },
+        });
+        const { markdown } = (await mdResp.json()) as { markdown: string };
+        return markdown?.trim() || null;
+      }
+
+      if (status === 'ERROR') {
+        logger.warn({ jobId }, 'LlamaParse job errored — trying Gemini');
+        return null;
+      }
+    }
+
+    logger.warn({ jobId }, 'LlamaParse timed out after 60 s — trying Gemini');
+    return null;
+  } catch (err) {
+    logger.warn({ err: (err as Error).message }, 'LlamaParse extraction failed — trying Gemini');
+    return null;
+  }
 }
 
 /**
@@ -231,15 +292,19 @@ export async function extractResumeText(file: {
 }): Promise<string> {
   try {
     if (isPdf(file.mimetype, file.originalname)) {
-      // 1. Gemini — free tier, reads the PDF visually.
+      // 1. LlamaParse — free (1,000 pages/day), best quality.
+      const llamaText = await extractPdfWithLlamaParse(file.buffer);
+      if (llamaText) return normalize(llamaText);
+
+      // 2. Gemini — free tier, reads the PDF visually.
       const geminiText = await extractPdfWithGemini(file.buffer);
       if (geminiText) return normalize(geminiText);
 
-      // 2. Claude — paid fallback, also reads visually.
+      // 3. Claude — paid fallback, also reads visually.
       const claudeText = await extractPdfWithClaude(file.buffer);
       if (claudeText) return normalize(claudeText);
 
-      // 3. unpdf — pure-JS, zero AI cost, last resort.
+      // 4. unpdf — pure-JS, zero AI cost, last resort.
       const pdf = await getDocumentProxy(new Uint8Array(file.buffer));
       const { text } = await extractText(pdf, { mergePages: true });
       const joined = Array.isArray(text) ? text.join('\n') : (text ?? '');
