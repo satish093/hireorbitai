@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import clsx from 'clsx';
 import { Layout } from '../components/Layout';
 import { api } from '../services/api';
+import { useRealtime } from '../hooks/useRealtime';
 
 interface GenerationStatus {
   course_stats: Record<string, number>;
@@ -145,6 +147,30 @@ export function TrainingAIActivity() {
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [error, setError] = useState('');
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  type FeedKind = 'info' | 'ok' | 'err' | 'done';
+  const [feed, setFeed] = useState<{ time: Date; text: string; kind: FeedKind }[]>([]);
+  const pushFeed = useCallback((text: string, kind: FeedKind) => {
+    setFeed((prev) => [{ time: new Date(), text, kind }, ...prev].slice(0, 60));
+  }, []);
+
+  useRealtime({
+    'training:outline-start': (p: any) =>
+      pushFeed(`Analysing course structure for "${p.courseTitle}"…`, 'info'),
+    'training:outline-ready': (p: any) =>
+      pushFeed(
+        `Course outline ready — ${p.lessonCount} lesson${p.lessonCount === 1 ? '' : 's'} planned`,
+        'ok',
+      ),
+    'training:lesson-start': (p: any) =>
+      pushFeed(`Writing lesson ${p.index}/${p.total}: "${p.title}"…`, 'info'),
+    'training:lesson-ready': (p: any) => pushFeed(`✓ Lesson ready: "${p.title}"`, 'ok'),
+    'training:lesson-failed': (p: any) =>
+      pushFeed(`✗ Failed: "${p.title}"${p.error ? ` — ${p.error}` : ''}`, 'err'),
+    'training:course-ready': (_p: any) => pushFeed('Course generation complete.', 'done'),
+    'training:course-failed': (p: any) =>
+      pushFeed(`Course generation failed${p.error ? `: ${p.error}` : ''}`, 'err'),
+  });
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -381,6 +407,38 @@ export function TrainingAIActivity() {
                 </button>
               </div>
             )}
+          </div>
+        )}
+
+        {/* ── LIVE ACTIVITY FEED ── */}
+        {feed.length > 0 && (
+          <div className="rounded-xl border border-border bg-surface p-4">
+            <p className="text-[11px] font-mono uppercase tracking-wider text-muted mb-3">
+              Live activity
+            </p>
+            <ul className="space-y-1.5 max-h-64 overflow-y-auto">
+              {feed.map((item, i) => (
+                <li key={i} className="flex items-start gap-2 text-xs">
+                  <span className="font-mono text-[10px] text-muted shrink-0 mt-0.5">
+                    {item.time.toLocaleTimeString([], {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      second: '2-digit',
+                    })}
+                  </span>
+                  <span
+                    className={clsx(
+                      item.kind === 'ok' && 'text-success',
+                      item.kind === 'err' && 'text-danger',
+                      item.kind === 'done' && 'text-accent font-medium',
+                      item.kind === 'info' && 'text-ink-2',
+                    )}
+                  >
+                    {item.text}
+                  </span>
+                </li>
+              ))}
+            </ul>
           </div>
         )}
 

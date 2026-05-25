@@ -6,6 +6,7 @@ import * as ai from '../services/trainingAI.service';
 import { httpError, MANAGER_TIER } from '../types';
 import { logger } from '../config/logger';
 import { evaluateAchievements, logStudyMinutes } from '../services/trainingAchievements.service';
+import { publishToUser } from '../services/realtime.service';
 
 function isManagerTier(role?: string): boolean {
   return !!role && (MANAGER_TIER as string[]).includes(role);
@@ -629,7 +630,12 @@ async function applyOutline(
 }
 
 /** Generate lesson content server-side without a request context (background use). */
-async function generateLessonContentBackground(lessonId: string): Promise<void> {
+async function generateLessonContentBackground(
+  lessonId: string,
+  userId: string,
+  index: number,
+  total: number,
+): Promise<void> {
   const { data: lesson } = await repo.lessons.get(lessonId);
   if (!lesson) return;
   const l: any = lesson;
@@ -647,6 +653,14 @@ async function generateLessonContentBackground(lessonId: string): Promise<void> 
   }
 
   await repo.lessons.update(lessonId, { content_status: 'GENERATING' });
+  await publishToUser(userId, 'training:lesson-start', {
+    courseId: l.course_id,
+    lessonId,
+    title: l.title,
+    index,
+    total,
+  }).catch(() => {});
+
   try {
     const { data: content } = await ai.generateLessonContent(
       {
@@ -683,9 +697,22 @@ async function generateLessonContentBackground(lessonId: string): Promise<void> 
         .createMany(rows)
         .catch((e: Error) => logger.warn({ err: e }, 'quiz persistence failed in background'));
     }
+    await publishToUser(userId, 'training:lesson-ready', {
+      courseId: l.course_id,
+      lessonId,
+      title: l.title,
+      index,
+      total,
+    }).catch(() => {});
   } catch (err) {
     await repo.lessons.update(lessonId, { content_status: 'FAILED' });
     logger.error({ err, lessonId }, 'background lesson content generation failed');
+    await publishToUser(userId, 'training:lesson-failed', {
+      courseId: l.course_id,
+      lessonId,
+      title: l.title,
+      error: String(err).slice(0, 200),
+    }).catch(() => {});
   }
 }
 
@@ -716,9 +743,16 @@ export const generateCourse: RequestHandler = async (req, res) => {
     .status(201)
     .json({ course_id: courseId, content_status: 'GENERATING', degraded: false, lessons: [] });
 
+  const userId = req.user!.id;
+
   // Background pipeline: outline → lesson stubs → lesson content (all lessons).
   setImmediate(async () => {
     try {
+      await publishToUser(userId, 'training:outline-start', {
+        courseId,
+        courseTitle: parsed.data.title,
+      }).catch(() => {});
+
       const { data: outline, degraded } = await ai.generateCourseOutline({
         title: parsed.data.title,
         category: parsed.data.category,
@@ -730,16 +764,34 @@ export const generateCourse: RequestHandler = async (req, res) => {
       });
       const lessons = await applyOutline(courseId, outline, degraded);
 
+      await publishToUser(userId, 'training:outline-ready', {
+        courseId,
+        lessonCount: (lessons as any[]).length,
+      }).catch(() => {});
+
       if (!degraded) {
-        for (const lesson of lessons as any[]) {
-          await generateLessonContentBackground(lesson.id).catch((err) =>
-            logger.error({ err, lessonId: lesson.id }, 'background lesson generation failed'),
+        for (let i = 0; i < (lessons as any[]).length; i++) {
+          await generateLessonContentBackground(
+            (lessons as any[])[i].id,
+            userId,
+            i + 1,
+            (lessons as any[]).length,
+          ).catch((err) =>
+            logger.error(
+              { err, lessonId: (lessons as any[])[i].id },
+              'background lesson generation failed',
+            ),
           );
         }
+        await publishToUser(userId, 'training:course-ready', { courseId }).catch(() => {});
         await repo.courses.update(courseId, { content_status: 'READY' }).catch(() => {});
       }
     } catch (err) {
       logger.error({ err, courseId }, 'background course outline generation failed');
+      await publishToUser(userId, 'training:course-failed', {
+        courseId,
+        error: String(err).slice(0, 200),
+      }).catch(() => {});
       await repo.courses.update(courseId, { content_status: 'FAILED' }).catch(() => {});
     }
   });
@@ -821,6 +873,13 @@ export const generateLessonContent: RequestHandler = async (req, res) => {
   }
 
   await repo.lessons.update(l.id, { content_status: 'GENERATING' });
+  await publishToUser(req.user!.id, 'training:lesson-start', {
+    courseId: l.course_id,
+    lessonId: l.id,
+    title: l.title,
+    index: 1,
+    total: 1,
+  }).catch(() => {});
 
   let content: ai.LessonContent;
   try {
@@ -838,6 +897,12 @@ export const generateLessonContent: RequestHandler = async (req, res) => {
     content = result.data;
   } catch (err: any) {
     await repo.lessons.update(l.id, { content_status: 'FAILED' });
+    await publishToUser(req.user!.id, 'training:lesson-failed', {
+      courseId: l.course_id,
+      lessonId: l.id,
+      title: l.title,
+      error: (err?.message ?? 'AI generation failed').slice(0, 200),
+    }).catch(() => {});
     const status = err?.status === 503 ? 503 : 502;
     throw httpError(
       status,
@@ -856,6 +921,14 @@ export const generateLessonContent: RequestHandler = async (req, res) => {
     content_status: 'READY',
   });
   if (upErr) throw httpError(500, upErr.message);
+
+  await publishToUser(req.user!.id, 'training:lesson-ready', {
+    courseId: l.course_id,
+    lessonId: l.id,
+    title: l.title,
+    index: 1,
+    total: 1,
+  }).catch(() => {});
 
   await repo.quizzes.removeForLesson(l.id);
   if (content.quiz && content.quiz.length > 0) {

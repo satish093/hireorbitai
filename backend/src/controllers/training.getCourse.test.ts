@@ -38,6 +38,9 @@ vi.mock('../services/trainingAchievements.service', () => ({
   evaluateAchievements: vi.fn(),
   logStudyMinutes: vi.fn(),
 }));
+vi.mock('../services/realtime.service', () => ({
+  publishToUser: vi.fn(() => Promise.resolve()),
+}));
 
 import { getCourse } from './training.controller';
 

@@ -526,9 +526,9 @@ DESIGN PRINCIPLES:
 - learning_objectives: 4–8 items using Bloom's verbs (Define, Explain, Apply, Analyze, Design, Evaluate). Avoid "understand" — it's unmeasurable.
 - expected_outcomes: outcome statements from the learner's perspective ("You will be able to…"). 3–5 items.
 - roadmap: sequence phases logically — foundational concepts → application → practice → mastery. 2–4 phases.
-- resources: 3–6 genuinely useful external references. Official documentation > blog posts. Use plausible, well-known URLs (MDN, official docs, GitHub repos, YouTube channels from known authors). Set type accurately: DOC/VIDEO/ARTICLE/TOOL.
+- resources: 3–6 genuinely useful external references. Official documentation > blog posts. ONLY use well-known authoritative domains: docs.*, learn.*, developer.* (official vendor docs), github.com, youtube.com, NIST, OWASP, MDN, AWS/Azure/GCP official docs. Do NOT invent URLs — only use domains you are certain exist.
 - completion_criteria: be realistic. minimum_time_minutes = (estimated_duration_hours × 60 × 0.8). quiz_passing_score default 70. requires_manager_approval true only for compliance/safety topics.
-- lessons: exactly the requested count, in strict teaching order (0-based). Each lesson has ONE measurable objective (single Bloom's verb). Do NOT write lesson bodies here — summaries only (1 sentence).
+- lessons: exactly the requested count, in strict teaching order (0-based). Each lesson has ONE measurable objective (single Bloom's verb). Do NOT write lesson bodies here — summaries only (1 sentence). estimated_minutes: foundational concept lessons = 30–45 min, applied/lab lessons = 45–60 min, advanced architecture lessons = 50–70 min.
 
 DIFFICULTY CALIBRATION:
 - BEGINNER: assumes no prior knowledge of the topic; introduces vocabulary and basic concepts.
@@ -634,32 +634,41 @@ export interface LessonContentInput {
   lesson_objective?: string | null;
 }
 
-const LESSON_CONTENT_SYSTEM = `You are writing one lesson inside an online technical course. Apply the 4C/ID model: show the concept, give a concrete worked example, provide practice exercises, consolidate with takeaways.
+const LESSON_CONTENT_SYSTEM = `You are a senior technical writer at a top-tier IT staffing firm creating a self-paced e-learning lesson.
 
-CONTENT STRUCTURE (content field — Markdown):
+TARGET QUALITY: Match professional certification study material — structured prose with named frameworks (CIA triad, ATT&CK tactics, OWASP Top 10, OSI model, etc.), real vendor tools, decision trees, and documented anti-patterns. Readers are working professionals, not students. Every abstract claim needs a concrete, named example.
+
+CONTENT (content field — Markdown):
 ## [Lesson Title]
-### Introduction (1–2 short paragraphs: why this matters, what learners will know after)
-### Core Concepts (## / ### subsections; use bullets and code blocks for technical content)
-### [Additional subsections as needed]
-Target 500–800 words. No front-matter, no "In this lesson we will…" openers.
+### Introduction
+1–2 paragraphs: WHY this matters on the job and exactly what the learner will be able to DO after this lesson.
+### Core Concepts
+Use ### subsections, bullets, and numbered lists to structure distinct concepts.
+For technical topics: include runnable code with triple-backtick fences and language tags (\`\`\`python, \`\`\`sql, \`\`\`bash, etc.).
+For conceptual topics: include a named framework or taxonomy, then show how to apply it to a real decision.
+### [Add further ### subsections as needed for the topic]
+Target 600–900 words. Write the COMPLETE lesson body — do NOT truncate or summarise. No "In this lesson we will…" openers.
 
 PRACTICAL EXAMPLE (practical_example — Markdown):
-One concrete, worked example. For technical topics: include a real code snippet with explanation.
-For conceptual topics: a realistic scenario with a step-by-step walkthrough.
+One realistic worked example from professional practice.
+Technical: runnable code + line-by-line explanation of what each part does.
+Conceptual: a specific on-the-job scenario ("Your SIEM fires 200 alerts on Monday morning — here is how you triage them").
 
 EXERCISES (1–2 items):
-- prompt: what the learner will DO (active, specific — "Build a function that…", "Configure X to…")
-- expected_outcome: the observable result of a correct attempt
-- hints: 1–2 directional nudges (not answers)
+- prompt: active verb + specific task ("Build a function that…", "Configure X to enforce Y…", "Analyse the following log and identify…")
+- expected_outcome: the observable, verifiable deliverable
+- hints: exactly 2 directional nudges that point toward the answer without giving it away
 
-KEY TAKEAWAYS (3–4 one-line bullets, each starting with a strong verb)
+KEY TAKEAWAYS (4–5 items):
+Present-tense decision rules, NOT summaries. Use strong verbs: "Use X when Y", "Always Z before W", "Prefer A over B because C". These are rules the learner can apply on the job tomorrow.
 
-QUIZ (2–4 questions — apply the Bloom's rubric: mix recall, application, analysis):
-- correct_answer must be copied EXACTLY from the options array
-- explanation cites the specific section of the lesson
+QUIZ (3–5 questions — Bloom's mix: ~40 % recall, ~40 % apply, ~20 % analyze):
+- correct_answer: copy the EXACT string from the options array — do NOT paraphrase
+- explanation: cite the specific section name (e.g., "See Core Concepts → TLS Handshake")
+- For apply/analyze questions, distractors must be plausible misconceptions or near-synonyms, not obviously wrong
 
 Return valid JSON matching this exact structure — use these exact top-level keys, no wrapping object:
-{"content":"## Title\n...","practical_example":"...","exercises":[{"prompt":"...","expected_outcome":"...","hints":["..."]}],"key_takeaways":["..."],"quiz":[{"question":"...","options":["A","B","C","D"],"correct_answer":"A","explanation":"...","points":1}]}
+{"content":"## Title\n...","practical_example":"...","exercises":[{"prompt":"...","expected_outcome":"...","hints":["...","..."]}],"key_takeaways":["...","...","...","..."],"quiz":[{"question":"...","options":["A","B","C","D"],"correct_answer":"A","explanation":"See Core Concepts → ...","points":1}]}
 
 No prose outside the JSON.`;
 
