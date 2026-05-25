@@ -105,7 +105,7 @@ const sections: Section[] = [
         roles: ALL_ROLES,
         flagKey: 'interviews',
       },
-      { to: '/resumes', label: 'Resumes', icon: IconFile, roles: ALL_ROLES },
+      { to: '/resumes', label: 'Resumes', icon: IconFile, roles: OPERATOR_TIER },
       { to: '/vendors', label: 'Vendors', icon: IconBuilding, roles: OPERATOR_TIER },
       { to: '/clients', label: 'Clients', icon: IconBuilding2, roles: OPERATOR_TIER },
       {

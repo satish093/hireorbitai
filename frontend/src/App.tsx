@@ -324,7 +324,7 @@ export default function App() {
         <Route
           path="/resumes"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allow={OPERATOR_TIER}>
               <Resumes />
             </ProtectedRoute>
           }
