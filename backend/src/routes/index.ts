@@ -19,6 +19,7 @@ import { tasksRouter } from './tasks.routes';
 import { taskViewsRouter } from './taskViews.routes';
 import { messagesRouter } from './messages.routes';
 import { realtimeRouter } from './realtime.routes';
+import * as realtimeCtl from '../controllers/realtime.controller';
 import { featureFlagsRouter } from './featureFlags.routes';
 import * as featureFlagsCtl from '../controllers/featureFlags.controller';
 import { userGroupsRouter } from './userGroups.routes';
@@ -53,6 +54,11 @@ router.post('/invitations/setup', invitationsCtl.setup);
 // Admin write routes (PATCH /feature-flags/:key, etc.) stay behind the block
 // via the full router below.
 router.get('/feature-flags/me', requireAuth, featureFlagsCtl.myFlags);
+
+// SSE stream — authenticated via short-lived SSE token in the query string,
+// NOT a Bearer header, so it must be mounted before requireAuth.
+// Token validation (and single-use invalidation) happens inside the controller.
+router.get('/realtime/stream', realtimeCtl.stream);
 
 // All other routes require auth. Additionally, every route below is blocked
 // while the user is on a temporary password — they must rotate it first.

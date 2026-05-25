@@ -7,8 +7,6 @@ export const realtimeRouter = Router();
 // full JWT in the EventSource URL query string, which would appear in CDN logs.
 realtimeRouter.post('/token', c.issueToken);
 
-// Long-lived SSE stream. Token validated in the controller (short-lived SSE
-// token preferred; falls back to req.user for backwards compatibility).
-// Rate limiting is intentionally NOT applied here — each browser tab opens
-// exactly one stream and the global limiter would close it via 429.
-realtimeRouter.get('/stream', c.stream);
+// NOTE: GET /stream is intentionally NOT here — it is mounted directly on the
+// root router BEFORE requireAuth in routes/index.ts so the SSE token (query
+// param) can be validated without requiring an Authorization header.
