@@ -30,6 +30,7 @@ export function AIProviderModal({ open, onConfirm, onClose, action = 'Generate' 
   const [authUrl, setAuthUrl] = useState('');
   const [sessionId, setSessionId] = useState('');
   const [oauthError, setOauthError] = useState('');
+  const [copied, setCopied] = useState(false);
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -101,6 +102,16 @@ export function AIProviderModal({ open, onConfirm, onClose, action = 'Generate' 
     onConfirm({ mode: 'api' });
   }
 
+  async function handleCopyUrl() {
+    try {
+      await navigator.clipboard.writeText(authUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard blocked (e.g. insecure context) — the Open link button still works.
+    }
+  }
+
   const oauthReady = oauthPhase === 'connected';
   const canGenerate = mode === 'apikey' || oauthReady;
   const busy = oauthPhase === 'starting' || oauthPhase === 'polling' || oauthPhase === 'restarting';
@@ -117,9 +128,17 @@ export function AIProviderModal({ open, onConfirm, onClose, action = 'Generate' 
       title="Choose AI Provider"
       size="sm"
       footer={
-        /* Stack vertically on mobile (primary on top), row on sm+ */
-        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <Button variant="outline" onClick={onClose} disabled={busy} block className="sm:w-auto">
+        /* Stack vertically on mobile (primary on top), row on sm+. `w-full` so
+           the row spans the footer; `min-w-0` + `whitespace-normal` let a long
+           action label wrap instead of pushing the dialog off-screen. */
+        <div className="flex w-full flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <Button
+            variant="outline"
+            onClick={onClose}
+            disabled={busy}
+            block
+            className="min-w-0 sm:w-auto"
+          >
             Cancel
           </Button>
           <Button
@@ -127,14 +146,15 @@ export function AIProviderModal({ open, onConfirm, onClose, action = 'Generate' 
             onClick={handleConfirm}
             disabled={!canGenerate}
             block
-            className="sm:w-auto"
+            className="min-w-0 whitespace-normal sm:w-auto sm:max-w-[65%]"
           >
             {action} →
           </Button>
         </div>
       }
     >
-      <div className="space-y-2">
+      {/* min-w-0 so no long token (e.g. the auth URL) can stretch the dialog. */}
+      <div className="min-w-0 space-y-2">
         {/* ── OAuth option ── */}
         <div
           className={`rounded-lg border p-3 sm:p-4 transition-colors ${
@@ -161,7 +181,7 @@ export function AIProviderModal({ open, onConfirm, onClose, action = 'Generate' 
                   </span>
                 )}
               </div>
-              <p className="text-xs text-muted mt-0.5">
+              <p className="text-xs text-muted mt-0.5 break-words">
                 Use your Claude Max subscription. No API credits needed.
               </p>
 
@@ -170,7 +190,9 @@ export function AIProviderModal({ open, onConfirm, onClose, action = 'Generate' 
                   {(oauthPhase === 'idle' || oauthPhase === 'error') && (
                     <>
                       {oauthError && (
-                        <p className="text-xs text-rose-600 dark:text-rose-400">{oauthError}</p>
+                        <p className="text-xs text-rose-600 dark:text-rose-400 break-words">
+                          {oauthError}
+                        </p>
                       )}
                       <Button variant="outline" size="sm" onClick={handleConnect} block>
                         Connect Claude Max
@@ -188,14 +210,30 @@ export function AIProviderModal({ open, onConfirm, onClose, action = 'Generate' 
                         <p className="text-xs font-medium text-amber-800 dark:text-amber-300">
                           Open this URL in your browser and approve the login:
                         </p>
-                        <a
-                          href={authUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="block text-xs break-all text-accent hover:underline leading-relaxed"
-                        >
-                          {authUrl}
-                        </a>
+                        {/* Internal scroll cap so a long URL never grows the dialog. */}
+                        <div className="max-h-24 overflow-y-auto overflow-x-hidden rounded border border-amber-200/70 dark:border-amber-800/70 bg-white/60 dark:bg-black/20 px-2 py-1.5">
+                          <span className="block text-[11px] leading-relaxed break-all text-ink/80">
+                            {authUrl}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <a
+                            href={authUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex h-7 min-w-0 flex-1 items-center justify-center gap-1 rounded-[5px] border border-border-strong bg-surface px-2.5 text-xs font-medium text-ink transition-colors hover:bg-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                          >
+                            Open link ↗
+                          </a>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleCopyUrl}
+                            className="min-w-0 flex-1"
+                          >
+                            {copied ? 'Copied ✓' : 'Copy'}
+                          </Button>
+                        </div>
                       </div>
                       <Button variant="accent" size="sm" onClick={handleApproved} block>
                         I&apos;ve approved — continue
@@ -214,7 +252,7 @@ export function AIProviderModal({ open, onConfirm, onClose, action = 'Generate' 
                   )}
 
                   {oauthPhase === 'connected' && (
-                    <p className="text-xs text-emerald-600 dark:text-emerald-400">
+                    <p className="text-xs text-emerald-600 dark:text-emerald-400 break-words">
                       Subscription is active. Click &ldquo;{action} →&rdquo; to proceed.
                     </p>
                   )}
@@ -238,9 +276,9 @@ export function AIProviderModal({ open, onConfirm, onClose, action = 'Generate' 
             onChange={() => setMode('apikey')}
             className="mt-1 accent-[var(--accent)] shrink-0"
           />
-          <div>
+          <div className="min-w-0 flex-1">
             <div className="text-sm font-medium text-ink">API key</div>
-            <p className="text-xs text-muted mt-0.5">
+            <p className="text-xs text-muted mt-0.5 break-words">
               Use the Anthropic API key configured on the server.
             </p>
           </div>
