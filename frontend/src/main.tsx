@@ -7,6 +7,7 @@ import { AuthProvider } from './context/AuthContext';
 import { FeatureFlagsProvider } from './hooks/useFeatureFlags';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ScrollToTop } from './components/ScrollToTop';
+import { ViewTransition } from './components/ViewTransition';
 // Validate env vars at module load — throws synchronously if anything is
 // missing/malformed so we surface a clean error before React even mounts.
 import './config/env';
@@ -17,6 +18,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ErrorBoundary>
       <BrowserRouter>
+        <ViewTransition />
         <ScrollToTop />
         <AuthProvider>
           <FeatureFlagsProvider>
