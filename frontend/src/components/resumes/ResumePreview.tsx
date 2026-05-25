@@ -9,23 +9,11 @@ import { MarkdownView } from './markdown';
 interface Props {
   resumeId: string;
   fileName?: string;
-  /** Bump to force a background re-fetch (e.g. after re-extraction). */
   refreshKey?: number;
-  /** Re-extract readable text from the stored file (for old fileless uploads). */
   onReextract?: () => void;
   reextracting?: boolean;
 }
 
-/**
- * Renders a resume version the way it would print: real white paper, sans-serif
- * type, sectioned headers, drop shadow. The paper is intentionally NOT themed —
- * it stays white in dark mode so the PDF export matches what's on screen.
- *
- * Stale-while-revalidate: when the same resumeId re-fetches (e.g. after AI
- * re-extraction or applying a tailor session) the existing body stays visible
- * rather than being replaced by a skeleton. A skeleton only appears when a
- * genuinely different resumeId is loaded for the first time.
- */
 export function ResumePreview({
   resumeId,
   fileName,
@@ -79,25 +67,29 @@ export function ResumePreview({
     };
   }, [resumeId, refreshKey]);
 
+  /* ── Loading skeleton ── */
   if (loading) {
     return (
-      <div className="bg-white rounded-xl border border-slate-200 shadow-md px-8 sm:px-12 py-8 sm:py-10">
-        <div className="flex flex-col items-center mb-8 gap-2">
-          <Skeleton className="h-7 w-48" />
-          <Skeleton className="h-2.5 w-px bg-indigo-300" />
-          <Skeleton className="h-3 w-64" />
+      <div className="bg-white dark:bg-white rounded-xl border border-slate-200 shadow-sm">
+        <div className="px-8 sm:px-12 py-8 sm:py-10">
+          <div className="flex flex-col items-center mb-8 gap-2">
+            <Skeleton className="h-7 w-48" />
+            <Skeleton className="h-2.5 w-px bg-indigo-300" />
+            <Skeleton className="h-3 w-64" />
+          </div>
+          <Skeleton className="h-3 w-24 mb-4" />
+          <Skeleton className="h-3 w-full mb-2" />
+          <Skeleton className="h-3 w-5/6 mb-2" />
+          <Skeleton className="h-3 w-4/6 mb-6" />
+          <Skeleton className="h-3 w-24 mb-4" />
+          <Skeleton className="h-3 w-full mb-2" />
+          <Skeleton className="h-3 w-3/4" />
         </div>
-        <Skeleton className="h-3 w-24 mb-4" />
-        <Skeleton className="h-3 w-full mb-2" />
-        <Skeleton className="h-3 w-5/6 mb-2" />
-        <Skeleton className="h-3 w-4/6 mb-6" />
-        <Skeleton className="h-3 w-24 mb-4" />
-        <Skeleton className="h-3 w-full mb-2" />
-        <Skeleton className="h-3 w-3/4" />
       </div>
     );
   }
 
+  /* ── Error ── */
   if (error) {
     return (
       <EmptyState
@@ -108,6 +100,7 @@ export function ResumePreview({
     );
   }
 
+  /* ── No text yet ── */
   if (!body) {
     return (
       <EmptyState
@@ -126,28 +119,22 @@ export function ResumePreview({
     );
   }
 
-  const displayName = fileName ? fileName.replace(/\.[^.]+$/, '') : null;
-
   return (
-    <div>
+    <div className="space-y-3">
       {/* Toolbar */}
-      <div className="flex items-center justify-between mb-3 px-1">
-        {displayName ? (
-          <span className="text-[12px] text-muted font-medium truncate max-w-[60%]">
-            {displayName}
-          </span>
-        ) : (
-          <span />
-        )}
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-muted font-mono truncate max-w-[60%]">
+          {fileName ? fileName.replace(/\.[^.]+$/, '') : ''}
+        </span>
         <Button size="sm" variant="outline" onClick={() => print()}>
-          ⬇ Export PDF
+          ↓ Export PDF
         </Button>
       </div>
 
-      {/* Paper — scrollable document; always white so PDF export matches screen */}
+      {/* Document */}
       <div
         ref={paperRef}
-        className={`overflow-y-auto max-h-[72vh] bg-white text-slate-900 w-full rounded-xl border border-slate-200 shadow-md px-8 sm:px-12 py-8 sm:py-10 print:!bg-white print:!text-slate-900 print:shadow-none print:border-none print:overflow-visible print:max-h-none print:px-0 print:py-0 transition-opacity duration-300 ${refreshing ? 'opacity-60' : 'opacity-100'}`}
+        className={`bg-white text-slate-900 rounded-xl border border-slate-200 shadow-sm w-full overflow-y-auto max-h-[70vh] px-8 sm:px-12 py-8 sm:py-10 print:!bg-white print:!text-slate-900 print:shadow-none print:border-none print:overflow-visible print:max-h-none print:px-0 print:py-0 transition-opacity duration-300 ${refreshing ? 'opacity-50' : 'opacity-100'}`}
         style={{ fontFamily: "'Helvetica Neue', Arial, ui-sans-serif, system-ui, sans-serif" }}
       >
         <MarkdownView md={body ?? ''} />

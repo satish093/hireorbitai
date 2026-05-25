@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import toast from 'react-hot-toast';
-import { ButtonGroup, ButtonGroupItem } from '../ButtonGroup';
 import { Button } from '../Button';
 import { Modal } from '../Modal';
 import { EmptyState } from '../EmptyState';
@@ -24,6 +23,13 @@ interface Props {
   onEdited: () => void;
 }
 
+const TABS: { id: CenterMode; label: string }[] = [
+  { id: 'preview', label: 'Preview' },
+  { id: 'profile', label: 'Profile' },
+  { id: 'edit', label: 'Edit' },
+  { id: 'diff', label: 'Diff vs prev' },
+];
+
 export function CenterPane({
   version,
   versions,
@@ -39,7 +45,6 @@ export function CenterPane({
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [reextracting, setReextracting] = useState(false);
-  // Bumped after a re-extraction so the preview re-fetches the new body text.
   const [previewKey, setPreviewKey] = useState(0);
 
   async function reextract() {
@@ -53,7 +58,7 @@ export function CenterPane({
             (data.ai_score != null ? ` · ATS ${Math.round(data.ai_score)}` : ''),
         );
         setPreviewKey((k) => k + 1);
-        onEdited(); // reload versions so the score pill reflects the new value
+        onEdited();
       } else {
         toast('No extractable text in this file — original kept. Use Download.', { icon: '📄' });
       }
@@ -66,7 +71,7 @@ export function CenterPane({
 
   if (!version) {
     return (
-      <div className="bg-surface border border-border rounded-xl min-h-[420px] grid place-items-center">
+      <div className="bg-surface border border-border rounded-2xl min-h-[480px] grid place-items-center">
         <EmptyState
           icon="📄"
           title="No version selected"
@@ -76,9 +81,6 @@ export function CenterPane({
     );
   }
 
-  // A live session draft in Diff mode applies into a NEW version; otherwise the
-  // displayed version is simply flagged current. Disable only when there's
-  // nothing to do (already current and no draft to apply).
   const applyingDraft = mode === 'diff' && !!sessionId;
   const disabled = version.is_current && !applyingDraft;
 
@@ -110,57 +112,85 @@ export function CenterPane({
     versions.filter((v) => v.version < version.version).sort((a, b) => b.version - a.version)[0]
       ?.id ?? null;
 
+  const atsScore = version.ai_score != null ? Math.round(version.ai_score) : null;
+
   return (
-    <div className="bg-surface border border-border rounded-xl flex flex-col min-h-[420px]">
-      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 border-b border-border">
-        <div className="min-w-0 flex items-baseline gap-2">
-          <span className="text-xs font-mono font-medium text-ink">v{version.version}</span>
-          <span className="text-xs font-mono text-muted truncate">{version.file_name}</span>
-          {version.ai_score != null && (
-            <span
-              title="AI resume score (0–100)"
-              className={`text-[11px] font-semibold px-1.5 py-0.5 rounded self-center ${
-                version.ai_score >= 80
-                  ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300'
-                  : version.ai_score >= 60
-                    ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300'
-                    : 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300'
+    <div className="bg-surface border border-border rounded-2xl flex flex-col overflow-hidden">
+      {/* ── Header ── */}
+      <div className="border-b border-border">
+        {/* Row 1: version meta + action buttons */}
+        <div className="flex flex-wrap items-center justify-between gap-2 px-5 pt-4 pb-3">
+          <div className="flex items-center gap-2 min-w-0">
+            {/* Version badge */}
+            <span className="text-[11px] font-mono font-bold bg-ink text-surface px-2 py-0.5 rounded-md shrink-0">
+              v{version.version}
+            </span>
+
+            {/* ATS score */}
+            {atsScore != null && (
+              <span
+                className={`text-[11px] font-semibold px-1.5 py-0.5 rounded shrink-0 ${
+                  atsScore >= 80
+                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400'
+                    : atsScore >= 60
+                      ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400'
+                      : 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400'
+                }`}
+              >
+                ATS {atsScore}
+              </span>
+            )}
+
+            {/* Current badge */}
+            {version.is_current && (
+              <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400 shrink-0">
+                Current
+              </span>
+            )}
+
+            {/* Filename */}
+            <span className="text-xs text-muted font-mono truncate hidden sm:block">
+              {version.file_name}
+            </span>
+          </div>
+
+          {/* Actions */}
+          <div className="flex items-center gap-2 shrink-0">
+            <Button size="sm" variant="ghost" onClick={reextract} loading={reextracting}>
+              ↻ Re-extract
+            </Button>
+            <Button
+              size="sm"
+              variant={disabled ? 'outline' : 'primary'}
+              disabled={disabled}
+              onClick={() => setConfirmOpen(true)}
+            >
+              {version.is_current && !applyingDraft ? 'Current' : 'Make current'}
+            </Button>
+          </div>
+        </div>
+
+        {/* Row 2: underline tabs */}
+        <div className="flex px-5 gap-0">
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => onMode(tab.id)}
+              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
+                mode === tab.id
+                  ? 'border-accent text-accent'
+                  : 'border-transparent text-muted hover:text-ink hover:border-border-strong'
               }`}
             >
-              ATS {Math.round(version.ai_score)}
-            </span>
-          )}
-        </div>
-        <ButtonGroup>
-          <ButtonGroupItem pressed={mode === 'profile'} onClick={() => onMode('profile')}>
-            Profile
-          </ButtonGroupItem>
-          <ButtonGroupItem pressed={mode === 'preview'} onClick={() => onMode('preview')}>
-            Preview
-          </ButtonGroupItem>
-          <ButtonGroupItem pressed={mode === 'edit'} onClick={() => onMode('edit')}>
-            Edit
-          </ButtonGroupItem>
-          <ButtonGroupItem pressed={mode === 'diff'} onClick={() => onMode('diff')}>
-            Diff vs prev
-          </ButtonGroupItem>
-        </ButtonGroup>
-        <div className="flex items-center gap-2">
-          <Button size="sm" variant="ghost" onClick={reextract} loading={reextracting}>
-            ↻ Re-extract
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={disabled}
-            onClick={() => setConfirmOpen(true)}
-          >
-            {version.is_current && !applyingDraft ? 'Current' : 'Make current'}
-          </Button>
+              {tab.label}
+            </button>
+          ))}
         </div>
       </div>
 
-      <div className="flex-1 p-4 min-h-0">
+      {/* ── Content area ── */}
+      <div className="flex-1 p-5 min-h-0">
         {mode === 'preview' && (
           <ResumePreview
             resumeId={version.id}
@@ -191,6 +221,7 @@ export function CenterPane({
         )}
       </div>
 
+      {/* ── Confirm modal ── */}
       <Modal
         open={confirmOpen}
         onClose={busy ? () => undefined : () => setConfirmOpen(false)}

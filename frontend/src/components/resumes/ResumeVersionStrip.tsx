@@ -1,7 +1,7 @@
 import { Fragment } from 'react';
 import clsx from 'clsx';
 import { Pill } from '../Pill';
-import { AtsBar, fmtShortDate } from './AtsBits';
+import { fmtShortDate } from './AtsBits';
 import type { ResumeVersion } from './types';
 
 interface Props {
@@ -12,86 +12,98 @@ interface Props {
   onDelete?: (id: string) => void;
 }
 
-// solid success bg + white text → 4.5:1+ contrast at 11px (was 3:1 with soft bg)
 const CURRENT_TONE = { bg: 'bg-success-soft', text: 'text-[#166534] dark:text-white' };
 
-/**
- * Horizontal scrollable row of fat version cards. Arrows separate cards, the
- * active card gets an ink border + shadow, and a dashed "+ New" card at the end
- * opens a new tailor session. Scrolls horizontally once there are many versions.
- */
+function AtsChip({ score }: { score: number | null }) {
+  if (score == null) return null;
+  const s = Math.round(score);
+  const cls =
+    s >= 80
+      ? 'text-emerald-700 dark:text-emerald-400'
+      : s >= 60
+        ? 'text-amber-700 dark:text-amber-400'
+        : 'text-red-700 dark:text-red-400';
+  return <span className={`text-[11px] font-bold tabular-nums ${cls}`}>ATS {s}</span>;
+}
+
 export function ResumeVersionStrip({ versions, activeId, onSelect, onNew, onDelete }: Props) {
   return (
-    <div className="flex items-stretch gap-0 overflow-x-auto pb-2 -mx-1 px-1">
-      {versions.map((v, i) => (
-        <Fragment key={v.id}>
-          {i > 0 && (
-            <div className="self-center px-1 text-muted shrink-0 select-none" aria-hidden>
-              ←
+    <div className="flex items-stretch gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+      {versions.map((v) => (
+        <div key={v.id} className="relative shrink-0 group">
+          <button
+            type="button"
+            onClick={() => onSelect(v.id)}
+            aria-pressed={v.id === activeId}
+            className={clsx(
+              'w-48 text-left rounded-xl border p-3 transition-all duration-150',
+              v.id === activeId
+                ? 'border-accent bg-accent/5 shadow-sm'
+                : 'border-border bg-surface hover:border-accent/40 hover:bg-hover',
+            )}
+          >
+            {/* Top row: version badge + current pill */}
+            <div className="flex items-center justify-between gap-1 mb-2">
+              <span
+                className={clsx(
+                  'text-[11px] font-mono font-bold px-1.5 py-0.5 rounded',
+                  v.id === activeId ? 'bg-accent text-white' : 'bg-hover text-muted',
+                )}
+              >
+                v{v.version}
+              </span>
+              {v.is_current && (
+                <Pill tone={CURRENT_TONE} size="xs">
+                  CURRENT
+                </Pill>
+              )}
             </div>
-          )}
-          {/* Wrapper div so the delete button is a sibling of the card button,
-              not nested inside it (nested-interactive a11y violation). */}
-          <div className="relative shrink-0">
+
+            {/* Date */}
+            <div className="text-[10px] text-muted font-mono mb-1">
+              {fmtShortDate(v.created_at)}
+            </div>
+
+            {/* Filename */}
+            <div className="text-[11px] text-ink-2 truncate leading-snug">{v.file_name}</div>
+
+            {/* ATS score */}
+            <div className="mt-2">
+              <AtsChip score={v.ai_score ?? null} />
+            </div>
+
+            {/* Tailored-for label */}
+            {(v.tailored_job || v.tailored_for_job_id) && (
+              <div className="mt-1 text-[10px] text-muted truncate">
+                ✦ {v.tailored_job?.company_name ?? v.tailored_job?.title ?? 'tailored'}
+              </div>
+            )}
+          </button>
+
+          {onDelete && (
             <button
               type="button"
-              onClick={() => onSelect(v.id)}
-              aria-pressed={v.id === activeId}
-              className={clsx(
-                'w-56 text-left rounded-xl border bg-surface p-3 transition hover-lift',
-                v.id === activeId
-                  ? 'border-ink shadow-md'
-                  : 'border-border hover:border-border-strong',
-              )}
+              aria-label="Delete version"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (confirm(`Delete v${v.version} (${v.file_name})?`)) onDelete(v.id);
+              }}
+              className="absolute top-2 right-2 w-5 h-5 inline-flex items-center justify-center rounded-full text-muted opacity-0 group-hover:opacity-100 hover:text-danger hover:bg-danger-soft text-xs transition-all"
             >
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-mono font-medium text-ink">v{v.version}</span>
-                {v.is_current && (
-                  <Pill tone={CURRENT_TONE} size="xs">
-                    CURRENT
-                  </Pill>
-                )}
-              </div>
-              <div className="mt-1 text-[10px] font-mono text-muted">
-                {fmtShortDate(v.created_at)}
-              </div>
-              <div className="mt-1.5 text-xs text-ink-2 line-clamp-2 min-h-[2rem] break-words">
-                {v.file_name}
-              </div>
-              <AtsBar score={v.ai_score != null ? Math.round(v.ai_score) : null} className="mt-2" />
-              {(v.tailored_job || v.tailored_for_job_id) && (
-                <div className="mt-2 text-[10px] text-muted truncate">
-                  Tailored for {v.tailored_job?.company_name ?? v.tailored_job?.title ?? 'a job'}
-                </div>
-              )}
+              ✕
             </button>
-            {onDelete && (
-              <button
-                type="button"
-                aria-label="Delete version"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (confirm(`Delete v${v.version} (${v.file_name})?`)) onDelete(v.id);
-                }}
-                className="absolute top-1.5 right-1.5 w-5 h-5 inline-flex items-center justify-center rounded-full text-muted hover:text-danger hover:bg-danger-soft text-xs transition"
-              >
-                ✕
-              </button>
-            )}
-          </div>
-        </Fragment>
-      ))}
-      {versions.length > 0 && (
-        <div className="self-center px-1 text-muted shrink-0 select-none" aria-hidden>
-          ←
+          )}
         </div>
-      )}
+      ))}
+
+      {/* New tailor card */}
       <button
         type="button"
         onClick={onNew}
-        className="shrink-0 w-40 rounded-xl border border-dashed border-border-strong p-3 grid place-items-center text-muted hover:text-ink hover:border-ink transition press"
+        className="shrink-0 w-36 rounded-xl border border-dashed border-border p-3 flex flex-col items-center justify-center gap-1 text-muted hover:text-accent hover:border-accent/50 hover:bg-accent/5 transition-all duration-150"
       >
-        <span className="text-sm font-medium">+ New tailor</span>
+        <span className="text-xl leading-none">+</span>
+        <span className="text-xs font-medium">New tailor</span>
       </button>
     </div>
   );
