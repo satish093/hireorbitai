@@ -81,7 +81,7 @@ export function ResumePreview({
 
   if (loading) {
     return (
-      <div className="rounded-2xl overflow-hidden bg-gradient-to-b from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900 p-6 sm:p-10 flex justify-center">
+      <div className="rounded-2xl overflow-hidden bg-gradient-to-b from-slate-100 to-slate-200 dark:from-slate-600 dark:to-slate-700 p-6 sm:p-10 flex justify-center">
         <div className="bg-white w-full max-w-[720px] rounded-sm px-10 py-12 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.08),0_12px_32px_-4px_rgba(0,0,0,0.14)]">
           <div className="flex flex-col items-center mb-8 gap-2">
             <Skeleton className="h-7 w-48" />
@@ -147,7 +147,7 @@ export function ResumePreview({
       </div>
 
       {/* Tray — gradient neutral bg so the white paper stands out */}
-      <div className="overflow-y-auto max-h-[72vh] bg-gradient-to-b from-slate-200 to-slate-300 dark:from-slate-800 dark:to-slate-900 rounded-2xl p-5 sm:p-8 flex justify-center">
+      <div className="overflow-y-auto max-h-[72vh] bg-gradient-to-b from-slate-200 to-slate-300 dark:from-slate-600 dark:to-slate-700 rounded-2xl p-5 sm:p-8 flex justify-center">
         {/* Paper — always white regardless of app theme; matches what will print */}
         <div
           ref={paperRef}
