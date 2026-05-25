@@ -264,6 +264,17 @@ export function TrainingCourseDetails() {
     }
   }
 
+  async function deleteCourse() {
+    if (!window.confirm(`Delete "${course?.title}"? This cannot be undone.`)) return;
+    try {
+      await api.delete(`/training/courses/${id}`);
+      toast.success('Course deleted');
+      navigate('/training/courses');
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error ?? 'Failed to delete course');
+    }
+  }
+
   function enrich() {
     promptAndRun({ kind: 'enrich' });
   }
@@ -360,15 +371,20 @@ export function TrainingCourseDetails() {
                   Edit
                 </Link>
                 {isAdmin && (
-                  <Button
-                    variant="accent"
-                    onClick={enrich}
-                    disabled={lifecycleBusy}
-                    loading={lifecycleBusy}
-                    title="Use AI to fill in the overview, roadmap, resources, and final project. Lessons are left unchanged."
-                  >
-                    ✦ Fill in materials
-                  </Button>
+                  <>
+                    <Button
+                      variant="accent"
+                      onClick={enrich}
+                      disabled={lifecycleBusy}
+                      loading={lifecycleBusy}
+                      title="Use AI to fill in the overview, roadmap, resources, and final project. Lessons are left unchanged."
+                    >
+                      ✦ Fill in materials
+                    </Button>
+                    <Button variant="danger-ghost" onClick={deleteCourse}>
+                      Delete
+                    </Button>
+                  </>
                 )}
                 {course.review_status !== 'REVIEWED' && course.review_status !== 'PUBLISHED' && (
                   <Button variant="outline" onClick={markReviewed} disabled={lifecycleBusy}>

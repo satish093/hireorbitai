@@ -3,11 +3,10 @@
  * single-target check used by the message send / thread-view controllers.
  *
  * permission.service.test.ts already covers getAccessibleUserIds() scopes and
- * the cache. This file pins the two behaviors specific to canMessageUser that
- * a controller leans on directly:
+ * the cache. This file pins the behaviors specific to canMessageUser:
  *   - a non-manager caller is denied a target outside their relationship graph
  *     (the core IDOR guard for messaging),
- *   - the prior-thread fast path keeps an existing conversation reachable.
+ *   - prior messages do NOT grant access (strict assignment-only model).
  *
  * DB mocked end-to-end, same strategy as the sibling test file.
  */
@@ -90,8 +89,7 @@ function setupDb(rows: Record<string, unknown[]>) {
           } else if (k.startsWith('in:')) {
             if (!(v as unknown[]).includes(r[k.slice(3)])) return false;
           }
-          // `or` is intentionally not applied — prior-thread tests supply the
-          // exact message rows they want counted on the `messages` table.
+          // `or` is intentionally not applied here.
         }
         return true;
       }),
@@ -110,8 +108,6 @@ describe('canMessageUser — relationship scope', () => {
       recruiters: [{ id: 'r-mine', user_id: 'u-recruiter', manager_id: null }],
       recruiter_managers: [],
       consultants: [{ recruiter_id: 'r-mine', user_id: 'u-my-consultant' }],
-      users: [{ id: 'u-recruiter', reports_to: null }],
-      messages: [],
     });
     const ok = await canMessageUser({ id: 'u-recruiter', role: 'RECRUITER' }, 'u-my-consultant');
     expect(ok).toBe(true);
@@ -125,8 +121,6 @@ describe('canMessageUser — relationship scope', () => {
       ],
       recruiter_managers: [],
       consultants: [{ recruiter_id: 'r-other', user_id: 'u-stranger-consultant' }],
-      users: [{ id: 'u-recruiter', reports_to: null }],
-      messages: [],
     });
     const ok = await canMessageUser(
       { id: 'u-recruiter', role: 'RECRUITER' },
@@ -141,14 +135,17 @@ describe('canMessageUser — relationship scope', () => {
   });
 });
 
-describe('canMessageUser — prior-thread legitimacy', () => {
-  it('allows a reply when a prior message thread exists, even with no hierarchy link', async () => {
-    // A message row between the two parties → the count(head) fast path returns
-    // > 0 and short-circuits before the hierarchy lookup runs.
+describe('canMessageUser — strict assignment, no prior-thread bypass', () => {
+  it('prior messages do NOT grant access — only current assignment does', async () => {
+    // Recruiter has a message history with a stranger but no assignment link.
+    // With the strict model, past messages don't unlock future access.
     setupDb({
-      messages: [{ id: 'm-1', sender_id: 'u-stranger', recipient_id: 'u-recruiter' }],
+      recruiters: [{ id: 'r-mine', user_id: 'u-recruiter', manager_id: null }],
+      recruiter_managers: [],
+      consultants: [],
+      // messages table is not queried at all in the new model
     });
     const ok = await canMessageUser({ id: 'u-recruiter', role: 'RECRUITER' }, 'u-stranger');
-    expect(ok).toBe(true);
+    expect(ok).toBe(false);
   });
 });

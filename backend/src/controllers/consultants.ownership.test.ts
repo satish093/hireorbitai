@@ -137,15 +137,13 @@ describe('consultants.get — read ownership', () => {
     expect(res.body).toMatchObject({ id: 'c-1' });
   });
 
-  it("returns 403 (not 404) when a CONSULTANT reads another user's row", async () => {
+  it("returns 404 when a CONSULTANT reads another user's row", async () => {
     mock.rows.consultants = [CONSULTANT_ROW];
     const { err } = await call(consultants.get as Handler, CONSULTANT_OTHER, {
       params: { id: 'c-1' },
     });
-    // Current behaviour: 403. Per security.md this should ideally be 404 to
-    // avoid acting as an existence oracle, but 403 is what the controller
-    // currently throws. This test documents and pins the behaviour.
-    expect(err?.status).toBe(403);
+    // 404 (not 403) so the endpoint cannot be used as an existence oracle.
+    expect(err?.status).toBe(404);
   });
 
   it('returns 404 when the consultant row does not exist', async () => {
@@ -226,30 +224,27 @@ describe('consultants.update — write ownership', () => {
 // ---------------------------------------------------------------------------
 
 describe('consultants.update — field allowlist (mass-assignment guard)', () => {
-  it('does not write user_id from request body — it is not in onboardingSchema', async () => {
+  it('rejects body containing user_id — onboardingSchema is .strict()', async () => {
     mock.rows.consultants = [CONSULTANT_ROW];
-    await call(consultants.update as Handler, MANAGER, {
+    const { err } = await call(consultants.update as Handler, MANAGER, {
       params: { id: 'c-1' },
-      // user_id is a server-controlled field not in onboardingSchema
+      // user_id is a server-controlled field not in onboardingSchema; .strict() rejects it
       body: { primary_skill: 'Go', user_id: 'u-attacker' },
     });
-    const patch = mock.updates.find((u) => u.table === 'consultants')?.payload;
-    // Zod strips unknown fields because onboardingSchema has no .passthrough()
-    expect(patch).toBeDefined();
-    expect(patch).not.toHaveProperty('user_id');
-    expect(patch).toMatchObject({ primary_skill: 'Go' });
+    expect(err?.status).toBe(400);
+    // No DB write should have happened
+    expect(mock.updates.find((u) => u.table === 'consultants')).toBeUndefined();
   });
 
-  it('does not write recruiter_id from request body — it is not in onboardingSchema', async () => {
+  it('rejects body containing recruiter_id — onboardingSchema is .strict()', async () => {
     mock.rows.consultants = [CONSULTANT_ROW];
-    await call(consultants.update as Handler, MANAGER, {
+    const { err } = await call(consultants.update as Handler, MANAGER, {
       params: { id: 'c-1' },
       body: { visa_status: 'OPT', recruiter_id: 'r-attacker' },
     });
-    const patch = mock.updates.find((u) => u.table === 'consultants')?.payload;
-    expect(patch).toBeDefined();
-    expect(patch).not.toHaveProperty('recruiter_id');
-    expect(patch).toMatchObject({ visa_status: 'OPT' });
+    expect(err?.status).toBe(400);
+    // No DB write should have happened
+    expect(mock.updates.find((u) => u.table === 'consultants')).toBeUndefined();
   });
 
   it('returns 400 for completely invalid body', async () => {

@@ -12,6 +12,7 @@ import {
   TaskStatus,
   TASK_PRIORITIES,
   TaskPriority,
+  MANAGER_TIER,
 } from '../types';
 
 interface Summary {
@@ -190,7 +191,8 @@ export function ManagerDashboard() {
             loaded AND came back 0. When the tasks feature is disabled,
             /tasks/metrics 403s and `tasks` stays null forever — treating null
             as "needs setup" kept this card pinned open permanently. */}
-      {(profile?.role === 'SUPER_ADMIN' || profile?.role === 'MANAGER') &&
+      {profile?.role &&
+        (MANAGER_TIER as readonly string[]).includes(profile.role) &&
         jobsCount !== null &&
         (jobsCount === 0 || (tasks !== null && tasks.total === 0)) && (
           <QuickActions hasJobs={jobsCount > 0} hasTasks={!!tasks && tasks.total > 0} />

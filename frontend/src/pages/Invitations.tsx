@@ -10,7 +10,7 @@ import { Button } from '../components/Button';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { invalidate } from '../hooks/useInvalidate';
-import { ADMIN_TIER } from '../types';
+import { ADMIN_TIER, OWNER_TIER } from '../types';
 import toast from 'react-hot-toast';
 
 const ALL_INVITE_OPTIONS = [
@@ -37,7 +37,7 @@ export function Invitations() {
   const isAdmin = !!profile && (ADMIN_TIER as string[]).includes(profile.role);
 
   const ROLE_OPTIONS =
-    profile?.role === 'SUPER_ADMIN'
+    profile?.role != null && (OWNER_TIER as readonly string[]).includes(profile.role)
       ? ALL_INVITE_OPTIONS
       : ALL_INVITE_OPTIONS.filter((o) => o.value !== 'SUPER_ADMIN');
 

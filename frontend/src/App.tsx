@@ -5,6 +5,7 @@ import { FeatureGuard } from './hooks/useFeatureFlags';
 import { RealtimeNotifications } from './components/RealtimeNotifications';
 import { ProductTour } from './components/ProductTour';
 import { useAuth } from './context/AuthContext';
+import { useSessionRevoke } from './hooks/useSessionRevoke';
 import { ADMIN_TIER, MANAGER_TIER, OPERATOR_TIER, OWNER_TIER } from './types';
 
 // ---------------------------------------------------------------------------
@@ -169,6 +170,9 @@ export default function App() {
   // route changes. Keyed by user id so it remounts (reconnects) on a switch
   // of identity and unmounts on sign-out.
   const { profile } = useAuth();
+  // Single-device enforcement: if the same account logs in elsewhere, the
+  // backend pushes session:revoked and this hook redirects to /login.
+  useSessionRevoke();
 
   // Preload every page chunk as soon as the user is authenticated so all
   // subsequent nav clicks are instant (no loading flash). The imports run in

@@ -1,13 +1,19 @@
 import { useEffect, useRef } from 'react';
 import { getSession } from '../services/session';
+import { api } from '../services/api';
 
 /**
  * Subscribe to the server-side SSE realtime channel.
  *
  * The handlers map { eventType → callback } routes each pushed event by
  * name. Hook handles connection, reconnection with exponential backoff,
- * and cleanup on unmount. Auth is the JWT from localStorage passed as
- * ?token= since EventSource cannot set custom headers.
+ * and cleanup on unmount.
+ *
+ * Auth flow: a short-lived SSE token is exchanged via POST /realtime/token
+ * (JWT in Authorization header) before opening the EventSource. This keeps
+ * the full JWT out of the URL — and therefore out of CDN/proxy access logs,
+ * browser history, and HTTP Referrer headers. The token is single-use with
+ * a 60-second TTL, so any URL leak is harmless after the first open.
  *
  * Usage:
  *   useRealtime({
@@ -33,17 +39,25 @@ export function useRealtime(handlers: Record<string, (payload: unknown) => void>
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     let backoff = 1_000; // start at 1s, capped at 30s
 
-    function open() {
+    async function open() {
       if (cancelled) return;
-      // Token comes from the same session source the api client uses,
-      // so a refresh-rotated token flows through automatically.
       const sess = getSession();
-      const token = sess?.access_token ?? null;
-      if (!token) return;
-      // Use the same /api/* prefix the axios client uses so Nginx routes
-      // correctly. import.meta.env.VITE_API_URL ends with /api in this app.
+      if (!sess?.access_token) return;
+
+      // Exchange the JWT for a short-lived SSE token. The axios client sends
+      // the JWT in the Authorization header — keeping it out of the URL.
       const base = import.meta.env.VITE_API_URL ?? '/api';
-      const url = `${base}/realtime/stream?token=${encodeURIComponent(token)}`;
+      let sseToken: string;
+      try {
+        const { data } = await api.post<{ sse_token: string }>('/realtime/token');
+        sseToken = data.sse_token;
+      } catch {
+        scheduleReconnect();
+        return;
+      }
+      if (cancelled) return;
+
+      const url = `${base}/realtime/stream?token=${encodeURIComponent(sseToken)}`;
       try {
         es = new EventSource(url, { withCredentials: false });
       } catch {

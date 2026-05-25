@@ -40,18 +40,20 @@ export const me: RequestHandler = async (req, res) => {
 // oversized strings or a `javascript:` avatar URL that would later render
 // in someone else's browser.
 // ---------------------------------------------------------------------------
-const syncSchema = z.object({
-  full_name: z.string().trim().max(120).optional(),
-  phone: z.string().trim().max(40).optional(),
-  // Only http(s) avatars — `javascript:` and `data:` get rejected at the schema layer.
-  avatar_url: z
-    .string()
-    .trim()
-    .url()
-    .max(2048)
-    .refine((v) => /^https?:\/\//i.test(v), 'avatar_url must be http(s)')
-    .optional(),
-});
+const syncSchema = z
+  .object({
+    full_name: z.string().trim().max(120).optional(),
+    phone: z.string().trim().max(40).optional(),
+    // Only http(s) avatars — `javascript:` and `data:` get rejected at the schema layer.
+    avatar_url: z
+      .string()
+      .trim()
+      .url()
+      .max(2048)
+      .refine((v) => /^https?:\/\//i.test(v), 'avatar_url must be http(s)')
+      .optional(),
+  })
+  .strict();
 
 export const syncProfile: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
@@ -126,10 +128,12 @@ export const setJobAlerts: RequestHandler = async (req, res) => {
 // ---------------------------------------------------------------------------
 // /login
 // ---------------------------------------------------------------------------
-const loginSchema = z.object({
-  email: z.string().email().max(254),
-  password: z.string().min(1).max(200),
-});
+const loginSchema = z
+  .object({
+    email: z.string().email().max(254),
+    password: z.string().min(1).max(200),
+  })
+  .strict();
 
 export const login: RequestHandler = async (req, res) => {
   const parsed = loginSchema.safeParse(req.body);
@@ -145,9 +149,11 @@ export const login: RequestHandler = async (req, res) => {
 // The api.ts interceptor on the frontend fires this when the access token is
 // within ~60s of expiry.
 // ---------------------------------------------------------------------------
-const refreshSchema = z.object({
-  refresh_token: z.string().min(20).max(500),
-});
+const refreshSchema = z
+  .object({
+    refresh_token: z.string().min(20).max(500),
+  })
+  .strict();
 
 export const refresh: RequestHandler = async (req, res) => {
   const parsed = refreshSchema.safeParse(req.body);
@@ -173,14 +179,16 @@ export const logout: RequestHandler = async (req, res) => {
 // ---------------------------------------------------------------------------
 // /change-password — used by the forced first-login flow AND voluntary changes
 // ---------------------------------------------------------------------------
-const changePwSchema = z.object({
-  current_password: z.string().min(1).max(200),
-  new_password: z.string().min(12).max(200),
-  // No min length here — the "passwords do not match" branch below handles
-  // a too-short confirm, and we'd rather show that message than a confusing
-  // "must be at least 12 characters" error pointed at the confirm field.
-  confirm_password: z.string().max(200),
-});
+const changePwSchema = z
+  .object({
+    current_password: z.string().min(1).max(200),
+    new_password: z.string().min(12).max(200),
+    // No min length here — the "passwords do not match" branch below handles
+    // a too-short confirm, and we'd rather show that message than a confusing
+    // "must be at least 12 characters" error pointed at the confirm field.
+    confirm_password: z.string().max(200),
+  })
+  .strict();
 
 export const changePassword: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
@@ -203,7 +211,7 @@ export const changePassword: RequestHandler = async (req, res) => {
 // /forgot-password — generates a token and emails it. Always returns 200 so
 // we don't reveal whether an email is registered.
 // ---------------------------------------------------------------------------
-const forgotSchema = z.object({ email: z.string().email().max(254) });
+const forgotSchema = z.object({ email: z.string().email().max(254) }).strict();
 
 export const forgotPassword: RequestHandler = async (req, res) => {
   const parsed = forgotSchema.safeParse(req.body);
@@ -220,12 +228,14 @@ export const forgotPassword: RequestHandler = async (req, res) => {
 // ---------------------------------------------------------------------------
 // /reset-password — consumes a token, sets a new password.
 // ---------------------------------------------------------------------------
-const resetSchema = z.object({
-  token: z.string().min(20).max(500),
-  new_password: z.string().min(12).max(200),
-  // See changePwSchema — let the mismatch branch surface a clearer error.
-  confirm_password: z.string().max(200),
-});
+const resetSchema = z
+  .object({
+    token: z.string().min(20).max(500),
+    new_password: z.string().min(12).max(200),
+    // See changePwSchema — let the mismatch branch surface a clearer error.
+    confirm_password: z.string().max(200),
+  })
+  .strict();
 
 export const resetPassword: RequestHandler = async (req, res) => {
   const parsed = resetSchema.safeParse(req.body);

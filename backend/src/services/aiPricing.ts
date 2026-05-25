@@ -21,6 +21,10 @@ interface Price {
 // Matched by LONGEST model-id prefix, so dated ids (…-4-5-20251001) and point
 // releases (…-4-6) resolve to their family without an entry each.
 const PRICES: Record<string, Price> = {
+  // --- Groq (free tier — $0 up to quota, then pay-as-you-go) ---
+  'llama-3.3-70b-versatile': { input: 0, output: 0 },
+  'llama-3.1-8b-instant': { input: 0, output: 0 },
+  'llama3-70b-8192': { input: 0, output: 0 },
   // --- Anthropic ---
   'claude-haiku-4': { input: 1, output: 5 },
   'claude-sonnet-4': { input: 3, output: 15 },

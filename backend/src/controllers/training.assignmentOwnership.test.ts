@@ -47,6 +47,8 @@ vi.mock('../config/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 vi.mock('../services/trainingAI.service', () => ({}));
+vi.mock('../services/ai.service', () => ({ lessonCoach: vi.fn() }));
+vi.mock('../config/anthropic', () => ({ ANTHROPIC_ENABLED: true }));
 vi.mock('../services/trainingAchievements.service', () => ({
   evaluateAchievements: vi.fn(),
   logStudyMinutes: vi.fn(),

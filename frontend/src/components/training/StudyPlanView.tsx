@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { api } from '../../services/api';
 import { Button } from '../Button';
@@ -41,7 +42,11 @@ const TYPE_TONE: Record<string, string> = {
   Live: 'bg-danger-soft text-danger',
 };
 
-export function StudyPlanView() {
+export function StudyPlanView({
+  assignmentsByCourseId = {},
+}: {
+  assignmentsByCourseId?: Record<string, string>;
+}) {
   const [plan, setPlan] = useState<StudyPlan | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -177,37 +182,51 @@ export function StudyPlanView() {
                 <span className="ml-auto text-[11px] font-mono text-muted">{fmtMinutes(mins)}</span>
               </div>
               <ul className="space-y-1.5">
-                {items.map((it) => (
-                  <li key={it.id} className="flex items-center gap-2.5">
-                    <input
-                      type="checkbox"
-                      checked={it.completed}
-                      onChange={() => toggle(it)}
-                      className="accent-[color:var(--accent)] w-4 h-4 shrink-0"
-                    />
-                    <span
-                      className={
-                        'text-sm truncate flex-1 ' +
-                        (it.completed ? 'text-muted line-through' : 'text-ink')
-                      }
-                    >
-                      {it.title}
-                    </span>
-                    <span
-                      className={
-                        'text-[10px] font-medium rounded px-1.5 py-0.5 shrink-0 ' +
-                        (TYPE_TONE[it.item_type] ?? 'bg-bg-sunken text-muted')
-                      }
-                    >
-                      {it.item_type}
-                    </span>
-                    {it.duration_min ? (
-                      <span className="text-[11px] font-mono text-faint shrink-0 w-12 text-right">
-                        {fmtMinutes(it.duration_min)}
+                {items.map((it) => {
+                  const assignmentId = it.course_id
+                    ? assignmentsByCourseId[it.course_id]
+                    : undefined;
+                  return (
+                    <li key={it.id} className="flex items-center gap-2.5">
+                      <input
+                        type="checkbox"
+                        checked={it.completed}
+                        onChange={() => toggle(it)}
+                        className="accent-[color:var(--accent)] w-4 h-4 shrink-0"
+                      />
+                      <span
+                        className={
+                          'text-sm truncate flex-1 ' +
+                          (it.completed ? 'text-muted line-through' : 'text-ink')
+                        }
+                      >
+                        {it.title}
                       </span>
-                    ) : null}
-                  </li>
-                ))}
+                      <span
+                        className={
+                          'text-[10px] font-medium rounded px-1.5 py-0.5 shrink-0 ' +
+                          (TYPE_TONE[it.item_type] ?? 'bg-bg-sunken text-muted')
+                        }
+                      >
+                        {it.item_type}
+                      </span>
+                      {it.duration_min ? (
+                        <span className="text-[11px] font-mono text-faint shrink-0 w-10 text-right">
+                          {fmtMinutes(it.duration_min)}
+                        </span>
+                      ) : null}
+                      {assignmentId && !it.completed ? (
+                        <Link
+                          to={`/training/assignments/${assignmentId}`}
+                          className="shrink-0 text-[11px] text-accent hover:underline font-medium"
+                          title="Open lesson"
+                        >
+                          Open →
+                        </Link>
+                      ) : null}
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           );

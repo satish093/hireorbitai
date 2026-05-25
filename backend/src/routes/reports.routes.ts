@@ -1,13 +1,13 @@
 import { Router } from 'express';
 import { requireRole } from '../middleware/auth';
-import { MANAGER_TIER } from '../types';
+import { MANAGER_TIER, OPERATOR_TIER } from '../types';
 import * as c from '../controllers/reports.controller';
 
 export const reportsRouter = Router();
 
-// Daily activity logging — recruiters log their own work; managers can read.
-reportsRouter.get('/daily', c.listDaily);
-reportsRouter.post('/daily', c.upsertDaily);
+// Daily activity logging — recruiters log their own work; managers can read all.
+reportsRouter.get('/daily', requireRole(...OPERATOR_TIER), c.listDaily);
+reportsRouter.post('/daily', requireRole(...OPERATOR_TIER), c.upsertDaily);
 
 // Manager-and-above analytics.
 reportsRouter.get('/manager-summary', requireRole(...MANAGER_TIER), c.managerSummary);

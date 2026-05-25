@@ -17,13 +17,9 @@
 
 import { z } from 'zod/v4';
 import type { MessageParam, TextBlockParam } from '@anthropic-ai/sdk/resources/messages';
-import {
-  anthropic,
-  ANTHROPIC_MODEL,
-  AI_MAX_INPUT_CHARS,
-  AI_MAX_JOB_DESC_CHARS,
-} from '../config/anthropic';
+import { anthropic, ANTHROPIC_MODEL, AI_MAX_INPUT_CHARS } from '../config/anthropic';
 import { groqClient, GROQ_MODEL, GROQ_FAST_MODEL, GROQ_ENABLED } from '../config/groq';
+import { geminiClient, GEMINI_ENABLED, GEMINI_MODEL } from '../config/gemini';
 import { logAiUsage } from './aiUsage';
 import {
   withCache,
@@ -33,7 +29,7 @@ import {
   skillMatchCache,
   jobMatchCache,
 } from './aiCache';
-import { normalizeSkills, diffSkills, extractKnownSkills } from './skillNorm';
+import { normalizeSkills } from './skillNorm';
 import { logger } from '../config/logger';
 import {
   scoreResumeRuleBased,
@@ -292,10 +288,128 @@ async function callGroqText(
 }
 
 // ---------------------------------------------------------------------------
+// Gemini helpers
+// ---------------------------------------------------------------------------
+
+async function callGeminiStructured<T extends z.ZodType>(
+  callName: string,
+  systemPrompt: string,
+  userContent: string,
+  schema: T,
+  _maxTokens = 2048,
+): Promise<z.infer<T>> {
+  if (!GEMINI_ENABLED || !geminiClient) {
+    throw new Error(`${callName} requires GEMINI_API_KEY to be configured`);
+  }
+  const model = geminiClient.getGenerativeModel({
+    model: GEMINI_MODEL,
+    systemInstruction: systemPrompt + '\n\nReturn valid JSON only, no markdown fences.',
+  });
+  const result = await model.generateContent(userContent);
+  const raw = result.response.text();
+  const usage = result.response.usageMetadata;
+  logAiUsage(callName, GEMINI_MODEL, {
+    input_tokens: usage?.promptTokenCount ?? 0,
+    output_tokens: usage?.candidatesTokenCount ?? 0,
+  });
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(extractJson(raw));
+  } catch {
+    throw new Error(`Gemini returned malformed JSON for ${callName}`);
+  }
+  const validated = schema.safeParse(parsed);
+  if (!validated.success) {
+    logger.warn(
+      { issues: validated.error.issues.slice(0, 3), callName },
+      'Gemini schema validation failed',
+    );
+    throw new Error(`Gemini returned unexpected structure for ${callName} — please try again.`);
+  }
+  return validated.data as z.infer<T>;
+}
+
+async function callGeminiText(
+  callName: string,
+  systemPrompt: string,
+  userContent: string,
+  _maxTokens = 600,
+): Promise<string> {
+  if (!GEMINI_ENABLED || !geminiClient) {
+    throw new Error(`${callName} requires GEMINI_API_KEY to be configured`);
+  }
+  const model = geminiClient.getGenerativeModel({
+    model: GEMINI_MODEL,
+    systemInstruction: systemPrompt,
+  });
+  const result = await model.generateContent(userContent);
+  const usage = result.response.usageMetadata;
+  logAiUsage(callName, GEMINI_MODEL, {
+    input_tokens: usage?.promptTokenCount ?? 0,
+    output_tokens: usage?.candidatesTokenCount ?? 0,
+  });
+  return result.response.text();
+}
+
+// ---------------------------------------------------------------------------
+// Provider-chain abstraction — replaces duplicated Groq/Anthropic fallback
+// ---------------------------------------------------------------------------
+
+/** Try each provider in order; log on failure and advance to next. Throws the
+ *  last error only when all providers are exhausted. */
+async function callWithProviders<T>(label: string, providers: Array<() => Promise<T>>): Promise<T> {
+  let lastErr: unknown;
+  for (const [i, call] of providers.entries()) {
+    try {
+      return await call();
+    } catch (err) {
+      logger.warn({ label, attempt: i + 1 }, 'ai: provider failed, trying next');
+      lastErr = err;
+    }
+  }
+  throw lastErr;
+}
+
+/** Groq-primary structured: Groq → Gemini → Anthropic */
+async function callGroqStructuredWithFallback<T extends z.ZodType>(
+  callName: string,
+  systemPrompt: string,
+  userContent: string,
+  schema: T,
+  maxTokens = 2048,
+): Promise<z.infer<T>> {
+  return callWithProviders(callName, [
+    ...(GROQ_ENABLED
+      ? [() => callGroqStructured(callName, systemPrompt, userContent, schema, maxTokens)]
+      : []),
+    ...(GEMINI_ENABLED
+      ? [() => callGeminiStructured(callName, systemPrompt, userContent, schema, maxTokens)]
+      : []),
+    () => callStructured(callName, systemPrompt, userContent, schema, maxTokens),
+  ]);
+}
+
+/** Groq-primary text: Groq → Gemini → Anthropic */
+async function callGroqTextWithFallback(
+  callName: string,
+  systemPrompt: string,
+  userContent: string,
+  maxTokens = 600,
+): Promise<string> {
+  return callWithProviders(callName, [
+    ...(GROQ_ENABLED ? [() => callGroqText(callName, systemPrompt, userContent, maxTokens)] : []),
+    ...(GEMINI_ENABLED
+      ? [() => callGeminiText(callName, systemPrompt, userContent, maxTokens)]
+      : []),
+    () => callText(callName, systemPrompt, userContent, maxTokens),
+  ]);
+}
+
+// ---------------------------------------------------------------------------
 // Resume scoring — rubric-based, 5 dimensions × 20 pts
 // ---------------------------------------------------------------------------
 
-const ResumeScoreSchema = z.object({
+export const ResumeScoreSchema = z.object({
   score: z.number(),
   score_breakdown: z
     .object({
@@ -312,7 +426,7 @@ const ResumeScoreSchema = z.object({
 });
 export type ResumeScoreResult = z.infer<typeof ResumeScoreSchema>;
 
-const SCORE_RESUME_SYSTEM = `You are a senior technical recruiter and certified resume coach with 15+ years of experience placing engineers and consultants. Score resumes with the rigour of a top-tier staffing agency reviewer.
+const _SCORE_RESUME_SYSTEM = `You are a senior technical recruiter and certified resume coach with 15+ years of experience placing engineers and consultants. Score resumes with the rigour of a top-tier staffing agency reviewer.
 
 SCORING RUBRIC — 5 dimensions × 20 points = 100 total:
 
@@ -375,7 +489,7 @@ const EducationItemSchema = z.object({
   graduation_year: z.number().nullable(),
 });
 
-const ResumeProfileSchema = z.object({
+export const ResumeProfileSchema = z.object({
   name: z.string().nullable(),
   email: z.string().nullable(),
   phone: z.string().nullable(),
@@ -393,7 +507,7 @@ const ResumeProfileSchema = z.object({
 });
 export type ResumeProfile = z.infer<typeof ResumeProfileSchema>;
 
-const PARSE_PROFILE_SYSTEM = `You are a precise data-extraction engine for resumes. Extract ONLY what is explicitly stated — never infer, guess, or fabricate. When a field isn't present, use null or an empty array.
+const _PARSE_PROFILE_SYSTEM = `You are a precise data-extraction engine for resumes. Extract ONLY what is explicitly stated — never infer, guess, or fabricate. When a field isn't present, use null or an empty array.
 
 EXTRACTION RULES:
 - skills: Extract ALL technical and soft skills mentioned anywhere in the resume. Include programming languages, frameworks, tools, certifications, and methodologies. Normalise obvious abbreviations ("JS" → "JavaScript", "K8s" → "Kubernetes") but keep less obvious ones verbatim.
@@ -458,14 +572,16 @@ export async function generateVendorSubmissionEmail(
     ? `\n\nJob description excerpt:\n${clip(input.jobDescription, 800)}`
     : '';
 
-  return callStructured(
-    'generateVendorSubmissionEmail',
-    VENDOR_EMAIL_SYSTEM,
-    `Recruiter: ${input.recruiterName}
+  const userContent = `Recruiter: ${input.recruiterName}
 Vendor / hiring manager: ${input.vendorName ?? 'Hiring Team'}
 Consultant: ${input.consultantName} — ${input.consultantExperienceYears} years total experience
 Top skills: ${skills}
-Target role: ${input.jobTitle}${jdContext}`,
+Target role: ${input.jobTitle}${jdContext}`;
+
+  return callGroqStructuredWithFallback(
+    'generateVendorSubmissionEmail',
+    VENDOR_EMAIL_SYSTEM,
+    userContent,
     VendorEmailSchema,
     700,
   );
@@ -475,7 +591,7 @@ Target role: ${input.jobTitle}${jdContext}`,
 // Job requirements extraction
 // ---------------------------------------------------------------------------
 
-const JobRequirementsSchema = z.object({
+export const JobRequirementsSchema = z.object({
   must_haves: z.array(z.string()),
   nice_to_haves: z.array(z.string()),
   required_skills: z.array(z.string()),
@@ -493,7 +609,7 @@ const JobRequirementsSchema = z.object({
 });
 export type JobRequirements = z.infer<typeof JobRequirementsSchema>;
 
-const EXTRACT_JOB_SYSTEM = `You are parsing a job posting to produce structured fields for a candidate-matching UI. Extract ONLY what is explicitly stated or strongly implied — never invent or assume.
+const _EXTRACT_JOB_SYSTEM = `You are parsing a job posting to produce structured fields for a candidate-matching UI. Extract ONLY what is explicitly stated or strongly implied — never invent or assume.
 
 FIELD-BY-FIELD RULES:
 - must_haves: hard gates — if the candidate lacks these, a recruiter would not submit them. Use short phrases (≤ 8 words each).
@@ -523,7 +639,7 @@ export async function extractJobRequirements(input: {
 // Per-skill match scoring  (resume vs job)
 // ---------------------------------------------------------------------------
 
-const SkillMatchSchema = z.object({
+export const SkillMatchSchema = z.object({
   per_skill: z.array(
     z.object({
       skill: z.string(),
@@ -542,7 +658,7 @@ const SkillMatchSchema = z.object({
 });
 export type SkillMatchResult = z.infer<typeof SkillMatchSchema>;
 
-const SKILL_MATCH_SYSTEM = `You are a technical skills assessor for a staffing agency. Score how well a consultant's resume matches a job posting.
+const _SKILL_MATCH_SYSTEM = `You are a technical skills assessor for a staffing agency. Score how well a consultant's resume matches a job posting.
 
 SCORING MODEL:
 overall_score = round(skill_match × 0.60 + seniority_match × 0.25 + industry_match × 0.15)
@@ -631,7 +747,51 @@ export async function jobCopilot(input: {
     : '\n\n(No resume on file — answer from the job context and note where a resume would help.)';
 
   const userContent = `${jobBlock}${resumeBlock}\n\n=== CANDIDATE QUESTION ===\n${input.question}`;
-  const text = await callGroqText('jobCopilot', JOB_COPILOT_SYSTEM, userContent, 600);
+  const text = await callGroqTextWithFallback('jobCopilot', JOB_COPILOT_SYSTEM, userContent, 600);
+  return text || 'Unable to generate an answer. Try rephrasing your question.';
+}
+
+// ---------------------------------------------------------------------------
+// Lesson coach — conversational tutor grounded in ONE training lesson
+// ---------------------------------------------------------------------------
+
+const LESSON_COACH_SYSTEM = `You are a patient, encouraging learning coach helping a student understand ONE specific training lesson. You have been given the full lesson content.
+
+BEHAVIOUR RULES:
+1. Answer ONLY from the lesson content provided. If the answer isn't in the lesson, say "That isn't covered in this lesson." — never invent facts, definitions, examples, or outside information.
+2. Be clear and encouraging. Explain concepts in plain language; use analogies drawn only from the lesson where helpful.
+3. Keep answers under 180 words. Use short paragraphs or a bullet list — never dense walls of text.
+4. If the student asks something adjacent to the lesson, point them to the relevant part of the lesson rather than guessing.
+5. Stay on-topic — politely decline questions unrelated to learning this lesson.`;
+
+export async function lessonCoach(input: {
+  question: string;
+  lesson: {
+    title: string;
+    description?: string | null;
+    content?: string | null;
+    practical_example?: string | null;
+    key_takeaways?: string[] | null;
+  };
+  courseTitle?: string | null;
+}): Promise<string> {
+  const lessonBlock = [
+    `Lesson: ${input.lesson.title}`,
+    input.courseTitle ? `Course: ${input.courseTitle}` : '',
+    input.lesson.description ? `Summary: ${input.lesson.description}` : '',
+    input.lesson.content ? `\n=== LESSON CONTENT ===\n${clip(input.lesson.content)}` : '',
+    input.lesson.practical_example
+      ? `\n=== WORKED EXAMPLE ===\n${clip(input.lesson.practical_example, 2_000)}`
+      : '',
+    input.lesson.key_takeaways?.length
+      ? `\n=== KEY TAKEAWAYS ===\n${input.lesson.key_takeaways.map((t) => `- ${t}`).join('\n')}`
+      : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  const userContent = `${lessonBlock}\n\n=== STUDENT QUESTION ===\n${input.question}`;
+  const text = await callGroqTextWithFallback('lessonCoach', LESSON_COACH_SYSTEM, userContent, 600);
   return text || 'Unable to generate an answer. Try rephrasing your question.';
 }
 
@@ -731,7 +891,7 @@ ${clip(input.job.description) || '(none)'}
 Sections to rewrite: ${sectionList}
 Keywords to weave in: ${keywordList}${aggressiveAddendum}`;
 
-  return callGroqStructured(
+  return callGroqStructuredWithFallback(
     'tailorResumeForJob',
     TAILOR_RESUME_SYSTEM,
     userContent,
@@ -795,7 +955,7 @@ ${clip(input.job.description) || '(none)'}
 Sections to rewrite: ${sectionList}
 Keywords to weave in: ${keywordList}`;
 
-  return callGroqStructured(
+  return callGroqStructuredWithFallback(
     'tailorResumeForJobStructured',
     structuredSystem,
     userContent,
@@ -808,7 +968,7 @@ Keywords to weave in: ${keywordList}`;
 // Batch job matching for the recommended-jobs feed
 // ---------------------------------------------------------------------------
 
-const JobMatchListSchema = z.object({
+export const JobMatchListSchema = z.object({
   matches: z.array(
     z.object({
       job_id: z.string(),
@@ -819,7 +979,7 @@ const JobMatchListSchema = z.object({
 });
 export type JobMatchResult = z.infer<typeof JobMatchListSchema>['matches'][number];
 
-const JOB_MATCH_SYSTEM = `You are ranking job opportunities for a specific consultant. Your scores feed directly into the consultant's recommended-jobs feed — accuracy matters more than generosity.
+const _JOB_MATCH_SYSTEM = `You are ranking job opportunities for a specific consultant. Your scores feed directly into the consultant's recommended-jobs feed — accuracy matters more than generosity.
 
 SCORING BANDS:
 85–100 = Strong Match: most required skills are clearly evidenced; seniority fits within ±0 levels; location/remote aligns.

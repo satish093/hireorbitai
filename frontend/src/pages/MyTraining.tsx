@@ -31,19 +31,26 @@ export function MyTraining() {
     );
 
   const [hours, setHours] = useState<number | null>(null);
+  // assignments fetched here so StudyPlanView can link plan items to the right assignment
+  const [assignmentsByCourseId, setAssignmentsByCourseId] = useState<Record<string, string>>({});
   useEffect(() => {
     let alive = true;
-    api
-      .get('/training/activity', { params: { days: 30 } })
-      .then((r) => {
-        if (!alive) return;
-        const total = (r.data?.series ?? []).reduce(
-          (a: number, s: { minutes: number }) => a + s.minutes,
-          0,
-        );
-        setHours(total / 60);
-      })
-      .catch(() => {});
+    Promise.all([
+      api.get('/training/activity', { params: { days: 30 } }).catch(() => ({ data: null })),
+      api.get('/training/my-training').catch(() => ({ data: [] })),
+    ]).then(([act, asgn]) => {
+      if (!alive) return;
+      const total = (act.data?.series ?? []).reduce(
+        (a: number, s: { minutes: number }) => a + s.minutes,
+        0,
+      );
+      setHours(total / 60);
+      const map: Record<string, string> = {};
+      for (const a of asgn.data ?? []) {
+        if (a.course_id) map[a.course_id] = a.id;
+      }
+      setAssignmentsByCourseId(map);
+    });
     return () => {
       alive = false;
     };
@@ -74,7 +81,7 @@ export function MyTraining() {
       {tab === 'mine' ? (
         <MyTrainingView onBrowseCatalog={() => setTab('catalog')} />
       ) : tab === 'plan' ? (
-        <StudyPlanView />
+        <StudyPlanView assignmentsByCourseId={assignmentsByCourseId} />
       ) : tab === 'catalog' ? (
         <CatalogView />
       ) : (

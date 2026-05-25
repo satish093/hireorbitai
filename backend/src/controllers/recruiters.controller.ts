@@ -1,7 +1,7 @@
 import { RequestHandler } from 'express';
 import { z } from 'zod';
 import { db } from '../config/db';
-import { httpError } from '../types';
+import { httpError, MANAGER_TIER } from '../types';
 
 const SELECT_WITH_JOINS =
   '*, user:users!user_id(id, email, full_name, group_id), ' +
@@ -127,6 +127,9 @@ export const addManager: RequestHandler = async (req, res) => {
     .eq('id', parsed.data.manager_id)
     .maybeSingle();
   if (!target) throw httpError(404, 'Manager user not found');
+  const t = target as { id: string; role: string };
+  if (!(MANAGER_TIER as readonly string[]).includes(t.role))
+    throw httpError(400, 'Assigned user must be manager-tier');
 
   // Probe whether the junction table exists.
   const { data: existing, error: existErr } = await db

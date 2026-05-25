@@ -9,6 +9,7 @@ import type { AppliedSubTab, ApplyTarget, JobRow, TabKey } from './types';
 import { daysAgoISO, filteredRows, resolveApplyUrl } from './helpers';
 import type { JobSortKey } from './JobTabsBar';
 import type { JobFilterState } from './JobFilterBar';
+import { MANAGER_TIER } from '../../types';
 
 /** Client-side sort of the loaded rows for the list column. */
 export function sortRows(list: JobRow[], sort: JobSortKey): JobRow[] {
@@ -27,7 +28,8 @@ export function sortRows(list: JobRow[], sort: JobSortKey): JobRow[] {
 
 export function useJobSearch() {
   const { profile } = useAuth();
-  const isManager = profile?.role === 'SUPER_ADMIN' || profile?.role === 'MANAGER';
+  const isManager =
+    profile?.role != null && (MANAGER_TIER as readonly string[]).includes(profile.role);
   const isConsultant = profile?.role === 'CONSULTANT';
   /** True for everyone who can apply on behalf of a consultant — recruiters
    *  and the manager tier all qualify. */

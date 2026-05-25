@@ -133,7 +133,16 @@ Every controller that touches a column added by a late-arrival migration has ret
 
 ### Job ingestion
 
-`backend/src/services/jobIngestion.service.ts` runs pluggable drivers (Greenhouse / Lever / RemoteOK / Remotive / Arbeitnow / Adzuna / JSearch / Ashby / Jooble / USAJobs / SerpAPI / SearchApi / Monster / manual). The scheduler (`backend/src/jobs/scheduler.ts`) wires `jobs-sync.job`, `reminders.job`, `daily-digest.job`, and `sessions-purge.job` on intervals. Each job has `name`, `intervalMs`, `initialDelayMs`, and an idempotent `run()`. Reminders use exponential-backoff retry (1m → 16m, 5 attempts max) before being force-marked SENT.
+`backend/src/services/jobIngestion.service.ts` runs pluggable drivers. **Strict 4-source policy**: only LinkedIn, Dice, Monster, and CareerBuilder are ingested. Driver mapping:
+
+| Board         | Driver                                          | RapidAPI product                  |
+| ------------- | ----------------------------------------------- | --------------------------------- |
+| LinkedIn      | `fetchLinkedIn`                                 | Fantastic Jobs (`RAPIDAPI_KEY`)   |
+| Dice          | `fetchJSearch` + `site:dice.com` slugs          | JSearch (`JSEARCH_API_KEY`)       |
+| CareerBuilder | `fetchJSearch` + `site:careerbuilder.com` slugs | JSearch (`JSEARCH_API_KEY`)       |
+| Monster       | `fetchMonster`                                  | Monster Jobs API (`RAPIDAPI_KEY`) |
+
+The JSearch driver has a `JSEARCH_ALLOWED = Set(['Dice','CareerBuilder'])` publisher filter that drops any other board (LinkedIn, Indeed, ZipRecruiter…) that JSearch returns even with `site:` filters. `database/jobs-strict-4-sources.sql` is the canonical migration. The scheduler (`backend/src/jobs/scheduler.ts`) wires `jobs-sync.job`, `reminders.job`, `daily-digest.job`, and `sessions-purge.job` on intervals. Each job has `name`, `intervalMs`, `initialDelayMs`, and an idempotent `run()`. Reminders use exponential-backoff retry (1m → 16m, 5 attempts max) before being force-marked SENT.
 
 ## Conventions
 
@@ -163,5 +172,5 @@ Claude may SSH into the server to run read-only diagnostics, inspect logs, and e
 - **Querying with `.ilike('email', x)` on user-supplied email** allows wildcard matching — always use `.eq()` after `email.toLowerCase()`.
 - **`min-h-screen` / `h-screen`** break on iOS Safari due to the URL bar. Use `min-h-dvh` / `h-dvh`.
 - **Frontend `VITE_*` vars are baked at build time** — changing them requires a fresh `npm --prefix frontend run build`.
-- **Job ingestion runs on a ~$10/month Plan B budget.** Only the dedicated LinkedIn RapidAPI driver is paid (~$10 Basic tier, ~1000 req/mo). Dice / Monster / CareerBuilder coverage comes from **JSearch's free 150/mo tier** using `site:` query operators that surface them via the `publisher` field — **not** from the dedicated `monster` source (intentionally disabled). `JOB_SYNC_INTERVAL_MS` is intentionally 24h, not the default 6h, to fit the JSearch free quota. If you re-enable the `monster` source row or shorten the sync interval, the JSearch free tier breaks within a week. Canonical migration: `database/enable-jobs-plan-b.sql`.
-- **Test Plan B with zero API spend** by setting `JOB_SOURCES_MOCK=true` in `backend/.env`. LinkedIn / JSearch / Adzuna drivers then return synthetic jobs (`external_id` prefixed `MOCK-`, description tagged `[MOCK]`) instead of calling the real APIs. Verifies the full ingestion pipeline. Cleanup: `DELETE FROM public.jobs WHERE external_id LIKE 'MOCK-%';`. Implementation in `backend/src/services/jobIngestionMocks.ts`.
+- **Strict 4-source job ingestion.** Only LinkedIn, Dice, Monster, and CareerBuilder are active. All other `source_companies` rows were removed by `database/jobs-strict-4-sources.sql`. Do **not** re-add Adzuna, Remotive, Greenhouse, or any other source — they violate the policy. Monster uses its own dedicated RapidAPI driver (not JSearch). `JOB_SYNC_INTERVAL_MS` depends on your RapidAPI tier: 6h (Power $110/mo), 12h (Standard $30/mo), or 24h (Budget $20/mo).
+- **Test job ingestion with zero API spend** by setting `JOB_SOURCES_MOCK=true` in `backend/.env`. LinkedIn / JSearch / Monster drivers return synthetic jobs (`external_id` prefixed `MOCK-`, description tagged `[MOCK]`) instead of calling the real APIs. Only LinkedIn, Dice, CareerBuilder, Monster publishers will appear (the JSearch allowlist filter applies to mocks too). Cleanup: `DELETE FROM public.jobs WHERE external_id LIKE 'MOCK-%';`. Implementation in `backend/src/services/jobIngestionMocks.ts`.

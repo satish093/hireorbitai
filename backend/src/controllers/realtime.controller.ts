@@ -20,10 +20,52 @@
  * this to work end-to-end. Documented in the operations runbook.
  */
 
+import crypto from 'crypto';
 import type { RequestHandler } from 'express';
 import { httpError } from '../types';
 import { subscribe, type RealtimeEvent } from '../services/realtime.service';
 import { logger } from '../config/logger';
+
+// ---------------------------------------------------------------------------
+// Short-lived SSE token store
+//
+// EventSource (browser) cannot attach an Authorization header, so the legacy
+// approach was to pass the full JWT as ?token= in the URL — which exposes it
+// in browser history, CDN logs, and HTTP Referrer headers.
+//
+// Instead we use a two-step exchange:
+//   POST /realtime/token   (requireAuth → JWT in Authorization header)
+//     → returns { sse_token: "<64-byte-hex>" }
+//   GET  /realtime/stream?token=<sse_token>
+//     → looks up the token (60 s TTL, single-use), gets userId, opens stream.
+//
+// The token is consumed on first connect. Any leak of the short URL is safe
+// after the TTL expires or after the first successful open.
+// ---------------------------------------------------------------------------
+interface SseTokenEntry {
+  userId: string;
+  expiresAt: number;
+}
+const sseTokens = new Map<string, SseTokenEntry>();
+
+function evictExpiredSseTokens(): void {
+  const now = Date.now();
+  for (const [token, entry] of sseTokens) {
+    if (entry.expiresAt <= now) sseTokens.delete(token);
+  }
+}
+
+/** POST /realtime/token — exchange a JWT for a short-lived SSE connect token. */
+export const issueToken: RequestHandler = (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  evictExpiredSseTokens();
+  if (sseTokens.size > 10_000) {
+    logger.warn({ size: sseTokens.size }, 'realtime/token: SSE token store too large');
+  }
+  const token = crypto.randomBytes(32).toString('hex');
+  sseTokens.set(token, { userId: req.user.id, expiresAt: Date.now() + 60_000 });
+  res.json({ sse_token: token });
+};
 
 /**
  * GET /realtime/stream
@@ -33,8 +75,24 @@ import { logger } from '../config/logger';
  * so intermediate proxies don't kill the connection on inactivity.
  */
 export const stream: RequestHandler = async (req, res) => {
-  if (!req.user) throw httpError(401, 'Not authenticated');
-  const userId = req.user.id;
+  // Prefer the short-lived SSE token (single-use, 60 s TTL) — this keeps
+  // the full JWT out of the URL and therefore out of CDN/proxy access logs.
+  // Fall back to req.user if no sse_token is provided so existing clients
+  // continue to work during the transition window.
+  let userId: string;
+  const sseToken = (req.query.token as string | undefined)?.trim();
+  if (sseToken) {
+    evictExpiredSseTokens();
+    const entry = sseTokens.get(sseToken);
+    if (!entry || entry.expiresAt <= Date.now())
+      throw httpError(401, 'SSE token invalid or expired');
+    sseTokens.delete(sseToken); // single-use
+    userId = entry.userId;
+  } else if (req.user) {
+    userId = req.user.id;
+  } else {
+    throw httpError(401, 'Not authenticated');
+  }
 
   // SSE headers. The flush + no-cache combo is critical — Nginx will
   // buffer otherwise. The `X-Accel-Buffering: no` header is the standard

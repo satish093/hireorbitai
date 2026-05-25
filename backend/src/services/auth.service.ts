@@ -9,6 +9,7 @@ import {
   validatePasswordStrength,
 } from '../utils/password';
 import { audit } from './audit.service';
+import { publishToUser } from './realtime.service';
 import {
   sendWelcomeWithTempPassword,
   sendPasswordResetLink,
@@ -203,6 +204,11 @@ export async function login(email: string, password: string, req: Request): Prom
       req,
     });
   }
+
+  // Kick any other devices that still have an open SSE connection. The
+  // session_version bump already invalidates their JWTs server-side; this
+  // makes the logout immediate rather than waiting for their next API call.
+  void publishToUser(profile.id, 'session:revoked', { reason: 'new_login' }).catch(() => {});
 
   return {
     access_token: data.session.access_token,

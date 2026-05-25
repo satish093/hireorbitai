@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Layout } from '../components/Layout';
@@ -27,18 +27,129 @@ import { Button } from '../components/Button';
 /**
  * Student-facing training plan walkthrough.
  *
- * This is the page a consultant lands on when they open one of their training
- * assignments. It is designed to feel like a proper STEM-OPT training program
- * — not just a list of clickable lessons:
- *
- *   1. Plan overview header — objectives, skills, weekly cadence, due date,
- *      and the milestone status (12-month self-eval / final eval).
- *   2. Curriculum on the left rail — lessons sequenced + progress checkboxes.
- *   3. Active lesson body on the right with mark-complete + quiz CTA.
- *   4. Inline links into the I-983 plan view + evaluation submission.
- *
- * Manager-tier viewers also see the "+ Add feedback" affordance.
+ * Upgrades in this version:
+ *   - Auto study-time tracking: measures time on each lesson and submits
+ *     `time_spent_minutes` so the activity heatmap + streak actually populate.
+ *   - Interactive exercises: textarea inputs + reveal-on-demand hints.
+ *   - Richer LessonBody: fenced code blocks, blockquotes, horizontal rules,
+ *     heading anchors for the inline Table of Contents.
+ *   - Estimated read time shown in the lesson header.
+ *   - Table of Contents sidebar for lessons with 3+ headings.
  */
+interface CoachMsg {
+  role: 'user' | 'assistant';
+  text: string;
+}
+
+/**
+ * Inline AI learning coach. Answers are grounded strictly in the active lesson's
+ * content (the backend refuses to fabricate). Chat resets when the lesson changes.
+ */
+function LessonCoach({ assignmentId, lessonId }: { assignmentId: string; lessonId: string }) {
+  const [messages, setMessages] = useState<CoachMsg[]>([]);
+  const [input, setInput] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  // Grounded per-lesson — never carry context across lessons.
+  useEffect(() => {
+    setMessages([]);
+    setInput('');
+  }, [lessonId]);
+
+  const suggestions = [
+    'Explain this lesson in simple terms.',
+    'What are the key points to remember?',
+    'Give me an example of this concept.',
+  ];
+
+  async function ask(question: string) {
+    const q = question.trim();
+    if (!q || busy) return;
+    setInput('');
+    setMessages((m) => [...m, { role: 'user', text: q }]);
+    setBusy(true);
+    try {
+      const { data } = await api.post(`/training/assignments/${assignmentId}/coach`, {
+        question: q,
+        lesson_id: lessonId,
+      });
+      setMessages((m) => [...m, { role: 'assistant', text: data?.answer ?? 'No answer.' }]);
+    } catch (e) {
+      const msg =
+        (e as { response?: { data?: { error?: string } } })?.response?.data?.error ??
+        'The coach is unavailable right now.';
+      setMessages((m) => [...m, { role: 'assistant', text: `⚠ ${msg}` }]);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mt-4 border border-violet-200 dark:border-violet-500/25 bg-violet-50/50 dark:bg-violet-500/10 rounded-xl p-4">
+      <div className="text-[10px] font-semibold uppercase tracking-widest text-violet-700 dark:text-violet-300 mb-2">
+        ✦ Ask the Coach
+      </div>
+      {messages.length === 0 ? (
+        <p className="text-sm text-muted mb-3">
+          Stuck on something? Ask about this lesson — the coach answers only from what you're
+          reading here.
+        </p>
+      ) : (
+        <div className="space-y-2.5 mb-3">
+          {messages.map((m, i) => (
+            <div
+              key={i}
+              className={
+                'text-sm rounded-xl px-3 py-2 max-w-[90%] whitespace-pre-wrap break-words ' +
+                (m.role === 'user'
+                  ? 'ml-auto bg-ink text-bg'
+                  : 'mr-auto bg-hover border border-border text-ink')
+              }
+            >
+              {m.text}
+            </div>
+          ))}
+          {busy && <div className="text-xs text-muted">Thinking…</div>}
+        </div>
+      )}
+
+      {messages.length === 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          {suggestions.map((s) => (
+            <button
+              key={s}
+              onClick={() => ask(s)}
+              disabled={busy}
+              className="text-[11px] px-2 py-1 rounded-full border border-border text-muted hover:bg-hover disabled:opacity-50"
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="flex items-center gap-2">
+        <input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') ask(input);
+          }}
+          placeholder="Ask about this lesson…"
+          className="flex-1 min-w-0 text-sm h-9 rounded-lg border border-border px-3 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+        />
+        <button
+          onClick={() => ask(input)}
+          disabled={busy || !input.trim()}
+          className="h-9 px-4 rounded-lg bg-ink text-bg text-sm font-medium hover:opacity-90 disabled:opacity-50 press"
+        >
+          Ask
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function LessonViewer() {
   const { id } = useParams<{ id: string }>();
   const { profile } = useAuth();
@@ -56,14 +167,31 @@ export function LessonViewer() {
     profile.id === assignment.assigned_to_user_id
   );
 
+  // Exercise interactivity
+  const [exerciseAnswers, setExerciseAnswers] = useState<Record<string, string>>({});
+  const [hintsOpen, setHintsOpen] = useState<Record<string, boolean>>({});
+
+  // Study-time tracking: measure time per lesson, submit on lesson switch / unmount.
+  const lessonStartRef = useRef<number>(Date.now());
+  const prevLessonIdRef = useRef<string | null>(null);
+
+  function submitElapsedTime(lessonId: string) {
+    if (!id) return;
+    const mins = Math.round((Date.now() - lessonStartRef.current) / 60_000);
+    if (mins < 1) return;
+    api
+      .put(`/training/assignments/${id}/progress`, {
+        lesson_id: lessonId,
+        time_spent_minutes: mins,
+      })
+      .catch(() => {});
+  }
+
   async function load() {
     if (!id) return;
     try {
       const r = await api.get(`/training/assignments/${id}`);
       setAssignment(r.data);
-      // Course content is served pinned-to-version (or live for legacy) by the
-      // assignment endpoint — answer-stripped. No separate /courses fetch, so a
-      // later edit to the live course never changes what this student sees.
       const cc = r.data.course_content ?? {};
       const courseObj = {
         ...(cc.course ?? {}),
@@ -71,16 +199,12 @@ export function LessonViewer() {
         quizzes: cc.quizzes ?? [],
       };
       setCourse(courseObj);
-      // Evaluations endpoint exists for everyone authed against an assignment
-      // they own (or manager-tier). It may 403 for stragglers — swallow.
       try {
         const er = await api.get(`/training/assignments/${id}/evaluations`);
         setEvals(er.data ?? []);
       } catch {
         setEvals([]);
       }
-      // Resume: prefer the student's last-viewed lesson, else the first
-      // incomplete (or the first lesson). Only on initial load.
       if (!activeLessonId && courseObj.lessons.length) {
         const ordered = courseObj.lessons
           .slice()
@@ -102,8 +226,24 @@ export function LessonViewer() {
     load(); /* eslint-disable-next-line */
   }, [id]);
 
-  // Record the current lesson for resume + "current lesson" analytics. Owner
-  // only — managers previewing shouldn't overwrite a student's position.
+  // Submit time for the previous lesson when switching, then reset the clock.
+  useEffect(() => {
+    if (prevLessonIdRef.current && prevLessonIdRef.current !== activeLessonId) {
+      submitElapsedTime(prevLessonIdRef.current);
+    }
+    prevLessonIdRef.current = activeLessonId;
+    lessonStartRef.current = Date.now();
+    /* eslint-disable-next-line */
+  }, [activeLessonId]);
+
+  // Flush remaining time when navigating away.
+  useEffect(() => {
+    return () => {
+      if (prevLessonIdRef.current) submitElapsedTime(prevLessonIdRef.current);
+    }; /* eslint-disable-next-line */
+  }, [id]);
+
+  // Record the current lesson for resume + analytics (owner only).
   useEffect(() => {
     if (!id || !activeLessonId || !isConsultantOwner) return;
     api.put(`/training/assignments/${id}/viewed`, { lesson_id: activeLessonId }).catch(() => {});
@@ -118,8 +258,6 @@ export function LessonViewer() {
   );
   const activeLesson = lessons.find((l: any) => l.id === activeLessonId);
   const activeIdx = lessons.findIndex((l: any) => l.id === activeLessonId);
-  // Per-lesson quiz counts, derived from the course quiz set (which carries
-  // lesson_id). Lets each lesson surface its own knowledge check.
   const lessonQuizCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const q of course?.quizzes ?? []) {
@@ -128,12 +266,28 @@ export function LessonViewer() {
     return counts;
   }, [course]);
 
+  // Estimated read time (words / 200 wpm, rounded up to nearest minute).
+  const estimatedReadMin = useMemo(() => {
+    const words = (activeLesson?.content ?? '').trim().split(/\s+/).filter(Boolean).length;
+    return words > 60 ? Math.max(1, Math.round(words / 200)) : null;
+  }, [activeLesson]);
+
+  // Table of contents: headings extracted from lesson content.
+  const toc = useMemo(() => extractToc(activeLesson?.content ?? ''), [activeLesson]);
+
   async function toggle(lesson: any) {
     const cur = progressById.get(lesson.id);
+    const completing = !cur?.completed;
+    // Include time when marking complete; reset the per-lesson clock.
+    const mins = completing
+      ? Math.max(0, Math.round((Date.now() - lessonStartRef.current) / 60_000))
+      : undefined;
+    if (completing) lessonStartRef.current = Date.now();
     try {
       const r = await api.put(`/training/assignments/${id}/progress`, {
         lesson_id: lesson.id,
-        completed: !cur?.completed,
+        completed: completing,
+        ...(mins != null && mins > 0 ? { time_spent_minutes: mins } : {}),
       });
       setAssignment({
         ...assignment,
@@ -149,9 +303,6 @@ export function LessonViewer() {
     }
   }
 
-  // Reload assignment + gates after any compliance action (ack, final-assessment,
-  // supervision note). The child components own the API call; we just need the
-  // parent's assignment row to reflect the new status.
   async function refreshAll() {
     if (!id) return;
     try {
@@ -159,7 +310,7 @@ export function LessonViewer() {
       setAssignment(a.data);
       gates.refresh();
     } catch {
-      /* swallow — toast already fired in the child */
+      /* swallow — toast already fired in child */
     }
   }
 
@@ -176,7 +327,6 @@ export function LessonViewer() {
       </Layout>
     );
 
-  // Compute training-plan milestones.
   const start = assignment.training_start_date ? new Date(assignment.training_start_date) : null;
   const end = assignment.training_end_date ? new Date(assignment.training_end_date) : null;
   const today = new Date();
@@ -244,7 +394,6 @@ export function LessonViewer() {
           </div>
         </div>
 
-        {/* Overall progress + milestones strip */}
         <div className="grid md:grid-cols-3 gap-4 mt-5">
           <Stat label="Overall progress">
             <TrainingProgressBar value={assignment.progress_percentage} />
@@ -294,7 +443,6 @@ export function LessonViewer() {
           </Stat>
         </div>
 
-        {/* Objectives + assessment methods — the I-983 Section 5 contract */}
         {(course.learning_objectives?.length || course.assessment_methods?.length) && (
           <div className="grid md:grid-cols-2 gap-5 mt-5 pt-5 border-t border-border">
             {course.learning_objectives?.length ? (
@@ -361,7 +509,6 @@ export function LessonViewer() {
             )}
           </div>
 
-          {/* Skills you'll be picking up. Mirrors I-983 Section 6 on a small card. */}
           {course.skills_taught?.length ? (
             <div className="bg-surface border border-border rounded-xl p-3">
               <div className="text-[10px] font-semibold uppercase tracking-widest text-muted mb-2">
@@ -385,14 +532,40 @@ export function LessonViewer() {
           )}
           {activeLesson && (
             <article className="bg-surface border border-border rounded-2xl p-6">
-              <div className="text-[10px] font-semibold uppercase tracking-widest text-muted">
-                Lesson {activeIdx + 1} of {lessons.length}
-                {typeof activeLesson.estimated_minutes === 'number' &&
-                  ` · ${activeLesson.estimated_minutes} min`}
+              {/* Lesson meta */}
+              <div className="flex items-center justify-between gap-2 flex-wrap mb-1">
+                <div className="text-[10px] font-semibold uppercase tracking-widest text-muted">
+                  Lesson {activeIdx + 1} of {lessons.length}
+                  {typeof activeLesson.estimated_minutes === 'number' &&
+                    ` · ${activeLesson.estimated_minutes} min`}
+                </div>
+                {estimatedReadMin && (
+                  <span className="text-[10px] text-muted">~{estimatedReadMin} min read</span>
+                )}
               </div>
-              <h2 className="text-xl font-semibold tracking-tight mt-1">{activeLesson.title}</h2>
+              <h2 className="text-xl font-semibold tracking-tight mt-0.5">{activeLesson.title}</h2>
               {activeLesson.description && (
                 <p className="text-muted mt-1">{activeLesson.description}</p>
+              )}
+
+              {/* Table of contents for lessons with 3+ headings */}
+              {toc.length >= 3 && (
+                <div className="mt-4 border border-border rounded-xl p-3 bg-hover">
+                  <div className="text-[10px] font-semibold uppercase tracking-widest text-muted mb-2">
+                    In this lesson
+                  </div>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1">
+                    {toc.map((h) => (
+                      <a
+                        key={h.id}
+                        href={`#${h.id}`}
+                        className="text-xs text-accent hover:underline"
+                      >
+                        {h.text}
+                      </a>
+                    ))}
+                  </div>
+                </div>
               )}
 
               {activeLesson.video_url && (
@@ -413,32 +586,61 @@ export function LessonViewer() {
                   <LessonBody text={activeLesson.practical_example} />
                 </div>
               )}
+
+              {/* Interactive exercises */}
               {Array.isArray(activeLesson.exercises) && activeLesson.exercises.length > 0 && (
-                <div className="mt-4">
-                  <div className="text-[10px] font-semibold uppercase tracking-widest text-muted mb-2">
+                <div className="mt-5">
+                  <div className="text-[10px] font-semibold uppercase tracking-widest text-muted mb-3">
                     Exercises
                   </div>
-                  <div className="space-y-2">
-                    {activeLesson.exercises.map((ex: any, i: number) => (
-                      <div key={i} className="border border-border rounded-lg p-3">
-                        <div className="text-sm font-medium text-ink">{ex.prompt}</div>
-                        {ex.expected_outcome && (
-                          <div className="text-xs text-muted mt-1">
-                            <span className="font-semibold">Goal:</span> {ex.expected_outcome}
-                          </div>
-                        )}
-                        {Array.isArray(ex.hints) && ex.hints.length > 0 && (
-                          <ul className="mt-1 text-xs text-muted list-disc list-inside">
-                            {ex.hints.map((h: string, j: number) => (
-                              <li key={j}>{h}</li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-                    ))}
+                  <div className="space-y-3">
+                    {activeLesson.exercises.map((ex: any, i: number) => {
+                      const key = `${activeLesson.id}-${i}`;
+                      return (
+                        <div
+                          key={i}
+                          className="border border-border rounded-xl p-4 space-y-3 bg-hover/40"
+                        >
+                          <div className="text-sm font-medium text-ink">{ex.prompt}</div>
+                          {ex.expected_outcome && (
+                            <div className="text-xs text-muted">
+                              <span className="font-semibold">Goal:</span> {ex.expected_outcome}
+                            </div>
+                          )}
+                          <textarea
+                            className="w-full min-h-[90px] text-sm rounded-lg border border-border bg-surface px-3 py-2.5 text-ink focus:outline-none focus:ring-2 focus:ring-brand-300 resize-y placeholder:text-muted"
+                            placeholder="Type your answer here…"
+                            value={exerciseAnswers[key] ?? ''}
+                            onChange={(e) =>
+                              setExerciseAnswers((prev) => ({ ...prev, [key]: e.target.value }))
+                            }
+                          />
+                          {Array.isArray(ex.hints) && ex.hints.length > 0 && (
+                            <div>
+                              <button
+                                className="text-xs text-accent hover:underline"
+                                onClick={() =>
+                                  setHintsOpen((prev) => ({ ...prev, [key]: !prev[key] }))
+                                }
+                              >
+                                {hintsOpen[key] ? 'Hide hints' : `Show hints (${ex.hints.length})`}
+                              </button>
+                              {hintsOpen[key] && (
+                                <ul className="mt-2 space-y-1 text-xs text-muted list-disc list-inside">
+                                  {ex.hints.map((h: string, j: number) => (
+                                    <li key={j}>{h}</li>
+                                  ))}
+                                </ul>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
+
               {Array.isArray(activeLesson.key_takeaways) &&
                 activeLesson.key_takeaways.length > 0 && (
                   <div className="mt-4 border border-emerald-100 dark:border-emerald-500/20 bg-emerald-50/60 rounded-xl p-4">
@@ -470,6 +672,8 @@ export function LessonViewer() {
                 </div>
               )}
 
+              <LessonCoach assignmentId={id!} lessonId={activeLesson.id} />
+
               <div className="mt-6 pt-4 border-t border-border flex items-center justify-between flex-wrap gap-2">
                 <Button
                   variant={progressById.get(activeLesson.id)?.completed ? 'outline' : 'primary'}
@@ -499,10 +703,6 @@ export function LessonViewer() {
             </article>
           )}
 
-          {/* Completion workflow — always visible so the consultant can see
-              every remaining gate, not just lessons. Server-side multi-gate
-              evaluation: lessons + time + quiz + uploads + acknowledgement +
-              final assessment + manager approval. */}
           <div className="mt-5 space-y-4">
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <h2 className="text-lg font-semibold tracking-tight">Finishing this course</h2>
@@ -577,14 +777,64 @@ function Tick({ on }: { on: boolean }) {
 }
 
 // ===========================================================================
-// LessonBody — render plain-text lesson content into ALL-CAPS headings,
-// bullets, and numbered lists without a markdown dependency.
+// Helpers for Table of Contents
+// ===========================================================================
+function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+function extractToc(text: string): { id: string; text: string }[] {
+  if (!text) return [];
+  const results: { id: string; text: string }[] = [];
+  for (const raw of text.replace(/\r\n/g, '\n').split('\n')) {
+    const line = raw.trimEnd();
+    const mdMatch = line.match(/^\s{0,3}#{1,6}\s+(.*?)(?:\s+#+\s*)?$/);
+    if (mdMatch) {
+      const t = mdMatch[1].trim();
+      results.push({ id: slugify(t), text: t });
+      continue;
+    }
+    if (
+      /^[A-Z0-9][A-Z0-9 \-/&+(),.]{2,79}$/.test(line) &&
+      line === line.toUpperCase() &&
+      /[A-Z]/.test(line)
+    ) {
+      results.push({ id: slugify(line), text: line });
+    }
+  }
+  return results;
+}
+
+// ===========================================================================
+// LessonBody — rich plain-text / Markdown renderer
+//
+// Supports:
+//   • ATX headings (#, ##, …) and ALL-CAPS legacy headings
+//   • Fenced code blocks (```lang … ```)  ← new
+//   • Blockquotes (> text)                ← new
+//   • Horizontal rules (--- / ***)        ← new
+//   • Bullet and numbered lists
+//   • Inline **bold** and `code`
+//   • Heading anchors for the ToC         ← new
 // ===========================================================================
 function LessonBody({ text }: { text: string }) {
-  const blocks: { kind: 'heading' | 'para' | 'ul' | 'ol'; lines: string[] }[] = [];
+  // Pre-extract fenced code blocks so they survive the line-by-line parser.
+  const codeBlocks: { lang: string; code: string }[] = [];
+  const withoutCode = text
+    .replace(/\r\n/g, '\n')
+    .replace(/```(\w*)\n([\s\S]*?)```/g, (_m, lang: string, code: string) => {
+      const idx = codeBlocks.length;
+      codeBlocks.push({ lang: lang ?? '', code: code.trimEnd() });
+      return `\n__CODE_BLOCK_${idx}__\n`;
+    });
+
+  type Kind = 'heading' | 'para' | 'ul' | 'ol' | 'blockquote' | 'code' | 'hr';
+  const blocks: { kind: Kind; lines: string[]; meta?: string }[] = [];
   let buf: string[] = [];
-  let mode: 'para' | 'ul' | 'ol' | null = null;
-  const lines = text.replace(/\r\n/g, '\n').split('\n');
+  let mode: 'para' | 'ul' | 'ol' | 'blockquote' | null = null;
 
   function flush() {
     if (buf.length === 0) return;
@@ -593,20 +843,37 @@ function LessonBody({ text }: { text: string }) {
     mode = null;
   }
 
-  for (const raw of lines) {
+  for (const raw of withoutCode.split('\n')) {
     const line = raw.trimEnd();
     if (!line.trim()) {
       flush();
       continue;
     }
-    // Markdown ATX heading (#, ##, ###) — strip the hashes.
-    const md = line.match(/^\s{0,3}(#{1,6})\s+(.*)$/);
-    if (md) {
+
+    // Code block placeholder
+    const codeMatch = line.match(/^__CODE_BLOCK_(\d+)__$/);
+    if (codeMatch) {
       flush();
-      blocks.push({ kind: 'heading', lines: [md[2].replace(/\s+#+\s*$/, '')] });
+      blocks.push({ kind: 'code', lines: [], meta: codeMatch[1] });
       continue;
     }
-    // ALL-CAPS line treated as a heading (legacy plain-text lessons).
+
+    // Horizontal rule
+    if (/^[-*_]{3,}\s*$/.test(line)) {
+      flush();
+      blocks.push({ kind: 'hr', lines: [] });
+      continue;
+    }
+
+    // Markdown heading
+    const mdHead = line.match(/^\s{0,3}(#{1,6})\s+(.*)$/);
+    if (mdHead) {
+      flush();
+      blocks.push({ kind: 'heading', lines: [mdHead[2].replace(/\s+#+\s*$/, '')] });
+      continue;
+    }
+
+    // ALL-CAPS legacy heading
     if (
       /^[A-Z0-9][A-Z0-9 \-/&+(),.]{2,79}$/.test(line) &&
       line === line.toUpperCase() &&
@@ -616,18 +883,31 @@ function LessonBody({ text }: { text: string }) {
       blocks.push({ kind: 'heading', lines: [line] });
       continue;
     }
+
+    // Blockquote
+    if (/^\s*>\s?/.test(line)) {
+      if (mode !== 'blockquote') flush();
+      mode = 'blockquote';
+      buf.push(line.replace(/^\s*>\s?/, ''));
+      continue;
+    }
+
+    // Bullet list
     if (/^\s*[-•*+]\s+/.test(line)) {
       if (mode !== 'ul') flush();
       mode = 'ul';
       buf.push(line.replace(/^\s*[-•*+]\s+/, ''));
       continue;
     }
+
+    // Numbered list
     if (/^\s*\d+\.\s+/.test(line)) {
       if (mode !== 'ol') flush();
       mode = 'ol';
       buf.push(line.replace(/^\s*\d+\.\s+/, ''));
       continue;
     }
+
     if (mode !== 'para') flush();
     mode = 'para';
     buf.push(line);
@@ -637,11 +917,27 @@ function LessonBody({ text }: { text: string }) {
   return (
     <div className="space-y-3 text-sm leading-relaxed">
       {blocks.map((b, i) => {
+        if (b.kind === 'code') {
+          const cb = codeBlocks[parseInt(b.meta ?? '0')];
+          return (
+            <pre
+              key={i}
+              className="overflow-x-auto rounded-xl bg-[oklch(0.18_0.02_250)] text-[oklch(0.92_0.03_240)] text-[0.82em] px-5 py-4 font-mono leading-relaxed my-1"
+            >
+              <code>{cb?.code ?? ''}</code>
+            </pre>
+          );
+        }
+        if (b.kind === 'hr') {
+          return <hr key={i} className="border-border my-1" />;
+        }
         if (b.kind === 'heading') {
+          const id = slugify(b.lines[0]);
           return (
             <h3
+              id={id}
               key={i}
-              className="text-[11px] font-semibold tracking-widest uppercase text-muted mt-4"
+              className="text-[11px] font-semibold tracking-widest uppercase text-muted mt-4 scroll-mt-20"
             >
               {b.lines[0]}
             </h3>
@@ -665,6 +961,19 @@ function LessonBody({ text }: { text: string }) {
             </ol>
           );
         }
+        if (b.kind === 'blockquote') {
+          return (
+            <blockquote
+              key={i}
+              className="border-l-4 border-accent/40 pl-4 py-0.5 text-muted italic space-y-1"
+            >
+              {b.lines.map((l, j) => (
+                <p key={j}>{inlineMd(l)}</p>
+              ))}
+            </blockquote>
+          );
+        }
+        // para
         return (
           <p key={i} className="whitespace-pre-wrap">
             {b.lines.map((l, j) => (
@@ -680,24 +989,28 @@ function LessonBody({ text }: { text: string }) {
   );
 }
 
-// Render inline markdown — **bold** and `code` — without a dependency.
+// Inline markdown: **bold**, `code`, and _italic_.
 function inlineMd(text: string) {
-  const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g);
+  const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`|_[^_]+_)/g);
   return parts.map((p, i) => {
-    if (/^\*\*[^*]+\*\*$/.test(p)) {
+    if (/^\*\*[^*]+\*\*$/.test(p))
       return (
         <strong key={i} className="font-semibold text-ink">
           {p.slice(2, -2)}
         </strong>
       );
-    }
-    if (/^`[^`]+`$/.test(p)) {
+    if (/^`[^`]+`$/.test(p))
       return (
-        <code key={i} className="text-[0.85em] bg-hover text-ink rounded px-1 py-0.5">
+        <code key={i} className="text-[0.85em] bg-hover text-ink rounded px-1 py-0.5 font-mono">
           {p.slice(1, -1)}
         </code>
       );
-    }
+    if (/^_[^_]+_$/.test(p))
+      return (
+        <em key={i} className="italic">
+          {p.slice(1, -1)}
+        </em>
+      );
     return p;
   });
 }

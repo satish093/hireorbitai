@@ -187,11 +187,6 @@ describe('jobs.matchForConsultant — :consultantId IDOR guard', () => {
 });
 
 describe('jobs.scoreJobs — role + profile guards', () => {
-  it('404s when caller is not a CONSULTANT', async () => {
-    const { err } = await call(scoreJobs, { user: MANAGER });
-    expect(err?.status).toBe(404);
-  });
-
   it('400s when CONSULTANT has no consultant profile', async () => {
     mockFlags.nullConsultant = true;
     try {

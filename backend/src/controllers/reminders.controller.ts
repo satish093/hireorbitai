@@ -1,6 +1,29 @@
 import { RequestHandler } from 'express';
+import { z } from 'zod';
 import { db } from '../config/db';
 import { httpError } from '../types';
+
+const createSchema = z
+  .object({
+    title: z.string().min(1),
+    due_at: z.string().min(1),
+    description: z.string().optional().nullable(),
+    related_type: z.string().optional().nullable(),
+    related_id: z.string().uuid().optional().nullable(),
+    status: z.string().optional(),
+  })
+  .strict();
+
+const updateSchema = z
+  .object({
+    title: z.string().min(1).optional(),
+    due_at: z.string().min(1).optional(),
+    description: z.string().optional().nullable(),
+    related_type: z.string().optional().nullable(),
+    related_id: z.string().uuid().optional().nullable(),
+    status: z.string().optional(),
+  })
+  .strict();
 
 // Every mutation here checks ownership before applying — previously update,
 // complete, and remove would happily edit any reminder if the caller knew the
@@ -29,19 +52,11 @@ export const list: RequestHandler = async (req, res) => {
 
 export const create: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
-  // Strip any client-supplied owner_id so a malicious client can't create a
-  // reminder owned by another user.
-  const { owner_id: _ignore, ...body } = req.body ?? {};
-  void _ignore;
-  if (!body.title || typeof body.title !== 'string') {
-    throw httpError(400, 'title is required');
-  }
-  if (!body.due_at) {
-    throw httpError(400, 'due_at is required');
-  }
+  const parsed = createSchema.safeParse(req.body ?? {});
+  if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
   const { data, error } = await db
     .from('reminders')
-    .insert({ ...body, owner_id: req.user.id })
+    .insert({ ...parsed.data, owner_id: req.user.id })
     .select()
     .single();
   if (error) throw httpError(500, error.message);
@@ -51,12 +66,11 @@ export const create: RequestHandler = async (req, res) => {
 export const update: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   await assertOwner(req.params.id, req.user.id);
-  // Never let the caller change ownership via PATCH.
-  const { owner_id: _ignore, ...body } = req.body ?? {};
-  void _ignore;
+  const parsed = updateSchema.safeParse(req.body ?? {});
+  if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
   const { data, error } = await db
     .from('reminders')
-    .update(body)
+    .update(parsed.data)
     .eq('id', req.params.id)
     .select()
     .single();

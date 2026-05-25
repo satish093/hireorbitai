@@ -30,6 +30,7 @@ import { recruiterGoalsRouter } from './recruiterGoals.routes';
 import { trainingRouter } from './training.routes';
 import { filesRouter } from './files.routes';
 import { aiUsageRouter } from './aiUsage.routes';
+import { workAuthDocsRouter } from './workAuthDocs.routes';
 
 export const router = Router();
 
@@ -61,6 +62,7 @@ router.use(blockIfMustChangePassword);
 
 router.use('/invitations', invitationsRouter);
 router.use('/consultants', consultantsRouter);
+router.use('/work-auth-docs', workAuthDocsRouter);
 router.use('/recruiters', recruitersRouter);
 router.use('/resumes', resumesRouter);
 router.use('/jobs', jobsRouter);

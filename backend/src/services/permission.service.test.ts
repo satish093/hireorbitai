@@ -3,9 +3,10 @@
  * the suite runs in milliseconds without a Postgres dependency.
  *
  * What this covers:
- *   - role-tier branches (admin / manager / recruiter / consultant / other)
- *   - reports-to chain (both directions)
- *   - existing-thread legitimacy carry-over
+ *   - role-tier branches (admin / manager / recruiter / consultant)
+ *   - assignment-based isolation (recruiter ↔ consultant, manager ↔ recruiter)
+ *   - reports_to chain is NOT used for messaging permissions
+ *   - prior-thread legitimacy is NOT used (strict assignment only)
  *   - self-message refusal
  *   - cache hit, cache miss, cache invalidation
  *
@@ -69,7 +70,7 @@ vi.mock('../config/db', () => {
         const rows = mock.handlers.get(table)?.(filters) ?? [];
         return Promise.resolve({ data: rows[0] ?? null, error: null } as R);
       },
-      // Used by canMessageUser's prior-thread check (count + head:true).
+      // Supports head:true selects (count queries).
       then<T>(resolve: (value: R) => T) {
         const rows = mock.handlers.get(table)?.(filters) ?? [];
         return Promise.resolve({
@@ -136,9 +137,8 @@ function setupDb(rows: Record<string, unknown[]>) {
             const col = k.slice(3);
             if (r[col] !== v) return false;
           }
-          // `or` is left unmatched on purpose — tests that exercise the
-          // prior-thread fast path supply pre-filtered rows on the
-          // 'messages' table instead of trying to parse PostgREST OR syntax.
+          // `or` is left unmatched — the permission service no longer
+          // queries the messages table at all.
         }
         return true;
       });
@@ -192,7 +192,6 @@ describe('permission.service — admin override', () => {
       ],
       recruiter_managers: [],
       consultants: [{ recruiter_id: 'r-mine', user_id: 'u-consultant' }],
-      messages: [],
     });
     const ids = await getAccessibleUserIds({ id: 'u-manager', role: 'MANAGER' });
     // Admin users always reachable
@@ -219,8 +218,6 @@ describe('permission.service — recruiter scope', () => {
         { recruiter_id: 'r-1', user_id: 'u-consultant-1' },
         { recruiter_id: 'r-1', user_id: 'u-consultant-2' },
       ],
-      users: [{ id: 'u-recruiter', reports_to: null }],
-      messages: [],
     });
     const ids = await getAccessibleUserIds({ id: 'u-recruiter', role: 'RECRUITER' });
     expect(ids.has('u-consultant-1')).toBe(true);
@@ -235,8 +232,6 @@ describe('permission.service — recruiter scope', () => {
       ],
       recruiter_managers: [],
       consultants: [{ recruiter_id: 'r-other', user_id: 'u-other-consultant' }],
-      users: [{ id: 'u-recruiter', reports_to: null }],
-      messages: [],
     });
     const ids = await getAccessibleUserIds({ id: 'u-recruiter', role: 'RECRUITER' });
     expect(ids.has('u-other-consultant')).toBe(false);
@@ -247,8 +242,6 @@ describe('permission.service — recruiter scope', () => {
       recruiters: [{ id: 'r-1', user_id: 'u-recruiter', manager_id: null }],
       recruiter_managers: [{ recruiter_id: 'r-1', manager_id: 'u-manager' }],
       consultants: [],
-      users: [{ id: 'u-recruiter', reports_to: null }],
-      messages: [],
     });
     const ids = await getAccessibleUserIds({ id: 'u-recruiter', role: 'RECRUITER' });
     expect(ids.has('u-manager')).toBe(true);
@@ -261,8 +254,6 @@ describe('permission.service — consultant scope', () => {
       consultants: [{ user_id: 'u-consultant', recruiter_id: 'r-1' }],
       recruiters: [{ id: 'r-1', user_id: 'u-recruiter', manager_id: null }],
       recruiter_managers: [],
-      users: [{ id: 'u-consultant', reports_to: null }],
-      messages: [],
     });
     const ids = await getAccessibleUserIds({ id: 'u-consultant', role: 'CONSULTANT' });
     expect(ids.has('u-recruiter')).toBe(true);
@@ -276,8 +267,6 @@ describe('permission.service — consultant scope', () => {
         { id: 'r-other', user_id: 'u-other-recruiter', manager_id: null },
       ],
       recruiter_managers: [],
-      users: [{ id: 'u-consultant', reports_to: null }],
-      messages: [],
     });
     const ids = await getAccessibleUserIds({ id: 'u-consultant', role: 'CONSULTANT' });
     expect(ids.has('u-my-recruiter')).toBe(true);
@@ -285,37 +274,41 @@ describe('permission.service — consultant scope', () => {
   });
 });
 
-describe('permission.service — reports-to chain', () => {
-  it('non-manager user can message their direct manager + reports + neither stranger', async () => {
-    // CONSULTANT skips the manager-tier early-return so the reports_to
-    // branch actually runs. Provide an empty consultants list so the
-    // consultant-scope branch also returns empty — isolating the reports_to
-    // logic.
+describe('permission.service — strict assignment only (no reports_to, no prior-thread)', () => {
+  it('reports_to chain is ignored — consultant with no assignment sees nobody', async () => {
+    // Even though u-me has a reports_to boss and direct reports, those are
+    // NOT messaging permissions. Only the recruiter assignment matters.
     setupDb({
       recruiters: [],
       recruiter_managers: [],
-      consultants: [],
+      consultants: [{ user_id: 'u-me', recruiter_id: null }],
       users: [
-        // The caller's own row carries the reports_to FK pointing at their boss.
         { id: 'u-me', reports_to: 'u-boss' },
-        // Boss row — has to exist as a user for the directory fetch later,
-        // but the reports_to permission resolution only needs the FK on
-        // the caller row above.
         { id: 'u-boss', reports_to: null },
-        // Direct reports.
         { id: 'u-report-1', reports_to: 'u-me' },
-        { id: 'u-report-2', reports_to: 'u-me' },
-        // Stranger reports to someone else.
-        { id: 'u-stranger', reports_to: 'u-someone-else' },
       ],
-      messages: [],
     });
     const ids = await getAccessibleUserIds({ id: 'u-me', role: 'CONSULTANT' });
-    expect(ids.has('u-boss')).toBe(true);
-    expect(ids.has('u-report-1')).toBe(true);
-    expect(ids.has('u-report-2')).toBe(true);
-    expect(ids.has('u-stranger')).toBe(false);
+    // reports_to boss is NOT reachable — not an assignment relationship
+    expect(ids.has('u-boss')).toBe(false);
+    // Direct reports are NOT reachable — not an assignment relationship
+    expect(ids.has('u-report-1')).toBe(false);
     expect(ids.has('u-me')).toBe(false);
+  });
+
+  it('prior messages do NOT grant ongoing access — assignment is the only gate', async () => {
+    // Consultant is assigned to r-mine. They previously messaged u-stranger.
+    // u-stranger must still be unreachable because the assignment changed.
+    setupDb({
+      consultants: [{ user_id: 'u-consultant', recruiter_id: 'r-mine' }],
+      recruiters: [{ id: 'r-mine', user_id: 'u-recruiter', manager_id: null }],
+      recruiter_managers: [],
+      // Even if messages table had rows between consultant and stranger,
+      // we no longer query it — so it doesn't matter.
+    });
+    const ids = await getAccessibleUserIds({ id: 'u-consultant', role: 'CONSULTANT' });
+    expect(ids.has('u-recruiter')).toBe(true);
+    expect(ids.has('u-stranger')).toBe(false);
   });
 });
 

@@ -1,6 +1,21 @@
 import { RequestHandler } from 'express';
+import { z } from 'zod';
 import { db, pool } from '../config/db';
-import { httpError } from '../types';
+import { httpError, MANAGER_TIER } from '../types';
+
+const upsertDailySchema = z
+  .object({
+    recruiter_id: z.string().uuid(),
+    activity_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'activity_date must be YYYY-MM-DD'),
+    submissions_count: z.number().int().min(0).optional(),
+    interviews_scheduled: z.number().int().min(0).optional(),
+    interviews_completed: z.number().int().min(0).optional(),
+    vendor_calls: z.number().int().min(0).optional(),
+    offers: z.number().int().min(0).optional(),
+    placements: z.number().int().min(0).optional(),
+    notes: z.string().optional().nullable(),
+  })
+  .strict();
 
 // ---------------------------------------------------------------------------
 // Daily activity (manual recruiter daily log)
@@ -12,13 +27,23 @@ import { httpError } from '../types';
  */
 export const upsertDaily: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
-  const body = req.body ?? {};
-  if (!body.recruiter_id || !body.activity_date) {
-    throw httpError(400, 'recruiter_id and activity_date required');
+  const parsed = upsertDailySchema.safeParse(req.body ?? {});
+  if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
+
+  // Non-manager callers can only write their own daily log.
+  if (!(MANAGER_TIER as readonly string[]).includes(req.user.role)) {
+    const { data: myRec } = await db
+      .from('recruiters')
+      .select('id')
+      .eq('user_id', req.user.id)
+      .maybeSingle();
+    if (!myRec || (myRec as { id: string }).id !== parsed.data.recruiter_id)
+      throw httpError(403, 'Cannot log activity for another recruiter');
   }
+
   const { data, error } = await db
     .from('recruiter_daily_activity')
-    .upsert(body, { onConflict: 'recruiter_id,activity_date' })
+    .upsert(parsed.data, { onConflict: 'recruiter_id,activity_date' })
     .select()
     .single();
   if (error) throw httpError(500, error.message);
@@ -26,9 +51,27 @@ export const upsertDaily: RequestHandler = async (req, res) => {
 };
 
 export const listDaily: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
   const { recruiter_id, from, to } = req.query as Record<string, string | undefined>;
   let qb = db.from('recruiter_daily_activity').select('*');
-  if (recruiter_id) qb = qb.eq('recruiter_id', recruiter_id);
+
+  // Non-manager callers can only see their own rows.
+  if (!(MANAGER_TIER as readonly string[]).includes(req.user.role)) {
+    const { data: myRec } = await db
+      .from('recruiters')
+      .select('id')
+      .eq('user_id', req.user.id)
+      .maybeSingle();
+    const ownRecId = myRec ? (myRec as { id: string }).id : null;
+    if (!ownRecId) {
+      res.json([]);
+      return;
+    }
+    qb = qb.eq('recruiter_id', ownRecId);
+  } else if (recruiter_id) {
+    qb = qb.eq('recruiter_id', recruiter_id);
+  }
+
   if (from) qb = qb.gte('activity_date', from);
   if (to) qb = qb.lte('activity_date', to);
   const { data, error } = await qb.order('activity_date', { ascending: false });

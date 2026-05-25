@@ -153,6 +153,9 @@ export function jdToSafeHtml(raw: string): string {
       const tag = el.tagName.toUpperCase();
       if (tag === 'SCRIPT' || tag === 'STYLE') return;
       if (JD_KEEP_TAGS.has(tag)) {
+        // createElement creates a bare element — no attributes are copied from el.
+        // If you ever add <a> or <img> to JD_KEEP_TAGS, allowlist specific safe
+        // attributes (href, src) explicitly here rather than copying all of el's attributes.
         const clean = doc.createElement(tag.toLowerCase());
         walk(el, clean);
         dest.appendChild(clean);

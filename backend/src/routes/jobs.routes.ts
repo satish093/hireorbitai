@@ -35,7 +35,7 @@ jobsRouter.post('/import-url', ingest, requireRole(...OPERATOR_TIER), c.importBy
 
 jobsRouter.get('/', c.list);
 jobsRouter.post('/', requireRole(...OPERATOR_TIER), c.create);
-jobsRouter.post('/score', c.scoreJobs);
+jobsRouter.post('/score', requireRole('CONSULTANT'), c.scoreJobs);
 
 jobsRouter.get('/:id', c.get);
 jobsRouter.patch('/:id', requireRole(...OPERATOR_TIER), c.update);
@@ -50,10 +50,10 @@ jobsRouter.get('/:id/note', requireRole(...OPERATOR_TIER), c.getNote);
 jobsRouter.patch('/:id/note', requireRole(...OPERATOR_TIER), c.setNote);
 
 jobsRouter.get('/:id/match-for-me', c.matchForMe);
-jobsRouter.get('/:id/requirements', c.requirementsFor);
+jobsRouter.get('/:id/requirements', requireRole(...OPERATOR_TIER), c.requirementsFor);
 jobsRouter.get('/:id/skill-gap', c.skillGap);
 jobsRouter.post('/:id/ats-match', c.atsMatch);
-jobsRouter.post('/:id/enrich', c.enrichOne);
+jobsRouter.post('/:id/enrich', ingest, requireRole(...OPERATOR_TIER), c.enrichOne);
 jobsRouter.post('/:id/skill-match', c.skillMatchForMe);
 jobsRouter.post('/:id/skill-match-for-me', c.skillMatchForMe);
 jobsRouter.post('/:id/copilot', c.copilot);

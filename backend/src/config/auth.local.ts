@@ -183,6 +183,18 @@ export async function signInWithPassword(args: {
       error: { message: 'Invalid login credentials', status: 400 },
     };
   }
+
+  // Single-device enforcement: revoke every existing session before issuing a
+  // new one. This bumps session_version so any in-flight JWTs become invalid
+  // on the next requireAuth check, and deletes all refresh-token rows. We then
+  // re-read session_version so the new access token carries the updated sv.
+  await revokeAllSessions(row.id);
+  const sv = await pool.query<{ session_version: number }>(
+    `SELECT session_version FROM public.users WHERE id = $1 LIMIT 1`,
+    [row.id],
+  );
+  row.session_version = sv.rows[0]!.session_version;
+
   return { data: await issueSession(row), error: null };
 }
 

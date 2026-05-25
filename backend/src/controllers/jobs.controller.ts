@@ -10,7 +10,7 @@ import {
 import { parseJobRequirements } from '../services/jobParser.service';
 import { tailorForJob as resumeTailorForJob } from './resumes.controller';
 import { fromJob as applicationsFromJob } from './applications.controller';
-import { httpError, MANAGER_TIER, OPERATOR_TIER } from '../types';
+import { httpError, MANAGER_TIER } from '../types';
 import { ANTHROPIC_ENABLED } from '../config/anthropic';
 
 // Light user join helper — explicit FK hint so the embed never collides.
@@ -162,13 +162,27 @@ async function annotateLiked<T extends { id: string }>(
 // CRUD + filters
 // ---------------------------------------------------------------------------
 
+/** Strip PostgREST OR-string control characters from a user-supplied search term. */
+function escapeOrTerm(s: string): string {
+  // Commas split OR conditions; parens delimit nested groups; dots separate
+  // column.operator.value; percent/underscore are ILIKE wildcards that could
+  // match unintended rows. Strip them all so the literal search text is safe.
+  return s
+    .replace(/[,%()._]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export const list: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   const { q, location, remote, level, job_type, posted_after, years_min, publisher, job_function } =
     req.query as Record<string, string | undefined>;
 
   let qb = db.from('jobs').select(JOB_SELECT).eq('is_active', true);
-  if (q) qb = qb.or(`title.ilike.%${q}%,description.ilike.%${q}%`);
+  if (q) {
+    const safe = escapeOrTerm(q);
+    if (safe) qb = qb.or(`title.ilike.%${safe}%,description.ilike.%${safe}%`);
+  }
   if (location) qb = applyLocationFilter(qb, location);
   if (remote === 'true') qb = qb.eq('remote', true);
   if (remote === 'false') qb = qb.eq('remote', false);
@@ -319,6 +333,7 @@ export const setNote: RequestHandler = async (req, res) => {
 };
 
 export const remove: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
   const { error } = await db.from('jobs').delete().eq('id', req.params.id);
   if (error) throw httpError(500, error.message);
   res.json({ ok: true });
@@ -1225,7 +1240,6 @@ function skillsMatch(consultantSkill: string, jobSkill: string): boolean {
  */
 export const scoreJobs: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
-  if (req.user.role !== 'CONSULTANT') throw httpError(404, 'Not found');
 
   const consultant = await getConsultantForUser(req.user.id);
   if (!consultant) throw httpError(400, 'Complete your consultant profile first');
@@ -1280,9 +1294,7 @@ export const skillGap: RequestHandler = async (req, res) => {
     null;
   const explicitId = (req.query.consultant_id as string | undefined)?.trim();
   if (explicitId) {
-    const role = req.user.role;
-    if (!(OPERATOR_TIER as string[]).includes(role))
-      throw httpError(403, 'Only managers can request another consultant gap');
+    await assertConsultantAccess(req.user, explicitId);
     const { data } = await db
       .from('consultants')
       .select('id, primary_skill, skills')

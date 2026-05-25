@@ -3,6 +3,8 @@ import { z } from 'zod';
 import * as repo from '../repositories/training.repository';
 import * as svc from '../services/training.service';
 import * as ai from '../services/trainingAI.service';
+import { lessonCoach as runLessonCoach } from '../services/ai.service';
+import { ANTHROPIC_ENABLED } from '../config/anthropic';
 import { httpError, MANAGER_TIER, ADMIN_TIER } from '../types';
 import { logger } from '../config/logger';
 import { evaluateAchievements, logStudyMinutes } from '../services/trainingAchievements.service';
@@ -531,6 +533,54 @@ export const submitQuizAttempt: RequestHandler = async (req, res) => {
     correct_answer: (quiz as any).correct_answer,
     explanation: (quiz as any).explanation,
   });
+};
+
+// POST /assignments/:id/coach — grounded AI learning coach for a single lesson.
+// Owner-or-manager only; answers strictly from the lesson's pinned content.
+const coachSchema = z
+  .object({
+    question: z.string().trim().min(1).max(500),
+    lesson_id: z.string().uuid(),
+  })
+  .strict();
+export const lessonCoach: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  if (!ANTHROPIC_ENABLED) throw httpError(503, 'AI coach is not configured.');
+
+  const parsed = coachSchema.safeParse(req.body);
+  if (!parsed.success) throw httpError(400, 'A question is required', parsed.error.flatten());
+
+  // Caller must own the assignment OR be manager-tier (404, not 403).
+  const { data: a } = await repo.assignments.get(req.params.id);
+  if (!a) throw httpError(404, 'Assignment not found');
+  if ((a as any).assigned_to_user_id !== req.user.id && !isManagerTier(req.user.role)) {
+    throw httpError(404, 'Not found');
+  }
+
+  // Ground the coach in the exact pinned version the learner is reading; this
+  // also blocks lesson IDs that belong to other courses.
+  const content = await svc.resolveAssignmentContent(a);
+  const lesson = (content.lessons ?? []).find((l: any) => l.id === parsed.data.lesson_id);
+  if (!lesson) throw httpError(404, 'Lesson not found');
+
+  let answer: string;
+  try {
+    answer = await runLessonCoach({
+      question: parsed.data.question,
+      lesson: {
+        title: (lesson as any).title,
+        description: (lesson as any).description,
+        content: (lesson as any).content,
+        practical_example: (lesson as any).practical_example,
+        key_takeaways: (lesson as any).key_takeaways,
+      },
+      courseTitle: (content.course as any)?.title ?? null,
+    });
+  } catch (err) {
+    req.log?.warn({ err }, 'lessonCoach failed');
+    throw httpError(502, 'The coach is unavailable right now. Try again shortly.');
+  }
+  res.json({ answer });
 };
 
 // ---------------------------------------------------------------------------

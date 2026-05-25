@@ -44,7 +44,8 @@ export type AuditAction =
   | 'resume_access_denied'
   | 'training_course_accessed'
   | 'training_lesson_accessed'
-  | 'data_access_denied';
+  | 'data_access_denied'
+  | 'consultant_recruiter_assigned';
 
 interface AuditInput {
   action: AuditAction;

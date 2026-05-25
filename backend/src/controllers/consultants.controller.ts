@@ -2,6 +2,8 @@ import { RequestHandler } from 'express';
 import { z } from 'zod';
 import { db } from '../config/db';
 import { httpError, MANAGER_TIER } from '../types';
+import { invalidatePermissionCache } from '../services/permission.service';
+import { audit } from '../services/audit.service';
 
 function isManagerTier(role?: string): boolean {
   return !!role && (MANAGER_TIER as string[]).includes(role);
@@ -16,21 +18,23 @@ async function getCallerRecruiterRowId(userId: string): Promise<string | null> {
   return data?.id ?? null;
 }
 
-const onboardingSchema = z.object({
-  visa_status: z.string().optional(),
-  current_location: z.string().optional(),
-  preferred_locations: z.array(z.string()).optional(),
-  primary_skill: z.string().optional(),
-  total_experience_years: z.number().optional(),
-  relocation: z.boolean().optional(),
-  remote_only: z.boolean().optional(),
-  expected_rate: z.number().optional(),
-  linkedin_url: z.string().url().optional().or(z.literal('')),
-  github_url: z.string().url().optional().or(z.literal('')),
-  notes: z.string().optional(),
-  desired_positions: z.array(z.string()).optional(),
-  skills: z.array(z.string()).optional(),
-});
+const onboardingSchema = z
+  .object({
+    visa_status: z.string().optional(),
+    current_location: z.string().optional(),
+    preferred_locations: z.array(z.string()).optional(),
+    primary_skill: z.string().optional(),
+    total_experience_years: z.number().optional(),
+    relocation: z.boolean().optional(),
+    remote_only: z.boolean().optional(),
+    expected_rate: z.number().optional(),
+    linkedin_url: z.string().url().optional().or(z.literal('')),
+    github_url: z.string().url().optional().or(z.literal('')),
+    notes: z.string().optional(),
+    desired_positions: z.array(z.string()).optional(),
+    skills: z.array(z.string()).optional(),
+  })
+  .strict();
 
 export const list: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
@@ -151,15 +155,16 @@ export const get: RequestHandler = async (req, res) => {
   if (error || !data) throw httpError(404, error?.message ?? 'Not found');
   const row = data as any;
 
-  // Scope: same rules as list.
+  // Scope: same rules as list. Return 404 (not 403) so the endpoint can't
+  // be used to probe whether a consultant id exists.
   if (!isManagerTier(req.user.role)) {
     if (req.user.role === 'RECRUITER') {
       const myRecId = await getCallerRecruiterRowId(req.user.id);
-      if (!myRecId || row.recruiter_id !== myRecId) throw httpError(403, 'Forbidden');
+      if (!myRecId || row.recruiter_id !== myRecId) throw httpError(404, 'Not found');
     } else if (req.user.role === 'CONSULTANT') {
-      if (row.user_id !== req.user.id) throw httpError(403, 'Forbidden');
+      if (row.user_id !== req.user.id) throw httpError(404, 'Not found');
     } else {
-      throw httpError(403, 'Forbidden');
+      throw httpError(404, 'Not found');
     }
   }
   res.json(row);
@@ -241,8 +246,28 @@ export const update: RequestHandler = async (req, res) => {
 };
 
 export const assignRecruiter: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
   const recruiter_id = req.body?.recruiter_id;
   if (!recruiter_id) throw httpError(400, 'recruiter_id required');
+
+  // Verify the consultant exists and capture the current recruiter for cache invalidation.
+  const { data: cons } = await db
+    .from('consultants')
+    .select('id, user_id, recruiter_id')
+    .eq('id', req.params.id)
+    .maybeSingle();
+  if (!cons) throw httpError(404, 'Consultant not found');
+  const oldCons = cons as { id: string; user_id: string | null; recruiter_id: string | null };
+
+  // Verify the target recruiter_id points to a real recruiter row.
+  const { data: rec } = await db
+    .from('recruiters')
+    .select('id, user_id')
+    .eq('id', recruiter_id)
+    .maybeSingle();
+  if (!rec) throw httpError(400, 'Recruiter not found');
+  const newRec = rec as { id: string; user_id: string | null };
+
   const { data, error } = await db
     .from('consultants')
     .update({ recruiter_id })
@@ -250,13 +275,51 @@ export const assignRecruiter: RequestHandler = async (req, res) => {
     .select()
     .single();
   if (error) throw httpError(500, error.message);
+
+  // Invalidate permission caches for old recruiter, new recruiter, and the consultant.
+  if (oldCons.recruiter_id) {
+    const { data: oldRec } = await db
+      .from('recruiters')
+      .select('user_id')
+      .eq('id', oldCons.recruiter_id)
+      .maybeSingle();
+    if (oldRec?.user_id) invalidatePermissionCache(oldRec.user_id as string);
+  }
+  if (newRec.user_id) invalidatePermissionCache(newRec.user_id);
+  if (oldCons.user_id) invalidatePermissionCache(oldCons.user_id);
+
+  await audit({
+    action: 'consultant_recruiter_assigned',
+    user_id: req.user.id,
+    req,
+    metadata: {
+      consultant_id: req.params.id,
+      old_recruiter_id: oldCons.recruiter_id,
+      new_recruiter_id: recruiter_id,
+    },
+  });
+
   res.json(data);
 };
 
 export const setMarketingStatus: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
   const schema = z.object({ marketing_status: z.enum(['ACTIVE', 'PAUSED', 'PLACED']) });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid status');
+
+  // Non-manager callers (recruiters) can only update their own consultants.
+  if (!isManagerTier(req.user.role)) {
+    const myRecId = await getCallerRecruiterRowId(req.user.id);
+    const { data: cons } = await db
+      .from('consultants')
+      .select('recruiter_id')
+      .eq('id', req.params.id)
+      .maybeSingle();
+    if (!cons || (cons as { recruiter_id: string | null }).recruiter_id !== myRecId)
+      throw httpError(404, 'Not found');
+  }
+
   const { data, error } = await db
     .from('consultants')
     .update({ marketing_status: parsed.data.marketing_status })

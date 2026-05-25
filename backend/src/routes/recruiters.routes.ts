@@ -1,13 +1,14 @@
 import { Router } from 'express';
 import { requireRole } from '../middleware/auth';
-import { MANAGER_TIER } from '../types';
+import { MANAGER_TIER, OPERATOR_TIER } from '../types';
 import * as c from '../controllers/recruiters.controller';
 
 export const recruitersRouter = Router();
 
-recruitersRouter.get('/', c.list);
-recruitersRouter.get('/:id', c.get);
-recruitersRouter.post('/onboard', c.onboard);
+recruitersRouter.get('/', requireRole(...OPERATOR_TIER), c.list);
+recruitersRouter.get('/:id', requireRole(...OPERATOR_TIER), c.get);
+// Recruiters onboard themselves; gate to the RECRUITER role only.
+recruitersRouter.post('/onboard', requireRole('RECRUITER'), c.onboard);
 
 // Many-to-many manager assignments — manager-tier and above can re-org.
 recruitersRouter.post('/:id/managers', requireRole(...MANAGER_TIER), c.addManager);

@@ -610,7 +610,10 @@ export const setGroup: RequestHandler = async (req, res) => {
 // ---------------------------------------------------------------------------
 const notesSchema = z.object({ admin_notes: z.string().max(5000).nullable() });
 export const setNotes: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
   const { id } = req.params;
+  // Prevent lower-rank admins from annotating equal- or higher-tier users.
+  await loadTargetOrThrow({ role: req.user.role }, id);
   const parsed = notesSchema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid input');
   const { data, error } = await db

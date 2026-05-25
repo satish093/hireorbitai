@@ -72,6 +72,11 @@ const envSchema = z.object({
   // Get a free key at console.groq.com — no credit card required.
   GROQ_API_KEY: optionalKey,
 
+  // --- Google Gemini (free tier — analysis, scoring, large-context tasks) ---
+  // Get a free key at aistudio.google.com — 15 req/min, 1M tokens/day, no card.
+  GEMINI_API_KEY: optionalKey,
+  GEMINI_MODEL: z.string().default('gemini-2.0-flash'),
+
   // --- Anthropic ---
   ANTHROPIC_API_KEY: optionalKey,
   // OAuth access token for Claude.ai subscription mode (claude-... format).
@@ -259,6 +264,10 @@ export const env = {
   },
   groq: {
     apiKey: e.GROQ_API_KEY || undefined,
+  },
+  gemini: {
+    apiKey: e.GEMINI_API_KEY || undefined,
+    model: e.GEMINI_MODEL,
   },
   anthropic: {
     apiKey: e.ANTHROPIC_API_KEY,

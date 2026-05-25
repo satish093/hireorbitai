@@ -3,6 +3,7 @@ import { Link, Navigate } from 'react-router-dom';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useInvalidationListener } from './useInvalidate';
+import { OWNER_TIER } from '../types';
 
 interface FeatureFlagsContextValue {
   flags: Record<string, boolean>;
@@ -147,7 +148,7 @@ export function FeatureGuard({
  *  flip the flag back on. */
 function FeatureDisabledPanel({ feature }: { feature: string }) {
   const { profile } = useAuth();
-  const isOwner = profile?.role === 'SUPER_ADMIN' || profile?.role === 'CEO';
+  const isOwner = profile?.role != null && (OWNER_TIER as readonly string[]).includes(profile.role);
   const label = feature.replace(/_/g, ' ');
   return (
     <div className="min-h-[60dvh] flex items-center justify-center p-6">

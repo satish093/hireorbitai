@@ -30,7 +30,7 @@ trainingRouter.post('/courses/generate', requireRole(...ADMIN_TIER), c.generateC
 trainingRouter.post('/courses/backfill', requireRole(...ADMIN_TIER), c.backfillCourses);
 trainingRouter.get('/courses/:id', c.getCourse);
 trainingRouter.put('/courses/:id', requireRole(...MANAGER_TIER), c.updateCourse);
-trainingRouter.delete('/courses/:id', requireRole(...MANAGER_TIER), c.deleteCourse);
+trainingRouter.delete('/courses/:id', requireRole(...ADMIN_TIER), c.deleteCourse);
 trainingRouter.post('/courses/:id/generate-outline', requireRole(...ADMIN_TIER), c.generateOutline);
 trainingRouter.post(
   '/courses/:id/generate-capstone',
@@ -69,6 +69,8 @@ trainingRouter.get('/assignments/:id', c.getAssignment);
 trainingRouter.put('/assignments/:id', requireRole(...MANAGER_TIER), c.updateAssignment); // I-983 attestation block
 trainingRouter.put('/assignments/:id/progress', c.updateProgress);
 trainingRouter.put('/assignments/:id/viewed', c.markLessonViewed);
+// Grounded AI learning coach — learner route, ownership checked in the controller.
+trainingRouter.post('/assignments/:id/coach', c.lessonCoach);
 trainingRouter.post('/assignments/:id/upload', c.recordUpload);
 trainingRouter.post('/assignments/:id/feedback', requireRole(...MANAGER_TIER), c.addFeedback);
 trainingRouter.post('/assignments/:id/quiz-attempt', c.submitQuizAttempt);

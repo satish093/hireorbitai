@@ -529,11 +529,17 @@ async function fetchJSearch(slug: string | null): Promise<NormalizedJob[]> {
 
   // De-dupe by external_id (queries can overlap).
   const seen = new Set<string>();
-  return out.filter((j) => {
+  const deduped = out.filter((j) => {
     if (seen.has(j.external_id)) return false;
     seen.add(j.external_id);
     return true;
   });
+
+  // JSearch aggregates many boards (LinkedIn, Indeed, ZipRecruiter…) even when
+  // a site: filter is used. Only Dice and CareerBuilder pass through here —
+  // Monster has its own dedicated driver, LinkedIn has its own driver.
+  const JSEARCH_ALLOWED = new Set(['Dice', 'CareerBuilder']);
+  return deduped.filter((j) => JSEARCH_ALLOWED.has(j.publisher ?? ''));
 }
 
 function mapJSearchEmployment(t?: string | null): string {
