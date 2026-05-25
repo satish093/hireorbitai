@@ -598,6 +598,8 @@ EXTRACTION RULES:
 - linkedin_url: Accept any URL containing "linkedin.com/in/".
 - experiences: Sort most-recent first. description: include the full content of role bullets as a single string.
 - age: Only if explicitly stated as a number (not inferred from graduation year).
+- education: Extract only real institutions and degrees. IGNORE any text that is a template placeholder, instruction, or tip (e.g. text starting with "Tip:", "Enter your", "List your", or any instructional sentence inside parentheses or brackets). If a field contains placeholder text, leave it null.
+- general: Skip any line that is clearly a template instruction, placeholder, or example text rather than real candidate data.
 
 Return valid JSON matching the schema. No markdown, no explanation.`;
 
