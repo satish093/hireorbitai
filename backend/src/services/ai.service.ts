@@ -19,7 +19,7 @@ import { z } from 'zod/v4';
 import type { MessageParam, TextBlockParam } from '@anthropic-ai/sdk/resources/messages';
 import { anthropic, ANTHROPIC_MODEL, AI_MAX_INPUT_CHARS } from '../config/anthropic';
 import { groqClient, GROQ_MODEL, GROQ_FAST_MODEL, GROQ_ENABLED } from '../config/groq';
-import { geminiClient, GEMINI_ENABLED, GEMINI_MODEL } from '../config/gemini';
+import { geminiClient, GEMINI_ENABLED, GEMINI_MODEL, withGeminiRetry } from '../config/gemini';
 import { logAiUsage } from './aiUsage';
 import {
   withCache,
@@ -349,7 +349,7 @@ async function callGeminiStructured<T extends z.ZodType>(
     model: GEMINI_MODEL,
     systemInstruction: systemPrompt + '\n\nReturn valid JSON only, no markdown fences.',
   });
-  const result = await model.generateContent(userContent);
+  const result = await withGeminiRetry(() => model.generateContent(userContent));
   const raw = result.response.text();
   const usage = result.response.usageMetadata;
   const inputTok = usage?.promptTokenCount ?? 0;
@@ -390,7 +390,7 @@ async function callGeminiText(
     model: GEMINI_MODEL,
     systemInstruction: systemPrompt,
   });
-  const result = await model.generateContent(userContent);
+  const result = await withGeminiRetry(() => model.generateContent(userContent));
   const usage = result.response.usageMetadata;
   const inputTok = usage?.promptTokenCount ?? 0;
   const outputTok = usage?.candidatesTokenCount ?? 0;
@@ -630,7 +630,7 @@ JSON SCHEMA TO RETURN:
 
 RESUME TEXT:
 ${text}`;
-    const result = await model.generateContent(prompt);
+    const result = await withGeminiRetry(() => model.generateContent(prompt));
     const raw = result.response.text();
     const parsed: unknown = JSON.parse(raw);
     return ResumeProfileSchema.parse(parsed);

@@ -1,5 +1,5 @@
 import { extractText, getDocumentProxy } from 'unpdf';
-import { geminiClient, GEMINI_ENABLED, GEMINI_MODEL } from '../config/gemini';
+import { geminiClient, GEMINI_ENABLED, GEMINI_MODEL, withGeminiRetry } from '../config/gemini';
 import { anthropic, ANTHROPIC_ENABLED } from '../config/anthropic';
 import { logger } from '../config/logger';
 
@@ -63,14 +63,15 @@ async function extractPdfWithGemini(buffer: Buffer): Promise<string | null> {
   try {
     const base64 = buffer.toString('base64');
     const model = geminiClient.getGenerativeModel({ model: GEMINI_MODEL });
-    const result = await model.generateContent({
-      contents: [
-        {
-          role: 'user',
-          parts: [
-            { inlineData: { mimeType: 'application/pdf', data: base64 } },
-            {
-              text: `Extract this resume and format it as clean Markdown:
+    const result = await withGeminiRetry(() =>
+      model.generateContent({
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              { inlineData: { mimeType: 'application/pdf', data: base64 } },
+              {
+                text: `Extract this resume and format it as clean Markdown:
 - Candidate name → # Name
 - Section headings (Experience, Education, Skills, Summary, etc.) → ## Section
 - Job titles / degree entries → ### Title at Company  (or ### Degree at Institution)
@@ -78,11 +79,12 @@ async function extractPdfWithGemini(buffer: Buffer): Promise<string | null> {
 - All other text as plain paragraphs
 
 Output only the Markdown. No commentary, no code fences.`,
-            },
-          ],
-        },
-      ],
-    });
+              },
+            ],
+          },
+        ],
+      }),
+    );
     const text = result.response.text();
     return text.trim() || null;
   } catch (err) {
@@ -100,19 +102,20 @@ async function extractImageWithGemini(buffer: Buffer, mimetype: string): Promise
   try {
     const base64 = buffer.toString('base64');
     const model = geminiClient.getGenerativeModel({ model: GEMINI_MODEL });
-    const result = await model.generateContent({
-      contents: [
-        {
-          role: 'user',
-          parts: [
-            {
-              inlineData: {
-                mimeType: mimetype as 'image/jpeg' | 'image/png' | 'image/webp',
-                data: base64,
+    const result = await withGeminiRetry(() =>
+      model.generateContent({
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              {
+                inlineData: {
+                  mimeType: mimetype as 'image/jpeg' | 'image/png' | 'image/webp',
+                  data: base64,
+                },
               },
-            },
-            {
-              text: `Extract this resume image and format it as clean Markdown:
+              {
+                text: `Extract this resume image and format it as clean Markdown:
 - Candidate name → # Name
 - Section headings (Experience, Education, Skills, Summary, etc.) → ## Section
 - Job titles / degree entries → ### Title at Company  (or ### Degree at Institution)
@@ -120,11 +123,12 @@ async function extractImageWithGemini(buffer: Buffer, mimetype: string): Promise
 - All other text as plain paragraphs
 
 Output only the Markdown. No commentary, no code fences.`,
-            },
-          ],
-        },
-      ],
-    });
+              },
+            ],
+          },
+        ],
+      }),
+    );
     const text = result.response.text();
     return text.trim() || null;
   } catch (err) {
