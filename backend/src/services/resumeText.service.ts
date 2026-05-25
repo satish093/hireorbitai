@@ -1,13 +1,7 @@
-import mammoth from 'mammoth';
 import { extractText, getDocumentProxy } from 'unpdf';
 import { geminiClient, GEMINI_ENABLED, GEMINI_MODEL } from '../config/gemini';
 import { anthropic, ANTHROPIC_ENABLED } from '../config/anthropic';
 import { logger } from '../config/logger';
-
-// word-extractor has no @types package; type the constructor inline.
-const WordExtractor: new () => {
-  extract(input: Buffer): Promise<{ getBody(): string }>;
-} = require('word-extractor');
 
 /**
  * Convert an uploaded resume file into plain, readable text so the site can
@@ -53,8 +47,11 @@ function isDocx(mimetype: string, name: string): boolean {
   );
 }
 
-function isDoc(mimetype: string, name: string): boolean {
-  return mimetype === 'application/msword' || /\.doc$/i.test(name);
+function isImage(mimetype: string, name: string): boolean {
+  return (
+    ['image/jpeg', 'image/png', 'image/webp'].includes(mimetype) ||
+    /\.(jpe?g|png|webp)$/i.test(name)
+  );
 }
 
 /**
@@ -83,6 +80,79 @@ async function extractPdfWithGemini(buffer: Buffer): Promise<string | null> {
     return text.trim() || null;
   } catch (err) {
     logger.warn({ err: (err as Error).message }, 'Gemini PDF extraction failed — trying Claude');
+    return null;
+  }
+}
+
+/**
+ * Use Gemini vision to extract resume text from an image file.
+ * Returns null on any failure so the caller can fall back to Claude.
+ */
+async function extractImageWithGemini(buffer: Buffer, mimetype: string): Promise<string | null> {
+  if (!GEMINI_ENABLED || !geminiClient) return null;
+  try {
+    const base64 = buffer.toString('base64');
+    const model = geminiClient.getGenerativeModel({ model: GEMINI_MODEL });
+    const result = await model.generateContent({
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            {
+              inlineData: {
+                mimeType: mimetype as 'image/jpeg' | 'image/png' | 'image/webp',
+                data: base64,
+              },
+            },
+            {
+              text: 'This is a resume image. Extract all the text exactly as written, preserving line breaks, section headings, and structure. Output only the raw text, no commentary.',
+            },
+          ],
+        },
+      ],
+    });
+    const text = result.response.text();
+    return text.trim() || null;
+  } catch (err) {
+    logger.warn({ err: (err as Error).message }, 'Gemini image extraction failed — trying Claude');
+    return null;
+  }
+}
+
+/**
+ * Use Claude vision to extract resume text from an image file (paid fallback).
+ */
+async function extractImageWithClaude(buffer: Buffer, mimetype: string): Promise<string | null> {
+  if (!ANTHROPIC_ENABLED) return null;
+  try {
+    const base64 = buffer.toString('base64');
+    const resp = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 4096,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'image',
+              source: {
+                type: 'base64',
+                media_type: mimetype as 'image/jpeg' | 'image/png' | 'image/webp',
+                data: base64,
+              },
+            },
+            {
+              type: 'text',
+              text: 'This is a resume image. Extract all the text exactly as written, preserving line breaks, section headings, and structure. Output only the raw text, no commentary.',
+            },
+          ],
+        },
+      ],
+    });
+    const text = resp.content.find((b) => b.type === 'text')?.text ?? '';
+    return text.trim() || null;
+  } catch (err) {
+    logger.warn({ err: (err as Error).message }, 'Claude image extraction failed');
     return null;
   }
 }
@@ -150,14 +220,16 @@ export async function extractResumeText(file: {
       const joined = Array.isArray(text) ? text.join('\n') : (text ?? '');
       return normalize(joined);
     }
-    if (isDocx(file.mimetype, file.originalname)) {
-      const { value } = await mammoth.extractRawText({ buffer: file.buffer });
-      return normalize(value ?? '');
-    }
-    if (isDoc(file.mimetype, file.originalname)) {
-      const extractor = new WordExtractor();
-      const doc = await extractor.extract(file.buffer);
-      return normalize(doc.getBody() ?? '');
+    if (isImage(file.mimetype, file.originalname)) {
+      // 1. Gemini vision — free tier.
+      const geminiText = await extractImageWithGemini(file.buffer, file.mimetype);
+      if (geminiText) return normalize(geminiText);
+
+      // 2. Claude vision — paid fallback.
+      const claudeText = await extractImageWithClaude(file.buffer, file.mimetype);
+      if (claudeText) return normalize(claudeText);
+
+      return '';
     }
     return '';
   } catch (err) {

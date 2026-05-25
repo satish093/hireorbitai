@@ -34,7 +34,7 @@ export function Resumes() {
             <div className="flex gap-2 w-full sm:w-auto sm:contents">
               <FileUpload
                 label={w.uploading ? 'Uploading…' : '+ Upload'}
-                accept=".pdf,.doc,.docx"
+                accept=".pdf,.jpg,.jpeg,.png,.webp"
                 disabled={!w.consultantId}
                 onFile={w.upload}
                 className="flex-1 sm:flex-none"

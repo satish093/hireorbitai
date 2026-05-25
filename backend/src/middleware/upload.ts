@@ -18,12 +18,8 @@ import type { Request } from 'express';
 
 const MB = 1024 * 1024;
 
-const RESUME_MIME = new Set([
-  'application/pdf',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-]);
-const RESUME_EXT = /\.(pdf|doc|docx)$/i;
+const RESUME_MIME = new Set(['application/pdf', 'image/jpeg', 'image/png', 'image/webp']);
+const RESUME_EXT = /\.(pdf|jpe?g|png|webp)$/i;
 
 const ATTACHMENT_MIME = new Set([
   'application/pdf',
@@ -51,7 +47,7 @@ function buildFilter(mimes: Set<string>, extRegex: RegExp): multer.Options['file
   };
 }
 
-/** Resume-specific uploader — PDF + Word, 10 MB max. */
+/** Resume-specific uploader — PDF + images (JPEG/PNG/WebP), 10 MB max. */
 export const uploadResume = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * MB, files: 1 },
