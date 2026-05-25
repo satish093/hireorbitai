@@ -5,6 +5,7 @@ import { StatusBadge } from '../components/StatusBadge';
 import { Modal } from '../components/Modal';
 import { FormInput } from '../components/FormInput';
 import { SelectInput } from '../components/SelectInput';
+import { SearchSelect, type SearchSelectItem } from '../components/SearchSelect';
 import { PageHeader } from '../components/PageHeader';
 import { Button } from '../components/Button';
 import { api } from '../services/api';
@@ -17,13 +18,24 @@ const EMPTY = { consultant_id: '', job_id: '', vendor_id: '', notes: '', resume_
 export function Applications() {
   const [rows, setRows] = useState<any[]>([]);
   const [consultants, setConsultants] = useState<any[]>([]);
-  const [jobs, setJobs] = useState<any[]>([]);
   const [vendors, setVendors] = useState<any[]>([]);
   const [resumeVersions, setResumeVersions] = useState<ResumeVersion[]>([]);
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState(EMPTY);
+  // Pinned selections for the searchable pickers — keep the chosen row visible
+  // even when it falls out of the current (server-searched) result set.
+  const [selJob, setSelJob] = useState<SearchSelectItem | null>(null);
+  const [selConsultant, setSelConsultant] = useState<SearchSelectItem | null>(null);
+  const [selVendor, setSelVendor] = useState<SearchSelectItem | null>(null);
+
+  function resetForm() {
+    setForm(EMPTY);
+    setSelJob(null);
+    setSelConsultant(null);
+    setSelVendor(null);
+  }
 
   function load() {
     setLoading(true);
@@ -42,12 +54,8 @@ export function Applications() {
         if (!cancelled) setConsultants(r.data ?? []);
       })
       .catch(() => {});
-    api
-      .get('/jobs')
-      .then((r) => {
-        if (!cancelled) setJobs(r.data ?? []);
-      })
-      .catch(() => {});
+    // Jobs are fetched on demand inside the searchable picker (the list can be
+    // in the thousands) — don't pull the whole table on mount.
     api
       .get('/vendors')
       .then((r) => {
@@ -100,7 +108,7 @@ export function Applications() {
       }
       toast.success('Submitted');
       setOpen(false);
-      setForm(EMPTY);
+      resetForm();
       load();
       // Notify JobSearch (Applied tab), dashboards, Reports.
       invalidate('applications');
@@ -158,9 +166,10 @@ export function Applications() {
 
       <Modal
         open={open}
+        size="lg"
         onClose={() => {
           setOpen(false);
-          setForm(EMPTY);
+          resetForm();
         }}
         title="New submission"
         description="Pick a consultant, a job, and a vendor. The system pre-checks for duplicates."
@@ -170,7 +179,7 @@ export function Applications() {
               variant="outline"
               onClick={() => {
                 setOpen(false);
-                setForm(EMPTY);
+                resetForm();
               }}
             >
               Cancel
@@ -182,22 +191,52 @@ export function Applications() {
         }
       >
         <div className="space-y-3">
-          <SelectInput
+          <SearchSelect
             label="Consultant *"
-            placeholder="Select a consultant…"
+            placeholder="Search consultants…"
             value={form.consultant_id}
-            options={consultants.map((c) => ({
-              value: c.id,
-              label: c.user?.full_name ?? c.user?.email,
-            }))}
-            onChange={(e) => setForm({ ...form, consultant_id: e.target.value })}
+            selected={selConsultant}
+            search={(q) =>
+              consultants
+                .map((c) => ({
+                  value: c.id,
+                  label: c.user?.full_name ?? c.user?.email ?? 'Unknown',
+                  sublabel: c.user?.full_name ? c.user?.email : undefined,
+                }))
+                .filter((o) =>
+                  q
+                    ? `${o.label} ${o.sublabel ?? ''}`.toLowerCase().includes(q.toLowerCase())
+                    : true,
+                )
+            }
+            onSelect={(item) => {
+              setSelConsultant(item);
+              setForm((f) => ({ ...f, consultant_id: item?.value ?? '' }));
+            }}
+            emptyText="No consultants found"
           />
-          <SelectInput
+          <SearchSelect
             label="Job *"
-            placeholder="Select a job…"
+            placeholder="Search jobs by title or keyword…"
             value={form.job_id}
-            options={jobs.map((j) => ({ value: j.id, label: j.title }))}
-            onChange={(e) => setForm({ ...form, job_id: e.target.value })}
+            selected={selJob}
+            search={(q) =>
+              api
+                .get('/jobs', { params: q ? { q } : {} })
+                .then((r) =>
+                  ((r.data ?? []) as any[]).slice(0, 25).map((j) => ({
+                    value: j.id,
+                    label: j.title,
+                    sublabel: j.company_name ?? undefined,
+                  })),
+                )
+                .catch(() => [])
+            }
+            onSelect={(item) => {
+              setSelJob(item);
+              setForm((f) => ({ ...f, job_id: item?.value ?? '' }));
+            }}
+            emptyText="No jobs found"
           />
           {resumeVersions.length > 0 && (
             <SelectInput
@@ -211,12 +250,21 @@ export function Applications() {
               onChange={(e) => setForm({ ...form, resume_id: e.target.value })}
             />
           )}
-          <SelectInput
+          <SearchSelect
             label="Vendor"
-            placeholder="Select a vendor…"
+            placeholder="Search vendors…"
             value={form.vendor_id}
-            options={vendors.map((v) => ({ value: v.id, label: v.company_name }))}
-            onChange={(e) => setForm({ ...form, vendor_id: e.target.value })}
+            selected={selVendor}
+            search={(q) =>
+              vendors
+                .map((v) => ({ value: v.id, label: v.company_name }))
+                .filter((o) => (q ? o.label?.toLowerCase().includes(q.toLowerCase()) : true))
+            }
+            onSelect={(item) => {
+              setSelVendor(item);
+              setForm((f) => ({ ...f, vendor_id: item?.value ?? '' }));
+            }}
+            emptyText="No vendors found"
           />
           <FormInput
             label="Notes"
