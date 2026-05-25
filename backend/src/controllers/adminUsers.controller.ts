@@ -867,8 +867,8 @@ export const setRole: RequestHandler = async (req, res) => {
   assertOutranks(actor, row.role); // can't touch equal/higher users
   assertOutranks(actor, newRole); // can't promote to your own tier or above
 
-  // Non-admin managers are restricted to their own group
-  if (!ADMIN_TIER.includes(actor.role as Role)) {
+  // Only MANAGER role is group-scoped; HR_MANAGER and DEVELOPER may have no group
+  if (actor.role === 'MANAGER') {
     // Load actor's group_id from DB (not always in the JWT)
     const { data: actorRow } = await db
       .from('users')
