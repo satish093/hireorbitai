@@ -10,7 +10,6 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 const mock = vi.hoisted(() => ({
   pdfText: 'PDF   resume\r\n\r\n\r\ntext  ' as unknown,
   pdfThrows: false,
-  docxValue: 'DOCX resume text',
 }));
 
 vi.mock('unpdf', () => ({
@@ -19,10 +18,6 @@ vi.mock('unpdf', () => ({
     if (mock.pdfThrows) throw new Error('corrupt pdf');
     return { totalPages: 1, text: mock.pdfText };
   }),
-}));
-// mammoth uses `export =`, consumed as a default import — mock the default.
-vi.mock('mammoth', () => ({
-  default: { extractRawText: vi.fn(async () => ({ value: mock.docxValue, messages: [] })) },
 }));
 vi.mock('../config/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
@@ -39,7 +34,6 @@ const file = (mimetype: string, originalname: string) => ({
 beforeEach(() => {
   mock.pdfThrows = false;
   mock.pdfText = 'PDF   resume\r\n\r\n\r\ntext  ';
-  mock.docxValue = 'DOCX resume text';
 });
 
 describe('extractResumeText', () => {
@@ -60,11 +54,13 @@ describe('extractResumeText', () => {
     expect(out).toBe('page one\npage two');
   });
 
-  it('extracts a DOCX (by mime type)', async () => {
+  it('returns empty string for DOCX — uploads are restricted to PDF + images', async () => {
+    // DOCX/mammoth support was removed when uploads were restricted to PDF +
+    // images (commit c91d191). Unsupported types yield '' rather than throwing.
     const out = await extractResumeText(
       file('application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'cv.docx'),
     );
-    expect(out).toBe('DOCX resume text');
+    expect(out).toBe('');
   });
 
   it('returns empty string for legacy .doc / unsupported types (no throw)', async () => {

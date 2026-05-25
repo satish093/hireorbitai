@@ -8,6 +8,10 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/**/*.test.ts'],
+    // Inject dummy, schema-valid env before any module loads so config/env.ts
+    // (and the AI/storage modules that import it) don't process.exit on a
+    // missing var in CI, which has no .env. See vitest.setup.ts.
+    setupFiles: ['./vitest.setup.ts'],
     // Single-thread by default — most of our tests touch a shared module-
     // level cache (permission service). Parallel test files would flake
     // unless every test wipes the cache, which is brittle. The suite is
