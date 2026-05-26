@@ -117,6 +117,43 @@ try {
     Object.values(recruiterId),
   ]);
 
+  // Training: remove seeded courses (and their lessons/assignments/progress).
+  const COURSE_TITLES = [
+    'Spring Boot Fundamentals',
+    'React for Consultants',
+    'STEM OPT Compliance 101',
+  ];
+  const seededCourses = await client.query(
+    `SELECT id FROM public.training_courses WHERE title = ANY($1)`,
+    [COURSE_TITLES],
+  );
+  const oldCourseIds = seededCourses.rows.map((r) => r.id);
+  if (oldCourseIds.length) {
+    await client.query(
+      `DELETE FROM public.training_lesson_progress WHERE assignment_id IN
+         (SELECT id FROM public.training_assignments WHERE course_id = ANY($1))`,
+      [oldCourseIds],
+    );
+    await client.query(`DELETE FROM public.training_assignments WHERE course_id = ANY($1)`, [
+      oldCourseIds,
+    ]);
+    await client.query(`DELETE FROM public.training_lessons WHERE course_id = ANY($1)`, [
+      oldCourseIds,
+    ]);
+    await client.query(`DELETE FROM public.training_courses WHERE id = ANY($1)`, [oldCourseIds]);
+  }
+
+  // Tasks: remove demo-tagged tasks (+ their activity/comments).
+  await client.query(
+    `DELETE FROM public.task_activity WHERE task_id IN
+       (SELECT id FROM public.tasks WHERE tags @> ARRAY['demo']::text[])`,
+  );
+  await client.query(
+    `DELETE FROM public.task_comments WHERE task_id IN
+       (SELECT id FROM public.tasks WHERE tags @> ARRAY['demo']::text[])`,
+  );
+  await client.query(`DELETE FROM public.tasks WHERE tags @> ARRAY['demo']::text[]`);
+
   // Clients + vendors -------------------------------------------------------
   const clientId = {};
   for (const c of CLIENTS) {
@@ -441,12 +478,243 @@ try {
     }
   }
 
+  // Training: courses + lessons ---------------------------------------------
+  const COURSES = [
+    {
+      title: 'Spring Boot Fundamentals',
+      category: 'Technical',
+      difficulty: 'INTERMEDIATE',
+      tags: ['Java', 'Spring Boot', 'Backend'],
+      hours: 6,
+      compliance: null,
+      lessons: [
+        {
+          title: 'Intro to Spring Boot',
+          summary: 'What Spring Boot is and why it matters.',
+          mins: 25,
+        },
+        { title: 'Building REST APIs', summary: 'Controllers, services, repositories.', mins: 40 },
+        { title: 'Data with JPA', summary: 'Entities, repositories, transactions.', mins: 35 },
+      ],
+    },
+    {
+      title: 'React for Consultants',
+      category: 'Technical',
+      difficulty: 'BEGINNER',
+      tags: ['React', 'TypeScript', 'Frontend'],
+      hours: 5,
+      compliance: null,
+      lessons: [
+        { title: 'Components & Props', summary: 'The building blocks of React.', mins: 30 },
+        { title: 'State & Hooks', summary: 'useState, useEffect and friends.', mins: 35 },
+      ],
+    },
+    {
+      title: 'STEM OPT Compliance 101',
+      category: 'Compliance',
+      difficulty: 'BEGINNER',
+      tags: ['Compliance', 'I-983'],
+      hours: 3,
+      compliance: 'Process Training',
+      lessons: [
+        { title: 'I-983 Overview', summary: 'Training-plan basics for STEM OPT.', mins: 20 },
+        { title: 'Reporting Obligations', summary: 'Evaluations and timelines.', mins: 25 },
+      ],
+    },
+  ];
+  const courseIdByTitle = {};
+  const lessonIdsByCourse = {};
+  let lessonCount = 0;
+  for (const co of COURSES) {
+    const cr = await client.query(
+      `INSERT INTO public.training_courses
+         (title, description, category, difficulty, tags, estimated_duration_hours, status,
+          content_status, review_status, requires_manager_approval, compliance_category, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,'ACTIVE','READY','PUBLISHED',false,$7,$8) RETURNING id`,
+      [
+        co.title,
+        `${co.title} — seeded demo course.`,
+        co.category,
+        co.difficulty,
+        co.tags,
+        co.hours,
+        co.compliance,
+        adminId,
+      ],
+    );
+    const cid = cr.rows[0].id;
+    courseIdByTitle[co.title] = cid;
+    lessonIdsByCourse[cid] = [];
+    let order = 1;
+    for (const ls of co.lessons) {
+      const lr = await client.query(
+        `INSERT INTO public.training_lessons
+           (course_id, title, summary, description, content, lesson_order, estimated_minutes,
+            knowledge_check_required, content_status, content_format, key_takeaways)
+         VALUES ($1,$2,$3,$3,$4,$5,$6,false,'READY','markdown',$7) RETURNING id`,
+        [
+          cid,
+          ls.title,
+          ls.summary,
+          `# ${ls.title}\n\n${ls.summary}\n\nSeeded demo lesson content for the dev environment.`,
+          order++,
+          ls.mins,
+          JSON.stringify(['Remember the core concept', 'Apply it on the job']),
+        ],
+      );
+      lessonIdsByCourse[cid].push(lr.rows[0].id);
+      lessonCount++;
+    }
+  }
+
+  // Training: assignments + lesson progress ---------------------------------
+  const ASSIGN = [
+    {
+      course: 'Spring Boot Fundamentals',
+      consultant: CONSULTANTS[0],
+      status: 'IN_PROGRESS',
+      pct: 33,
+      done: 1,
+    },
+    {
+      course: 'React for Consultants',
+      consultant: CONSULTANTS[1],
+      status: 'COMPLETED',
+      pct: 100,
+      done: 2,
+    },
+    {
+      course: 'STEM OPT Compliance 101',
+      consultant: CONSULTANTS[0],
+      status: 'NOT_STARTED',
+      pct: 0,
+      done: 0,
+    },
+    {
+      course: 'STEM OPT Compliance 101',
+      consultant: CONSULTANTS[2],
+      status: 'IN_PROGRESS',
+      pct: 50,
+      done: 1,
+    },
+    {
+      course: 'Spring Boot Fundamentals',
+      consultant: CONSULTANTS[4],
+      status: 'IN_PROGRESS',
+      pct: 66,
+      done: 2,
+    },
+  ];
+  let progressCount = 0;
+  for (const a of ASSIGN) {
+    const cid = courseIdByTitle[a.course];
+    const ar = await client.query(
+      `INSERT INTO public.training_assignments
+         (course_id, assigned_to_user_id, assigned_by_user_id, status, progress_percentage, due_date, completed_at)
+       VALUES ($1,$2,$3,$4,$5, current_date + 30, $6) RETURNING id`,
+      [
+        cid,
+        userId[a.consultant],
+        adminId,
+        a.status,
+        a.pct,
+        a.status === 'COMPLETED' ? new Date().toISOString() : null,
+      ],
+    );
+    const aid = ar.rows[0].id;
+    const lessons = lessonIdsByCourse[cid];
+    for (let i = 0; i < a.done && i < lessons.length; i++) {
+      await client.query(
+        `INSERT INTO public.training_lesson_progress (assignment_id, lesson_id, completed, completed_at, time_spent_minutes)
+         VALUES ($1,$2,true, now() - interval '2 days', 30)`,
+        [aid, lessons[i]],
+      );
+      progressCount++;
+    }
+  }
+
+  // Tasks (varied status/priority, tagged 'demo' for idempotent reseed) ------
+  const TASKS = [
+    {
+      title: 'Submit Aniket to DataInc',
+      status: 'IN_PROGRESS',
+      priority: 'HIGH',
+      assignee: RECRUITERS[0],
+      consultant: CONSULTANTS[0],
+      dueInDays: 1,
+    },
+    {
+      title: 'Prep Yuki for frontend screen',
+      status: 'TODO',
+      priority: 'MEDIUM',
+      assignee: RECRUITERS[0],
+      consultant: CONSULTANTS[1],
+      dueInDays: 2,
+    },
+    {
+      title: 'Chase TechCorp DevOps feedback',
+      status: 'REVIEW',
+      priority: 'HIGH',
+      assignee: RECRUITERS[1],
+      consultant: CONSULTANTS[3],
+      dueInDays: 1,
+    },
+    {
+      title: 'Update consultant rate cards',
+      status: 'BACKLOG',
+      priority: 'LOW',
+      assignee: MANAGERS[0],
+      consultant: null,
+      dueInDays: 7,
+    },
+    {
+      title: 'Complete Spring Boot module 2',
+      status: 'TODO',
+      priority: 'MEDIUM',
+      assignee: CONSULTANTS[0],
+      consultant: CONSULTANTS[0],
+      dueInDays: 3,
+    },
+    {
+      title: 'Weekly pipeline review',
+      status: 'COMPLETED',
+      priority: 'MEDIUM',
+      assignee: MANAGERS[0],
+      consultant: null,
+      dueInDays: -1,
+    },
+  ];
+  let taskOrder = 0;
+  for (const t of TASKS) {
+    await client.query(
+      `INSERT INTO public.tasks
+         (title, description, status, priority, assignee_id, created_by, related_consultant_id, due_at, order_index, tags, completed_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7, now() + ($8 || ' days')::interval, $9, ARRAY['demo']::text[], $10)`,
+      [
+        t.title,
+        'Seeded demo task.',
+        t.status,
+        t.priority,
+        userId[t.assignee],
+        adminId,
+        t.consultant ? consultantId[t.consultant] : null,
+        String(t.dueInDays),
+        taskOrder++,
+        t.status === 'COMPLETED' ? new Date().toISOString() : null,
+      ],
+    );
+  }
+
   await client.query('COMMIT');
   console.log('--- mock data seeded ---');
   console.log(`  clients: ${CLIENTS.length}  vendors: ${VENDORS.length}  jobs: ${JOBS.length}`);
   console.log(`  applications: ${APPS.length}  interviews: ${INTERVIEWS.length}`);
   console.log(`  messages: ${MESSAGES.length}  reminders: ${REMINDERS.length}`);
   console.log(`  recruiter daily activity: ${RECRUITERS.length} recruiters × 5 days`);
+  console.log(
+    `  training: ${COURSES.length} courses, ${lessonCount} lessons, ${ASSIGN.length} assignments, ${progressCount} progress rows`,
+  );
+  console.log(`  tasks: ${TASKS.length}`);
 } catch (e) {
   await client.query('ROLLBACK');
   console.error('SEED FAILED:', e.message);

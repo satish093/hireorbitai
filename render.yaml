@@ -79,6 +79,15 @@ services:
       # Leave blank (sync:false, set in dashboard) for zero API spend.
       - key: ANTHROPIC_API_KEY
         sync: false
+      # Free AI stack — values entered in the Render dashboard (sync:false keeps
+      # secrets OUT of git). Groq is primary for AI tasks; Gemini is a fallback;
+      # LlamaParse handles resume-PDF extraction.
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: LLAMA_CLOUD_API_KEY
+        sync: false
       - key: JOB_SOURCES_MOCK
         value: 'true'
 
