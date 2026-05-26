@@ -103,7 +103,7 @@
   --ink: #bbbec3;
   --ink-2: #8b8f97;
   --muted: #8c9098; /* brightened: 4.72:1 on accent-soft/danger-soft (was 4.3:1) */
-  --faint: #7d8086;
+  --faint: #84878d; /* brightened: clears 4.5:1 AA on dark surfaces (was #7d8086 = 4.49:1) */
 
   /* Accent (sRGB-clipped from wide-gamut oklch originals) */
   --accent: #7887ff;

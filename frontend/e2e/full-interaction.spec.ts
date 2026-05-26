@@ -608,10 +608,11 @@ test.describe('Applications', () => {
     await expect(dialog).toBeVisible();
     await snap(page, '14-applications-modal-open');
 
-    // Select consultant (first available option)
-    const selects = dialog.locator('select');
-    await selects.nth(0).selectOption({ index: 1 }); // Consultant
-    await selects.nth(1).selectOption({ index: 1 }); // Job
+    // The modal now uses searchable pickers (SearchSelect), not native <select>s.
+    // Click the first result row in the Consultant and Job lists (mock data:
+    // "Casey Consultant" / "Senior Full-Stack Engineer").
+    await dialog.getByRole('button', { name: 'Casey Consultant' }).click();
+    await dialog.getByRole('button', { name: 'Senior Full-Stack Engineer' }).click();
     await snap(page, '15-applications-modal-filled');
 
     // Submit

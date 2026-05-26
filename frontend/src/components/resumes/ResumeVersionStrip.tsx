@@ -1,4 +1,3 @@
-import { Fragment } from 'react';
 import clsx from 'clsx';
 import { Pill } from '../Pill';
 import { fmtShortDate } from './AtsBits';
@@ -47,7 +46,7 @@ export function ResumeVersionStrip({ versions, activeId, onSelect, onNew, onDele
               <span
                 className={clsx(
                   'text-[11px] font-mono font-bold px-1.5 py-0.5 rounded',
-                  v.id === activeId ? 'bg-accent text-white' : 'bg-hover text-muted',
+                  v.id === activeId ? 'bg-accent text-white dark:text-bg' : 'bg-hover text-muted',
                 )}
               >
                 v{v.version}

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { Button } from '../Button';
+import { AiProgressCard } from '../AiProgressCard';
 import { api } from '../../services/api';
 import type { ResumeProfile } from './types';
 
@@ -37,20 +38,35 @@ export function ResumeProfileCard({ profile: initialProfile, resumeId, onParsed 
     }
   }
 
+  const parseOverlay = (
+    <AiProgressCard
+      open={parsing}
+      title="Extracting profile"
+      stages={[
+        'Reading resume text…',
+        'Identifying skills & experience…',
+        'Structuring the profile…',
+      ]}
+    />
+  );
+
   if (!profile) {
     return (
-      <div className="flex flex-col items-center justify-center gap-4 py-16 text-center">
-        <div className="text-4xl">🪪</div>
-        <div>
-          <p className="text-sm font-medium text-ink">No profile extracted yet</p>
-          <p className="text-xs text-muted mt-1">
-            AI will parse name, contact, skills, experience, and education from the resume text.
-          </p>
+      <>
+        {parseOverlay}
+        <div className="flex flex-col items-center justify-center gap-4 py-16 text-center">
+          <div className="text-4xl">🪪</div>
+          <div>
+            <p className="text-sm font-medium text-ink">No profile extracted yet</p>
+            <p className="text-xs text-muted mt-1">
+              AI will parse name, contact, skills, experience, and education from the resume text.
+            </p>
+          </div>
+          <Button variant="primary" size="sm" onClick={parseNow} loading={parsing}>
+            {parsing ? 'Extracting…' : 'Extract profile'}
+          </Button>
         </div>
-        <Button variant="primary" size="sm" onClick={parseNow} loading={parsing}>
-          {parsing ? 'Extracting…' : 'Extract profile'}
-        </Button>
-      </div>
+      </>
     );
   }
 
@@ -61,6 +77,7 @@ export function ResumeProfileCard({ profile: initialProfile, resumeId, onParsed 
 
   return (
     <div className="overflow-y-auto max-h-[calc(100vh-260px)] pr-1">
+      {parseOverlay}
       {/* ── Header: name + contact ── */}
       <div className="pb-4 border-b border-border">
         <h2 className="text-2xl font-bold text-ink leading-tight">{profile.name ?? 'Unknown'}</h2>

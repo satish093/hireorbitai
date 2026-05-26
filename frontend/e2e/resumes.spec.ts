@@ -222,3 +222,42 @@ test.describe('Résumés page — loading and RBAC', () => {
     expect(errors).toHaveLength(0);
   });
 });
+
+test.describe('Résumés page — AI progress card', () => {
+  test('re-extract shows the AI progress card until the request completes', async ({ page }) => {
+    const errors = trackPageErrors(page);
+
+    await seedSession(page, MANAGER);
+    await mockApi(page, {
+      profile: MANAGER,
+      flags: {},
+      handlers: {
+        '/consultants': { json: MOCK_CONSULTANTS },
+        '/resumes/consultant/c-1': { json: MOCK_RESUME_VERSIONS },
+      },
+    });
+
+    // Delay the re-extract response so the card is observable mid-flight.
+    // Registered after mockApi → takes precedence (Playwright routes are LIFO).
+    await page.route('**/api/resumes/*/reextract', async (route) => {
+      await new Promise((r) => setTimeout(r, 1500));
+      await route.fulfill({ json: { id: 'res-1', extracted: true, chars: 1234, ai_score: 88 } });
+    });
+
+    await page.goto('/resumes');
+    await page.waitForLoadState('networkidle');
+
+    // The CenterPane header re-extract button (exact, so it doesn't also match
+    // the profile card's "Re-extract profile").
+    await page.getByRole('button', { name: '↻ Re-extract', exact: true }).click();
+
+    // Card appears with its staged title + a progress bar while in flight.
+    await expect(page.getByText('Re-extracting resume')).toBeVisible({ timeout: 4000 });
+    await expect(page.getByRole('progressbar')).toBeVisible();
+
+    // Once the request resolves, the card is torn down.
+    await expect(page.getByText('Re-extracting resume')).toBeHidden({ timeout: 8000 });
+
+    expect(errors).toHaveLength(0);
+  });
+});

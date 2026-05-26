@@ -5,6 +5,7 @@ import { api } from '../../services/api';
 import { Button } from '../Button';
 import { SkeletonCard } from '../Skeleton';
 import { EmptyState } from '../EmptyState';
+import { AiProgressCard } from '../AiProgressCard';
 import { fmtMinutes, type PlanItem, type StudyPlan } from './types';
 
 function Donut({ pct }: { pct: number }) {
@@ -102,20 +103,35 @@ export function StudyPlanView({
     return Array.from(map.entries()).sort((a, b) => a[0] - b[0]);
   }, [plan]);
 
+  const planOverlay = (
+    <AiProgressCard
+      open={busy}
+      title="Building your study plan"
+      stages={[
+        'Reviewing your enrolled courses…',
+        'Finding the lessons you have left…',
+        'Laying out a weekly plan…',
+      ]}
+    />
+  );
+
   if (loading) return <SkeletonCard lines={8} />;
 
   if (!plan) {
     return (
-      <EmptyState
-        icon="✦"
-        title="No study plan yet"
-        description="Generate a plan from the lessons you still have left across your enrolled courses."
-        action={
-          <Button variant="primary" onClick={generate} loading={busy}>
-            ✦ Generate study plan
-          </Button>
-        }
-      />
+      <>
+        {planOverlay}
+        <EmptyState
+          icon="✦"
+          title="No study plan yet"
+          description="Generate a plan from the lessons you still have left across your enrolled courses."
+          action={
+            <Button variant="primary" onClick={generate} loading={busy}>
+              ✦ Generate study plan
+            </Button>
+          }
+        />
+      </>
     );
   }
 
@@ -141,6 +157,7 @@ export function StudyPlanView({
 
   return (
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_280px] items-start">
+      {planOverlay}
       <div className="space-y-4 min-w-0">
         {/* Banner */}
         <div className="rounded-xl bg-accent-soft border border-accent/30 p-4">
@@ -168,7 +185,9 @@ export function StudyPlanView({
                 <span
                   className={
                     'grid place-items-center w-7 h-7 rounded-full text-[12px] font-semibold ' +
-                    (active ? 'bg-accent text-white' : 'border border-border text-muted')
+                    (active
+                      ? 'bg-accent text-white dark:text-bg'
+                      : 'border border-border text-muted')
                   }
                 >
                   {weekNo}

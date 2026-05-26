@@ -43,6 +43,11 @@ async function setupManagerPage(page: Page, extra: Record<string, { json: unknow
 
 /** Inject dark mode and wait two paint cycles for computed styles to settle. */
 async function enableDarkMode(page: Page) {
+  // Audit the SETTLED state, not transitional frames. Entrance fades (opacity
+  // <1 mid-animation) blend text toward the background and produce spurious
+  // contrast failures under load. The app's reduced-motion CSS removes those
+  // animations, so emulating it makes the audit deterministic.
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.evaluate(() => {
     document.documentElement.setAttribute('data-theme', 'dark');
   });
@@ -149,7 +154,12 @@ test.describe('Dark mode — Desktop', () => {
     await setupManagerPage(page);
     await page.goto('/interviews');
     await page.waitForLoadState('load');
-    await expect(page.getByText('Phone Screen').first()).toBeVisible({ timeout: 8000 });
+    // The Interviews page is the Calendar surface in interviews mode. Wait for a
+    // stable chrome element rather than a specific event (whose visibility
+    // depends on the machine's real date vs the mock's fixed dates).
+    await expect(page.getByRole('button', { name: 'Schedule' }).first()).toBeVisible({
+      timeout: 8000,
+    });
     await enableDarkMode(page);
     const v = await auditPage(page, 'dark-desktop-interviews');
     expect(v, `${v.length} violation(s) on dark desktop /interviews`).toHaveLength(0);

@@ -3,6 +3,7 @@ import clsx from 'clsx';
 import toast from 'react-hot-toast';
 import { Modal } from '../Modal';
 import { Button } from '../Button';
+import { AiProgressCard } from '../AiProgressCard';
 import { FormInput } from '../FormInput';
 import { EmptyState } from '../EmptyState';
 import { Skeleton } from '../Skeleton';
@@ -80,32 +81,34 @@ export function TailorLauncher({ open, resumeId, onClose, onCreated }: Props) {
   }
 
   return (
-    <Modal
-      open={open}
-      onClose={busy ? () => undefined : onClose}
-      title="Tailor with AI"
-      description="Generate a job-targeted draft you can review change-by-change."
-      size="lg"
-      footer={
-        <>
-          <Button variant="ghost" onClick={onClose} disabled={busy}>
-            Cancel
-          </Button>
-          <Button variant="accent" onClick={generate} loading={busy} disabled={!jobId}>
-            {busy ? 'Tailoring…' : '✦ Generate draft'}
-          </Button>
-        </>
-      }
-    >
-      {busy ? (
-        <div className="py-8 text-center">
-          <div className="text-sm font-medium text-ink mb-1">Tailoring your resume…</div>
-          <p className="text-xs text-muted">
-            Scoring against the job, rewriting sections, and re-scoring. This can take up to a
-            minute.
-          </p>
-        </div>
-      ) : (
+    <>
+      <AiProgressCard
+        open={busy}
+        title="Tailoring your resume"
+        stages={[
+          'Scoring against the job…',
+          'Rewriting selected sections…',
+          'Re-scoring the draft…',
+        ]}
+        note="This can take up to a minute."
+      />
+      <Modal
+        open={open}
+        onClose={busy ? () => undefined : onClose}
+        title="Tailor with AI"
+        description="Generate a job-targeted draft you can review change-by-change."
+        size="lg"
+        footer={
+          <>
+            <Button variant="ghost" onClick={onClose} disabled={busy}>
+              Cancel
+            </Button>
+            <Button variant="accent" onClick={generate} loading={busy} disabled={!jobId}>
+              {busy ? 'Tailoring…' : '✦ Generate draft'}
+            </Button>
+          </>
+        }
+      >
         <div className="space-y-4">
           <div>
             <FormInput
@@ -170,7 +173,7 @@ export function TailorLauncher({ open, resumeId, onClose, onCreated }: Props) {
             </div>
           </div>
         </div>
-      )}
-    </Modal>
+      </Modal>
+    </>
   );
 }

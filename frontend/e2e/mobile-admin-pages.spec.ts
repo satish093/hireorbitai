@@ -171,6 +171,8 @@ const MOCK_DEACTIVATED_USERS = [
   },
 ];
 
+// Shape matches the current AIUsage page: top-level totals plus `paid`
+// (Anthropic) and `free` (Groq + Gemini) sub-objects driving the two tabs.
 const MOCK_AI_SUMMARY = {
   days: 30,
   totals: {
@@ -197,6 +199,56 @@ const MOCK_AI_SUMMARY = {
     },
   ],
   by_model: [{ model: 'claude-sonnet-4-5', calls: 42, total_tokens: 100000, cost_usd: '0.2340' }],
+  paid: {
+    totals: {
+      calls: 10,
+      input_tokens: 40000,
+      output_tokens: 6000,
+      cache_tokens: 1000,
+      cost_usd: '0.2340',
+    },
+    by_call: [
+      {
+        call_name: 'resume-score',
+        provider: 'anthropic',
+        calls: 10,
+        input_tokens: 40000,
+        output_tokens: 6000,
+        cost_usd: '0.2340',
+      },
+    ],
+  },
+  free: {
+    totals: { calls: 32, input_tokens: 45000, output_tokens: 6000, cost_usd: '0.0000' },
+    by_call: [
+      {
+        call_name: 'vendor-email',
+        provider: 'groq',
+        calls: 20,
+        input_tokens: 30000,
+        output_tokens: 4000,
+        cost_usd: '0',
+      },
+      {
+        call_name: 'job-match',
+        provider: 'gemini',
+        calls: 12,
+        input_tokens: 15000,
+        output_tokens: 2000,
+        cost_usd: '0',
+      },
+    ],
+    by_model: [
+      { model: 'llama-3.3-70b', provider: 'groq', calls: 20, total_tokens: 34000, cost_usd: '0' },
+      {
+        model: 'gemini-2.5-flash',
+        provider: 'gemini',
+        calls: 12,
+        total_tokens: 17000,
+        cost_usd: '0',
+      },
+    ],
+  },
 };
 
 const MOCK_AI_LOGS = [
@@ -502,9 +554,10 @@ test.describe('Mobile — AI Usage page', () => {
     await page.goto('/ai-usage');
     await page.waitForLoadState('networkidle');
 
-    await expect(page.getByText('AI Token Usage')).toBeVisible({ timeout: 8000 });
-    await expect(page.getByText('Total Calls')).toBeVisible({ timeout: 8000 });
-    await expect(page.getByText('Est. Cost (USD)')).toBeVisible({ timeout: 8000 });
+    // Page lands on the Free Models tab.
+    await expect(page.getByRole('heading', { name: 'AI Usage' })).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('Free Calls', { exact: true })).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('Total Tokens')).toBeVisible({ timeout: 8000 });
 
     expect(await hasHorizontalOverflow(page)).toBe(false);
     await screenshotAndAudit(page, 'ai-usage');

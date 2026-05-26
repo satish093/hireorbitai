@@ -2,7 +2,7 @@ import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { Button } from '../Button';
 import { Modal } from '../Modal';
-import { AiLoadingOverlay } from '../AiLoadingOverlay';
+import { AiProgressCard } from '../AiProgressCard';
 import { EmptyState } from '../EmptyState';
 import { api } from '../../services/api';
 import { ResumePreview } from './ResumePreview';
@@ -117,7 +117,7 @@ export function CenterPane({
 
   return (
     <div className="bg-surface border border-border rounded-2xl flex flex-col overflow-hidden">
-      <AiLoadingOverlay
+      <AiProgressCard
         open={reextracting}
         title="Re-extracting resume"
         stages={['Reading the file…', 'Extracting text…', 'Re-scoring against ATS…']}

@@ -120,7 +120,7 @@ export function TaskFilterBar({
             </svg>
             Filters
             {nActive > 0 && (
-              <span className="ml-0.5 text-[10px] font-mono bg-accent text-white rounded-full px-1.5">
+              <span className="ml-0.5 text-[10px] font-mono bg-accent text-white dark:text-bg rounded-full px-1.5">
                 {nActive}
               </span>
             )}

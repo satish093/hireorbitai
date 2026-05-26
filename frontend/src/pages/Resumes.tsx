@@ -9,6 +9,7 @@ import { EmptyState } from '../components/EmptyState';
 import { ResumeVersionStrip } from '../components/resumes/ResumeVersionStrip';
 import { CenterPane } from '../components/resumes/CenterPane';
 import { TailorLauncher } from '../components/resumes/TailorLauncher';
+import { AiProgressCard } from '../components/AiProgressCard';
 import { useResumeWorkspace } from '../components/resumes/useResumeWorkspace';
 
 export function Resumes() {
@@ -19,6 +20,12 @@ export function Resumes() {
 
   return (
     <Layout title="Resumes">
+      <AiProgressCard
+        open={w.uploading}
+        title="Processing your resume"
+        stages={['Uploading file…', 'Extracting text…', 'Scoring against ATS…', 'Parsing profile…']}
+        note="Large PDFs can take up to a minute."
+      />
       <PageHeader
         title="Resume workspace"
         description={
