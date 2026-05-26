@@ -15,13 +15,15 @@ import './config/env';
 import './styles/tokens.css';
 import './index.css';
 
-// DEV-ONLY toolbar. The `import.meta.env.DEV ? ... : null` guard is statically
-// evaluated by Vite — in a production build `import.meta.env.DEV` becomes
-// `false`, the dynamic import lands in a dead branch, and the entire dev chunk
-// (DevToolbar + devSession + DevPanel) is dropped from the bundle.
-const DevToolbar = import.meta.env.DEV
-  ? lazy(() => import('./dev/DevToolbar').then((m) => ({ default: m.DevToolbar })))
-  : () => null;
+// DEV-ONLY toolbar. The `VITE_DEV_TOOLS === 'true'` guard is statically
+// evaluated by Vite — in a production build the flag is unset, so the condition
+// is a constant `false`, the dynamic import lands in a dead branch, and the
+// entire dev chunk (DevToolbar + devSession + DevPanel) is dropped from the
+// bundle. The dev deploy (Render) builds with VITE_DEV_TOOLS=true, so it's kept.
+const DevToolbar =
+  import.meta.env.VITE_DEV_TOOLS === 'true'
+    ? lazy(() => import('./dev/DevToolbar').then((m) => ({ default: m.DevToolbar })))
+    : () => null;
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

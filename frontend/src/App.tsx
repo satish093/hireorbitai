@@ -10,12 +10,13 @@ import { useSessionRevoke } from './hooks/useSessionRevoke';
 import { config } from './config/env';
 import { ADMIN_TIER, MANAGER_TIER, OPERATOR_TIER, OWNER_TIER } from './types';
 
-// DEV-ONLY test panel. Gated by `import.meta.env.DEV` so the import lands in a
-// dead branch and is tree-shaken out of production builds (verified by
-// scripts/check-dist-clean.mjs).
-const DevPanel = import.meta.env.DEV
-  ? lazy(() => import('./dev/DevPanel').then((m) => ({ default: m.DevPanel })))
-  : null;
+// DEV-ONLY test panel. Gated by the build-time flag VITE_DEV_TOOLS so the
+// import lands in a dead branch and is tree-shaken out of production builds
+// (verified by scripts/check-dist-clean.mjs). The dev deploy sets the flag.
+const DevPanel =
+  import.meta.env.VITE_DEV_TOOLS === 'true'
+    ? lazy(() => import('./dev/DevPanel').then((m) => ({ default: m.DevPanel })))
+    : null;
 
 // ---------------------------------------------------------------------------
 // Route-level code splitting.

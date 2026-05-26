@@ -34,10 +34,13 @@ export const config = {
   apiBaseUrl: readUrl('VITE_API_URL', e.VITE_API_URL),
   isProd: !!e.PROD,
   mode: e.MODE as 'development' | 'production' | string,
-  // Development-only tooling (floating dev toolbar, /dev test panel). Requires
-  // BOTH a dev build (`import.meta.env.DEV`) AND VITE_DEV_TOOLS=true. In a
-  // production build Vite statically replaces `import.meta.env.DEV` with
-  // `false`, so this is always `false` in prod — and the dev code, reached only
-  // behind a `import.meta.env.DEV ? ... : null` guard, is tree-shaken away.
-  isDevTools: !!e.DEV && e.VITE_DEV_TOOLS === 'true',
+  // Development-only tooling (floating dev toolbar, /dev test panel). Enabled by
+  // the build-time flag VITE_DEV_TOOLS=true — set it for the dev deploy
+  // (Render), leave it unset for production. Vite statically replaces
+  // `import.meta.env.VITE_DEV_TOOLS` at build time, so in a prod build (flag
+  // unset) this is a constant `false` and the dev code — reached only behind a
+  // `import.meta.env.VITE_DEV_TOOLS === 'true' ? ... : null` guard — is
+  // tree-shaken away. Do NOT gate on `import.meta.env.DEV`: that's only true
+  // under `vite dev`, so a built (Render) dev site would lose the toolbar.
+  isDevTools: e.VITE_DEV_TOOLS === 'true',
 } as const;
