@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import Anthropic from '@anthropic-ai/sdk';
+import { z } from 'zod';
 import { httpError } from '../types';
 import { logger } from '../config/logger';
 
@@ -224,6 +225,40 @@ export const getLoginStatus: RequestHandler = (req, res) => {
   const session = loginSessions.get(req.params.sessionId);
   if (!session) return void res.json({ status: 'not_found' });
   res.json({ status: session.status, error: session.error });
+};
+
+/**
+ * Feed the browser-issued authorization code to the waiting `claude auth login`
+ * process. Claude's OAuth login is the manual code-paste flow: after the user
+ * approves the authorize URL, claude.com returns a code that must be written to
+ * the CLI's stdin. Writing it unblocks the process, which then exits 0 and the
+ * `proc.on('exit')` handler (setup-token → save → PM2 restart) takes over.
+ * Body: { code: string }
+ */
+const submitCodeSchema = z.object({ code: z.string().min(8).max(2048) }).strict();
+
+export const submitClaudeCode: RequestHandler = (req, res) => {
+  const parsed = submitCodeSchema.safeParse(req.body);
+  if (!parsed.success) {
+    throw httpError(400, 'A valid authorization code is required');
+  }
+
+  const session = loginSessions.get(req.params.sessionId);
+  if (!session) throw httpError(404, 'Login session not found');
+
+  // Idempotent: if the process already finished (or failed), just report it.
+  if (session.status !== 'pending') {
+    return void res.json({ ok: true, status: session.status });
+  }
+
+  const stdin = session.proc.stdin;
+  if (!stdin || stdin.destroyed || !stdin.writable) {
+    throw httpError(409, 'Login session is no longer accepting input — please start over');
+  }
+
+  stdin.write(parsed.data.code.trim() + '\n');
+  logger.info({ action: 'claude_reauth_code_submitted' }, 'admin: Claude re-auth code submitted');
+  res.json({ ok: true });
 };
 
 /**

@@ -152,6 +152,12 @@ trainingRouter.get(
   requireRole(...ADMIN_TIER),
   adminAI.getLoginStatus,
 );
+// Submit the browser-issued authorization code to the waiting login process.
+trainingRouter.post(
+  '/ai/claude-auth/:sessionId/code',
+  requireRole(...ADMIN_TIER),
+  adminAI.submitClaudeCode,
+);
 
 // ---- AI endpoints (manager-tier only — these spend Anthropic tokens) ----
 trainingRouter.post('/ai/generate-plan', requireRole(...MANAGER_TIER), c.aiGeneratePlan);

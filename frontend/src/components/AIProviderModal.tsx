@@ -29,6 +29,7 @@ export function AIProviderModal({ open, onConfirm, onClose, action = 'Generate' 
   const [oauthPhase, setOauthPhase] = useState<OAuthPhase>('checking');
   const [authUrl, setAuthUrl] = useState('');
   const [sessionId, setSessionId] = useState('');
+  const [code, setCode] = useState('');
   const [oauthError, setOauthError] = useState('');
   const [copied, setCopied] = useState(false);
 
@@ -76,7 +77,22 @@ export function AIProviderModal({ open, onConfirm, onClose, action = 'Generate' 
     }
   }
 
-  function handleApproved() {
+  async function handleSubmitCode() {
+    const trimmed = code.trim();
+    if (trimmed.length < 8) {
+      setOauthError('Paste the full authorization code from the browser.');
+      return;
+    }
+    setOauthError('');
+    try {
+      await api.post(`/training/ai/claude-auth/${sessionId}/code`, { code: trimmed });
+      startPolling();
+    } catch (e: any) {
+      setOauthError(e?.response?.data?.error ?? e?.message ?? 'Failed to submit code');
+    }
+  }
+
+  function startPolling() {
     setOauthPhase('polling');
     pollRef.current = setInterval(async () => {
       try {
@@ -85,6 +101,7 @@ export function AIProviderModal({ open, onConfirm, onClose, action = 'Generate' 
         );
         if (data.status === 'complete') {
           stopPoll();
+          setCode('');
           setOauthPhase('restarting');
           setTimeout(() => setOauthPhase('connected'), 5000);
         } else if (data.status === 'failed' || data.status === 'not_found') {
@@ -208,7 +225,7 @@ export function AIProviderModal({ open, onConfirm, onClose, action = 'Generate' 
                     <div className="space-y-2">
                       <div className="rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-3 py-2.5 space-y-2">
                         <p className="text-xs font-medium text-amber-800 dark:text-amber-300">
-                          Open this URL in your browser and approve the login:
+                          Open this URL, approve the login, then paste the code it gives you below:
                         </p>
                         {/* Internal scroll cap so a long URL never grows the dialog. */}
                         <div className="max-h-24 overflow-y-auto overflow-x-hidden rounded border border-amber-200/70 dark:border-amber-800/70 bg-white/60 dark:bg-black/20 px-2 py-1.5">
@@ -235,9 +252,26 @@ export function AIProviderModal({ open, onConfirm, onClose, action = 'Generate' 
                           </Button>
                         </div>
                       </div>
-                      <Button variant="accent" size="sm" onClick={handleApproved} block>
-                        I&apos;ve approved — continue
-                      </Button>
+                      <div className="space-y-2">
+                        <input
+                          type="text"
+                          autoComplete="off"
+                          spellCheck={false}
+                          value={code}
+                          onChange={(e) => setCode(e.target.value)}
+                          placeholder="Paste the code from the browser"
+                          className="h-9 w-full rounded-lg border border-border bg-surface px-3 text-sm text-ink placeholder:text-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                        />
+                        <Button
+                          variant="accent"
+                          size="sm"
+                          onClick={handleSubmitCode}
+                          disabled={code.trim().length < 8}
+                          block
+                        >
+                          Submit code
+                        </Button>
+                      </div>
                     </div>
                   )}
 

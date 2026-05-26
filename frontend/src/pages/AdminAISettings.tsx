@@ -10,6 +10,7 @@ export function AdminAISettings() {
   const [loginPhase, setLoginPhase] = useState<LoginPhase>('idle');
   const [authUrl, setAuthUrl] = useState('');
   const [sessionId, setSessionId] = useState('');
+  const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -69,8 +70,23 @@ export function AdminAISettings() {
     }
   }
 
-  function handleApproved() {
-    // User has opened the URL and approved — start polling for completion
+  // ── Submit the browser-issued code, then poll for completion ───────────────
+  async function handleSubmitCode() {
+    const trimmed = code.trim();
+    if (trimmed.length < 8) {
+      setError('Paste the full authorization code from the browser.');
+      return;
+    }
+    setError('');
+    try {
+      await api.post(`/training/ai/claude-auth/${sessionId}/code`, { code: trimmed });
+      startPolling();
+    } catch (e: any) {
+      setError(e?.response?.data?.error ?? e?.message ?? 'Failed to submit code');
+    }
+  }
+
+  function startPolling() {
     setLoginPhase('polling');
     pollRef.current = setInterval(async () => {
       try {
@@ -79,6 +95,7 @@ export function AdminAISettings() {
         );
         if (data.status === 'complete') {
           clearInterval(pollRef.current!);
+          setCode('');
           setLoginPhase('restarting');
           setSuccessMsg('Login successful! Server is restarting (~3 s)…');
           setTimeout(() => {
@@ -197,7 +214,8 @@ export function AdminAISettings() {
             <div className="space-y-3">
               <div className="rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-4 py-3 space-y-2">
                 <p className="text-xs font-medium text-amber-800 dark:text-amber-300">
-                  Open this URL in your browser and approve the login:
+                  Open this URL in your browser, approve the login, then paste the code it gives you
+                  below:
                 </p>
                 <a
                   href={authUrl}
@@ -208,9 +226,29 @@ export function AdminAISettings() {
                   {authUrl}
                 </a>
               </div>
-              <Button variant="accent" size="sm" onClick={handleApproved}>
-                I've approved — continue
-              </Button>
+              <div className="space-y-2">
+                <label htmlFor="claude-auth-code" className="block text-xs font-medium text-ink">
+                  Authorization code
+                </label>
+                <input
+                  id="claude-auth-code"
+                  type="text"
+                  autoComplete="off"
+                  spellCheck={false}
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  placeholder="Paste the code from the browser"
+                  className="h-9 w-full rounded-lg border border-border bg-surface px-3 text-sm text-ink placeholder:text-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                />
+                <Button
+                  variant="accent"
+                  size="sm"
+                  onClick={handleSubmitCode}
+                  disabled={code.trim().length < 8}
+                >
+                  Submit code
+                </Button>
+              </div>
             </div>
           ) : loginPhase === 'polling' ? (
             <div className="text-sm text-muted">Waiting for approval… (checking every 3 s)</div>
