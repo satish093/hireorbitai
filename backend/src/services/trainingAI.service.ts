@@ -361,7 +361,8 @@ QUALITY RULES:
 - explanation: 1–2 sentences citing the specific lesson section that supports the answer.
 - points: 1 for recall/apply questions; 2 for analysis/evaluation questions.
 
-Return valid JSON only.`;
+Return a single JSON object — no wrapper keys, no markdown fences:
+{"questions":[{"question":"...","options":["A","B","C","D"],"correct_answer":"A","explanation":"See Core Concepts → ...","points":1}]}`;
 
 export async function generateQuiz(input: {
   lesson_content: string;
