@@ -718,7 +718,13 @@ export async function parseResumeProfile(
   if (opts.bypassCache) resumeProfileCache.delete(cacheKey(clipped));
 
   return withCache(resumeProfileCache, clipped, async () => {
-    // 1. Groq — primary (free, fast, 14,400 req/day)
+    // 1. Gemini native JSON mode — best quality for complex structured extraction.
+    //    Profile parsing requires understanding document structure and ignoring
+    //    referees/templates; Gemini's JSON mode handles this reliably.
+    const gemini = await parseResumeProfileWithGemini(clipped);
+    if (gemini && gemini.name != null) return applyProfilePostProcess(gemini);
+
+    // 2. Groq — free fallback when Gemini is unavailable or quota-limited
     try {
       const groq = await callGroqStructuredWithFallback(
         'parseResumeProfile',
@@ -727,14 +733,13 @@ export async function parseResumeProfile(
         ResumeProfileSchema,
         1500,
       );
-      return applyProfilePostProcess(groq);
+      if (groq.name != null) return applyProfilePostProcess(groq);
     } catch {
-      // 2. Gemini — fallback when Groq is unavailable or rate-limited
-      const gemini = await parseResumeProfileWithGemini(clipped);
-      if (gemini) return applyProfilePostProcess(gemini);
-      // 3. Rule-based — always available, no AI required
-      return applyProfilePostProcess(parseResumeProfileRuleBased(clipped));
+      /* fall through to rule-based */
     }
+
+    // 3. Rule-based — always available, no AI required
+    return applyProfilePostProcess(parseResumeProfileRuleBased(clipped));
   });
 }
 
