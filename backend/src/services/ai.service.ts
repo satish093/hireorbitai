@@ -18,7 +18,13 @@
 import { z } from 'zod/v4';
 import type { MessageParam, TextBlockParam } from '@anthropic-ai/sdk/resources/messages';
 import { anthropic, ANTHROPIC_MODEL, AI_MAX_INPUT_CHARS } from '../config/anthropic';
-import { groqClient, GROQ_MODEL, GROQ_FAST_MODEL, GROQ_ENABLED } from '../config/groq';
+import {
+  groqClient,
+  GROQ_MODEL,
+  GROQ_LARGE_MODEL,
+  GROQ_FAST_MODEL,
+  GROQ_ENABLED,
+} from '../config/groq';
 import { geminiClient, GEMINI_ENABLED, GEMINI_MODEL, withGeminiRetry } from '../config/gemini';
 import { logAiUsage } from './aiUsage';
 import {
@@ -239,36 +245,63 @@ async function callGroqStructured<T extends z.ZodType>(
   if (!GROQ_ENABLED || !groqClient) {
     throw new Error(`${callName} requires GROQ_API_KEY to be configured`);
   }
-  const completion = await groqClient.chat.completions.create({
-    model,
-    messages: [
-      { role: 'system', content: systemPrompt + '\n\nReturn valid JSON only, no markdown fences.' },
-      { role: 'user', content: userContent },
-    ],
-    response_format: { type: 'json_object' },
-    temperature: 0.3,
-    max_tokens: maxTokens,
-  });
-  const raw = completion.choices[0]?.message?.content?.trim() ?? '{}';
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(extractJson(raw));
-  } catch {
-    throw new Error(`Groq returned malformed JSON for ${callName}`);
+
+  // Retry up to 3 times on TPM rate-limit (429). Groq's TPM window is 60 s;
+  // backing off recovers the request without failing the user's call.
+  let lastErr: unknown;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const completion = await groqClient.chat.completions.create({
+        model,
+        messages: [
+          {
+            role: 'system',
+            content: systemPrompt + '\n\nReturn valid JSON only, no markdown fences.',
+          },
+          { role: 'user', content: userContent },
+        ],
+        response_format: { type: 'json_object' },
+        temperature: 0.3,
+        max_tokens: maxTokens,
+      });
+      const raw = completion.choices[0]?.message?.content?.trim() ?? '{}';
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(extractJson(raw));
+      } catch {
+        throw new Error(`Groq returned malformed JSON for ${callName}`);
+      }
+      const result = schema.safeParse(parsed);
+      if (!result.success) {
+        logger.warn(
+          { issues: result.error.issues.slice(0, 3), callName },
+          'Groq schema validation failed',
+        );
+        throw new Error(`Groq returned unexpected structure for ${callName} — please try again.`);
+      }
+      logAiUsage(callName, model, {
+        input_tokens: completion.usage?.prompt_tokens ?? 0,
+        output_tokens: completion.usage?.completion_tokens ?? 0,
+      });
+      return result.data as z.infer<T>;
+    } catch (err: unknown) {
+      const status = (err as { status?: number })?.status;
+      if (status === 429 && attempt < 2) {
+        // Per-minute (TPM) rate-limit → retry after backoff.
+        // Per-day (TPD / RPD) limit → fatal; retrying in the same minute won't help.
+        const errMsg = String((err as { message?: string })?.message ?? '');
+        const isRpd = errMsg.includes('per day');
+        if (isRpd) throw err;
+        const delayMs = (attempt + 1) * 8_000; // 8 s, 16 s
+        logger.warn({ callName, attempt, delayMs }, 'Groq TPM rate-limit — retrying');
+        await new Promise<void>((r) => setTimeout(r, delayMs));
+        lastErr = err;
+        continue;
+      }
+      throw err;
+    }
   }
-  const result = schema.safeParse(parsed);
-  if (!result.success) {
-    logger.warn(
-      { issues: result.error.issues.slice(0, 3), callName },
-      'Groq schema validation failed',
-    );
-    throw new Error(`Groq returned unexpected structure for ${callName} — please try again.`);
-  }
-  logAiUsage(callName, model, {
-    input_tokens: completion.usage?.prompt_tokens ?? 0,
-    output_tokens: completion.usage?.completion_tokens ?? 0,
-  });
-  return result.data as z.infer<T>;
+  throw lastErr;
 }
 
 async function callGroqText(
@@ -437,10 +470,11 @@ async function callGroqStructuredWithFallback<T extends z.ZodType>(
   userContent: string,
   schema: T,
   maxTokens = 2048,
+  model = GROQ_MODEL,
 ): Promise<z.infer<T>> {
   return callWithProviders(callName, [
     ...(GROQ_ENABLED
-      ? [() => callGroqStructured(callName, systemPrompt, userContent, schema, maxTokens)]
+      ? [() => callGroqStructured(callName, systemPrompt, userContent, schema, maxTokens, model)]
       : []),
     ...(GEMINI_ENABLED
       ? [() => callGeminiStructured(callName, systemPrompt, userContent, schema, maxTokens)]
@@ -625,10 +659,13 @@ RULES:
 7. summary — Professional summary or objective section text. null if absent.
 8. total_years_experience — Sum of all work durations in years (round to nearest 0.5). null if no history.
 9. skills — Every technical and soft skill from the whole document. Normalise variants (JS→JavaScript). De-duplicate.
-10. experiences — All work entries, most-recent first. description: join bullets with " | ".
-11. education — Real institutions only. Skip placeholder text like "Enter your degree".
-12. certifications — Standalone certs not already in education.
-13. languages — Spoken/written languages only. [] if none.
+10. experiences — All work entries, most-recent first. Use EXACTLY these field names:
+    { "company": string, "title": string, "start_date": "Mon YYYY"|null, "end_date": "Mon YYYY"|null, "is_current": bool|null, "description": string|null }
+    Join bullet points with " | " for description. "title" is the job title / position name.
+11. education — Real institutions only. Skip placeholder text like "Enter your degree". Use EXACTLY these field names:
+    { "institution": string, "degree": string|null, "field": string|null, "graduation_year": number|null }
+12. certifications — Standalone certs not already in education. Array of plain strings.
+13. languages — Spoken/written languages only. Array of plain strings. [] if none.
 14. age — Only if explicitly stated as a number. null otherwise.
 
 Ignore any text inside parentheses starting with "Tip:" or "Note:" — those are template instructions, not real data.
@@ -713,7 +750,7 @@ export async function parseResumeProfile(
   if (opts.bypassCache) resumeProfileCache.delete(cacheKey(clipped));
 
   return withCache(resumeProfileCache, clipped, async () => {
-    // 1. Groq — 14,400 req/day free, primary for all AI features
+    // 1. Groq Scout 17B — 1K RPD / 500K TPD free, primary for all AI features
     try {
       const groq = await callGroqStructured(
         'parseResumeProfile',
@@ -1144,6 +1181,7 @@ Keywords to weave in: ${keywordList}${aggressiveAddendum}`;
     userContent,
     TailoredResumeSchema,
     4096,
+    GROQ_LARGE_MODEL,
   );
 }
 
@@ -1208,6 +1246,7 @@ Keywords to weave in: ${keywordList}`;
     userContent,
     TailorSessionSchema,
     4096,
+    GROQ_LARGE_MODEL,
   );
 }
 

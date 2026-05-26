@@ -298,9 +298,11 @@ function FreeTab({
             <span className="text-sm font-semibold text-ink">Groq</span>
           </div>
           <p className="text-xs text-muted mb-3">
-            LLaMA 3.3 70B · 1,000 RPD · Primary provider
+            LLaMA 4 Scout 17B · 1K RPD / 500K TPD · Primary provider
             <br />
-            LLaMA 3.1 8B · 14,400 RPD · Fast tasks
+            LLaMA 3.3 70B · 1K RPD / 100K TPD · Tailoring only
+            <br />
+            LLaMA 3.1 8B · 14.4K RPD / 500K TPD · Copilot &amp; coach
           </p>
           {groqModels.length > 0 ? (
             groqModels.map((m) => (
