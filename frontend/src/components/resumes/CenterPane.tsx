@@ -19,7 +19,6 @@ interface Props {
   onMode: (m: CenterMode) => void;
   sessionId: string | null;
   resumeId: string;
-  onMakeCurrent: () => void;
   onApplied: (newVersionId: string) => void;
   onEdited: () => void;
 }
@@ -39,7 +38,6 @@ export function CenterPane({
   onMode,
   sessionId,
   resumeId,
-  onMakeCurrent,
   onApplied,
   onEdited,
 }: Props) {
@@ -83,27 +81,19 @@ export function CenterPane({
   }
 
   const applyingDraft = mode === 'diff' && !!sessionId;
-  const disabled = version.is_current && !applyingDraft;
 
-  async function confirmMakeCurrent() {
-    if (!version) return;
+  async function confirmApplyDraft() {
+    if (!version || !sessionId) return;
     setBusy(true);
     try {
-      if (applyingDraft && sessionId) {
-        const { data } = await api.post(`/resumes/${resumeId}/tailor-sessions/${sessionId}/apply`);
-        const newId = data?.resume?.id;
-        if (!newId) throw new Error('Apply did not return a version');
-        await api.post(`/resumes/${newId}/set-current`);
-        toast.success('Applied draft and made it current');
-        onApplied(newId);
-      } else {
-        await api.post(`/resumes/${version.id}/set-current`);
-        toast.success(`v${version.version} is now current`);
-        onMakeCurrent();
-      }
+      const { data } = await api.post(`/resumes/${resumeId}/tailor-sessions/${sessionId}/apply`);
+      const newId = data?.resume?.id;
+      if (!newId) throw new Error('Apply did not return a version');
+      toast.success('Applied draft as a new version');
+      onApplied(newId);
       setConfirmOpen(false);
     } catch (e: any) {
-      toast.error(e?.response?.data?.error ?? 'Failed to make current');
+      toast.error(e?.response?.data?.error ?? 'Failed to apply draft');
     } finally {
       setBusy(false);
     }
@@ -148,13 +138,6 @@ export function CenterPane({
               </span>
             )}
 
-            {/* Current badge */}
-            {version.is_current && (
-              <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400 shrink-0">
-                Current
-              </span>
-            )}
-
             {/* Filename */}
             <span className="text-xs text-muted font-mono truncate hidden sm:block">
               {version.file_name}
@@ -166,14 +149,11 @@ export function CenterPane({
             <Button size="sm" variant="ghost" onClick={reextract} loading={reextracting}>
               ↻ Re-extract
             </Button>
-            <Button
-              size="sm"
-              variant={disabled ? 'outline' : 'primary'}
-              disabled={disabled}
-              onClick={() => setConfirmOpen(true)}
-            >
-              {version.is_current && !applyingDraft ? 'Current' : 'Make current'}
-            </Button>
+            {applyingDraft && (
+              <Button size="sm" variant="primary" onClick={() => setConfirmOpen(true)}>
+                Apply draft
+              </Button>
+            )}
           </div>
         </div>
 
@@ -233,28 +213,22 @@ export function CenterPane({
       <Modal
         open={confirmOpen}
         onClose={busy ? () => undefined : () => setConfirmOpen(false)}
-        title={applyingDraft ? 'Apply draft & make current' : 'Make current version'}
-        description={
-          applyingDraft
-            ? 'This materializes the accepted changes into a new resume version and marks it current. The original version is preserved.'
-            : `Mark v${version.version} as the current resume? This is the version that gets submitted.`
-        }
+        title="Apply draft as new version"
+        description="This materializes the accepted changes into a new resume version. The original version is preserved."
         size="sm"
         footer={
           <>
             <Button variant="ghost" onClick={() => setConfirmOpen(false)} disabled={busy}>
               Cancel
             </Button>
-            <Button variant="primary" onClick={confirmMakeCurrent} loading={busy}>
-              {applyingDraft ? 'Apply & make current' : 'Make current'}
+            <Button variant="primary" onClick={confirmApplyDraft} loading={busy}>
+              Apply draft
             </Button>
           </>
         }
       >
         <p className="text-sm text-muted">
-          {applyingDraft
-            ? 'Rejected changes are reverted; accepted and hand-edited changes are kept.'
-            : 'You can switch the current version again at any time.'}
+          Rejected changes are reverted; accepted and hand-edited changes are kept.
         </p>
       </Modal>
     </div>

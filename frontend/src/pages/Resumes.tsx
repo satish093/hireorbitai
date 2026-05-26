@@ -16,7 +16,7 @@ export function Resumes() {
   const w = useResumeWorkspace();
   const navigate = useNavigate();
   const [launcherOpen, setLauncherOpen] = useState(false);
-  const { active, versions, currentVersion, consultantId } = w;
+  const { active, versions, consultantId } = w;
 
   return (
     <Layout title="Resumes">
@@ -30,53 +30,30 @@ export function Resumes() {
         title="Resume workspace"
         description={
           consultantId
-            ? `${versions.length} version${versions.length === 1 ? '' : 's'}${
-                currentVersion ? ` · current v${currentVersion.version}` : ''
-              }`
-            : 'Select a consultant to open their resume versions.'
+            ? `${versions.length} version${versions.length === 1 ? '' : 's'}`
+            : 'Select a consultant to manage their resumes.'
         }
         action={
-          <>
-            {/* Two pairs so mobile shows 2 buttons per row, desktop stays flat. */}
-            <div className="flex gap-2 w-full sm:w-auto sm:contents">
-              <FileUpload
-                label={w.uploading ? 'Uploading…' : '+ Upload'}
-                accept=".pdf,.jpg,.jpeg,.png,.webp"
-                disabled={!w.consultantId}
-                onFile={w.upload}
-                className="flex-1 sm:flex-none"
-              />
-              <Button
-                variant="outline"
-                size="md"
-                disabled={!active}
-                onClick={w.duplicate}
-                className="flex-1 sm:flex-none"
-              >
-                Duplicate
-              </Button>
-            </div>
-            <div className="flex gap-2 w-full sm:w-auto sm:contents">
-              <Button
-                variant="outline"
-                size="md"
-                disabled={!active}
-                onClick={w.download}
-                className="flex-1 sm:flex-none"
-              >
-                Download
-              </Button>
-              <Button
-                variant="accent"
-                size="md"
-                disabled={!active}
-                onClick={() => setLauncherOpen(true)}
-                className="flex-1 sm:flex-none"
-              >
-                ✦ Tailor with AI
-              </Button>
-            </div>
-          </>
+          <div className="flex gap-2 w-full sm:w-auto sm:contents">
+            <Button
+              variant="outline"
+              size="md"
+              disabled={!active}
+              onClick={w.download}
+              className="flex-1 sm:flex-none"
+            >
+              Download
+            </Button>
+            <Button
+              variant="accent"
+              size="md"
+              disabled={!active}
+              onClick={() => setLauncherOpen(true)}
+              className="flex-1 sm:flex-none"
+            >
+              ✦ Tailor with AI
+            </Button>
+          </div>
         }
       />
 
@@ -102,7 +79,7 @@ export function Resumes() {
           description={
             w.consultants.length === 0
               ? 'No consultant profiles exist. Invite a consultant from the Users page first.'
-              : 'Select a consultant above to open their resume versions and the tailoring workspace.'
+              : 'Select a consultant above to open their resumes.'
           }
           action={
             w.consultants.length === 0 ? (
@@ -112,14 +89,30 @@ export function Resumes() {
             ) : undefined
           }
         />
+      ) : versions.length === 0 && !w.loading ? (
+        /* ── No resumes yet — prominent upload zone ── */
+        <div className="mt-6 flex flex-col items-center gap-5 py-16 border-2 border-dashed border-border rounded-2xl bg-surface">
+          <span className="text-5xl select-none">📄</span>
+          <div className="text-center">
+            <p className="text-base font-semibold text-ink">No resumes uploaded yet</p>
+            <p className="text-sm text-muted mt-1">Upload a PDF, JPG, or PNG to get started</p>
+          </div>
+          <FileUpload
+            label={w.uploading ? 'Uploading…' : '+ Upload resume'}
+            accept=".pdf,.jpg,.jpeg,.png,.webp"
+            disabled={w.uploading}
+            onFile={w.upload}
+          />
+        </div>
       ) : (
         <>
           <ResumeVersionStrip
             versions={versions}
             activeId={w.activeId}
             onSelect={w.selectVersion}
-            onNew={() => setLauncherOpen(true)}
             onDelete={w.deleteVersion}
+            onUpload={w.upload}
+            uploading={w.uploading}
           />
 
           <div className="mt-4">
@@ -131,7 +124,6 @@ export function Resumes() {
               onMode={w.setMode}
               sessionId={w.sessionId}
               resumeId={w.activeId}
-              onMakeCurrent={() => w.reloadVersions(w.activeId)}
               onApplied={w.onApplied}
               onEdited={() => w.reloadVersions(w.activeId)}
             />
