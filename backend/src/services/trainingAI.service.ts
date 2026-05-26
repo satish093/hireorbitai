@@ -162,6 +162,17 @@ async function generateStructured<S extends z.ZodTypeAny>(
 
   const result = schema.safeParse(obj);
   if (!result.success) {
+    // Model sometimes wraps the payload in a single container key
+    // e.g. {"course_outline": {...}} or {"capstone": {...}}.
+    // Try each top-level value that is a plain object before giving up.
+    if (typeof obj === 'object' && obj !== null && !Array.isArray(obj)) {
+      for (const val of Object.values(obj as Record<string, unknown>)) {
+        if (typeof val === 'object' && val !== null && !Array.isArray(val)) {
+          const nested = schema.safeParse(val);
+          if (nested.success) return nested.data as z.infer<S>;
+        }
+      }
+    }
     logger.warn({ issues: result.error.issues.slice(0, 3) }, 'AI schema validation failed');
     throw aiError(502, 'AI returned an unexpected structure — please try again.');
   }
@@ -218,7 +229,7 @@ ANALYSIS APPROACH:
 4. Sequence the roadmap so each phase unblocks the next — don't recommend advanced topics before foundations.
 
 OUTPUT RULES:
-- missing_skills: 5–12 items. Use canonical names (React not ReactJS). Omit skills the resume clearly demonstrates.
+- missing_skills: STRICTLY 5–12 items total. List the SPECIFIC tool/technology that is missing, not its category. If the JD requires "GitHub Actions" and the resume has "Jenkins", list "GitHub Actions" — NOT "Git" (which the resume already shows). Do NOT list foundational skills (Git, Linux, IDE) unless the JD explicitly requires an advanced variant.
 - recommended_courses: 4–8 items. Use EXACTLY these field names: title (course name), category (e.g. "Security", "Cloud"), difficulty ("BEGINNER"|"INTERMEDIATE"|"ADVANCED"), why_recommended (specific JD requirement it addresses).
 - learning_roadmap: 2–4 phases ordered by dependency. Phase 1 = most critical blockers.
   Use EXACTLY these field names: phase (name), duration_weeks (number or null), focus_areas (string array).
@@ -526,7 +537,7 @@ DESIGN PRINCIPLES:
 - learning_objectives: 4–8 items using Bloom's verbs (Define, Explain, Apply, Analyze, Design, Evaluate). Avoid "understand" — it's unmeasurable.
 - expected_outcomes: outcome statements from the learner's perspective ("You will be able to…"). 3–5 items.
 - roadmap: sequence phases logically — foundational concepts → application → practice → mastery. 2–4 phases.
-- resources: 3–6 genuinely useful external references. Official documentation > blog posts. ONLY use well-known authoritative domains: docs.*, learn.*, developer.* (official vendor docs), github.com, youtube.com, NIST, OWASP, MDN, AWS/Azure/GCP official docs. Do NOT invent URLs — only use domains you are certain exist.
+- resources: 3–6 genuinely useful external references. Official documentation > blog posts. ONLY use well-known authoritative domains: docs.*, learn.*, developer.* (official vendor docs), github.com, youtube.com, NIST, OWASP, MDN, AWS/Azure/GCP official docs. Do NOT invent URLs — only use domains you are certain exist. type must be EXACTLY one of: DOC, VIDEO, ARTICLE, TOOL — no other values (not GUIDE, COURSE, REFERENCE, TUTORIAL, etc.).
 - completion_criteria: be realistic. minimum_time_minutes = (estimated_duration_hours × 60 × 0.8). quiz_passing_score default 70. requires_manager_approval true only for compliance/safety topics.
 - lessons: exactly the requested count, in strict teaching order (0-based). Each lesson has ONE measurable objective (single Bloom's verb). Do NOT write lesson bodies here — summaries only (1 sentence). estimated_minutes: foundational concept lessons = 30–45 min, applied/lab lessons = 45–60 min, advanced architecture lessons = 50–70 min.
 
@@ -535,7 +546,8 @@ DIFFICULTY CALIBRATION:
 - INTERMEDIATE: assumes 6–12 months of practice; goes deeper into trade-offs and patterns.
 - ADVANCED: assumes professional experience; covers edge cases, performance, and architecture decisions.
 
-Return valid JSON only. No markdown, no preamble.`;
+Return a single JSON object using EXACTLY these top-level keys — no wrapper keys, no markdown fences:
+{"overview":"...","learning_objectives":["..."],"skills_taught":["..."],"expected_outcomes":["..."],"roadmap":[{"phase":"...","duration_label":"Week 1","focus_areas":["..."]}],"resources":[{"title":"...","url":"https://...","type":"DOC"}],"completion_criteria":{"minimum_time_minutes":0,"quiz_passing_score":70,"quiz_max_attempts":3,"requires_manager_approval":false},"estimated_duration_hours":0,"lessons":[{"title":"...","summary":"...","objective":"...","estimated_minutes":30,"lesson_order":0}]}`;
 
 export async function generateCourseOutline(
   input: CourseOutlineInput,
@@ -712,20 +724,55 @@ export async function generateLessonContent(
 // Capstone
 // ---------------------------------------------------------------------------
 
-const CapstoneSchema = z.object({
-  assessment_type: z.enum(['PRACTICAL_ASSIGNMENT', 'SHORT_ANSWER', 'MULTIPLE_CHOICE']),
-  instructions: z.string(),
-  questions: z.array(
-    z.object({
-      prompt: z.string(),
-      guidance: z
-        .string()
-        .nullish()
-        .transform((v) => v ?? ''),
-    }),
-  ),
-  rubric: z.array(z.object({ criterion: z.string(), weight: z.number() })),
-});
+const CapstoneSchema = z
+  .object({
+    assessment_type: z.enum(['PRACTICAL_ASSIGNMENT', 'SHORT_ANSWER', 'MULTIPLE_CHOICE']),
+    // Model sometimes uses task_instructions / capstone_instructions / description
+    instructions: z.string().optional(),
+    task_instructions: z.string().optional(),
+    capstone_instructions: z.string().optional(),
+    description: z.string().optional(),
+    questions: z.array(
+      z.object({
+        // Model sometimes uses question / task / deliverable instead of prompt
+        prompt: z.string().optional(),
+        question: z.string().optional(),
+        task: z.string().optional(),
+        deliverable: z.string().optional(),
+        guidance: z
+          .string()
+          .nullish()
+          .transform((v) => v ?? ''),
+        description: z
+          .string()
+          .nullish()
+          .transform((v) => v ?? ''),
+        hints: z
+          .string()
+          .nullish()
+          .transform((v) => v ?? ''),
+      }),
+    ),
+    rubric: z.array(
+      z.object({
+        criterion: z.string(),
+        // Normalize decimal weights (0.2) → integer percentages (20)
+        weight: z
+          .number()
+          .transform((w) => (w > 0 && w <= 1 ? Math.round(w * 100) : Math.round(w))),
+      }),
+    ),
+  })
+  .transform((d) => ({
+    assessment_type: d.assessment_type,
+    instructions:
+      d.instructions ?? d.task_instructions ?? d.capstone_instructions ?? d.description ?? '',
+    questions: d.questions.map((q) => ({
+      prompt: q.prompt ?? q.question ?? q.task ?? q.deliverable ?? '',
+      guidance: q.guidance || q.description || q.hints || '',
+    })),
+    rubric: d.rubric,
+  }));
 export type Capstone = z.infer<typeof CapstoneSchema>;
 
 export interface CapstoneInput {
@@ -754,7 +801,10 @@ Include 1–2 sentences of guidance per question.
 RUBRIC (3–6 criteria, weights summing to 100):
 Criteria should be outcome-based, not process-based ("Demonstrates correct use of X" not "Followed instructions").
 
-Return valid JSON only.`;
+Return a single JSON object using EXACTLY these top-level keys — no wrapper keys, no markdown fences:
+{"assessment_type":"PRACTICAL_ASSIGNMENT","instructions":"...","questions":[{"prompt":"...","guidance":"..."}],"rubric":[{"criterion":"...","weight":25}]}
+
+IMPORTANT: rubric weights must be integers that sum to exactly 100.`;
 
 export async function generateCapstone(
   input: CapstoneInput,
@@ -834,19 +884,10 @@ DERIVATION RULES:
 - resources: choose references that directly support the lesson topics (official docs, well-known tutorials).
 - capstone: design a final assessment that integrates the skills from ALL lessons, not just the last one.
 
-OUTPUT — return a single flat JSON object with EXACTLY these top-level keys (no wrapping parent key):
-{
-  "overview": "<Markdown string — 2–4 paragraphs>",
-  "learning_objectives": ["<string>"],
-  "skills_taught": ["<string>"],
-  "expected_outcomes": ["<string>"],
-  "roadmap": [{"phase":"<string>","duration_label":"<string>","focus_areas":["<string>"]}],
-  "resources": [{"title":"<string>","url":"<string>","type":"DOC|VIDEO|ARTICLE|TOOL"}],
-  "completion_criteria": {"minimum_time_minutes":<int>,"quiz_passing_score":<0-100>,"quiz_max_attempts":<int>,"requires_manager_approval":<bool>},
-  "capstone": {"assessment_type":"PRACTICAL_ASSIGNMENT|SHORT_ANSWER|MULTIPLE_CHOICE","instructions":"<Markdown>","questions":[{"prompt":"<string>","guidance":"<string>"}],"rubric":[{"criterion":"<string>","weight":<number>}]}
-}
+OUTPUT — return a single flat JSON object with EXACTLY these top-level keys (no wrapping parent key, no markdown fences):
+{"overview":"...","learning_objectives":["..."],"skills_taught":["..."],"expected_outcomes":["..."],"roadmap":[{"phase":"...","duration_label":"Week 1","focus_areas":["..."]}],"resources":[{"title":"...","url":"https://...","type":"DOC"}],"completion_criteria":{"minimum_time_minutes":0,"quiz_passing_score":70,"quiz_max_attempts":3,"requires_manager_approval":false},"capstone":{"assessment_type":"PRACTICAL_ASSIGNMENT","instructions":"...","questions":[{"prompt":"...","guidance":"..."}],"rubric":[{"criterion":"...","weight":25}]}}
 
-Return valid JSON only. No markdown fences, no prose outside the JSON.`;
+IMPORTANT: capstone.rubric weights must be integers that sum to exactly 100.`;
 
 export async function enrichCourseMeta(
   input: EnrichInput,
