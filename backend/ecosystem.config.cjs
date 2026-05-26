@@ -47,13 +47,10 @@ module.exports = {
   apps: [
     {
       name: 'hireorbitai-api',
-      // node_args passes flags to the Node binary itself (not the script).
-      // `--env-file` is a Node 22 built-in that loads `.env` at startup.
-      // Note: interpreter_args is for non-Node interpreters; node_args is
-      // the correct PM2 field for Node flags.
-      interpreter: 'node',
-      node_args: `--env-file=${path.join(__dirname, '.env')}`,
-      script: 'dist/server.js',
+      // Shell wrapper sources .env before handing off to Node — more reliable
+      // than --env-file in node_args, which PM2 does not propagate consistently.
+      interpreter: '/bin/sh',
+      script: 'start.prod.sh',
       cwd: __dirname,
       instances: INSTANCES,
       exec_mode: EXEC_MODE,
