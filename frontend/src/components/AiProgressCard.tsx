@@ -60,7 +60,8 @@ export function AiProgressCard({ open, title, stages, stageMs = 4500, note }: Pr
 
   return (
     <div
-      className="pointer-events-none fixed bottom-4 left-4 right-4 z-[60] sm:left-auto sm:w-80"
+      className="pointer-events-none fixed left-4 right-4 z-[60] sm:left-auto sm:w-80"
+      style={{ bottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}
       role="status"
       aria-live="polite"
       aria-busy="true"
