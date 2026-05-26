@@ -519,7 +519,7 @@ export function parseResumeProfileRuleBased(text: string): ResumeProfile {
   if (headerSec) {
     const locCandidates = [
       ...headerSec.content.matchAll(
-        /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*),\s*([A-Z]{2})(?:\s+\d{5}(?:-\d{4})?)?/g,
+        /([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2}),\s*([A-Z]{2})(?:\s+\d{5}(?:-\d{4})?)?/g,
       ),
     ];
     const validLoc = locCandidates.find((m) => US_STATES.has(m[2]!));

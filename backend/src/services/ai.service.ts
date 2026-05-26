@@ -629,7 +629,7 @@ CONTACT EXTRACTION:
 - If multiple emails or phones appear in different sections, use only the one in the header block.
 
 FIELD RULES:
-- name: The candidate's full name. Almost always the FIRST prominent text at the top, on its own line before contact details. Return null only if genuinely absent.
+- name: The candidate's full name. Almost always the FIRST prominent text at the top that looks like a real person's name (Title Case or ALL CAPS, 2-4 words). Ignore any leading line that looks like a filename or document slug (e.g. "functionalsample", "resume_john", all lowercase with no spaces). Return null only if genuinely absent.
 - headline: Professional title or tagline directly beneath the name (e.g. "Senior Software Engineer", "Full-Stack Developer | React | Node.js"). Return null if not present.
 - email: From the header block only (see CONTACT EXTRACTION above). Return null if absent.
 - phone: From the header block only. Return null if absent.

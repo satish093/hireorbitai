@@ -40,13 +40,20 @@ function normalize(s: string): string {
 
 /** Strip template boilerplate that leaks through extraction (tip instructions, page numbers). */
 function cleanExtractedText(text: string): string {
-  return text
+  let out = text
     .replace(/\(Tip:[^)]*\)/gi, '')
     .replace(/\(Note:[^)]*\)/gi, '')
     .replace(/^.*\bTip:/gim, '')
     .replace(/^\s*Page\s+\d+\s*$/gim, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
+
+  // Remove a leading document-title line that looks like a filename
+  // (all lowercase letters/digits/underscores/hyphens, no spaces — e.g. "functionalsample").
+  // These come from LlamaParse / Gemini including the PDF document title.
+  out = out.replace(/^[a-z0-9][a-z0-9_\-]*\n+/m, '').trim();
+
+  return out;
 }
 
 function isPdf(mimetype: string, name: string): boolean {
