@@ -324,10 +324,13 @@ const server = app.listen(env.port, () => {
     void ensureDefaultAdmin();
   }
   // In-process background scheduler — reminders dispatch, session purge,
-  // etc. See ./jobs/index.ts for the registry. Off by default in test mode
-  // and when DISABLE_JOBS=true so unit-test runs don't fire timers.
-  if (env.nodeEnv !== 'test' && process.env.DISABLE_JOBS !== 'true') {
+  // etc. See ./jobs/index.ts for the registry. Off by default in test mode,
+  // when DISABLE_JOBS=true (so unit-test runs don't fire timers), and when
+  // RUN_SCHEDULER=false (low-RAM / free-tier dev hosts skip the workers).
+  if (env.nodeEnv !== 'test' && process.env.DISABLE_JOBS !== 'true' && env.runScheduler) {
     jobs.start();
+  } else if (!env.runScheduler) {
+    logger.info('Background scheduler disabled (RUN_SCHEDULER=false)');
   }
   // Boot the realtime LISTEN client. Best-effort: if it fails, the app
   // still works (frontends fall back to polling). Reconnect logic inside

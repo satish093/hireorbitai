@@ -166,6 +166,26 @@ const envSchema = z.object({
   // which environment they belong to; 'warn' logs and continues; 'off' skips
   // the check entirely (use only if your DB names don't follow the convention).
   DB_GUARD: z.enum(['enforce', 'warn', 'off']).default('enforce'),
+
+  // --- Development tooling ---
+  // Master switch for the development-only surface: the role/user switch
+  // endpoints (/auth/dev/*) and the Super-Admin test panel API (/dev/*).
+  // CRITICAL: this is FORCE-DISABLED whenever NODE_ENV=production (see the
+  // derived `env.devTools` below) — setting it true in prod has no effect, so
+  // none of the dev tooling can ever leak into the live environment.
+  DEV_TOOLS: z
+    .string()
+    .optional()
+    .default('false')
+    .transform((v) => v === 'true' || v === '1'),
+  // Whether to start the in-process background-job scheduler. Default on.
+  // Set RUN_SCHEDULER=false on low-RAM / free-tier dev hosts to skip the
+  // reminders / jobs-sync / daily-digest / sessions-purge workers entirely.
+  RUN_SCHEDULER: z
+    .string()
+    .optional()
+    .default('true')
+    .transform((v) => v !== 'false' && v !== '0'),
 });
 
 // Parse + fail-fast. `safeParse` lets us format every error in one shot
@@ -251,6 +271,11 @@ export const env = {
   port: e.PORT,
   nodeEnv: e.NODE_ENV,
   isProd: e.NODE_ENV === 'production',
+  // Dev tooling is ON only when explicitly enabled AND not in production.
+  // The `&& NODE_ENV !== 'production'` is the hard kill-switch — a stray
+  // DEV_TOOLS=true on the prod host is silently ignored.
+  devTools: e.DEV_TOOLS && e.NODE_ENV !== 'production',
+  runScheduler: e.RUN_SCHEDULER,
   appUrl: e.APP_URL,
   corsOrigins: e.CORS_ORIGIN,
   trustProxy: e.TRUST_PROXY,

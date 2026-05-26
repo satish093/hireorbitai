@@ -1,5 +1,6 @@
 import { RequestHandler } from 'express';
 import { db } from '../config/db';
+import { env } from '../config/env';
 import { httpError, Role } from '../types';
 
 // Light-weight presence heartbeat. We bump last_seen_at at most once every
@@ -156,5 +157,16 @@ export const blockIfMustChangePassword: RequestHandler = (req, _res, next) => {
   if (req.user.must_change_password) {
     throw httpError(403, 'Password change required. Set a new password to continue.');
   }
+  next();
+};
+
+/**
+ * Gate for development-only routes (role/user switching, the Super-Admin test
+ * panel API). Returns 404 — not 403 — when dev tooling is off, so these
+ * endpoints are completely invisible in production (no existence oracle).
+ * `env.devTools` is itself force-disabled whenever NODE_ENV=production.
+ */
+export const requireDevTools: RequestHandler = (_req, _res, next) => {
+  if (!env.devTools) throw httpError(404, 'Not found');
   next();
 };
