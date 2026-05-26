@@ -718,10 +718,7 @@ export async function parseResumeProfile(
   if (opts.bypassCache) resumeProfileCache.delete(cacheKey(clipped));
 
   return withCache(resumeProfileCache, clipped, async () => {
-    // 1. Gemini — best structured extraction (free tier)
-    const gemini = await parseResumeProfileWithGemini(clipped);
-    if (gemini) return applyProfilePostProcess(gemini);
-    // 2. Groq — free fallback using the same schema
+    // 1. Groq — primary (free, fast, 14,400 req/day)
     try {
       const groq = await callGroqStructuredWithFallback(
         'parseResumeProfile',
@@ -732,6 +729,9 @@ export async function parseResumeProfile(
       );
       return applyProfilePostProcess(groq);
     } catch {
+      // 2. Gemini — fallback when Groq is unavailable or rate-limited
+      const gemini = await parseResumeProfileWithGemini(clipped);
+      if (gemini) return applyProfilePostProcess(gemini);
       // 3. Rule-based — always available, no AI required
       return applyProfilePostProcess(parseResumeProfileRuleBased(clipped));
     }
