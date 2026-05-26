@@ -116,13 +116,50 @@ ls -lhS ~/backups | head                  # newest first
 0 4 * * * find /home/hireorbitai/backups -mindepth 1 -maxdepth 1 -type d -mtime +14 -exec rm -rf {} +
 ```
 
-### Offsite
+### Weekly Google Drive backup (free)
 
-Daily backups on the same disk only protect against application-level mistakes. For real disaster recovery, push the stamped folders to off-host storage (S3, B2, another VPS):
+Daily backups on the same disk only protect against application-level mistakes — they die with the VPS.
+For real disaster recovery, push a copy off-host. [scripts/backup-gdrive.sh](../../scripts/backup-gdrive.sh)
+takes a fresh snapshot and copies it to Google Drive via [rclone](https://rclone.org) (free, open-source;
+a personal Google account gives you 15 GB at no cost).
+
+**One-time setup on the VPS:**
+
+```bash
+# 1. Install rclone
+curl https://rclone.org/install.sh | sudo bash
+
+# 2. Create a remote named "gdrive" (type: drive). Leave client_id/secret blank
+#    (uses rclone's built-in), scope "drive". On a headless VPS, rclone will
+#    print an `rclone authorize "drive"` command — run THAT on a laptop with a
+#    browser, sign in to Google, and paste the token back into the VPS prompt.
+rclone config
+
+# 3. Verify the remote works
+rclone lsd gdrive:
+```
+
+**Run it once by hand** to confirm the upload lands:
+
+```bash
+bash scripts/backup-gdrive.sh
+rclone lsf gdrive:hireorbitai-backups            # should list the new <stamp>/ folder
+```
+
+**Weekly cron** (end of week — Sunday 03:00, as the `hireorbitai` user via `crontab -e`):
 
 ```cron
-30 3 * * * rclone copy /home/hireorbitai/backups remote:hireorbitai-backups --transfers=4 --max-age 25h
+0 3 * * 0 /home/hireorbitai/hireorbitai/scripts/backup-gdrive.sh >> /home/hireorbitai/backups/backup-gdrive.log 2>&1
 ```
+
+To keep Drive from growing without bound, add `--prune-weeks N` (deletes Drive copies older than N weeks):
+
+```cron
+0 3 * * 0 /home/hireorbitai/hireorbitai/scripts/backup-gdrive.sh --prune-weeks 8 >> /home/hireorbitai/backups/backup-gdrive.log 2>&1
+```
+
+Env overrides: `RCLONE_REMOTE` (default `gdrive`), `RCLONE_DEST` (default `hireorbitai-backups`).
+Use `--no-snapshot` to push the newest existing local stamp without taking a fresh dump.
 
 ---
 
@@ -143,6 +180,51 @@ pm2 restart hireorbit-api --update-env
 ```
 
 The existing uploads directory is moved aside to `<UPLOADS_DIR>.pre-restore.<unix>` before extract — if the restored tree is bad you can roll back manually with a single `mv`.
+
+---
+
+## VPS-to-VPS migration
+
+[scripts/migrate.sh](../../scripts/migrate.sh) packs the database, the uploads directory, **and**
+`backend/.env` into one portable tarball so a new host comes up byte-identical — existing signed file
+URLs and refresh tokens keep working because `STORAGE_URL_SECRET` / `JWT_SECRET` / `COOKIE_SECRET`
+travel with the bundle.
+
+> ⚠ **The bundle contains live secrets.** Transfer it only over `scp`/SSH (never email, cloud drives,
+> or shared storage). It is written `chmod 600`. Delete it from **both** hosts once the new VPS is verified.
+
+**On the OLD host** — build the bundle:
+
+```bash
+cd ~/hireorbitai
+bash scripts/migrate.sh export
+# → ~/migrate/hireorbitai-migrate-<stamp>.tar.gz  (db + uploads + .env)
+```
+
+**Copy it over** and bring up the **NEW host**:
+
+```bash
+# from the old host (or your laptop)
+scp ~/migrate/hireorbitai-migrate-<stamp>.tar.gz  hireorbitai@NEW_HOST:~/
+
+# on the NEW host — provision per "First-time setup" above, then:
+git clone <repo-url> ~/hireorbitai && cd ~/hireorbitai
+bash scripts/migrate.sh import ~/hireorbitai-migrate-<stamp>.tar.gz          # dry run — prints the plan
+bash scripts/migrate.sh import ~/hireorbitai-migrate-<stamp>.tar.gz --force  # restore db + uploads + .env
+
+npm ci
+npm run build
+npm --prefix backend run migrate:up        # apply any migrations newer than the dump
+pm2 start backend/ecosystem.config.cjs     # or: pm2 reload hireorbit-api --update-env
+curl -fsS http://127.0.0.1:${PORT:-4000}/api/health
+```
+
+The import backs up any existing `backend/.env` to `backend/.env.pre-migrate.<unix>` and moves the live
+uploads dir aside to `<UPLOADS_DIR>.pre-migrate.<unix>` before extracting — same roll-back safety as restore.
+
+> **DB name guard:** the backend's `DB_GUARD` check keys on the database name in `DATABASE_URL`. Keep the
+> same `hireorbitai_prod` / `hireorbitai_dev` naming on the new host, or set `DB_GUARD=off` in `.env`.
+> Finally, **delete the bundle**: `rm ~/hireorbitai-migrate-<stamp>.tar.gz` (and on the old host).
 
 ---
 
