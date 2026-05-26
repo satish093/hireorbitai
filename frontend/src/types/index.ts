@@ -19,12 +19,13 @@ export {
   MANAGER_TIER,
   OPERATOR_TIER,
   ALL_ROLES,
+  DEVELOPER_CAPABILITIES,
   TASK_STATUSES,
   TASK_PRIORITIES,
   isAdmin,
   isManagerOrUp,
 } from '@hireorbitai/shared';
-export type { Role, TaskStatus, TaskPriority } from '@hireorbitai/shared';
+export type { Role, DeveloperCapability, TaskStatus, TaskPriority } from '@hireorbitai/shared';
 
 import type { Role, TaskStatus, TaskPriority } from '@hireorbitai/shared';
 

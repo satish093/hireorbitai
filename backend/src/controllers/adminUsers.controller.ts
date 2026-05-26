@@ -1,7 +1,7 @@
 import { RequestHandler } from 'express';
 import { z } from 'zod';
 import { db, pool } from '../config/db';
-import { httpError, ALL_ROLES, ADMIN_TIER, Role } from '../types';
+import { httpError, ALL_ROLES, ADMIN_TIER, DEVELOPER_CAPABILITIES, Role } from '../types';
 import { audit } from '../services/audit.service';
 import { requestPasswordReset } from '../services/auth.service';
 import { logger } from '../config/logger';
@@ -425,6 +425,49 @@ export const impersonate: RequestHandler = async (req, res) => {
 // /users/:id payload shape so the frontend's UserProfile.tsx component can
 // render either the admin view or a self-view.
 // ---------------------------------------------------------------------------
+// PATCH /admin/users/:id/capabilities
+//
+// SUPER_ADMIN-only. Sets the capability grants for a DEVELOPER ("scoped
+// super-admin"). Validated against the fixed catalog; only applies to DEVELOPER
+// accounts. The hard bar (create SUPER_ADMIN/DEVELOPER, impersonate-super-admin,
+// last-super-admin) is NOT in the catalog and stays SUPER_ADMIN-only elsewhere.
+const capabilitiesSchema = z
+  .object({ capabilities: z.array(z.enum(DEVELOPER_CAPABILITIES)) })
+  .strict();
+
+export const setCapabilities: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  if (req.user.role !== 'SUPER_ADMIN') {
+    throw httpError(403, 'Only a SUPER_ADMIN can set developer capabilities.');
+  }
+  const parsed = capabilitiesSchema.safeParse(req.body);
+  if (!parsed.success) throw httpError(400, 'Invalid capabilities', parsed.error.flatten());
+
+  const { data: target } = await db
+    .from('users')
+    .select('id, email, role')
+    .eq('id', req.params.id)
+    .maybeSingle();
+  if (!target) throw httpError(404, 'User not found');
+  const t = target as { id: string; email: string; role: Role };
+  if (t.role !== 'DEVELOPER') {
+    throw httpError(400, 'Capabilities apply only to DEVELOPER accounts.');
+  }
+
+  const caps = [...new Set(parsed.data.capabilities)];
+  const { error } = await db.from('users').update({ capabilities: caps }).eq('id', t.id);
+  if (error) throw httpError(500, error.message);
+
+  audit({
+    action: 'developer_capabilities_set',
+    user_id: t.id,
+    email: t.email,
+    req,
+    metadata: { capabilities: caps, by: req.user.id },
+  });
+  res.json({ ok: true, capabilities: caps });
+};
+
 export const get: RequestHandler = async (req, res) => {
   const { id } = req.params;
   const { data, error } = await db.from('users').select('*').eq('id', id).maybeSingle();

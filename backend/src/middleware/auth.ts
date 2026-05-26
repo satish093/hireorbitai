@@ -1,7 +1,7 @@
 import { RequestHandler } from 'express';
 import { db } from '../config/db';
 import { env } from '../config/env';
-import { httpError, Role } from '../types';
+import { httpError, Role, DeveloperCapability } from '../types';
 
 // Light-weight presence heartbeat. We bump last_seen_at at most once every
 // HEARTBEAT_MIN_MS per user so we don't write to Postgres on every API call —
@@ -83,12 +83,12 @@ export const requireAuth: RequestHandler = async (req, _res, next) => {
   // so we narrow the select on schema-cache errors.
   let { data: profile, error: pErr } = await db
     .from('users')
-    .select('id, email, role, group_id, must_change_password, status')
+    .select('id, email, role, group_id, must_change_password, status, capabilities')
     .eq('id', data.user.id)
     .single();
   if (
     pErr &&
-    /status|must_change_password|group_id/.test(pErr.message) &&
+    /status|must_change_password|group_id|capabilities/.test(pErr.message) &&
     /schema cache|column/i.test(pErr.message)
   ) {
     ({ data: profile, error: pErr } = await db
@@ -113,6 +113,7 @@ export const requireAuth: RequestHandler = async (req, _res, next) => {
     role: profile.role as Role,
     group_id: (profile as any).group_id ?? null,
     must_change_password: !!(profile as any).must_change_password,
+    capabilities: ((profile as any).capabilities ?? []) as DeveloperCapability[],
   };
   heartbeat(profile.id);
   next();
@@ -129,6 +130,33 @@ export const requireRole =
     if (!req.user) throw httpError(401, 'Not authenticated');
     if (!allowed.includes(req.user.role)) throw httpError(403, 'Forbidden — insufficient role');
     next();
+  };
+
+/** True only for a DEVELOPER that holds the given capability grant. */
+export function hasCapability(
+  user: { role: Role; capabilities?: DeveloperCapability[] } | undefined,
+  cap: DeveloperCapability,
+): boolean {
+  return !!user && user.role === 'DEVELOPER' && (user.capabilities ?? []).includes(cap);
+}
+
+/**
+ * RBAC gate that also admits a DEVELOPER holding a specific capability.
+ *
+ * Drop-in replacement for `requireRole(...tier)` on any surface a DEVELOPER may
+ * be granted: a caller passes if their role is in `tier` OR they are a
+ * DEVELOPER with `cap` granted. DEVELOPER has NO tier membership, so without
+ * the grant it is denied — fail-closed.
+ *
+ *   router.use('/admin/features', requireRoleOrCapability(OWNER_TIER, 'feature_flags'), …)
+ */
+export const requireRoleOrCapability =
+  (tier: Role[], cap: DeveloperCapability): RequestHandler =>
+  (req, _res, next) => {
+    if (!req.user) throw httpError(401, 'Not authenticated');
+    if (tier.includes(req.user.role)) return next();
+    if (hasCapability(req.user, cap)) return next();
+    throw httpError(403, 'Forbidden — insufficient role');
   };
 
 /**

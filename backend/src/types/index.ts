@@ -21,14 +21,15 @@ export {
   MANAGER_TIER,
   OPERATOR_TIER,
   ALL_ROLES,
+  DEVELOPER_CAPABILITIES,
   TASK_STATUSES,
   TASK_PRIORITIES,
   isAdmin,
   isManagerOrUp,
 } from '@hireorbitai/shared';
-export type { Role, TaskStatus, TaskPriority } from '@hireorbitai/shared';
+export type { Role, DeveloperCapability, TaskStatus, TaskPriority } from '@hireorbitai/shared';
 
-import type { Role } from '@hireorbitai/shared';
+import type { Role, DeveloperCapability } from '@hireorbitai/shared';
 
 export interface AuthUser {
   id: string;
@@ -36,6 +37,8 @@ export interface AuthUser {
   role: Role;
   group_id?: string | null;
   must_change_password?: boolean;
+  // Per-account capability grants — only meaningful for the DEVELOPER role.
+  capabilities?: DeveloperCapability[];
 }
 
 declare global {

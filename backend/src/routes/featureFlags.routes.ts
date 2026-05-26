@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { requireRole } from '../middleware/auth';
+import { requireRoleOrCapability } from '../middleware/auth';
 import { OWNER_TIER } from '../types';
 import * as c from '../controllers/featureFlags.controller';
 
@@ -9,5 +9,9 @@ featureFlagsRouter.get('/', c.list);
 featureFlagsRouter.get('/me', c.myFlags);
 featureFlagsRouter.get('/overrides', c.listOverrides);
 // Only workspace owners (SUPER_ADMIN / CEO) can flip flags.
-featureFlagsRouter.patch('/:key', requireRole(...OWNER_TIER), c.setFlag);
-featureFlagsRouter.put('/groups/:groupId/:key', requireRole(...OWNER_TIER), c.setGroupOverride);
+featureFlagsRouter.patch('/:key', requireRoleOrCapability(OWNER_TIER, 'feature_flags'), c.setFlag);
+featureFlagsRouter.put(
+  '/groups/:groupId/:key',
+  requireRoleOrCapability(OWNER_TIER, 'feature_flags'),
+  c.setGroupOverride,
+);
