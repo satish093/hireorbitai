@@ -14,6 +14,21 @@ import { estimateCostUsd, type AnthropicUsage } from './aiPricing';
  * Lightweight: no external calls, no persistent state. `cost_usd` is an
  * estimate from aiPricing (prices are hardcoded; treat as a guide, not billing).
  */
+/** Log one LlamaParse PDF extraction (1 call = 1 PDF job, no token concept). */
+export function logLlamaParseUsage(call: string, pages = 1): void {
+  logger.info(
+    { ai_usage: { call, model: 'llamaparse', pages } },
+    `ai.usage ${call} llamaparse ${pages}p`,
+  );
+  pool
+    .query(
+      `INSERT INTO ai_usage_logs (call_name, model, input_tokens, output_tokens, cache_read_tokens, cost_usd)
+       VALUES ($1, 'llamaparse', $2, 0, 0, 0)`,
+      [call, pages],
+    )
+    .catch(() => {});
+}
+
 export function logAiUsage(call: string, model: string, usage: AnthropicUsage | undefined): void {
   if (!usage) return;
   const input = usage.input_tokens ?? 0;

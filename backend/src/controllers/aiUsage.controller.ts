@@ -6,6 +6,7 @@ const PROVIDER_SQL = `
   CASE
     WHEN model LIKE 'claude-%' THEN 'anthropic'
     WHEN model LIKE 'gemini-%' THEN 'gemini'
+    WHEN model = 'llamaparse' THEN 'llamaparse'
     ELSE 'groq'
   END`;
 

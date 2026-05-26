@@ -87,6 +87,7 @@ const PROVIDER_COLORS: Record<string, string> = {
   anthropic: 'bg-purple-100 text-purple-700',
   gemini: 'bg-blue-100 text-blue-700',
   groq: 'bg-green-100 text-green-700',
+  llamaparse: 'bg-orange-100 text-orange-700',
 };
 
 function ProviderBadge({ provider }: { provider: string }) {
@@ -258,6 +259,8 @@ function FreeTab({
   const geminiCalls = summary?.free.by_call.filter((r) => r.provider === 'gemini') ?? [];
   const groqModels = summary?.free.by_model.filter((m) => m.provider === 'groq') ?? [];
   const geminiModels = summary?.free.by_model.filter((m) => m.provider === 'gemini') ?? [];
+  const llamaModels = summary?.free.by_model.filter((m) => m.provider === 'llamaparse') ?? [];
+  const llamaCalls = llamaModels.reduce((s, m) => s + m.calls, 0);
 
   const groqBars: BarRow[] = groqCalls.map((r) => [r.call_name, r.calls, `${r.calls} calls`]);
   const geminiBars: BarRow[] = geminiCalls.map((r) => [r.call_name, r.calls, `${r.calls} calls`]);
@@ -274,7 +277,7 @@ function FreeTab({
         <DashboardCard
           label="Free Calls"
           value={loading ? '…' : (ft?.calls ?? 0)}
-          hint="Groq + Gemini"
+          hint="Groq + Gemini + LlamaParse"
           accent="brand"
         />
         <DashboardCard
@@ -361,11 +364,12 @@ function FreeTab({
               <span className="text-ink">10,000 pages/mo</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted">1 credit</span>
-              <span className="text-ink">= 1 page</span>
+              <span className="text-muted">PDFs parsed</span>
+              <span className="tabular-nums text-ink font-medium">
+                {loading ? '…' : llamaCalls}
+              </span>
             </div>
           </div>
-          <p className="text-[10px] text-muted mt-3">Live usage: cloud.llamaindex.ai</p>
         </div>
       </div>
 

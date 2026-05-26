@@ -2,6 +2,7 @@ import { extractText, getDocumentProxy } from 'unpdf';
 import { geminiClient, GEMINI_ENABLED, GEMINI_MODEL, withGeminiRetry } from '../config/gemini';
 import { anthropic, ANTHROPIC_ENABLED } from '../config/anthropic';
 import { LLAMAPARSE_ENABLED, LLAMAPARSE_API_KEY, LLAMAPARSE_BASE_URL } from '../config/llamaparse';
+import { logLlamaParseUsage } from './aiUsage';
 import { logger } from '../config/logger';
 
 /**
@@ -109,7 +110,11 @@ async function extractPdfWithLlamaParse(buffer: Buffer): Promise<string | null> 
           headers: { Authorization: `Bearer ${LLAMAPARSE_API_KEY}` },
         });
         const { markdown } = (await mdResp.json()) as { markdown: string };
-        return markdown?.trim() || null;
+        if (markdown?.trim()) {
+          logLlamaParseUsage('extractResumeText');
+          return markdown.trim();
+        }
+        return null;
       }
 
       if (status === 'ERROR') {
