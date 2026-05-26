@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { db } from '../config/db';
 import { httpError, MANAGER_TIER } from '../types';
 import { invalidatePermissionCache } from '../services/permission.service';
+import { managerGroupUserIds } from '../services/groupScope';
 import { audit } from '../services/audit.service';
 
 function isManagerTier(role?: string): boolean {
@@ -53,6 +54,15 @@ export const list: RequestHandler = async (req, res) => {
   //   CONSULTANT: only their own row
   if (isManagerTier(req.user.role)) {
     if (recruiter_id) q = q.eq('recruiter_id', recruiter_id);
+    // A MANAGER is confined to their own group; HR_MANAGER + admin-tier are not.
+    const groupUserIds = await managerGroupUserIds(req.user);
+    if (groupUserIds !== null) {
+      if (groupUserIds.length === 0) {
+        res.json([]);
+        return;
+      }
+      q = q.in('user_id', groupUserIds);
+    }
   } else if (req.user.role === 'RECRUITER') {
     const myRecId = await getCallerRecruiterRowId(req.user.id);
     if (!myRecId) {

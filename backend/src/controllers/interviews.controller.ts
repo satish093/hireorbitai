@@ -2,6 +2,7 @@ import { RequestHandler } from 'express';
 import { z } from 'zod';
 import { db } from '../config/db';
 import { httpError, MANAGER_TIER } from '../types';
+import { managerGroupConsultantIds } from '../services/groupScope';
 import { syncInterviewReminders } from '../services/interviewReminders.service';
 import { publishToUser } from '../services/realtime.service';
 
@@ -230,6 +231,15 @@ export const list: RequestHandler = async (req, res) => {
 
   if (isManagerTier(req.user.role)) {
     if (consultant_id) qb = qb.eq('consultant_id', consultant_id);
+    // A MANAGER only sees interviews for consultants in their own group.
+    const groupConsultantIds = await managerGroupConsultantIds(req.user);
+    if (groupConsultantIds !== null) {
+      if (groupConsultantIds.length === 0) {
+        res.json([]);
+        return;
+      }
+      qb = qb.in('consultant_id', groupConsultantIds);
+    }
   } else if (req.user.role === 'RECRUITER') {
     const myRecId = await getCallerRecruiterRowId(req.user.id);
     if (!myRecId) {

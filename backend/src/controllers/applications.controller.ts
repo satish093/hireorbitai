@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { db } from '../config/db';
 import { atsScore } from '../services/ai.service';
 import { httpError, MANAGER_TIER } from '../types';
+import { managerGroupConsultantIds } from '../services/groupScope';
 
 // ---------------------------------------------------------------------------
 // Authorization helpers
@@ -78,6 +79,15 @@ export const list: RequestHandler = async (req, res) => {
   if (isManagerTier(req.user.role)) {
     if (consultant_id) qb = qb.eq('consultant_id', consultant_id);
     if (recruiter_id) qb = qb.eq('recruiter_id', recruiter_id);
+    // A MANAGER only sees applications for consultants in their own group.
+    const groupConsultantIds = await managerGroupConsultantIds(req.user);
+    if (groupConsultantIds !== null) {
+      if (groupConsultantIds.length === 0) {
+        res.json([]);
+        return;
+      }
+      qb = qb.in('consultant_id', groupConsultantIds);
+    }
   } else if (req.user.role === 'RECRUITER') {
     const myRecId = await getCallerRecruiterRowId(req.user.id);
     if (!myRecId) {

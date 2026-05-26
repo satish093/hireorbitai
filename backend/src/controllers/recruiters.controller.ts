@@ -2,6 +2,7 @@ import { RequestHandler } from 'express';
 import { z } from 'zod';
 import { db } from '../config/db';
 import { httpError, MANAGER_TIER } from '../types';
+import { managerGroupUserIds } from '../services/groupScope';
 
 const SELECT_WITH_JOINS =
   '*, user:users!user_id(id, email, full_name, group_id), ' +
@@ -19,20 +20,31 @@ const onboardingSchema = z.object({
   notes: z.string().optional(),
 });
 
-export const list: RequestHandler = async (_req, res) => {
-  const { data, error } = await db
-    .from('recruiters')
-    .select(SELECT_WITH_JOINS)
-    .order('created_at', { ascending: false });
+export const list: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  // A MANAGER only sees recruiters in their own group; HR_MANAGER + admin-tier
+  // see all groups.
+  const groupUserIds = await managerGroupUserIds(req.user);
+  if (groupUserIds !== null && groupUserIds.length === 0) {
+    res.json([]);
+    return;
+  }
+
+  let q = db.from('recruiters').select(SELECT_WITH_JOINS).order('created_at', { ascending: false });
+  if (groupUserIds !== null) q = q.in('user_id', groupUserIds);
+  const { data, error } = await q;
+
   // The new `recruiter_managers` table may not exist yet — degrade gracefully
   // by retrying with the simpler embed.
   if (error && /recruiter_managers/i.test(error.message)) {
-    const fallback = await db
+    let fq = db
       .from('recruiters')
       .select(
         '*, user:users!user_id(id, email, full_name, group_id), manager:users!manager_id(id, email, full_name, group_id)',
       )
       .order('created_at', { ascending: false });
+    if (groupUserIds !== null) fq = fq.in('user_id', groupUserIds);
+    const fallback = await fq;
     if (fallback.error) throw httpError(500, fallback.error.message);
     res.json(fallback.data);
     return;

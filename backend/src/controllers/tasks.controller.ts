@@ -9,6 +9,7 @@ import {
   TaskPriority,
   MANAGER_TIER,
 } from '../types';
+import { managerGroupUserIds } from '../services/groupScope';
 
 const SELECT_WITH_JOINS = `
   *,
@@ -51,7 +52,20 @@ function applyFilters(qb: any, q: Record<string, any>) {
 export const list: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   let qb = db.from('tasks').select(SELECT_WITH_JOINS);
-  if (!isManagerLike(req.user.role)) qb = qb.eq('assignee_id', req.user.id);
+  if (!isManagerLike(req.user.role)) {
+    qb = qb.eq('assignee_id', req.user.id);
+  } else {
+    // A MANAGER only sees tasks assigned to people in their own group;
+    // HR_MANAGER + admin-tier see all.
+    const groupUserIds = await managerGroupUserIds(req.user);
+    if (groupUserIds !== null) {
+      if (groupUserIds.length === 0) {
+        res.json([]);
+        return;
+      }
+      qb = qb.in('assignee_id', groupUserIds);
+    }
+  }
   qb = applyFilters(qb, req.query as Record<string, any>);
   const { data, error } = await qb
     .order('order_index', { ascending: true })
