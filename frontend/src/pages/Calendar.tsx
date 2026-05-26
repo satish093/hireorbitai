@@ -253,9 +253,8 @@ export function Calendar({
         selectedId={selectedId}
         onSelect={setSelected}
         onAnchor={(d) => {
-          // Clicking a date drills into its day view (both Calendar + Interviews).
+          // Clicking a date just moves the anchor — it does not change the view.
           setAnchor(d);
-          setView('day');
         }}
       />
     ) : view === 'agenda' ? (
