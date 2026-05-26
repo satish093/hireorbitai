@@ -419,7 +419,7 @@ try {
       await client.query(
         `INSERT INTO public.recruiter_daily_activity
            (recruiter_id, activity_date, submissions_count, interviews_scheduled, interviews_completed, vendor_calls, offers, placements)
-         VALUES ($1, current_date - $2, $3, $4, $5, $6, $7, $8)
+         VALUES ($1, current_date - ($2)::int, $3, $4, $5, $6, $7, $8)
          ON CONFLICT (recruiter_id, activity_date) DO UPDATE SET
            submissions_count = EXCLUDED.submissions_count,
            interviews_scheduled = EXCLUDED.interviews_scheduled,
