@@ -180,8 +180,9 @@ test.describe('Résumés page — loading and RBAC', () => {
     // "Go to Users" CTA is present.
     await expect(page.getByRole('button', { name: 'Go to Users' })).toBeVisible({ timeout: 8000 });
 
-    // Upload button is disabled because consultantId is falsy.
-    await expect(page.locator('button:has-text("+ Upload")')).toBeDisabled();
+    // No upload control when there is no consultant — the upload zone only
+    // appears after a consultant is selected and has no resumes yet.
+    await expect(page.locator('input[type="file"]')).toHaveCount(0);
 
     await page.screenshot({ path: 'e2e-results/resumes-no-consultants.png' });
 
@@ -214,8 +215,9 @@ test.describe('Résumés page — loading and RBAC', () => {
       timeout: 8000,
     });
 
-    // Upload button is disabled because consultantId is still ''.
-    await expect(page.locator('button:has-text("+ Upload")')).toBeDisabled();
+    // No upload control when consultantId is still '' — the upload zone only
+    // appears after a consultant is selected and has no resumes yet.
+    await expect(page.locator('input[type="file"]')).toHaveCount(0);
 
     await page.screenshot({ path: 'e2e-results/resumes-pick-consultant.png' });
 

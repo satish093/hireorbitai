@@ -35,7 +35,14 @@ export function RecruiterTargetingBar({
         // Auto-pick current resume if none chosen yet.
         if (!value.resumeId) {
           const current = list.find((x) => x.is_current) ?? list[0];
-          if (current) onChange({ ...value, resumeId: current.id });
+          if (current) {
+            const resumeSkills = current.parsed_profile?.skills?.filter(Boolean) ?? [];
+            onChange({
+              ...value,
+              resumeId: current.id,
+              skills: value.skills.length > 0 ? value.skills : resumeSkills,
+            });
+          }
         }
       })
       .catch(() => {
@@ -67,7 +74,13 @@ export function RecruiterTargetingBar({
   }
   function pickResume(rid: string) {
     if (!value) return;
-    onChange({ ...value, resumeId: rid });
+    const resume = resumes.find((r) => r.id === rid);
+    const resumeSkills = resume?.parsed_profile?.skills?.filter(Boolean) ?? [];
+    onChange({
+      ...value,
+      resumeId: rid,
+      skills: value.skills.length > 0 ? value.skills : resumeSkills,
+    });
   }
 
   return (
@@ -104,7 +117,6 @@ export function RecruiterTargetingBar({
             {resumes.map((r) => (
               <option key={r.id} value={r.id}>
                 v{r.version} · {r.file_name}
-                {r.is_current ? ' (current)' : ''}
               </option>
             ))}
           </select>

@@ -121,6 +121,7 @@ export interface ResumeOption {
   file_name: string;
   is_current: boolean;
   ai_score?: number | null;
+  parsed_profile?: { skills?: string[] | null } | null;
 }
 
 export interface SourceCompany {
