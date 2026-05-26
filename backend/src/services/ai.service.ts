@@ -602,19 +602,32 @@ export type ResumeProfile = z.infer<typeof ResumeProfileSchema>;
 
 const _PARSE_PROFILE_SYSTEM = `You are a precise resume data-extraction engine. Extract structured data exactly as stated — never infer, guess, or fabricate. Return null or [] for absent fields.
 
+CRITICAL — CANDIDATE vs. THIRD PARTIES:
+- The candidate is the person identified at the VERY TOP of the document — typically their full name alone on a line (or as the first prominent heading), followed immediately by contact details.
+- A "References", "Referees", "Referee", or "Reference" section near the end of the document contains OTHER people's contact details (coaches, managers, coordinators). NEVER extract any email, phone, or name from that section as the candidate's.
+- If the candidate's name appears again mid-document (e.g. as a running page header), that is the same person — do not treat it as a new contact block.
+
+CRITICAL — TEMPLATE INSTRUCTIONS:
+- Ignore ALL text inside parentheses that begins with "Tip:", "Note:", or contains instructional language like "Enter your…", "List your…", "Include…". These are resume template placeholders, not candidate data.
+- Do NOT include tip or note text in any field — summary, skills, education, certifications, or anywhere else.
+
+CONTACT EXTRACTION:
+- Extract email and phone ONLY from the header block at the very top of the document (before the first section heading such as "Career Objective", "Summary", "Experience", etc.).
+- If multiple emails or phones appear in different sections, use only the one in the header block.
+
 FIELD RULES:
-- name: The candidate's full name. It is almost always the FIRST prominent text at the top of the resume — typically the largest text, on its own line, before any contact details. Extract it even if it has no label. If genuinely absent, return null.
-- headline: The professional title or tagline that often appears directly beneath the name (e.g. "Senior Software Engineer", "Full-Stack Developer | React | Node.js"). Return null if not present.
-- email: Any valid email address. Return null if absent.
-- phone: Phone number in original format. Return null if absent.
+- name: The candidate's full name. Almost always the FIRST prominent text at the top, on its own line before contact details. Return null only if genuinely absent.
+- headline: Professional title or tagline directly beneath the name (e.g. "Senior Software Engineer", "Full-Stack Developer | React | Node.js"). Return null if not present.
+- email: From the header block only (see CONTACT EXTRACTION above). Return null if absent.
+- phone: From the header block only. Return null if absent.
 - location: City/State or full address if present. Return null if absent.
 - linkedin_url: Any URL containing "linkedin.com/in/". Return null otherwise.
 - website: Personal website or portfolio URL (not LinkedIn). Return null if absent.
 - summary: The professional summary or objective section verbatim. Return null if absent.
 - total_years_experience: Sum all work experience durations. For current roles, count to today. Round to nearest 0.5. Return null if no work history.
-- skills: Extract EVERY technical and soft skill mentioned anywhere — in a dedicated skills section, in job descriptions, in a summary. Include languages, frameworks, tools, cloud platforms, certifications, and methodologies. Normalise obvious abbreviations (JS→JavaScript, K8s→Kubernetes, PG→PostgreSQL) but keep domain-specific acronyms verbatim. De-duplicate.
+- skills: Extract EVERY technical and soft skill mentioned anywhere — skills section, job descriptions, summary. Include languages, frameworks, tools, cloud platforms, certifications, methodologies. Normalise obvious abbreviations (JS→JavaScript, K8s→Kubernetes). De-duplicate.
 - experiences: Sort most-recent first. description: join all bullets for the role into one string separated by " | ".
-- education: Real institutions and degrees only. Skip template placeholders ("Enter your degree", "List your school", text in brackets/parentheses starting with instructional words).
+- education: Real institutions and degrees only. Skip template placeholders ("Enter your degree", text in brackets/parentheses with instructional words).
 - certifications: Standalone certifications not already in education (e.g. "AWS Certified Solutions Architect").
 - languages: Spoken/written languages only. Return [] if none.
 - age: Only if explicitly stated as a number. Do NOT infer from graduation year.
@@ -668,11 +681,26 @@ function applyProfilePostProcess(profile: ResumeProfile): ResumeProfile {
   return { ...profile, skills: normalizeSkills(profile.skills) };
 }
 
+/**
+ * Clips resume text at any References/Referees section heading so referee
+ * contact details never reach the profile parser. Only clips when the section
+ * appears in the second half of the document (avoids clipping a job title that
+ * contains the word "reference").
+ */
+function prepareTextForProfileParse(text: string): string {
+  const refMatch = text.match(/^(references?|referees?|referee information)\s*$/im);
+  if (refMatch?.index != null && refMatch.index > text.length * 0.4) {
+    return text.slice(0, refMatch.index).trim();
+  }
+  return text;
+}
+
 export async function parseResumeProfile(
   resumeText: string,
   opts: { bypassCache?: boolean } = {},
 ): Promise<ResumeProfile> {
-  const clipped = clip(resumeText);
+  const cleaned = prepareTextForProfileParse(resumeText);
+  const clipped = clip(cleaned);
 
   if (opts.bypassCache) resumeProfileCache.delete(cacheKey(clipped));
 

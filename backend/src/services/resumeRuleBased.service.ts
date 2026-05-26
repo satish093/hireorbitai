@@ -355,20 +355,31 @@ function computeYearsFromExperiences(experiences: ExpItem[]): number | null {
 // ---------------------------------------------------------------------------
 
 export function parseResumeProfileRuleBased(text: string): ResumeProfile {
-  // --- Contact fields via regex ---
-  const emailMatch = text.match(/[\w.+\-]+@[\w\-]+\.[\w.]+/);
-  const email = emailMatch?.[0] ?? null;
+  // Strip template boilerplate before any extraction
+  const cleanedText = text
+    .replace(/\(Tip:[^)]*\)/gi, '')
+    .replace(/\(Note:[^)]*\)/gi, '')
+    .replace(/^.*\bTip:/gim, '')
+    .replace(/^\s*Page\s+\d+\s*$/gim, '');
 
-  const phoneMatch = text.match(/(\+?1[\s.\-]?)?\(?\d{3}\)?[\s.\-]\d{3}[\s.\-]\d{4}/);
+  const lines = cleanedText.split('\n');
+
+  // --- Contact fields — restricted to header block (first 30 lines) ---
+  const headerBlock = lines.slice(0, 30).join('\n');
+
+  const emailMatch = headerBlock.match(/[\w.+\-]+@[\w\-]+\.[\w.]+/);
+  const email = emailMatch?.[0]?.toLowerCase() ?? null;
+
+  const phoneMatch = headerBlock.match(/(\+?1[\s.\-]?)?\(?\d{3}\)?[\s.\-]\d{3}[\s.\-]\d{4}/);
   const phone = phoneMatch?.[0]?.trim() ?? null;
 
-  const liMatch = text.match(/linkedin\.com\/in\/([\w\-]+)/i);
+  const liMatch = cleanedText.match(/linkedin\.com\/in\/([\w\-]+)/i);
   const linkedin_url = liMatch ? `https://linkedin.com/in/${liMatch[1]}` : null;
 
-  const webMatch = text.match(/https?:\/\/(?!(?:www\.)?linkedin)[^\s<>"'\)]+/i);
+  const webMatch = cleanedText.match(/https?:\/\/(?!(?:www\.)?linkedin)[^\s<>"'\)]+/i);
   const website = webMatch?.[0] ?? null;
 
-  // --- Name: first line that looks like a personal name, not contact info ---
+  // --- Name: restricted to first 10 lines (header block) ---
   // Title Case: "John Smith", "Mary Jane Watson"
   const NAME_TITLE_RE = /^[A-Z][a-z]+(?:\s+[A-Z][a-z]*\.?){1,3}$/;
   // ALL CAPS (common in some PDF extractors): "JOHN SMITH"
@@ -376,7 +387,7 @@ export function parseResumeProfileRuleBased(text: string): ResumeProfile {
   // CamelCase-concatenated (pdf.js drops the space for large display fonts): "HaydenSmith"
   const NAME_CAMEL_RE = /^[A-Z][a-z]+(?:[A-Z][a-z]+){1,3}$/;
   let name: string | null = null;
-  for (const raw of text.split('\n').map((l) => l.trim())) {
+  for (const raw of lines.slice(0, 10).map((l) => l.trim())) {
     if (!raw || raw.length > 60) continue;
     // Strip markdown heading markers: "# Hayden Smith" → "Hayden Smith"
     const line = raw.replace(/^#{1,3}\s+/, '');
@@ -404,11 +415,13 @@ export function parseResumeProfileRuleBased(text: string): ResumeProfile {
   }
 
   // --- Skills ---
-  const skills = normalizeSkills(extractKnownSkills(text));
+  const skills = normalizeSkills(extractKnownSkills(cleanedText));
 
   // --- Total years of experience ---
   let total_years_experience: number | null = null;
-  const yearsMatch = text.match(/(\d+)\+?\s+years?\s+(?:of\s+)?(?:professional\s+)?experience/i);
+  const yearsMatch = cleanedText.match(
+    /(\d+)\+?\s+years?\s+(?:of\s+)?(?:professional\s+)?experience/i,
+  );
   if (yearsMatch) total_years_experience = parseInt(yearsMatch[1]!);
 
   // --- Section splitting ---
@@ -419,7 +432,7 @@ export function parseResumeProfileRuleBased(text: string): ResumeProfile {
   const sections: Section[] = [];
   let cur: Section = { heading: 'header', content: '' };
 
-  for (const line of text.split('\n')) {
+  for (const line of lines) {
     const trimmed = line.trim();
     if (SECTION_HEADING_RE.test(trimmed) && trimmed.length < 60) {
       sections.push(cur);

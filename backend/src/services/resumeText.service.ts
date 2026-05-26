@@ -37,6 +37,17 @@ function normalize(s: string): string {
     .slice(0, MAX_STORED_CHARS);
 }
 
+/** Strip template boilerplate that leaks through extraction (tip instructions, page numbers). */
+function cleanExtractedText(text: string): string {
+  return text
+    .replace(/\(Tip:[^)]*\)/gi, '')
+    .replace(/\(Note:[^)]*\)/gi, '')
+    .replace(/^.*\bTip:/gim, '')
+    .replace(/^\s*Page\s+\d+\s*$/gim, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 function isPdf(mimetype: string, name: string): boolean {
   return mimetype === 'application/pdf' || /\.pdf$/i.test(name);
 }
@@ -138,6 +149,8 @@ async function extractPdfWithGemini(buffer: Buffer): Promise<string | null> {
 - Job titles / degree entries → ### Title at Company  (or ### Degree at Institution)
 - All bullet points → - item
 - All other text as plain paragraphs
+
+Ignore all text in parentheses starting with "Tip:", "Note:", or similar instructional meta-text. Do not include page numbers.
 
 Output only the Markdown. No commentary, no code fences.`,
               },
@@ -294,21 +307,21 @@ export async function extractResumeText(file: {
     if (isPdf(file.mimetype, file.originalname)) {
       // 1. LlamaParse — free (1,000 pages/day), best quality.
       const llamaText = await extractPdfWithLlamaParse(file.buffer);
-      if (llamaText) return normalize(llamaText);
+      if (llamaText) return normalize(cleanExtractedText(llamaText));
 
       // 2. Gemini — free tier, reads the PDF visually.
       const geminiText = await extractPdfWithGemini(file.buffer);
-      if (geminiText) return normalize(geminiText);
+      if (geminiText) return normalize(cleanExtractedText(geminiText));
 
       // 3. Claude — paid fallback, also reads visually.
       const claudeText = await extractPdfWithClaude(file.buffer);
-      if (claudeText) return normalize(claudeText);
+      if (claudeText) return normalize(cleanExtractedText(claudeText));
 
       // 4. unpdf — pure-JS, zero AI cost, last resort.
       const pdf = await getDocumentProxy(new Uint8Array(file.buffer));
       const { text } = await extractText(pdf, { mergePages: true });
       const joined = Array.isArray(text) ? text.join('\n') : (text ?? '');
-      return normalize(joined);
+      return normalize(cleanExtractedText(joined));
     }
     if (isImage(file.mimetype, file.originalname)) {
       // 1. Gemini vision — free tier.
