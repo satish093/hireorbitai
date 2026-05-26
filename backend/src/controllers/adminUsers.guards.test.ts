@@ -103,9 +103,12 @@ describe('assertOutranks', () => {
     expect(status).toBe(403);
   });
 
-  it('treats HR_MANAGER and MANAGER as equal rank (neither outranks the other)', () => {
+  it('ranks HR_MANAGER above MANAGER (HR can manage a MANAGER, not vice-versa)', () => {
+    expect(ROLE_RANK.HR_MANAGER).toBeGreaterThan(ROLE_RANK.MANAGER);
+    // A MANAGER cannot act on an HR_MANAGER…
     expect(() => assertOutranks({ role: 'MANAGER' }, 'HR_MANAGER')).toThrowError(/cannot change/i);
-    expect(ROLE_RANK.MANAGER).toBe(ROLE_RANK.HR_MANAGER);
+    // …but an HR_MANAGER outranks (can act on) a MANAGER.
+    expect(() => assertOutranks({ role: 'HR_MANAGER' }, 'MANAGER')).not.toThrow();
   });
 
   it('is a no-op when the target role is null/undefined', () => {

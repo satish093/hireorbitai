@@ -17,8 +17,10 @@ export const ROLE_RANK: Record<Role, number> = {
   CEO: 90,
   CTO: 80,
   DIRECTOR: 70,
+  // HR_MANAGER sits ABOVE MANAGER: it oversees managers across all groups, so
+  // it can act on a MANAGER while a MANAGER cannot act on it.
+  HR_MANAGER: 65,
   MANAGER: 60,
-  HR_MANAGER: 60,
   DEVELOPER: 50,
   RECRUITER: 40,
   CONSULTANT: 10,
