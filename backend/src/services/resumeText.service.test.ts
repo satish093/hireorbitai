@@ -22,6 +22,14 @@ vi.mock('unpdf', () => ({
 vi.mock('../config/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
+// Prevent config/db (and pg) from loading — pg's class constructor throws
+// under vitest's CJS/ESM interop. All tests in this file are pure-function
+// tests that never touch the database.
+vi.mock('../config/db', () => ({
+  db: { from: vi.fn() },
+  pool: { query: vi.fn(), connect: vi.fn() },
+}));
+vi.mock('./aiUsage', () => ({ logLlamaParseUsage: vi.fn() }));
 
 import { extractResumeText } from './resumeText.service';
 
