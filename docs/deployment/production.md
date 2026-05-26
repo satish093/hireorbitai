@@ -116,49 +116,58 @@ ls -lhS ~/backups | head                  # newest first
 0 4 * * * find /home/hireorbitai/backups -mindepth 1 -maxdepth 1 -type d -mtime +14 -exec rm -rf {} +
 ```
 
-### Weekly Google Drive backup (free)
+### Weekly off-site backup (Cloudflare R2)
 
 Daily backups on the same disk only protect against application-level mistakes — they die with the VPS.
-For real disaster recovery, push a copy off-host. [scripts/backup-gdrive.sh](../../scripts/backup-gdrive.sh)
-takes a fresh snapshot and copies it to Google Drive via [rclone](https://rclone.org) (free, open-source;
-a personal Google account gives you 15 GB at no cost).
+For real disaster recovery, push a copy off-host. [scripts/backup-offsite.sh](../../scripts/backup-offsite.sh)
+takes a fresh snapshot and copies it to **Cloudflare R2** via [rclone](https://rclone.org). R2 is the best
+free fit for backups: 10 GB free, **zero egress fees** (a full restore during a disaster costs nothing),
+S3-compatible, and it authenticates with non-expiring API tokens — so cron won't silently break the way an
+OAuth token (Google Drive) eventually does.
 
-**One-time setup on the VPS:**
+> Any rclone remote works — the script is backend-agnostic. To use Backblaze B2, S3, or Drive instead,
+> just point `RCLONE_REMOTE` at that remote. R2 is the documented default.
+
+**One-time setup:**
+
+1. In the Cloudflare dashboard → **R2** → create a bucket named `hireorbitai-backups`.
+2. R2 → **Manage API Tokens** → create a token with **Object Read & Write**; note the **Access Key ID**,
+   **Secret Access Key**, and your **Account ID** (the endpoint is `https://<ACCOUNT_ID>.r2.cloudflarestorage.com`).
+3. On the VPS:
 
 ```bash
-# 1. Install rclone
+# Install rclone
 curl https://rclone.org/install.sh | sudo bash
 
-# 2. Create a remote named "gdrive" (type: drive). Leave client_id/secret blank
-#    (uses rclone's built-in), scope "drive". On a headless VPS, rclone will
-#    print an `rclone authorize "drive"` command — run THAT on a laptop with a
-#    browser, sign in to Google, and paste the token back into the VPS prompt.
+# Create a remote named "r2": type → s3, provider → Cloudflare,
+# access_key_id / secret_access_key → the R2 token pair,
+# region → auto, endpoint → https://<ACCOUNT_ID>.r2.cloudflarestorage.com
 rclone config
 
-# 3. Verify the remote works
-rclone lsd gdrive:
+# Verify the remote + bucket are reachable
+rclone lsd r2:
 ```
 
 **Run it once by hand** to confirm the upload lands:
 
 ```bash
-bash scripts/backup-gdrive.sh
-rclone lsf gdrive:hireorbitai-backups            # should list the new <stamp>/ folder
+bash scripts/backup-offsite.sh
+rclone lsf r2:hireorbitai-backups                # should list the new <stamp>/ folder
 ```
 
 **Weekly cron** (end of week — Sunday 03:00, as the `hireorbitai` user via `crontab -e`):
 
 ```cron
-0 3 * * 0 /home/hireorbitai/hireorbitai/scripts/backup-gdrive.sh >> /home/hireorbitai/backups/backup-gdrive.log 2>&1
+0 3 * * 0 /home/hireorbitai/hireorbitai/scripts/backup-offsite.sh >> /home/hireorbitai/backups/backup-offsite.log 2>&1
 ```
 
-To keep Drive from growing without bound, add `--prune-weeks N` (deletes Drive copies older than N weeks):
+To cap storage, add `--prune-weeks N` (deletes remote copies older than N weeks):
 
 ```cron
-0 3 * * 0 /home/hireorbitai/hireorbitai/scripts/backup-gdrive.sh --prune-weeks 8 >> /home/hireorbitai/backups/backup-gdrive.log 2>&1
+0 3 * * 0 /home/hireorbitai/hireorbitai/scripts/backup-offsite.sh --prune-weeks 8 >> /home/hireorbitai/backups/backup-offsite.log 2>&1
 ```
 
-Env overrides: `RCLONE_REMOTE` (default `gdrive`), `RCLONE_DEST` (default `hireorbitai-backups`).
+Env overrides: `RCLONE_REMOTE` (default `r2`), `RCLONE_DEST` (default `hireorbitai-backups`).
 Use `--no-snapshot` to push the newest existing local stamp without taking a fresh dump.
 
 ---
