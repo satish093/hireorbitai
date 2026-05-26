@@ -199,8 +199,9 @@ The existing uploads directory is moved aside to `<UPLOADS_DIR>.pre-restore.<uni
 URLs and refresh tokens keep working because `STORAGE_URL_SECRET` / `JWT_SECRET` / `COOKIE_SECRET`
 travel with the bundle.
 
-> ⚠ **The bundle contains live secrets.** Transfer it only over `scp`/SSH (never email, cloud drives,
-> or shared storage). It is written `chmod 600`. Delete it from **both** hosts once the new VPS is verified.
+> ⚠ **The bundle contains live secrets.** Move it only over `scp`/SSH or your **private** R2 bucket —
+> never email, public links, or shared drives. It is written `chmod 600`. Delete it from every host
+> **and from R2** once the new VPS is verified.
 
 **On the OLD host** — build the bundle:
 
@@ -210,16 +211,29 @@ bash scripts/migrate.sh export
 # → ~/migrate/hireorbitai-migrate-<stamp>.tar.gz  (db + uploads + .env)
 ```
 
-**Copy it over** and bring up the **NEW host**:
+Then move it to the new host with **either** transport:
+
+**Option A — direct scp** (needs SSH between the two hosts):
 
 ```bash
-# from the old host (or your laptop)
-scp ~/migrate/hireorbitai-migrate-<stamp>.tar.gz  hireorbitai@NEW_HOST:~/
+scp ~/migrate/hireorbitai-migrate-<stamp>.tar.gz  hireorbitai@NEW_HOST:~/migrate/
+```
 
-# on the NEW host — provision per "First-time setup" above, then:
+**Option B — via R2** (no host-to-host SSH; reuses the rclone `r2` remote from the backup setup):
+
+```bash
+# old host: upload the newest bundle to <bucket>/migrate/
+bash scripts/migrate.sh push
+# new host (after rclone config): download it
+bash scripts/migrate.sh pull
+```
+
+**On the NEW host** — provision per "First-time setup" above, then restore:
+
+```bash
 git clone <repo-url> ~/hireorbitai && cd ~/hireorbitai
-bash scripts/migrate.sh import ~/hireorbitai-migrate-<stamp>.tar.gz          # dry run — prints the plan
-bash scripts/migrate.sh import ~/hireorbitai-migrate-<stamp>.tar.gz --force  # restore db + uploads + .env
+bash scripts/migrate.sh import ~/migrate/hireorbitai-migrate-<stamp>.tar.gz          # dry run — prints the plan
+bash scripts/migrate.sh import ~/migrate/hireorbitai-migrate-<stamp>.tar.gz --force  # restore db + uploads + .env
 
 npm ci
 npm run build
@@ -233,7 +247,8 @@ uploads dir aside to `<UPLOADS_DIR>.pre-migrate.<unix>` before extracting — sa
 
 > **DB name guard:** the backend's `DB_GUARD` check keys on the database name in `DATABASE_URL`. Keep the
 > same `hireorbitai_prod` / `hireorbitai_dev` naming on the new host, or set `DB_GUARD=off` in `.env`.
-> Finally, **delete the bundle**: `rm ~/hireorbitai-migrate-<stamp>.tar.gz` (and on the old host).
+> Finally, **delete the bundle** everywhere: `rm ~/migrate/hireorbitai-migrate-<stamp>.tar.gz` on both
+> hosts, and if you used R2, `rclone deletefile r2:hireorbitai-backups/migrate/hireorbitai-migrate-<stamp>.tar.gz`.
 
 ---
 
