@@ -107,12 +107,13 @@ try {
   for (const u of all) {
     const id = randomUUID();
     const r = await pool.query(
-      `INSERT INTO public.users (id, email, password_hash, full_name, role, is_active, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, true, now(), now())
+      `INSERT INTO public.users (id, email, password_hash, full_name, role, is_active, must_change_password, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, true, false, now(), now())
        ON CONFLICT (email) DO UPDATE SET
          password_hash = EXCLUDED.password_hash,
          full_name = EXCLUDED.full_name,
          role = EXCLUDED.role,
+         must_change_password = false,
          updated_at = now()
        RETURNING id`,
       [id, u.email.toLowerCase(), PASSWORD_HASH, u.full_name, u.role],
