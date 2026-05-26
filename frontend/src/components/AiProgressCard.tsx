@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 interface Props {
   /** Show the card while a long AI operation runs. */
@@ -58,7 +59,7 @@ export function AiProgressCard({ open, title, stages, stageMs = 4500, note }: Pr
   // Cap below 100% — completion unmounts the card; we never imply "done".
   const pct = Math.min(92, Math.round(((stageIndex + 1) / stages.length) * 100));
 
-  return (
+  return createPortal(
     <div
       className="pointer-events-none fixed left-4 right-4 z-[60] sm:left-auto sm:w-80"
       style={{ bottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}
@@ -99,6 +100,7 @@ export function AiProgressCard({ open, title, stages, stageMs = 4500, note }: Pr
 
         {note && <p className="mt-1.5 text-[11px] text-faint">{note}</p>}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
