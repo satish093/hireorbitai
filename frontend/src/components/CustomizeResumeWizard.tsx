@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
 import { api } from '../services/api';
@@ -166,13 +167,15 @@ export function CustomizeResumeWizard({
     });
   }
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-3 sm:p-6"
       onClick={onClose}
+      role="dialog"
+      aria-modal="true"
     >
       <div
-        className="bg-surface rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden"
+        className="bg-surface rounded-2xl shadow-2xl w-full max-w-3xl max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-3rem)] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <header className="px-6 py-5 border-b border-border bg-gradient-to-br from-slate-50 to-white">
@@ -386,7 +389,8 @@ export function CustomizeResumeWizard({
           )}
         </footer>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

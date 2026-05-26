@@ -28,6 +28,24 @@ Don't reinvent these — the codebase already standardizes:
 - **`<Skeleton>` / `<SkeletonCard>` / `<SkeletonMetricGrid>`** — loading state. Replace any "Loading…" text with one of these.
 - **`<Modal>`** — has focus trap + body scroll + Escape close already. Don't roll your own.
 
+## Modals — viewport-centered, always portaled
+
+Every full-screen modal/dialog with a dark blurred backdrop must be **centered in the viewport**, not in
+page content. Use the shared **`<Modal>`** — it's the single source of truth and already does all of this:
+
+- Renders through **`createPortal(…, document.body)`**. This is non-negotiable: the app's `<main>` carries
+  `animate-page-enter` (a `transform` with `fill-mode: both`), and **a transformed ancestor re-anchors
+  `position: fixed` to itself**, so an inline modal would center against `<main>` (offset by the sidebar/
+  header) instead of the screen. Portaling to `<body>` escapes that.
+- Backdrop: `fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-3 sm:p-6`
+  — full-screen, blurred, fixed (stays put on scroll), responsive padding.
+- Body: `max-h-[calc(100dvh-…)]` + an `overflow-y-auto` scroll region so tall content scrolls **internally**
+  and the dialog never overflows the screen; near-full-width on mobile via `w-full max-w-…`.
+
+**Don't hand-roll modal positioning.** If you truly need a bespoke layout (e.g. a multi-step wizard), still
+`createPortal` to `document.body` and reuse the exact backdrop + `max-h`/scroll classes above. Drawers may
+anchor to a screen edge (`flex justify-end`) but must still use a full-screen portaled blurred backdrop.
+
 ## Form control alignment
 
 `Button` (md), `FormInput`, and `SelectInput` are all `h-9 rounded-lg`. A toolbar row of `[input] [select] [button]` should be pixel-aligned. If a new control type joins the family, match the height + radius + `focus-visible:` ring color.

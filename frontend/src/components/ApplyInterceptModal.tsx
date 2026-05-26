@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Avatar } from './TaskBits';
 
 /**
@@ -85,13 +86,15 @@ export function ApplyInterceptModal({
     onCustomize();
   }
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-3 sm:p-6"
       onClick={onClose}
+      role="dialog"
+      aria-modal="true"
     >
       <div
-        className="bg-surface rounded-2xl shadow-xl w-full max-w-md overflow-hidden"
+        className="bg-surface rounded-2xl shadow-xl w-full max-w-md max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-3rem)] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-5 py-4 flex items-center justify-between border-b border-border">
@@ -185,7 +188,8 @@ export function ApplyInterceptModal({
           </label>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

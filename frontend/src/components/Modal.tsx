@@ -1,4 +1,5 @@
 import { ReactNode, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 
 interface Props {
   open: boolean;
@@ -96,7 +97,10 @@ export function Modal({ open, onClose, title, description, children, footer, siz
   }, [open]);
 
   if (!open) return null;
-  return (
+  // Portal to <body> so the fixed overlay centers against the VIEWPORT, not a
+  // transformed ancestor (e.g. <main> carries animate-page-enter, whose
+  // persisted transform would otherwise re-anchor `position: fixed`).
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-3 sm:p-6 animate-fade-in"
       onClick={onClose}
@@ -137,6 +141,7 @@ export function Modal({ open, onClose, title, description, children, footer, siz
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

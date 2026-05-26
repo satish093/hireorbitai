@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import { Button } from '../Button';
 import type { JobRow } from './types';
 
@@ -10,13 +11,15 @@ export function ApplyConfirmModal({
   onClose: () => void;
   onConfirm: (yes: boolean) => void;
 }) {
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-3 sm:p-6"
       onClick={onClose}
+      role="dialog"
+      aria-modal="true"
     >
       <div
-        className="bg-surface rounded-2xl shadow-xl w-full max-w-md p-6"
+        className="bg-surface rounded-2xl shadow-xl w-full max-w-md p-6 max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-3rem)] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="text-base font-semibold text-ink mb-1">Did you apply?</h2>
@@ -39,6 +42,7 @@ export function ApplyConfirmModal({
           </Button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

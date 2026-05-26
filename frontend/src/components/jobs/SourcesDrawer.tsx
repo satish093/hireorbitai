@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
 import { api } from '../../services/api';
@@ -110,8 +111,16 @@ export function SourcesDrawer({
     }
   }
 
-  return (
-    <div className="fixed inset-0 z-50 bg-slate-900/30 flex justify-end" onClick={onClose}>
+  // Edge-anchored drawer (intentionally not centered), but still a full-screen
+  // portaled blurred backdrop so it overlays the whole viewport regardless of
+  // any transformed ancestor.
+  return createPortal(
+    <div
+      className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex justify-end"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+    >
       <div
         className="bg-surface w-full max-w-md h-full overflow-y-auto shadow-xl"
         onClick={(e) => e.stopPropagation()}
@@ -295,6 +304,7 @@ export function SourcesDrawer({
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

@@ -1,3 +1,5 @@
+import { createPortal } from 'react-dom';
+
 interface Props {
   consultantName: string;
   jobTitle: string;
@@ -19,13 +21,15 @@ export function DuplicateSubmissionModal({
   onConfirm,
   onCancel,
 }: Props) {
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 bg-slate-900/55 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-3 sm:p-6"
       onClick={onCancel}
+      role="dialog"
+      aria-modal="true"
     >
       <div
-        className="bg-surface rounded-2xl shadow-xl w-full max-w-md overflow-hidden"
+        className="bg-surface rounded-2xl shadow-xl w-full max-w-md max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-3rem)] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-6 pt-6 pb-4 flex items-start gap-3">
@@ -74,6 +78,7 @@ export function DuplicateSubmissionModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
