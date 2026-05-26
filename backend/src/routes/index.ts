@@ -3,6 +3,7 @@ import { requireAuth, blockIfMustChangePassword } from '../middleware/auth';
 import { requireFeature } from '../middleware/featureFlag';
 import { authRouter } from './auth.routes';
 import { devAuthRouter } from './devAuth.routes';
+import { devToolsRouter } from './devTools.routes';
 import { invitationsRouter } from './invitations.routes';
 import * as invitationsCtl from '../controllers/invitations.controller';
 import { consultantsRouter } from './consultants.routes';
@@ -44,6 +45,11 @@ router.use('/auth', authRouter);
 // inside is gated by requireDevTools (404 unless env.devTools, which is
 // force-disabled in production), so this is invisible on the live VPS.
 router.use('/auth/dev', devAuthRouter);
+
+// Super-Admin DEV test panel API. Mounted before the global requireAuth so its
+// own requireDevTools 404s first in production (no "auth required" leak). The
+// router re-applies requireAuth + requireRole(SUPER_ADMIN) internally.
+router.use('/dev', devToolsRouter);
 
 // Public file downloads. HMAC-signed URLs minted by storage.local — the route
 // validates the signature + expiry before streaming the file. No bearer token

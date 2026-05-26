@@ -7,7 +7,15 @@ import { RealtimeNotifications } from './components/RealtimeNotifications';
 import { ProductTour } from './components/ProductTour';
 import { useAuth } from './context/AuthContext';
 import { useSessionRevoke } from './hooks/useSessionRevoke';
+import { config } from './config/env';
 import { ADMIN_TIER, MANAGER_TIER, OPERATOR_TIER, OWNER_TIER } from './types';
+
+// DEV-ONLY test panel. Gated by `import.meta.env.DEV` so the import lands in a
+// dead branch and is tree-shaken out of production builds (verified by
+// scripts/check-dist-clean.mjs).
+const DevPanel = import.meta.env.DEV
+  ? lazy(() => import('./dev/DevPanel').then((m) => ({ default: m.DevPanel })))
+  : null;
 
 // ---------------------------------------------------------------------------
 // Route-level code splitting.
@@ -619,6 +627,19 @@ export default function App() {
           {/* Legacy student route — folded into the unified /training workspace. */}
           <Route path="/training/my" element={<Navigate to="/training" replace />} />
           <Route path="/training/my/*" element={<Navigate to="/training" replace />} />
+
+          {/* DEV-ONLY super-admin test panel. Registered only in dev builds with
+              VITE_DEV_TOOLS on; tree-shaken from production. */}
+          {config.isDevTools && DevPanel && (
+            <Route
+              path="/dev"
+              element={
+                <ProtectedRoute allow={['SUPER_ADMIN']}>
+                  <DevPanel />
+                </ProtectedRoute>
+              }
+            />
+          )}
 
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Route>
