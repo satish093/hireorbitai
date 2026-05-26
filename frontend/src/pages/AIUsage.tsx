@@ -324,7 +324,7 @@ function FreeTab({
             <span className="text-sm font-semibold text-ink">Gemini</span>
           </div>
           <p className="text-xs text-muted mb-3">
-            2.5 Flash · 10,000 RPD free · Fallback when Groq unavailable
+            2.5 Flash · 20 RPD free · Fallback when Groq unavailable
           </p>
           {geminiModels.length > 0 ? (
             geminiModels.map((m) => (

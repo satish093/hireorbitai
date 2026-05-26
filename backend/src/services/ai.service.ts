@@ -613,37 +613,25 @@ export const ResumeProfileSchema = z.object({
 });
 export type ResumeProfile = z.infer<typeof ResumeProfileSchema>;
 
-const _PARSE_PROFILE_SYSTEM = `You are a precise resume data-extraction engine. Extract structured data exactly as stated — never infer, guess, or fabricate. Return null or [] for absent fields.
+const _PARSE_PROFILE_SYSTEM = `You are a resume data-extraction engine. Extract every field listed below from the resume text. Return null for absent fields, [] for absent arrays.
 
-CRITICAL — CANDIDATE vs. THIRD PARTIES:
-- The candidate is the person identified at the VERY TOP of the document — typically their full name alone on a line (or as the first prominent heading), followed immediately by contact details.
-- A "References", "Referees", "Referee", or "Reference" section near the end of the document contains OTHER people's contact details (coaches, managers, coordinators). NEVER extract any email, phone, or name from that section as the candidate's.
-- If the candidate's name appears again mid-document (e.g. as a running page header), that is the same person — do not treat it as a new contact block.
+RULES:
+1. name — The candidate's full name: the first Title-Case or ALL-CAPS text at the top of the document that looks like a real person (2-4 words). Skip any leading line that is all-lowercase like a filename (e.g. "functionalsample"). Return null only if truly absent.
+2. headline — Professional title or tagline immediately under the name. null if absent.
+3. email, phone — From the document header only (above the first section heading). Ignore any email/phone inside a "References" or "Referees" section at the end — those belong to other people.
+4. location — City and state/country from the header. null if absent.
+5. linkedin_url — URL containing "linkedin.com/in/". null otherwise.
+6. website — Personal site/portfolio (not LinkedIn). null if absent.
+7. summary — Professional summary or objective section text. null if absent.
+8. total_years_experience — Sum of all work durations in years (round to nearest 0.5). null if no history.
+9. skills — Every technical and soft skill from the whole document. Normalise variants (JS→JavaScript). De-duplicate.
+10. experiences — All work entries, most-recent first. description: join bullets with " | ".
+11. education — Real institutions only. Skip placeholder text like "Enter your degree".
+12. certifications — Standalone certs not already in education.
+13. languages — Spoken/written languages only. [] if none.
+14. age — Only if explicitly stated as a number. null otherwise.
 
-CRITICAL — TEMPLATE INSTRUCTIONS:
-- Ignore ALL text inside parentheses that begins with "Tip:", "Note:", or contains instructional language like "Enter your…", "List your…", "Include…". These are resume template placeholders, not candidate data.
-- Do NOT include tip or note text in any field — summary, skills, education, certifications, or anywhere else.
-
-CONTACT EXTRACTION:
-- Extract email and phone ONLY from the header block at the very top of the document (before the first section heading such as "Career Objective", "Summary", "Experience", etc.).
-- If multiple emails or phones appear in different sections, use only the one in the header block.
-
-FIELD RULES:
-- name: The candidate's full name. Almost always the FIRST prominent text at the top that looks like a real person's name (Title Case or ALL CAPS, 2-4 words). Ignore any leading line that looks like a filename or document slug (e.g. "functionalsample", "resume_john", all lowercase with no spaces). Return null only if genuinely absent.
-- headline: Professional title or tagline directly beneath the name (e.g. "Senior Software Engineer", "Full-Stack Developer | React | Node.js"). Return null if not present.
-- email: From the header block only (see CONTACT EXTRACTION above). Return null if absent.
-- phone: From the header block only. Return null if absent.
-- location: City/State or full address if present. Return null if absent.
-- linkedin_url: Any URL containing "linkedin.com/in/". Return null otherwise.
-- website: Personal website or portfolio URL (not LinkedIn). Return null if absent.
-- summary: The professional summary or objective section verbatim. Return null if absent.
-- total_years_experience: Sum all work experience durations. For current roles, count to today. Round to nearest 0.5. Return null if no work history.
-- skills: Extract EVERY technical and soft skill mentioned anywhere — skills section, job descriptions, summary. Include languages, frameworks, tools, cloud platforms, certifications, methodologies. Normalise obvious abbreviations (JS→JavaScript, K8s→Kubernetes). De-duplicate.
-- experiences: Sort most-recent first. description: join all bullets for the role into one string separated by " | ".
-- education: Real institutions and degrees only. Skip template placeholders ("Enter your degree", text in brackets/parentheses with instructional words).
-- certifications: Standalone certifications not already in education (e.g. "AWS Certified Solutions Architect").
-- languages: Spoken/written languages only. Return [] if none.
-- age: Only if explicitly stated as a number. Do NOT infer from graduation year.
+Ignore any text inside parentheses starting with "Tip:" or "Note:" — those are template instructions, not real data.
 
 Return valid JSON only. No markdown fences, no explanation.`;
 
@@ -701,11 +689,18 @@ function applyProfilePostProcess(profile: ResumeProfile): ResumeProfile {
  * contains the word "reference").
  */
 function prepareTextForProfileParse(text: string): string {
-  const refMatch = text.match(/^(references?|referees?|referee information)\s*$/im);
-  if (refMatch?.index != null && refMatch.index > text.length * 0.4) {
-    return text.slice(0, refMatch.index).trim();
+  // Strip a leading filename-like line (all-lowercase slug) that PDF extractors
+  // sometimes insert as a document title before the actual resume content.
+  let out = text.replace(/^[a-z0-9][a-z0-9_\-]*\n+/m, '').trim();
+
+  // Clip at References/Referees section heading when it appears in the second
+  // half of the document so referee contacts never reach the parser.
+  const refMatch = out.match(/^(references?|referees?|referee information)\s*:?\s*$/im);
+  if (refMatch?.index != null && refMatch.index > out.length * 0.4) {
+    out = out.slice(0, refMatch.index).trim();
   }
-  return text;
+
+  return out;
 }
 
 export async function parseResumeProfile(
@@ -718,15 +713,9 @@ export async function parseResumeProfile(
   if (opts.bypassCache) resumeProfileCache.delete(cacheKey(clipped));
 
   return withCache(resumeProfileCache, clipped, async () => {
-    // 1. Gemini native JSON mode — best quality for complex structured extraction.
-    //    Profile parsing requires understanding document structure and ignoring
-    //    referees/templates; Gemini's JSON mode handles this reliably.
-    const gemini = await parseResumeProfileWithGemini(clipped);
-    if (gemini && gemini.name != null) return applyProfilePostProcess(gemini);
-
-    // 2. Groq — free fallback when Gemini is unavailable or quota-limited
+    // 1. Groq — 14,400 req/day free, primary for all AI features
     try {
-      const groq = await callGroqStructuredWithFallback(
+      const groq = await callGroqStructured(
         'parseResumeProfile',
         _PARSE_PROFILE_SYSTEM,
         `RESUME TEXT:\n${clipped}`,
@@ -735,8 +724,12 @@ export async function parseResumeProfile(
       );
       if (groq.name != null) return applyProfilePostProcess(groq);
     } catch {
-      /* fall through to rule-based */
+      /* fall through */
     }
+
+    // 2. Gemini native JSON mode — only when Groq fails (20 req/day free limit)
+    const gemini = await parseResumeProfileWithGemini(clipped);
+    if (gemini && gemini.name != null) return applyProfilePostProcess(gemini);
 
     // 3. Rule-based — always available, no AI required
     return applyProfilePostProcess(parseResumeProfileRuleBased(clipped));
