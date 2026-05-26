@@ -16,6 +16,7 @@
     "lint": "eslint \"src/**/*.{ts,tsx}\" --max-warnings 0",
     "lint:fix": "eslint \"src/**/*.{ts,tsx}\" --fix",
     "bootstrap:admin": "node --env-file=.env scripts/bootstrap-admin.mjs",
+    "seed:mock": "node --env-file=.env scripts/seed-mock-data.mjs",
     "migrate:up": "node --env-file=.env scripts/migrate.mjs up --migrations-dir migrations --migration-file-language sql",
     "migrate:ci": "node scripts/migrate.mjs up --migrations-dir migrations --migration-file-language sql",
     "migrate:down": "node --env-file=.env scripts/migrate.mjs down --migrations-dir migrations --migration-file-language sql --count 1",

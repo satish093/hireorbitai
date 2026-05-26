@@ -152,6 +152,9 @@ async function main() {
     run('seed: demo users', process.execPath, ['scripts/seed-users.mjs'], {
       cwd: resolve(ROOT, 'backend'),
     });
+    run('seed: mock data', process.execPath, ['scripts/seed-mock-data.mjs'], {
+      cwd: resolve(ROOT, 'backend'),
+    });
   }
 
   console.log('\n✓ dev reset complete.');
