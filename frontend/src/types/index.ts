@@ -27,7 +27,7 @@ export {
 } from '@hireorbitai/shared';
 export type { Role, DeveloperCapability, TaskStatus, TaskPriority } from '@hireorbitai/shared';
 
-import type { Role, TaskStatus, TaskPriority } from '@hireorbitai/shared';
+import type { Role, DeveloperCapability, TaskStatus, TaskPriority } from '@hireorbitai/shared';
 
 /** UI label for a role — display capitalisation lives with the UI. */
 export const ROLE_LABEL: Record<Role, string> = {
@@ -74,6 +74,16 @@ export interface UserProfile {
   tour_completed_at?: string | null;
   /** Per-user opt-in for the daily job-match email digest. Default true. */
   job_alerts?: boolean;
+  /** DEVELOPER capability grants (the "scoped super-admin" toggles). */
+  capabilities?: DeveloperCapability[];
+}
+
+/** True only for a DEVELOPER profile that holds the given capability grant. */
+export function hasCapability(
+  profile: Pick<UserProfile, 'role' | 'capabilities'> | null | undefined,
+  cap: DeveloperCapability,
+): boolean {
+  return !!profile && profile.role === 'DEVELOPER' && (profile.capabilities ?? []).includes(cap);
 }
 
 export type MarketingStatus = 'ACTIVE' | 'PAUSED' | 'PLACED';

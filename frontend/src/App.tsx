@@ -385,7 +385,7 @@ export default function App() {
           <Route
             path="/ai-usage"
             element={
-              <ProtectedRoute allow={MANAGER_TIER}>
+              <ProtectedRoute allow={MANAGER_TIER} capability="ai_usage">
                 <AIUsage />
               </ProtectedRoute>
             }
@@ -393,7 +393,7 @@ export default function App() {
           <Route
             path="/reports"
             element={
-              <ProtectedRoute allow={MANAGER_TIER}>
+              <ProtectedRoute allow={MANAGER_TIER} capability="reports">
                 <FeatureGuard feature="reports">
                   <Reports />
                 </FeatureGuard>
@@ -403,7 +403,7 @@ export default function App() {
           <Route
             path="/invitations"
             element={
-              <ProtectedRoute allow={MANAGER_TIER}>
+              <ProtectedRoute allow={MANAGER_TIER} capability="invitations">
                 <Invitations />
               </ProtectedRoute>
             }
@@ -475,7 +475,7 @@ export default function App() {
           <Route
             path="/admin/features"
             element={
-              <ProtectedRoute allow={OWNER_TIER}>
+              <ProtectedRoute allow={OWNER_TIER} capability="feature_flags">
                 <FeatureFlags />
               </ProtectedRoute>
             }
@@ -483,7 +483,7 @@ export default function App() {
           <Route
             path="/admin/groups"
             element={
-              <ProtectedRoute allow={MANAGER_TIER}>
+              <ProtectedRoute allow={MANAGER_TIER} capability="user_groups">
                 <UserGroups />
               </ProtectedRoute>
             }
@@ -499,7 +499,7 @@ export default function App() {
           <Route
             path="/admin/users"
             element={
-              <ProtectedRoute allow={ADMIN_TIER}>
+              <ProtectedRoute allow={ADMIN_TIER} capability="users">
                 <AdminUsers />
               </ProtectedRoute>
             }

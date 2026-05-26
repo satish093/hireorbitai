@@ -1,7 +1,7 @@
 import { ReactNode, Suspense } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Role } from '../types';
+import { Role, hasCapability, type DeveloperCapability } from '../types';
 
 function LayoutFallback() {
   return (
@@ -16,6 +16,8 @@ interface Props {
   children: ReactNode;
   /** Roles permitted to view this route. Omit to allow any authenticated role. */
   allow?: Role[];
+  /** If set, a DEVELOPER granted this capability is also allowed (alongside `allow`). */
+  capability?: DeveloperCapability;
   /** Skip the consultant/recruiter onboarding redirect — used on the onboarding pages themselves. */
   bypassOnboarding?: boolean;
   /** Skip the must_change_password redirect — used on /change-password itself. */
@@ -40,7 +42,13 @@ interface Props {
  * escalation hole — now we explicitly send the user to /unauthorized when
  * the session is present but the backend hasn't returned a usable profile.
  */
-export function ProtectedRoute({ children, allow, bypassOnboarding, bypassPasswordChange }: Props) {
+export function ProtectedRoute({
+  children,
+  allow,
+  capability,
+  bypassOnboarding,
+  bypassPasswordChange,
+}: Props) {
   const { session, profile, loading } = useAuth();
   const loc = useLocation();
 
@@ -63,7 +71,12 @@ export function ProtectedRoute({ children, allow, bypassOnboarding, bypassPasswo
     return <Navigate to="/change-password" replace />;
   }
 
-  if (allow && !allow.includes(profile.role)) {
+  // Role gate — a role in `allow` passes, OR a DEVELOPER holding `capability`.
+  if (
+    allow &&
+    !allow.includes(profile.role) &&
+    !(capability && hasCapability(profile, capability))
+  ) {
     return <Navigate to="/unauthorized" replace />;
   }
 

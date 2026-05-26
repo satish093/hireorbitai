@@ -10,6 +10,8 @@ import {
   ALL_ROLES,
   OWNER_TIER,
   ADMIN_TIER,
+  hasCapability,
+  type DeveloperCapability,
 } from '../types';
 import { api } from '../services/api';
 import { useFeatureFlags } from '../hooks/useFeatureFlags';
@@ -50,6 +52,8 @@ interface Item {
   icon: IconCmp;
   badgeKey?: 'tasks' | 'reminders' | 'inbox';
   flagKey?: string;
+  /** If set, a DEVELOPER granted this capability also sees the item. */
+  capability?: DeveloperCapability;
 }
 
 interface Section {
@@ -114,6 +118,7 @@ const sections: Section[] = [
         icon: IconBarChart,
         roles: MANAGER_TIER,
         flagKey: 'reports',
+        capability: 'reports',
       },
     ],
   },
@@ -161,10 +166,34 @@ const sections: Section[] = [
     heading: 'Admin',
     collapsible: true,
     items: [
-      { to: '/admin/users', label: 'Users', icon: IconUsers, roles: ADMIN_TIER },
-      { to: '/invitations', label: 'Invitations', icon: IconMailPlus, roles: MANAGER_TIER },
-      { to: '/admin/groups', label: 'User Groups', icon: IconUsersCog, roles: MANAGER_TIER },
-      { to: '/ai-usage', label: 'AI Usage', icon: IconSparkles, roles: MANAGER_TIER },
+      {
+        to: '/admin/users',
+        label: 'Users',
+        icon: IconUsers,
+        roles: ADMIN_TIER,
+        capability: 'users',
+      },
+      {
+        to: '/invitations',
+        label: 'Invitations',
+        icon: IconMailPlus,
+        roles: MANAGER_TIER,
+        capability: 'invitations',
+      },
+      {
+        to: '/admin/groups',
+        label: 'User Groups',
+        icon: IconUsersCog,
+        roles: MANAGER_TIER,
+        capability: 'user_groups',
+      },
+      {
+        to: '/ai-usage',
+        label: 'AI Usage',
+        icon: IconSparkles,
+        roles: MANAGER_TIER,
+        capability: 'ai_usage',
+      },
       {
         to: '/ai-email',
         label: 'AI Email',
@@ -173,7 +202,13 @@ const sections: Section[] = [
         flagKey: 'ai_email',
       },
       { to: '/admin/deactivated', label: 'Deactivated', icon: IconUserX, roles: ADMIN_TIER },
-      { to: '/admin/features', label: 'Feature Flags', icon: IconToggle, roles: OWNER_TIER },
+      {
+        to: '/admin/features',
+        label: 'Feature Flags',
+        icon: IconToggle,
+        roles: OWNER_TIER,
+        capability: 'feature_flags',
+      },
       { to: '/admin/ai-settings', label: 'AI Settings', icon: IconSparkles, roles: ADMIN_TIER },
       { to: '/admin/audit-log', label: 'Audit Log', icon: IconClipboard, roles: ADMIN_TIER },
     ],
@@ -437,7 +472,13 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps = {}
               .map((section) => ({
                 ...section,
                 items: section.items.filter((i) => {
-                  if (role && !i.roles.includes(role)) return false;
+                  // Visible if the role is in the item's tier OR a DEVELOPER
+                  // holds the item's capability grant.
+                  const roleOk =
+                    !role ||
+                    i.roles.includes(role) ||
+                    (i.capability ? hasCapability(profile, i.capability) : false);
+                  if (!roleOk) return false;
                   if (i.flagKey && flags[i.flagKey] === false) return false;
                   return true;
                 }),

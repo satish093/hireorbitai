@@ -12,7 +12,13 @@ import { EmptyState } from '../EmptyState';
 import { GroupBadge, RoleChip, StatusPill } from './UserBits';
 import { ConfirmDialog, type ConfirmSpec } from './ConfirmDialog';
 import { useUserDetail } from './useUserDetail';
-import { ALL_ROLES, type Role } from '@hireorbitai/shared';
+import { useAuth } from '../../context/AuthContext';
+import {
+  ALL_ROLES,
+  DEVELOPER_CAPABILITIES,
+  type Role,
+  type DeveloperCapability,
+} from '@hireorbitai/shared';
 import {
   AUDIT_DOT,
   auditTone,
@@ -58,6 +64,85 @@ function QuickAction({
   );
 }
 
+const CAP_LABEL: Record<DeveloperCapability, string> = {
+  users: 'User management',
+  user_groups: 'User groups',
+  feature_flags: 'Feature flags',
+  invitations: 'Invitations',
+  reports: 'Analytics / reports',
+  ai_usage: 'AI usage dashboard',
+};
+
+/**
+ * SUPER_ADMIN-only checklist that grants a DEVELOPER ("scoped super-admin") its
+ * capabilities. A DEVELOPER can reach only the areas ticked here.
+ */
+function DeveloperCapabilitiesSection({
+  userId,
+  current,
+  onSaved,
+}: {
+  userId: string;
+  current: DeveloperCapability[];
+  onSaved: () => void;
+}) {
+  const [sel, setSel] = useState<Set<DeveloperCapability>>(new Set(current));
+  const [saving, setSaving] = useState(false);
+  useEffect(() => {
+    setSel(new Set(current));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
+
+  function toggle(c: DeveloperCapability) {
+    setSel((prev) => {
+      const n = new Set(prev);
+      if (n.has(c)) n.delete(c);
+      else n.add(c);
+      return n;
+    });
+  }
+
+  async function save() {
+    setSaving(true);
+    try {
+      await api.patch(`/admin/users/${userId}/capabilities`, { capabilities: [...sel] });
+      toast.success('Capabilities updated');
+      onSaved();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error ?? 'Failed to save capabilities');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="p-4 border-t border-border">
+      <SectionLabel>Developer capabilities</SectionLabel>
+      <p className="text-xs text-muted mb-2">
+        A developer has no access by default — it can reach only the areas you grant here.
+      </p>
+      <div className="space-y-1.5">
+        {DEVELOPER_CAPABILITIES.map((c) => (
+          <label key={c} className="flex items-center gap-2 text-sm text-ink cursor-pointer">
+            <input
+              type="checkbox"
+              checked={sel.has(c)}
+              onChange={() => toggle(c)}
+              className="accent-[var(--accent)]"
+            />
+            {CAP_LABEL[c] ?? c}
+          </label>
+        ))}
+      </div>
+      <div className="mt-2 flex justify-end">
+        <Button size="sm" variant="secondary" onClick={save} loading={saving}>
+          Save capabilities
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 /**
  * Right-side slide-in detail pane for one user. Pinned header + destructive
  * footer, scrolling body. Every mutating action is confirmed via ConfirmDialog
@@ -78,6 +163,8 @@ export function UserDetailPane({
   onChanged: () => void;
 }) {
   const { user, audit, sessions, loading, error, reload, setUser } = useUserDetail(userId);
+  const { profile } = useAuth();
+  const viewerIsSuperAdmin = profile?.role === 'SUPER_ADMIN';
   const [confirm, setConfirm] = useState<ConfirmSpec | null>(null);
 
   const groupsById = useMemo(() => {
@@ -432,6 +519,14 @@ export function UserDetailPane({
                 </div>
               </div>
             </div>
+
+            {viewerIsSuperAdmin && user.role === 'DEVELOPER' && (
+              <DeveloperCapabilitiesSection
+                userId={user.id}
+                current={(user as { capabilities?: DeveloperCapability[] }).capabilities ?? []}
+                onSaved={afterMutation}
+              />
+            )}
 
             {/* Active sessions */}
             <div>
