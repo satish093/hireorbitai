@@ -8,8 +8,9 @@
 # The DEV database is Neon (free, separate server) — NOT defined here, set its
 # connection string as the DATABASE_URL secret below.
 #
-# autoDeploy is OFF on purpose: deploys are triggered by .github/workflows/dev.yml
-# AFTER `verify:full` passes, via Render Deploy Hooks. A failed test never ships.
+# autoDeploy is ON: Render's native GitHub integration redeploys both services
+# on every push to the `dev` branch — no GitHub Action or deploy hook needed.
+# (Pushing to `main` is the PRODUCTION VPS deploy and never touches Render.)
 #
 # Field names in Render's blueprint spec drift occasionally; if `render.yaml`
 # import fails, create the two services by hand in the dashboard using the same
@@ -22,7 +23,7 @@ services:
     runtime: node
     plan: free
     branch: dev
-    autoDeploy: false
+    autoDeploy: true
     buildCommand: npm ci && npm run shared:build && npm --prefix backend run build
     startCommand: node backend/dist/server.js
     healthCheckPath: /health
@@ -57,11 +58,23 @@ services:
         generateValue: true
       - key: STORAGE_URL_SECRET
         generateValue: true
-      # ---- dev-safe defaults: ephemeral uploads, no AI/API spend ----
+      # ---- dev tooling: role/user switch + super-admin test panel ----
+      # Force-disabled whenever NODE_ENV=production, so this is impossible to
+      # enable on the live VPS even by mistake.
+      - key: DEV_TOOLS
+        value: 'true'
+      # Skip the background-job scheduler (reminders/jobs-sync/digest/purge) to
+      # stay within the free instance's RAM.
+      - key: RUN_SCHEDULER
+        value: 'false'
+      # ---- dev-safe defaults: ephemeral uploads, no AI/API/email spend ----
       - key: UPLOADS_DIR
         value: /tmp/uploads
       - key: TRAINING_AI_PROVIDER
         value: stub
+      # Log emails instead of sending them (zero Brevo spend on dev).
+      - key: BREVO_MOCK
+        value: 'true'
       # Optional: set to a real sk-ant-… key to enable Anthropic AI on dev.
       # Leave blank (sync:false, set in dashboard) for zero API spend.
       - key: ANTHROPIC_API_KEY
@@ -74,13 +87,17 @@ services:
     name: hireorbit-web-dev
     runtime: static
     branch: dev
-    autoDeploy: false
+    autoDeploy: true
     buildCommand: npm ci && npm run shared:build && npm --prefix frontend run build
     staticPublishPath: frontend/dist
     envVars:
       # Set to the backend URL + /api, e.g. https://hireorbit-api-dev.onrender.com/api
       - key: VITE_API_URL
         sync: false
+      # Enables the floating dev toolbar + /dev test panel in this dev build.
+      # (Tree-shaken out of any production build regardless of this value.)
+      - key: VITE_DEV_TOOLS
+        value: 'true'
     routes:
       # SPA fallback — every unknown path serves index.html for client routing.
       - type: rewrite
