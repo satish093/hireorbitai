@@ -23,6 +23,7 @@ import { geminiClient, GEMINI_ENABLED, GEMINI_MODEL, withGeminiRetry } from '../
 import { logAiUsage } from './aiUsage';
 import {
   withCache,
+  cacheKey,
   resumeScoreCache,
   resumeProfileCache,
   jobRequirementsCache,
@@ -582,6 +583,7 @@ const EducationItemSchema = z.object({
 
 export const ResumeProfileSchema = z.object({
   name: z.string().nullable(),
+  headline: z.string().nullable(),
   email: z.string().nullable(),
   phone: z.string().nullable(),
   location: z.string().nullable(),
@@ -598,18 +600,26 @@ export const ResumeProfileSchema = z.object({
 });
 export type ResumeProfile = z.infer<typeof ResumeProfileSchema>;
 
-const _PARSE_PROFILE_SYSTEM = `You are a precise data-extraction engine for resumes. Extract ONLY what is explicitly stated — never infer, guess, or fabricate. When a field isn't present, use null or an empty array.
+const _PARSE_PROFILE_SYSTEM = `You are a precise resume data-extraction engine. Extract structured data exactly as stated — never infer, guess, or fabricate. Return null or [] for absent fields.
 
-EXTRACTION RULES:
-- skills: Extract ALL technical and soft skills mentioned anywhere in the resume. Include programming languages, frameworks, tools, certifications, and methodologies. Normalise obvious abbreviations ("JS" → "JavaScript", "K8s" → "Kubernetes") but keep less obvious ones verbatim.
-- total_years_experience: Sum work experience years. If current, count to today. Round to nearest 0.5.
-- linkedin_url: Accept any URL containing "linkedin.com/in/".
-- experiences: Sort most-recent first. description: include the full content of role bullets as a single string.
-- age: Only if explicitly stated as a number (not inferred from graduation year).
-- education: Extract only real institutions and degrees. IGNORE any text that is a template placeholder, instruction, or tip (e.g. text starting with "Tip:", "Enter your", "List your", or any instructional sentence inside parentheses or brackets). If a field contains placeholder text, leave it null.
-- general: Skip any line that is clearly a template instruction, placeholder, or example text rather than real candidate data.
+FIELD RULES:
+- name: The candidate's full name. It is almost always the FIRST prominent text at the top of the resume — typically the largest text, on its own line, before any contact details. Extract it even if it has no label. If genuinely absent, return null.
+- headline: The professional title or tagline that often appears directly beneath the name (e.g. "Senior Software Engineer", "Full-Stack Developer | React | Node.js"). Return null if not present.
+- email: Any valid email address. Return null if absent.
+- phone: Phone number in original format. Return null if absent.
+- location: City/State or full address if present. Return null if absent.
+- linkedin_url: Any URL containing "linkedin.com/in/". Return null otherwise.
+- website: Personal website or portfolio URL (not LinkedIn). Return null if absent.
+- summary: The professional summary or objective section verbatim. Return null if absent.
+- total_years_experience: Sum all work experience durations. For current roles, count to today. Round to nearest 0.5. Return null if no work history.
+- skills: Extract EVERY technical and soft skill mentioned anywhere — in a dedicated skills section, in job descriptions, in a summary. Include languages, frameworks, tools, cloud platforms, certifications, and methodologies. Normalise obvious abbreviations (JS→JavaScript, K8s→Kubernetes, PG→PostgreSQL) but keep domain-specific acronyms verbatim. De-duplicate.
+- experiences: Sort most-recent first. description: join all bullets for the role into one string separated by " | ".
+- education: Real institutions and degrees only. Skip template placeholders ("Enter your degree", "List your school", text in brackets/parentheses starting with instructional words).
+- certifications: Standalone certifications not already in education (e.g. "AWS Certified Solutions Architect").
+- languages: Spoken/written languages only. Return [] if none.
+- age: Only if explicitly stated as a number. Do NOT infer from graduation year.
 
-Return valid JSON matching the schema. No markdown, no explanation.`;
+Return valid JSON only. No markdown fences, no explanation.`;
 
 async function parseResumeProfileWithGemini(text: string): Promise<ResumeProfile | null> {
   if (!GEMINI_ENABLED || !geminiClient) return null;
@@ -623,6 +633,7 @@ async function parseResumeProfileWithGemini(text: string): Promise<ResumeProfile
 JSON SCHEMA TO RETURN:
 {
   "name": string | null,
+  "headline": string | null,
   "email": string | null,
   "phone": string | null,
   "location": string | null,
@@ -653,24 +664,35 @@ ${text}`;
   }
 }
 
-export async function parseResumeProfile(resumeText: string): Promise<ResumeProfile> {
+function applyProfilePostProcess(profile: ResumeProfile): ResumeProfile {
+  return { ...profile, skills: normalizeSkills(profile.skills) };
+}
+
+export async function parseResumeProfile(
+  resumeText: string,
+  opts: { bypassCache?: boolean } = {},
+): Promise<ResumeProfile> {
   const clipped = clip(resumeText);
+
+  if (opts.bypassCache) resumeProfileCache.delete(cacheKey(clipped));
+
   return withCache(resumeProfileCache, clipped, async () => {
     // 1. Gemini — best structured extraction (free tier)
     const gemini = await parseResumeProfileWithGemini(clipped);
-    if (gemini) return gemini;
+    if (gemini) return applyProfilePostProcess(gemini);
     // 2. Groq — free fallback using the same schema
     try {
-      return await callGroqStructuredWithFallback(
+      const groq = await callGroqStructuredWithFallback(
         'parseResumeProfile',
         _PARSE_PROFILE_SYSTEM,
         `RESUME TEXT:\n${clipped}`,
         ResumeProfileSchema,
         1500,
       );
+      return applyProfilePostProcess(groq);
     } catch {
       // 3. Rule-based — always available, no AI required
-      return parseResumeProfileRuleBased(clipped);
+      return applyProfilePostProcess(parseResumeProfileRuleBased(clipped));
     }
   });
 }

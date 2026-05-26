@@ -81,7 +81,10 @@ export function ResumeProfileCard({ profile: initialProfile, resumeId, onParsed 
       {/* ── Header: name + contact ── */}
       <div className="pb-4 border-b border-border">
         <h2 className="text-2xl font-bold text-ink leading-tight">{profile.name ?? 'Unknown'}</h2>
-        <p className="text-sm text-muted mt-1 flex flex-wrap gap-x-1 items-center">
+        {profile.headline && (
+          <p className="text-sm font-medium text-accent mt-0.5">{profile.headline}</p>
+        )}
+        <p className="text-sm text-muted mt-1.5 flex flex-wrap gap-x-1 items-center">
           {[profile.email, profile.phone].filter(Boolean).map((v, i, arr) => (
             <span key={i}>
               {v}

@@ -24,6 +24,7 @@ export interface ResumeEducation {
 
 export interface ResumeProfile {
   name: string | null;
+  headline?: string | null;
   email: string | null;
   phone: string | null;
   location: string | null;

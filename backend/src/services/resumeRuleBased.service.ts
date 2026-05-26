@@ -546,6 +546,7 @@ export function parseResumeProfileRuleBased(text: string): ResumeProfile {
 
   return {
     name,
+    headline: null,
     email,
     phone,
     location,

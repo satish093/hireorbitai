@@ -116,7 +116,7 @@ export const parseProfile: RequestHandler = async (req, res) => {
   const text: string = (resume as any).body_text ?? (resume as any).ai_feedback?.resume_text ?? '';
   if (!text) throw httpError(400, 'No extractable text — re-extract the resume first');
 
-  const profile = await parseResumeProfile(text);
+  const profile = await parseResumeProfile(text, { bypassCache: true });
   await db.from('resumes').update({ parsed_profile: profile }).eq('id', id);
   res.json(profile);
 };

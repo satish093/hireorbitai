@@ -221,6 +221,7 @@ export function CenterPane({
         )}
         {mode === 'profile' && (
           <ResumeProfileCard
+            key={version.id}
             profile={version.parsed_profile}
             resumeId={version.id}
             onParsed={onEdited}
