@@ -40,6 +40,7 @@ import { ChangePassword } from './pages/ChangePassword';
 import { Unauthorized } from './pages/Unauthorized';
 import { AcceptInvitation } from './pages/AcceptInvitation';
 import { ResetPassword } from './pages/ResetPassword';
+import { ManagerParked } from './pages/ManagerParked';
 
 const ConsultantOnboarding = lazy(() =>
   import('./pages/ConsultantOnboarding').then((m) => ({ default: m.ConsultantOnboarding })),
@@ -171,6 +172,9 @@ function DashboardRouter() {
   if (!profile) return null;
   if (profile.role === 'CONSULTANT') return <ConsultantDashboard />;
   if (profile.role === 'RECRUITER') return <RecruiterDashboard />;
+  // MANAGER is parked (no tier access) — show a clean "no access yet" landing
+  // instead of the manager dashboard, whose data calls would 403.
+  if (profile.role === 'MANAGER') return <ManagerParked />;
   // Everyone manager-and-above lands on the manager dashboard.
   return <ManagerDashboard />;
 }
