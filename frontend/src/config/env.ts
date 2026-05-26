@@ -34,4 +34,10 @@ export const config = {
   apiBaseUrl: readUrl('VITE_API_URL', e.VITE_API_URL),
   isProd: !!e.PROD,
   mode: e.MODE as 'development' | 'production' | string,
+  // Development-only tooling (floating dev toolbar, /dev test panel). Requires
+  // BOTH a dev build (`import.meta.env.DEV`) AND VITE_DEV_TOOLS=true. In a
+  // production build Vite statically replaces `import.meta.env.DEV` with
+  // `false`, so this is always `false` in prod — and the dev code, reached only
+  // behind a `import.meta.env.DEV ? ... : null` guard, is tree-shaken away.
+  isDevTools: !!e.DEV && e.VITE_DEV_TOOLS === 'true',
 } as const;

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
@@ -8,11 +8,20 @@ import { FeatureFlagsProvider } from './hooks/useFeatureFlags';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ScrollToTop } from './components/ScrollToTop';
 import { ViewTransition } from './components/ViewTransition';
+import { config } from './config/env';
 // Validate env vars at module load — throws synchronously if anything is
 // missing/malformed so we surface a clean error before React even mounts.
 import './config/env';
 import './styles/tokens.css';
 import './index.css';
+
+// DEV-ONLY toolbar. The `import.meta.env.DEV ? ... : null` guard is statically
+// evaluated by Vite — in a production build `import.meta.env.DEV` becomes
+// `false`, the dynamic import lands in a dead branch, and the entire dev chunk
+// (DevToolbar + devSession + DevPanel) is dropped from the bundle.
+const DevToolbar = import.meta.env.DEV
+  ? lazy(() => import('./dev/DevToolbar').then((m) => ({ default: m.DevToolbar })))
+  : () => null;
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
@@ -23,6 +32,11 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <AuthProvider>
           <FeatureFlagsProvider>
             <App />
+            {config.isDevTools && (
+              <Suspense fallback={null}>
+                <DevToolbar />
+              </Suspense>
+            )}
             <Toaster
               position="top-right"
               gutter={10}
