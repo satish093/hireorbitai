@@ -1,7 +1,8 @@
 /**
- * Group-scoped visibility helper. Only MANAGER is confined to its group;
- * HR_MANAGER + admin-tier see all groups (null = no scope). A MANAGER without a
- * group is fail-closed to an empty set (sees nobody), never org-wide.
+ * Group-scoped visibility helper. Only the group lead (HR_MANAGER) is confined
+ * to its group; admin-tier (incl. DIRECTOR) sees all groups (null = no scope),
+ * and MANAGER is parked. An HR_MANAGER without a group is fail-closed to an
+ * empty set (sees nobody), never org-wide.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -32,18 +33,22 @@ beforeEach(() => {
 });
 
 describe('managerGroupUserIds', () => {
-  it('returns null (no scope) for HR_MANAGER and admin-tier', async () => {
-    expect(await managerGroupUserIds({ role: 'HR_MANAGER', group_id: 'g1' })).toBeNull();
+  it('returns null (no scope) for admin-tier (incl. DIRECTOR — oversees all groups)', async () => {
     expect(await managerGroupUserIds({ role: 'DIRECTOR', group_id: null })).toBeNull();
     expect(await managerGroupUserIds({ role: 'SUPER_ADMIN' })).toBeNull();
   });
 
-  it('returns the group user ids for a MANAGER with a group', async () => {
-    expect(await managerGroupUserIds({ role: 'MANAGER', group_id: 'g1' })).toEqual(['u1', 'u2']);
+  it('returns null for MANAGER (parked) and lower roles — not the scoped role', async () => {
+    expect(await managerGroupUserIds({ role: 'MANAGER', group_id: 'g1' })).toBeNull();
+    expect(await managerGroupUserIds({ role: 'RECRUITER', group_id: 'g1' })).toBeNull();
   });
 
-  it('fail-closes to an empty set for a MANAGER with no group', async () => {
-    expect(await managerGroupUserIds({ role: 'MANAGER', group_id: null })).toEqual([]);
-    expect(await managerGroupUserIds({ role: 'MANAGER' })).toEqual([]);
+  it('returns the group user ids for an HR_MANAGER (group lead) with a group', async () => {
+    expect(await managerGroupUserIds({ role: 'HR_MANAGER', group_id: 'g1' })).toEqual(['u1', 'u2']);
+  });
+
+  it('fail-closes to an empty set for an HR_MANAGER with no group', async () => {
+    expect(await managerGroupUserIds({ role: 'HR_MANAGER', group_id: null })).toEqual([]);
+    expect(await managerGroupUserIds({ role: 'HR_MANAGER' })).toEqual([]);
   });
 });

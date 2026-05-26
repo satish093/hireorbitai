@@ -96,7 +96,7 @@ beforeEach(() => {
 
 const OWNER = { id: 'u-owner', role: 'CONSULTANT' };
 const OTHER = { id: 'u-other', role: 'CONSULTANT' };
-const MANAGER = { id: 'u-mgr', role: 'MANAGER' };
+const MANAGER = { id: 'u-mgr', role: 'HR_MANAGER' };
 
 describe('training.controller — getAssignment ownership (inline)', () => {
   it('the assignment owner is allowed', async () => {

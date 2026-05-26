@@ -134,7 +134,7 @@ const OTHER_CONS = {
 };
 
 const RECRUITER = { id: 'u-recruiter', role: 'RECRUITER' };
-const MANAGER_USER = { id: 'u-manager', role: 'MANAGER' };
+const MANAGER_USER = { id: 'u-manager', role: 'HR_MANAGER' };
 
 // ---------------------------------------------------------------------------
 // Tests

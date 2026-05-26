@@ -141,7 +141,7 @@ const RECRUITER_ROW = { id: 'r-1' };
 const CONSULTANT_OWNER = { id: OWNER_USER_ID, role: 'CONSULTANT' };
 const CONSULTANT_OTHER = { id: OTHER_USER_ID, role: 'CONSULTANT' };
 const RECRUITER_ASSIGNED = { id: RECRUITER_USER_ID, role: 'RECRUITER' };
-const MANAGER = { id: 'u-manager', role: 'MANAGER' };
+const MANAGER = { id: 'u-manager', role: 'HR_MANAGER' };
 const UNKNOWN_ROLE = { id: 'u-unknown', role: 'VENDOR' };
 
 // ---------------------------------------------------------------------------

@@ -121,7 +121,7 @@ const CONSULTANT_ROW = { id: 'c-1', user_id: OWNER_USER_ID, recruiter_id: 'r-1' 
 
 const CONSULTANT_OWNER = { id: OWNER_USER_ID, role: 'CONSULTANT' };
 const CONSULTANT_OTHER = { id: OTHER_USER_ID, role: 'CONSULTANT' };
-const MANAGER = { id: 'u-manager', role: 'MANAGER' };
+const MANAGER = { id: 'u-manager', role: 'HR_MANAGER' };
 
 // ---------------------------------------------------------------------------
 // get() — read ownership

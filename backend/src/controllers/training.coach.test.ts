@@ -78,7 +78,7 @@ const KNOWN_LESSON = '11111111-1111-1111-1111-111111111111';
 const OTHER_LESSON = '22222222-2222-2222-2222-222222222222';
 const CONSULTANT = { id: 'u-consultant', role: 'CONSULTANT' };
 const OTHER_CONSULTANT = { id: 'u-other', role: 'CONSULTANT' };
-const MANAGER = { id: 'u-manager', role: 'MANAGER' };
+const MANAGER = { id: 'u-manager', role: 'HR_MANAGER' };
 
 function mkRes() {
   const res: any = {

@@ -61,7 +61,7 @@ import {
 } from './jobs.controller';
 
 const CONSULTANT = { id: 'u-consultant', role: 'CONSULTANT' };
-const MANAGER = { id: 'u-manager', role: 'MANAGER' };
+const MANAGER = { id: 'u-manager', role: 'HR_MANAGER' };
 
 function mkRes() {
   const res: any = {

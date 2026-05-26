@@ -133,7 +133,7 @@ beforeEach(() => {
 // Fixtures
 // ---------------------------------------------------------------------------
 const RECRUITER = { id: 'u-recruiter', role: 'RECRUITER' };
-const MANAGER_USER = { id: 'u-manager', role: 'MANAGER' };
+const MANAGER_USER = { id: 'u-manager', role: 'HR_MANAGER' };
 const CONSULTANT_USER = { id: 'u-consultant', role: 'CONSULTANT' };
 
 const MY_REC_ROW = { id: 'rec-mine', user_id: 'u-recruiter', manager_id: null };

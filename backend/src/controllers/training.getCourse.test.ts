@@ -98,7 +98,7 @@ describe('training.getCourse — quiz answer-key guard', () => {
   });
 
   it('keeps the answer key for a manager-tier author (MANAGER)', async () => {
-    const body = await call('MANAGER');
+    const body = await call('HR_MANAGER');
     expect(body.quizzes[0]).toHaveProperty('correct_answer', 'A');
     expect(body.quizzes[0]).toHaveProperty('explanation', 'Because A');
   });

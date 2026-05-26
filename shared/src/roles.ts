@@ -27,21 +27,24 @@ export const OWNER_TIER: Role[] = ['SUPER_ADMIN', 'CEO'];
 export const ADMIN_TIER: Role[] = ['SUPER_ADMIN', 'CEO', 'CTO', 'DIRECTOR'];
 
 /**
- * Admin tier + people managers (incl. HR Manager).
+ * Admin tier + the group lead (HR_MANAGER).
  *
- * DEVELOPER is intentionally NOT here. A DEVELOPER is a "scoped super-admin"
- * whose access is **nothing by default** and is granted explicitly per-account
- * via `capabilities` (see DEVELOPER_CAPABILITIES + requireRoleOrCapability).
- * Keeping it out of the tiers means tier gates deny it until a capability is
- * granted — the fail-closed base for the configurable role.
+ * Two roles are intentionally NOT here:
+ *  - HR_MANAGER IS here — it's the group lead (scoped to one group via groupScope).
+ *  - DEVELOPER — a "scoped super-admin" whose access is **nothing by default**,
+ *    granted explicitly per-account via `capabilities` (DEVELOPER_CAPABILITIES +
+ *    requireRoleOrCapability).
+ *  - MANAGER — **parked**: it has no tier access for now (a valid login that
+ *    lands on nothing) until we give it a defined purpose. Re-add it here to
+ *    restore manager access.
  */
-export const MANAGER_TIER: Role[] = [...ADMIN_TIER, 'MANAGER', 'HR_MANAGER'];
+export const MANAGER_TIER: Role[] = [...ADMIN_TIER, 'HR_MANAGER'];
 
 /** Manager tier + Recruiter — operates on the talent pipeline. */
 export const OPERATOR_TIER: Role[] = [...MANAGER_TIER, 'RECRUITER'];
 
-/** Every authenticated role (DEVELOPER + CONSULTANT are not in any access tier). */
-export const ALL_ROLES: Role[] = [...OPERATOR_TIER, 'DEVELOPER', 'CONSULTANT'];
+/** Every authenticated role. MANAGER + DEVELOPER + CONSULTANT hold no access tier. */
+export const ALL_ROLES: Role[] = [...OPERATOR_TIER, 'MANAGER', 'DEVELOPER', 'CONSULTANT'];
 
 /**
  * DEVELOPER capability catalog — the fixed set of switches a SUPER_ADMIN ticks

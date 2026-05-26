@@ -112,7 +112,7 @@ beforeEach(() => {
 
 const CONSULTANT = { id: 'u-consultant', role: 'CONSULTANT' };
 const STRANGER = { id: 'u-stranger', role: 'RECRUITER' };
-const MANAGER = { id: 'u-manager', role: 'MANAGER' };
+const MANAGER = { id: 'u-manager', role: 'HR_MANAGER' };
 
 describe('tasks.controller — assertCanAccessTask ownership (via listSubtasks)', () => {
   it('returns 404 (not 403) for a non-manager who is neither assignee nor creator', async () => {

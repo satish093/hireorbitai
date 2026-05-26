@@ -113,7 +113,7 @@ beforeEach(() => {
 describe('interviews.controller — loadAndAuthorize (via update)', () => {
   it('MANAGER_TIER caller is authorized for any interview', async () => {
     mock.rows.interviews = [{ id: 'iv-1', consultant_id: 'c-1', created_by: 'u-other' }];
-    const err = await callUpdate({ id: 'u-mgr', role: 'MANAGER' }, 'iv-1');
+    const err = await callUpdate({ id: 'u-mgr', role: 'HR_MANAGER' }, 'iv-1');
     expect(err).toBeNull();
   });
 
@@ -159,7 +159,7 @@ describe('interviews.controller — loadAndAuthorize (via update)', () => {
 
   it('a missing interview row yields 404', async () => {
     mock.rows.interviews = [];
-    const err = await callUpdate({ id: 'u-mgr', role: 'MANAGER' }, 'iv-missing');
+    const err = await callUpdate({ id: 'u-mgr', role: 'HR_MANAGER' }, 'iv-missing');
     expect(err?.status).toBe(404);
   });
 });
