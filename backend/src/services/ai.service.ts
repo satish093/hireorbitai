@@ -566,16 +566,29 @@ export async function scoreResume(resumeText: string): Promise<ResumeScoreResult
 // ---------------------------------------------------------------------------
 
 const ExperienceItemSchema = z.object({
-  company: z.string(),
-  title: z.string(),
+  // .catch('') so a null company/title from the AI doesn't fail the whole parse
+  company: z
+    .string()
+    .nullable()
+    .catch(null)
+    .transform((v) => v ?? ''),
+  title: z
+    .string()
+    .nullable()
+    .catch(null)
+    .transform((v) => v ?? ''),
   start_date: z.string().nullable(),
   end_date: z.string().nullable(),
-  is_current: z.boolean().optional(),
+  is_current: z.boolean().nullish(),
   description: z.string().nullable(),
 });
 
 const EducationItemSchema = z.object({
-  institution: z.string(),
+  institution: z
+    .string()
+    .nullable()
+    .catch(null)
+    .transform((v) => v ?? ''),
   degree: z.string().nullable(),
   field: z.string().nullable(),
   graduation_year: z.number().nullable(),
