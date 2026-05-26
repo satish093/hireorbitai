@@ -13,14 +13,31 @@ import { DayView } from '../components/calendar/DayView';
 import { MonthView } from '../components/calendar/MonthView';
 import { AgendaView } from '../components/calendar/AgendaView';
 import { EventDetailBar } from '../components/calendar/EventDetailBar';
-import { ScheduleModal } from '../components/calendar/ScheduleModal';
+import { ScheduleModal, type EditInterview } from '../components/calendar/ScheduleModal';
 import { AddReminderModal } from '../components/calendar/AddReminderModal';
 import { FeedbackModal } from '../components/calendar/FeedbackModal';
+import type { EventAction } from '../components/calendar/EventDetailBar';
 import { useVisibleCalendars } from '../components/calendar/useVisibleCalendars';
-import type { CalView, CalendarKey } from '../components/calendar/types';
+import type { CalView, CalendarKey, CalEvent } from '../components/calendar/types';
+import { api } from '../services/api';
+import toast from 'react-hot-toast';
+import { invalidate, useInvalidationListener } from '../hooks/useInvalidate';
+import { useRealtime } from '../hooks/useRealtime';
 
 const ymd = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+/** Date → local "YYYY-MM-DDTHH:mm" for the schedule modal's DateTimePicker. */
+const toLocalInput = (d: Date) => {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+
+const STATUS_FOR: Record<Exclude<EventAction, 'reschedule'>, string> = {
+  complete: 'COMPLETED',
+  noshow: 'NO_SHOW',
+  cancel: 'CANCELLED',
+};
 
 // Icons for the mobile bottom tab bar
 const VIEW_META: { key: CalView; label: string; icon: JSX.Element }[] = [
@@ -88,12 +105,14 @@ export function Calendar({
   mode?: 'planner' | 'interviews';
 } = {}) {
   const isInterviews = mode === 'interviews';
-  const VIEWS = isInterviews ? VIEW_META : VIEW_META.filter((v) => v.key !== 'day');
+  // Day view is available in both modes so clicking a date in the month/agenda
+  // can drill into that day.
+  const VIEWS = VIEW_META;
 
   const [params, setParams] = useSearchParams();
   // Default to agenda — best on mobile; readable on desktop too.
   const rawView = ((params.get('view') as CalView) || 'agenda') as CalView;
-  const view = !isInterviews && rawView === 'day' ? 'week' : rawView;
+  const view = rawView;
   const dateParam = params.get('date');
   const anchor = useMemo(
     () => (dateParam ? new Date(`${dateParam}T00:00:00`) : new Date()),
@@ -104,13 +123,79 @@ export function Calendar({
   const visible = restrictTo ? new Set<CalendarKey>(restrictTo) : storedVisible;
 
   const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [createAt, setCreateAt] = useState<Date | null>(null);
+  const [editInterview, setEditInterview] = useState<EditInterview | null>(null);
   const [addFor, setAddFor] = useState<Date | null>(null);
   const [feedbackFor, setFeedbackFor] = useState<{ id: string; title?: string } | null>(null);
   const [reloadTick, setReloadTick] = useState(0);
 
-  const { events, loading } = useCalendarData(anchor, reloadTick);
+  const { events, loading, mutateLocal, reload } = useCalendarData(anchor, reloadTick);
   const shown = events.filter((e) => visible.has(e.calendar));
   const selectedEvent = shown.find((e) => e.id === selectedId) ?? null;
+
+  // Live sync: a mutation here or in another tab (SSE) refetches this surface.
+  useRealtime({ 'interview:changed': () => setReloadTick((t) => t + 1) });
+  useInvalidationListener('interviews', () => setReloadTick((t) => t + 1));
+
+  // Optimistic drag-to-reschedule.
+  function reschedule(ev: CalEvent, newStartIso: string) {
+    mutateLocal(ev.id, { start: newStartIso });
+    api
+      .patch(`/interviews/${ev.id}`, { scheduled_at: newStartIso })
+      .then(() => {
+        toast.success('Interview moved');
+        invalidate('interviews');
+      })
+      .catch((e: any) => {
+        reload();
+        toast.error(e?.response?.data?.error ?? 'Could not reschedule');
+      });
+  }
+
+  // Open the schedule modal at a clicked slot.
+  function openCreateAt(d: Date) {
+    setEditInterview(null);
+    setCreateAt(d);
+    setScheduleOpen(true);
+  }
+
+  // Quick actions on the selected interview.
+  function runAction(a: EventAction) {
+    if (!selectedEvent) return;
+    if (a === 'reschedule') {
+      setCreateAt(null);
+      setEditInterview({
+        id: selectedEvent.id,
+        consultant_id: selectedEvent.consultantId ?? null,
+        consultant_name: selectedEvent.consultantName ?? selectedEvent.attendee ?? null,
+        type: selectedEvent.interviewType ?? null,
+        scheduled_at: selectedEvent.start,
+        interviewer: selectedEvent.interviewer ?? null,
+        meeting_url: selectedEvent.meetingUrl ?? null,
+      });
+      setScheduleOpen(true);
+      return;
+    }
+    const status = STATUS_FOR[a];
+    mutateLocal(selectedEvent.id, { status });
+    api
+      .patch(`/interviews/${selectedEvent.id}`, { status })
+      .then(() => {
+        toast.success(`Marked ${status.toLowerCase().replace('_', ' ')}`);
+        invalidate('interviews');
+        setSelected(null);
+      })
+      .catch((e: any) => {
+        reload();
+        toast.error(e?.response?.data?.error ?? 'Could not update');
+      });
+  }
+
+  function closeSchedule() {
+    setScheduleOpen(false);
+    setCreateAt(null);
+    setEditInterview(null);
+  }
 
   const setParam = (key: string, value: string | null) =>
     setParams((prev) => {
@@ -153,7 +238,14 @@ export function Calendar({
 
   const activeView =
     view === 'day' ? (
-      <DayView anchor={anchor} events={shown} selectedId={selectedId} onSelect={setSelected} />
+      <DayView
+        anchor={anchor}
+        events={shown}
+        selectedId={selectedId}
+        onSelect={setSelected}
+        onReschedule={isInterviews ? reschedule : undefined}
+        onCreateAt={isInterviews ? openCreateAt : undefined}
+      />
     ) : view === 'month' ? (
       <MonthView
         anchor={anchor}
@@ -161,19 +253,22 @@ export function Calendar({
         selectedId={selectedId}
         onSelect={setSelected}
         onAnchor={(d) => {
-          if (isInterviews) {
-            setAnchor(d);
-            setView('day');
-          } else {
-            setAnchor(d);
-            setAddFor(d);
-          }
+          // Clicking a date drills into its day view (both Calendar + Interviews).
+          setAnchor(d);
+          setView('day');
         }}
       />
     ) : view === 'agenda' ? (
-      <AgendaView events={shown} selectedId={selectedId} onSelect={setSelected} />
+      <AgendaView anchor={anchor} events={shown} selectedId={selectedId} onSelect={setSelected} />
     ) : (
-      <WeekView anchor={anchor} events={shown} selectedId={selectedId} onSelect={setSelected} />
+      <WeekView
+        anchor={anchor}
+        events={shown}
+        selectedId={selectedId}
+        onSelect={setSelected}
+        onReschedule={isInterviews ? reschedule : undefined}
+        onCreateAt={isInterviews ? openCreateAt : undefined}
+      />
     );
 
   return (
@@ -218,7 +313,14 @@ export function Calendar({
             {/* Primary action — desktop only; mobile uses the FAB */}
             <div className="hidden md:block">
               {isInterviews ? (
-                <Button variant="primary" onClick={() => setScheduleOpen(true)}>
+                <Button
+                  variant="primary"
+                  onClick={() => {
+                    setEditInterview(null);
+                    setCreateAt(null);
+                    setScheduleOpen(true);
+                  }}
+                >
                   Schedule
                 </Button>
               ) : (
@@ -263,6 +365,9 @@ export function Calendar({
                         ? () => setFeedbackFor({ id: selectedEvent.id, title: selectedEvent.title })
                         : undefined
                     }
+                    onAction={
+                      isInterviews && selectedEvent.kind === 'interview' ? runAction : undefined
+                    }
                   />
                 </div>
               )}
@@ -274,7 +379,15 @@ export function Calendar({
       {/* ── Mobile FAB ───────────────────────────────────────────── */}
       <button
         className="md:hidden fixed bottom-[80px] right-5 w-14 h-14 rounded-full bg-accent text-white shadow-xl z-40 flex items-center justify-center text-3xl font-light leading-none active:scale-95 transition-transform"
-        onClick={() => (isInterviews ? setScheduleOpen(true) : setAddFor(anchor))}
+        onClick={() => {
+          if (isInterviews) {
+            setEditInterview(null);
+            setCreateAt(null);
+            setScheduleOpen(true);
+          } else {
+            setAddFor(anchor);
+          }
+        }}
         aria-label={isInterviews ? 'Schedule interview' : 'Add reminder'}
       >
         +
@@ -308,8 +421,10 @@ export function Calendar({
           <ScheduleModal
             open={scheduleOpen}
             mock={false}
-            onClose={() => setScheduleOpen(false)}
+            onClose={closeSchedule}
             onScheduled={() => setReloadTick((t) => t + 1)}
+            defaultStartLocal={createAt ? toLocalInput(createAt) : undefined}
+            editInterview={editInterview}
           />
           <FeedbackModal
             interview={feedbackFor}
