@@ -50,7 +50,8 @@ export type AuditAction =
   | 'ai_ats_scored'
   | 'ai_vendor_email_generated'
   | 'ai_resume_profile_parsed'
-  | 'ai_feature_error';
+  | 'ai_feature_error'
+  | 'dev_login';
 
 interface AuditInput {
   action: AuditAction;
