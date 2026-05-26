@@ -1,5 +1,8 @@
 import { Button } from '../Button';
+import { Popover } from '../ui/Popover';
 import { TONE_STYLES, type CalEvent } from './types';
+
+export type EventAction = 'reschedule' | 'complete' | 'noshow' | 'cancel';
 
 // ---------------------------------------------------------------------------
 // Helper: format "Tue 2:00 – 3:00 PM" from an ISO start + duration in minutes
@@ -65,11 +68,14 @@ export function EventDetailBar({
   onClose,
   onBrief,
   onFeedback,
+  onAction,
 }: {
   event: CalEvent;
   onClose: () => void;
   onBrief?: () => void;
   onFeedback?: () => void;
+  /** Quick status/reschedule actions (interviews only). */
+  onAction?: (a: EventAction) => void;
 }): JSX.Element {
   const toneStyles = TONE_STYLES[event.tone];
 
@@ -80,6 +86,7 @@ export function EventDetailBar({
   const showBrief = event.kind === 'interview' && typeof onBrief === 'function';
   const showMatch = event.kind === 'interview' && typeof event.matchScore === 'number';
   const showJoin = Boolean(event.meetingUrl);
+  const showActions = event.kind === 'interview' && typeof onAction === 'function';
 
   return (
     <div className="border-t border-border bg-bg-elev animate-fade-in-up">
@@ -131,6 +138,48 @@ export function EventDetailBar({
             >
               Join Zoom
             </Button>
+          )}
+          {showActions && (
+            <Popover
+              align="right"
+              panelClassName="min-w-[160px]"
+              button={(open) => (
+                <span
+                  role="button"
+                  tabIndex={0}
+                  aria-label="Interview actions"
+                  className={`inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted hover:text-ink ${open ? 'bg-hover' : 'hover:bg-hover'}`}
+                >
+                  ⋯
+                </span>
+              )}
+            >
+              {(close) => (
+                <div className="py-1 text-[13px]">
+                  {(
+                    [
+                      ['reschedule', 'Reschedule'],
+                      ['complete', 'Mark complete'],
+                      ['noshow', 'No-show'],
+                      ['cancel', 'Cancel interview'],
+                    ] as [EventAction, string][]
+                  ).map(([action, label]) => (
+                    <button
+                      key={action}
+                      type="button"
+                      onClick={() => {
+                        if (action === 'cancel' && !confirm('Cancel this interview?')) return;
+                        onAction!(action);
+                        close();
+                      }}
+                      className={`block w-full px-3 py-1.5 text-left hover:bg-hover ${action === 'cancel' ? 'text-danger' : 'text-ink'}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </Popover>
           )}
           {/* Close on desktop end */}
           <Button

@@ -160,18 +160,32 @@ function MobileEventCard({
 // ── Component ─────────────────────────────────────────────────────────────
 
 export function AgendaView({
+  anchor,
   events,
   selectedId,
   onSelect,
 }: {
+  /** The list starts from this date; ‹ › / Today / mini-calendar move it. */
+  anchor: Date;
   events: CalEvent[];
   selectedId: string | null;
   onSelect: (id: string) => void;
 }): JSX.Element {
-  const allGroups = groupByDay(events);
+  // Start of the anchored day — the agenda shows this day forward so the
+  // navigation controls (which move `anchor`) visibly page the list.
+  const fromMs = new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate()).getTime();
+  const anchorKey = `${anchor.getFullYear()}-${anchor.getMonth()}-${anchor.getDate()}`;
+
+  const allGroups = groupByDay(events).filter((g) => g.day.getTime() >= fromMs);
 
   const [weeksShown, setWeeksShown] = useState(2);
   const sentinelRef = useRef<HTMLDivElement>(null);
+
+  // Reset the infinite-scroll window whenever the anchor changes so navigating
+  // doesn't carry over a previously expanded range.
+  useEffect(() => {
+    setWeeksShown(2);
+  }, [anchorKey]);
 
   useEffect(() => {
     const el = sentinelRef.current;
@@ -184,11 +198,10 @@ export function AgendaView({
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, []);
+  }, [allGroups.length]);
 
-  const baseDate = allGroups.length > 0 ? allGroups[0]!.day : new Date();
-  const cutoff = new Date(baseDate);
-  cutoff.setDate(baseDate.getDate() + weeksShown * 7);
+  const cutoff = new Date(fromMs);
+  cutoff.setDate(cutoff.getDate() + weeksShown * 7);
   const visibleGroups = allGroups.filter((g) => g.day <= cutoff);
   const hasMore = allGroups.length > visibleGroups.length;
 
@@ -197,7 +210,7 @@ export function AgendaView({
       <div className="w-full flex items-center justify-center min-h-[65vh]">
         <div className="text-center space-y-2">
           <p className="text-4xl">📅</p>
-          <p className="text-[14px] text-muted">Nothing scheduled</p>
+          <p className="text-[14px] text-muted">Nothing scheduled from this date</p>
         </div>
       </div>
     );

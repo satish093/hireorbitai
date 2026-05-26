@@ -3,6 +3,48 @@ import { z } from 'zod';
 import { db } from '../config/db';
 import { httpError, MANAGER_TIER } from '../types';
 import { syncInterviewReminders } from '../services/interviewReminders.service';
+import { publishToUser } from '../services/realtime.service';
+
+/**
+ * Best-effort realtime push for an interview mutation. Notifies the actor (so
+ * their other open tabs sync) and the interview's consultant (so the person it
+ * concerns sees it live). Managers aren't fanned out — they refetch on
+ * navigation / the `interviews` invalidate channel. Never throws: a failed
+ * publish must not fail the mutation.
+ */
+async function publishInterviewChange(
+  row: {
+    id?: string;
+    consultant_id?: string | null;
+    scheduled_at?: string | null;
+    status?: string | null;
+  },
+  actorId: string,
+): Promise<void> {
+  try {
+    const recipients = new Set<string>();
+    if (actorId) recipients.add(actorId);
+    if (row.consultant_id) {
+      const { data } = await db
+        .from('consultants')
+        .select('user_id')
+        .eq('id', row.consultant_id)
+        .maybeSingle();
+      const uid = (data as { user_id?: string } | null)?.user_id;
+      if (uid) recipients.add(uid);
+    }
+    const payload = {
+      id: row.id,
+      scheduled_at: row.scheduled_at ?? null,
+      status: row.status ?? null,
+    };
+    await Promise.all(
+      [...recipients].map((uid) => publishToUser(uid, 'interview:changed', payload)),
+    );
+  } catch {
+    /* best-effort */
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Authorization helpers — every signed-in user reaches these handlers, so
@@ -244,6 +286,7 @@ export const schedule: RequestHandler = async (req, res) => {
     .single();
   if (error) throw httpError(500, 'Database error');
   await syncInterviewReminders(data as Parameters<typeof syncInterviewReminders>[0]);
+  await publishInterviewChange(data as Record<string, unknown>, req.user.id);
   res.status(201).json(data);
 };
 
@@ -260,6 +303,7 @@ export const scheduleMock: RequestHandler = async (req, res) => {
     .single();
   if (error) throw httpError(500, 'Database error');
   await syncInterviewReminders(data as Parameters<typeof syncInterviewReminders>[0]);
+  await publishInterviewChange(data as Record<string, unknown>, req.user.id);
   res.status(201).json(data);
 };
 
@@ -279,6 +323,7 @@ export const update: RequestHandler = async (req, res) => {
   // Reschedule / cancel: regenerate the lead-time reminders for the new
   // date (or clear them if the interview is no longer SCHEDULED).
   await syncInterviewReminders(data as Parameters<typeof syncInterviewReminders>[0]);
+  await publishInterviewChange(data as Record<string, unknown>, req.user.id);
   res.json(data);
 };
 
@@ -439,5 +484,6 @@ export const submitFeedback: RequestHandler = async (req, res) => {
     .select()
     .single();
   if (error) throw httpError(500, 'Database error');
+  await publishInterviewChange(data as Record<string, unknown>, req.user.id);
   res.json(data);
 };

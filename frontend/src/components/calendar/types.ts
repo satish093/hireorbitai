@@ -16,6 +16,12 @@ export interface CalEvent {
   meetingUrl?: string | null;
   matchScore?: number | null;
   status?: string | null;
+  // Raw interview fields (interviews only) — needed to open the reschedule/edit
+  // modal without a separate fetch.
+  consultantId?: string | null;
+  consultantName?: string | null;
+  interviewType?: string | null;
+  interviewer?: string | null;
 }
 
 export const CALENDARS: { key: CalendarKey; label: string; tone: CalTone }[] = [

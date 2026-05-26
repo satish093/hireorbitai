@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { api } from '../../services/api';
 import toast from 'react-hot-toast';
 import type { CalEvent } from './types';
@@ -13,6 +13,7 @@ interface RawInterview {
   is_mock?: boolean;
   status?: string | null;
   match_score?: number | null;
+  consultant_id?: string | null;
   consultant?: { user?: { full_name?: string | null } | null } | null;
 }
 interface RawReminder {
@@ -32,9 +33,30 @@ const DAY = 86_400_000;
 export function useCalendarData(anchor: Date, reloadKey = 0) {
   const [events, setEvents] = useState<CalEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  // Internal reload counter so callers can force a resync (e.g. to revert a
+  // failed optimistic mutation) without owning the key.
+  const [localReload, setLocalReload] = useState(0);
   // Re-fetch when the anchor's month changes (covers paging across views) or
   // when reloadKey bumps (after scheduling / feedback).
   const monthKey = `${anchor.getFullYear()}-${anchor.getMonth()}`;
+
+  /** Resync from the server. Use after a mutation fails to undo optimism. */
+  const reload = useCallback(() => setLocalReload((n) => n + 1), []);
+
+  /** Patch an event in place (optimistic). Re-sorts by start so a moved event
+   *  lands in the right slot immediately. */
+  const mutateLocal = useCallback((id: string, partial: Partial<CalEvent>) => {
+    setEvents((prev) =>
+      prev
+        .map((e) => (e.id === id ? { ...e, ...partial } : e))
+        .sort((a, b) => a.start.localeCompare(b.start)),
+    );
+  }, []);
+
+  /** Drop an event locally (optimistic delete). */
+  const removeLocal = useCallback((id: string) => {
+    setEvents((prev) => prev.filter((e) => e.id !== id));
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -61,6 +83,10 @@ export function useCalendarData(anchor: Date, reloadKey = 0) {
             meetingUrl: i.meeting_url ?? null,
             matchScore: typeof i.match_score === 'number' ? Math.round(i.match_score) : null,
             status: i.status ?? null,
+            consultantId: i.consultant_id ?? null,
+            consultantName: i.consultant?.user?.full_name ?? null,
+            interviewType: i.type ?? null,
+            interviewer: i.interviewer ?? null,
           }));
         const fromMs = new Date(from).getTime();
         const toMs = new Date(to).getTime();
@@ -92,7 +118,7 @@ export function useCalendarData(anchor: Date, reloadKey = 0) {
       alive = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [monthKey, reloadKey]);
+  }, [monthKey, reloadKey, localReload]);
 
-  return { events, loading };
+  return { events, loading, mutateLocal, removeLocal, reload };
 }

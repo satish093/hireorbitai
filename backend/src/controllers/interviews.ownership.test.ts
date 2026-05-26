@@ -69,6 +69,12 @@ vi.mock('../services/interviewReminders.service', () => ({
   syncInterviewReminders: vi.fn(),
 }));
 
+// Stub the realtime service so importing the controller never loads `pg`
+// (its `import { Client } from 'pg'` throws under vitest's module interop).
+vi.mock('../services/realtime.service', () => ({
+  publishToUser: vi.fn(),
+}));
+
 import { update } from './interviews.controller';
 
 function mkRes() {

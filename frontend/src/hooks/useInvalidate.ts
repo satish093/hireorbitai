@@ -20,7 +20,14 @@ import { useEffect, useRef } from 'react';
  * "have I handled this event?" flag.
  */
 
-type Channel = 'users' | 'tasks' | 'jobs' | 'applications' | 'invitations' | 'feature-flags';
+type Channel =
+  | 'users'
+  | 'tasks'
+  | 'jobs'
+  | 'applications'
+  | 'invitations'
+  | 'feature-flags'
+  | 'interviews';
 
 interface ChannelState {
   // Monotonic counter; incremented on every notify(). Subscribers read

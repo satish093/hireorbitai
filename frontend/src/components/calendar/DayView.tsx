@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import clsx from 'clsx';
 import { Avatar } from '../TaskBits';
+import { useDragReschedule } from './useDragReschedule';
+import { EventHoverCard } from './EventHoverCard';
 import { DAY_START, DAY_END, TONE_STYLES, layoutDay, sameDay, endOf, type CalEvent } from './types';
 
 // ── Local constants (Day-view only; does NOT touch shared HOUR_HEIGHT) ──
@@ -160,18 +162,42 @@ export function DayView({
   events,
   selectedId,
   onSelect,
+  onReschedule,
+  onCreateAt,
 }: {
   anchor: Date;
   events: CalEvent[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  onReschedule?: (ev: CalEvent, newStartIso: string) => void;
+  onCreateAt?: (date: Date) => void;
 }): JSX.Element {
   const [now, setNow] = useState(() => new Date());
+  const [hover, setHover] = useState<{ ev: CalEvent; rect: DOMRect } | null>(null);
 
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 60_000);
     return () => clearInterval(id);
   }, []);
+
+  const drag = useDragReschedule({
+    hourHeight: LOCAL_HOUR_HEIGHT,
+    onSelect,
+    onReschedule: onReschedule ?? (() => undefined),
+    enabled: !!onReschedule,
+  });
+
+  function handleColumnClick(e: React.MouseEvent<HTMLDivElement>) {
+    if (!onCreateAt) return;
+    if ((e.target as HTMLElement).closest('[data-event]')) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const y = e.clientY - rect.top;
+    const totalMin = Math.floor(((DAY_START + y / LOCAL_HOUR_HEIGHT) * 60) / 30) * 30;
+    const d = new Date(anchor);
+    d.setHours(0, 0, 0, 0);
+    d.setMinutes(totalMin);
+    onCreateAt(d);
+  }
 
   const isToday = sameDay(anchor, now);
   const nowHour = now.getHours();
@@ -230,7 +256,10 @@ export function DayView({
           </div>
 
           {/* Event column */}
-          <div className="relative flex-1">
+          <div
+            className={clsx('relative flex-1', onCreateAt && 'cursor-copy')}
+            onClick={handleColumnClick}
+          >
             {/* Horizontal hour gridlines */}
             {HOURS.map((h) => (
               <div
@@ -265,15 +294,33 @@ export function DayView({
 
               const tone = TONE_STYLES[ev.tone];
               const isSelected = ev.id === selectedId;
+              const dragging = drag.isDragging(ev.id);
+              const dragOffset = dragging ? drag.preview!.offsetPx : 0;
 
               return (
                 <button
                   key={ev.id}
                   type="button"
-                  onClick={() => onSelect(ev.id)}
+                  data-event={ev.id}
+                  onPointerDown={(e) => {
+                    setHover(null);
+                    drag.onEventPointerDown(e, ev);
+                  }}
+                  onPointerEnter={(e) => {
+                    if (e.pointerType === 'mouse')
+                      setHover({ ev, rect: e.currentTarget.getBoundingClientRect() });
+                  }}
+                  onPointerLeave={() => setHover(null)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      onSelect(ev.id);
+                    }
+                  }}
                   className={clsx(
-                    'absolute overflow-hidden rounded-lg border cursor-pointer text-left transition-shadow',
+                    'absolute overflow-hidden rounded-lg border text-left transition-shadow touch-none select-none',
                     tone.bg,
+                    dragging ? 'z-30 opacity-80 shadow-lg cursor-grabbing' : 'cursor-grab',
                     isSelected
                       ? 'ring-2 ring-accent border-transparent z-10 shadow-sm'
                       : `${tone.border} hover:shadow-sm`,
@@ -284,8 +331,14 @@ export function DayView({
                     left: `${leftPct}%`,
                     width: widthCalc,
                     marginLeft: 2,
+                    transform: dragOffset ? `translateY(${dragOffset}px)` : undefined,
                   }}
                 >
+                  {dragging && (
+                    <span className="absolute -top-5 left-0 z-40 rounded bg-ink px-1.5 py-0.5 text-[10px] font-mono text-bg shadow">
+                      {drag.preview!.label}
+                    </span>
+                  )}
                   {/* Left tone strip */}
                   <div
                     className={clsx('absolute left-0 top-0 bottom-0 w-1 rounded-l-lg', tone.bar)}
@@ -377,6 +430,7 @@ export function DayView({
           )}
         </div>
       </div>
+      {hover && !drag.preview && <EventHoverCard event={hover.ev} rect={hover.rect} />}
     </div>
   );
 }

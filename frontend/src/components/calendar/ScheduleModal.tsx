@@ -18,6 +18,25 @@ function localToIso(v: string): string {
   return isNaN(d.getTime()) ? '' : d.toISOString();
 }
 
+/** ISO (or Date) → local "YYYY-MM-DDTHH:mm" for the DateTimePicker. */
+function isoToLocal(iso?: string | null): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+export interface EditInterview {
+  id: string;
+  consultant_id?: string | null;
+  consultant_name?: string | null;
+  type?: string | null;
+  scheduled_at?: string | null;
+  interviewer?: string | null;
+  meeting_url?: string | null;
+}
+
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
@@ -48,15 +67,22 @@ export function ScheduleModal({
   mock,
   onClose,
   onScheduled,
+  defaultStartLocal,
+  editInterview,
 }: {
   open: boolean;
   mock: boolean;
   onClose: () => void;
   onScheduled: () => void;
+  /** Prefill the "When" field (local "YYYY-MM-DDTHH:mm") — used by click-to-create. */
+  defaultStartLocal?: string;
+  /** When set, the modal edits an existing interview (PATCH) instead of creating. */
+  editInterview?: EditInterview | null;
 }): JSX.Element {
   const [consultants, setConsultants] = useState<any[]>([]);
   const [form, setForm] = useState<typeof EMPTY_FORM>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const isEdit = !!editInterview;
 
   // Fetch consultants once when the modal first opens
   useEffect(() => {
@@ -73,6 +99,31 @@ export function ScheduleModal({
     };
   }, [open]);
 
+  // Seed the form when (re)opened — from the edited interview, or a prefilled
+  // start time, or empty.
+  useEffect(() => {
+    if (!open) return;
+    if (editInterview) {
+      const local = isoToLocal(editInterview.scheduled_at);
+      setForm({
+        consultant_id: editInterview.consultant_id ?? '',
+        type: editInterview.type ?? 'PHONE',
+        scheduled_at: localToIso(local),
+        scheduled_at_local: local,
+        interviewer: editInterview.interviewer ?? '',
+        meeting_url: editInterview.meeting_url ?? '',
+      });
+    } else if (defaultStartLocal) {
+      setForm({
+        ...EMPTY_FORM,
+        scheduled_at_local: defaultStartLocal,
+        scheduled_at: localToIso(defaultStartLocal),
+      });
+    } else {
+      setForm(EMPTY_FORM);
+    }
+  }, [open, editInterview, defaultStartLocal]);
+
   function handleClose() {
     setForm(EMPTY_FORM);
     onClose();
@@ -86,12 +137,23 @@ export function ScheduleModal({
     }
     setSaving(true);
     try {
-      const url = mock ? '/interviews/mock' : '/interviews';
-      const { scheduled_at_local: _slocal, ...payload } = form;
-      void _slocal;
-      if (mock) delete (payload as any).type;
-      await api.post(url, payload);
-      toast.success(mock ? 'Mock scheduled' : 'Interview scheduled');
+      if (isEdit && editInterview) {
+        // Edit/reschedule: PATCH only the mutable fields (type + consultant are
+        // immutable server-side and excluded from updateSchema).
+        await api.patch(`/interviews/${editInterview.id}`, {
+          scheduled_at: form.scheduled_at,
+          interviewer: form.interviewer || null,
+          meeting_url: form.meeting_url || null,
+        });
+        toast.success('Interview updated');
+      } else {
+        const url = mock ? '/interviews/mock' : '/interviews';
+        const { scheduled_at_local: _slocal, ...payload } = form;
+        void _slocal;
+        if (mock) delete (payload as any).type;
+        await api.post(url, payload);
+        toast.success(mock ? 'Mock scheduled' : 'Interview scheduled');
+      }
       setForm(EMPTY_FORM);
       onClose();
       onScheduled();
@@ -106,11 +168,19 @@ export function ScheduleModal({
     <Modal
       open={open}
       onClose={handleClose}
-      title={mock ? 'Schedule mock interview' : 'Schedule interview'}
+      title={
+        isEdit
+          ? 'Reschedule / edit interview'
+          : mock
+            ? 'Schedule mock interview'
+            : 'Schedule interview'
+      }
       description={
-        mock
-          ? 'Internal practice run — feedback only.'
-          : 'Records on the consultant timeline and calendar.'
+        isEdit
+          ? 'Update the time, interviewer, or meeting link.'
+          : mock
+            ? 'Internal practice run — feedback only.'
+            : 'Records on the consultant timeline and calendar.'
       }
       footer={
         <>
@@ -128,13 +198,23 @@ export function ScheduleModal({
           label="Consultant *"
           placeholder="Select a consultant…"
           value={form.consultant_id}
-          options={consultants.map((c) => ({
-            value: c.id,
-            label: c.user?.full_name ?? c.user?.email,
-          }))}
+          disabled={isEdit}
+          options={
+            isEdit && editInterview
+              ? [
+                  {
+                    value: editInterview.consultant_id ?? '',
+                    label: editInterview.consultant_name ?? 'Consultant',
+                  },
+                ]
+              : consultants.map((c) => ({
+                  value: c.id,
+                  label: c.user?.full_name ?? c.user?.email,
+                }))
+          }
           onChange={(e) => setForm({ ...form, consultant_id: e.target.value })}
         />
-        {!mock && (
+        {!mock && !isEdit && (
           <SelectInput
             label="Type"
             value={form.type}

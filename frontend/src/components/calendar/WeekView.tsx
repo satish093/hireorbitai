@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import clsx from 'clsx';
 import { Avatar } from '../TaskBits';
+import { useDragReschedule } from './useDragReschedule';
+import { EventHoverCard } from './EventHoverCard';
 import {
   HOUR_HEIGHT,
   DAY_START,
@@ -12,6 +14,9 @@ import {
   sameDay,
   type CalEvent,
 } from './types';
+
+const ymd = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 // Hours visible in the grid (DAY_START..DAY_END inclusive as labels)
 const HOURS = Array.from({ length: DAY_END - DAY_START + 1 }, (_, i) => DAY_START + i);
@@ -29,18 +34,55 @@ export function WeekView({
   events,
   selectedId,
   onSelect,
+  onReschedule,
+  onCreateAt,
 }: {
   anchor: Date;
   events: CalEvent[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  /** Drag-to-reschedule callback (interviews only). */
+  onReschedule?: (ev: CalEvent, newStartIso: string) => void;
+  /** Click an empty slot to create at that time. */
+  onCreateAt?: (date: Date) => void;
 }): JSX.Element {
   const [now, setNow] = useState(() => new Date());
+  const [hover, setHover] = useState<{ ev: CalEvent; rect: DOMRect } | null>(null);
 
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 60_000);
     return () => clearInterval(id);
   }, []);
+
+  // Map a screen point to the day column under it (for drag day-change).
+  const resolveDayFromPoint = (x: number, y: number): Date | null => {
+    const el = document.elementFromPoint(x, y)?.closest('[data-day]') as HTMLElement | null;
+    const iso = el?.getAttribute('data-day');
+    return iso ? new Date(`${iso}T00:00:00`) : null;
+  };
+
+  const drag = useDragReschedule({
+    hourHeight: HOUR_HEIGHT,
+    resolveDayFromPoint,
+    onSelect,
+    onReschedule: onReschedule ?? (() => undefined),
+    enabled: !!onReschedule,
+  });
+
+  // Compute the time for an empty-slot click within a day column.
+  function handleColumnClick(e: React.MouseEvent<HTMLDivElement>, day: Date) {
+    if (!onCreateAt) return;
+    // Ignore clicks that landed on an event (those are buttons stopping here).
+    if ((e.target as HTMLElement).closest('[data-event]')) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const y = e.clientY - rect.top;
+    const hoursFromStart = y / HOUR_HEIGHT;
+    const totalMin = Math.floor(((DAY_START + hoursFromStart) * 60) / 30) * 30;
+    const d = new Date(day);
+    d.setHours(0, 0, 0, 0);
+    d.setMinutes(totalMin);
+    onCreateAt(d);
+  }
 
   // Build Mon–Fri of this week
   const monday = mondayOf(anchor);
@@ -125,7 +167,13 @@ export function WeekView({
             return (
               <div
                 key={day.toISOString()}
-                className={clsx('relative flex-1 min-w-[60px]', isToday && 'bg-accent-soft')}
+                data-day={ymd(day)}
+                onClick={(e) => handleColumnClick(e, day)}
+                className={clsx(
+                  'relative flex-1 min-w-[60px]',
+                  isToday && 'bg-accent-soft',
+                  onCreateAt && 'cursor-copy',
+                )}
               >
                 {/* Horizontal hour gridlines */}
                 {HOURS.map((h) => (
@@ -171,15 +219,33 @@ export function WeekView({
 
                   const tone = TONE_STYLES[ev.tone];
                   const isSelected = ev.id === selectedId;
+                  const dragging = drag.isDragging(ev.id);
+                  const dragOffset = dragging ? drag.preview!.offsetPx : 0;
 
                   return (
                     <button
                       key={ev.id}
                       type="button"
-                      onClick={() => onSelect(ev.id)}
+                      data-event={ev.id}
+                      onPointerDown={(e) => {
+                        setHover(null);
+                        drag.onEventPointerDown(e, ev);
+                      }}
+                      onPointerEnter={(e) => {
+                        if (e.pointerType === 'mouse')
+                          setHover({ ev, rect: e.currentTarget.getBoundingClientRect() });
+                      }}
+                      onPointerLeave={() => setHover(null)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          onSelect(ev.id);
+                        }
+                      }}
                       className={clsx(
-                        'absolute overflow-hidden rounded-lg border cursor-pointer text-left transition-shadow',
+                        'absolute overflow-hidden rounded-lg border text-left transition-shadow touch-none select-none',
                         tone.bg,
+                        dragging ? 'z-30 opacity-80 shadow-lg cursor-grabbing' : 'cursor-grab',
                         isSelected
                           ? 'ring-2 ring-accent border-transparent z-10 shadow-sm'
                           : `${tone.border} hover:shadow-sm`,
@@ -190,8 +256,14 @@ export function WeekView({
                         left: `${leftPct}%`,
                         width: widthCalc,
                         marginLeft: 2,
+                        transform: dragOffset ? `translateY(${dragOffset}px)` : undefined,
                       }}
                     >
+                      {dragging && (
+                        <span className="absolute -top-5 left-0 z-40 rounded bg-ink px-1.5 py-0.5 text-[10px] font-mono text-bg shadow">
+                          {drag.preview!.label}
+                        </span>
+                      )}
                       {/* Left tone strip */}
                       <div
                         className={clsx(
@@ -234,6 +306,7 @@ export function WeekView({
           })}
         </div>
       </div>
+      {hover && !drag.preview && <EventHoverCard event={hover.ev} rect={hover.rect} />}
     </div>
   );
 }
