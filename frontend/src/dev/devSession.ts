@@ -32,9 +32,11 @@ export async function listDevUsers(): Promise<DevUser[]> {
 }
 
 /**
- * Mint a real session for a seeded user and adopt it. Writing the session fires
- * `hireorbitai:session-changed`, so AuthContext reloads the profile in place —
- * no full page reload, instant switch.
+ * Mint a real session for a seeded user and adopt it, then hard-navigate to the
+ * dashboard. The hard navigation (not an in-place swap) is deliberate: it works
+ * even from /login (whose form-only redirect never reacts to an externally set
+ * session) and fully re-initialises the app — auth, feature flags, sidebar — as
+ * the new user, clearing any stale per-user state when switching identities.
  */
 export async function loginAsUser(userId: string): Promise<void> {
   const { data } = await api.post<DevLoginResponse>('/auth/dev/login', { userId });
@@ -49,4 +51,5 @@ export async function loginAsUser(userId: string): Promise<void> {
       role: data.user.role,
     },
   });
+  window.location.assign('/dashboard');
 }
