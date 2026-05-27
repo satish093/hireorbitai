@@ -292,6 +292,17 @@ export const assignRecruiter: RequestHandler = async (req, res) => {
   if (!rec) throw httpError(400, 'Recruiter not found');
   const newRec = rec as { id: string; user_id: string | null };
 
+  // Group leads may only reassign within their own group: BOTH the consultant
+  // and the target recruiter must belong to the caller's group. Admin tier is
+  // unscoped.
+  if (isGroupLead(req.user.role)) {
+    const consInGroup = !!oldCons.user_id && (await leadCanAccessUser(req.user, oldCons.user_id));
+    const recInGroup = !!newRec.user_id && (await leadCanAccessUser(req.user, newRec.user_id));
+    if (!consInGroup || !recInGroup) {
+      throw httpError(403, 'Both the consultant and the recruiter must be in your group.');
+    }
+  }
+
   const { data, error } = await db
     .from('consultants')
     .update({ recruiter_id })

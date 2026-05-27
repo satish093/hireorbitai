@@ -91,7 +91,7 @@ const log = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() };
 
 async function call(
   handler: Handler,
-  user: { id: string; role: string },
+  user: { id: string; role: string; group_id?: string | null },
   opts: { body?: unknown; params?: Record<string, string> } = {},
 ) {
   const res = mkRes();
@@ -118,6 +118,8 @@ beforeEach(() => {
 // Fixtures
 // ---------------------------------------------------------------------------
 const MANAGER_USER = { id: 'u-manager', role: 'MANAGER' };
+// Admin tier is unscoped — used for the happy-path audit/cache assertions.
+const ADMIN_USER = { id: 'u-dir', role: 'DIRECTOR' };
 const CONSULTANT_ROW = { id: 'cons-1', user_id: 'u-cons', recruiter_id: 'rec-old' };
 const OLD_REC_ROW = { id: 'rec-old', user_id: 'u-old-recruiter' };
 const NEW_REC_ROW = { id: 'rec-new', user_id: 'u-new-recruiter' };
@@ -154,10 +156,10 @@ describe('consultants.assignRecruiter — validation + audit', () => {
     expect(err?.status).toBe(400);
   });
 
-  it('emits an audit event on successful assignment', async () => {
+  it('emits an audit event on successful assignment (admin tier, unscoped)', async () => {
     mock.rows.consultants = [CONSULTANT_ROW, OLD_REC_ROW]; // old rec looked up by id
     mock.rows.recruiters = [OLD_REC_ROW, NEW_REC_ROW];
-    const { err } = await call(consultants.assignRecruiter as Handler, MANAGER_USER, {
+    const { err } = await call(consultants.assignRecruiter as Handler, ADMIN_USER, {
       body: { recruiter_id: 'rec-new' },
       params: { id: 'cons-1' },
     });
@@ -170,12 +172,24 @@ describe('consultants.assignRecruiter — validation + audit', () => {
   it('calls invalidatePermissionCache for the old and new recruiter users', async () => {
     mock.rows.consultants = [CONSULTANT_ROW, OLD_REC_ROW];
     mock.rows.recruiters = [OLD_REC_ROW, NEW_REC_ROW];
-    const { err } = await call(consultants.assignRecruiter as Handler, MANAGER_USER, {
+    const { err } = await call(consultants.assignRecruiter as Handler, ADMIN_USER, {
       body: { recruiter_id: 'rec-new' },
       params: { id: 'cons-1' },
     });
     expect(err).toBeNull();
     // Permission cache must be cleared for the new recruiter's user
     expect(invalidateSpy).toHaveBeenCalledWith('u-new-recruiter');
+  });
+
+  it('returns 403 for a group lead when the consultant/recruiter are outside their group', async () => {
+    mock.rows.consultants = [CONSULTANT_ROW, OLD_REC_ROW];
+    mock.rows.recruiters = [OLD_REC_ROW, NEW_REC_ROW];
+    mock.rows.users = []; // group lead with no group members → fail-closed
+    const { err } = await call(
+      consultants.assignRecruiter as Handler,
+      { ...MANAGER_USER, group_id: 'g1' },
+      { body: { recruiter_id: 'rec-new' }, params: { id: 'cons-1' } },
+    );
+    expect(err?.status).toBe(403);
   });
 });

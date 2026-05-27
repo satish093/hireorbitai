@@ -234,6 +234,15 @@ describe('tasks.controller — create validation', () => {
     expect(insert?.created_by).toBe(MANAGER.id);
     expect(insert?.title).toBe('Do thing');
   });
+
+  it('a group lead cannot create a task assigned to a user outside their group', async () => {
+    mock.rows.users = []; // empty group → assignee not in scope → fail-closed
+    const err = await call(tasks.create as Handler, GROUP_LEAD, {
+      body: { title: 'Out of scope', assignee_id: 'u-outsider' },
+    });
+    expect(err?.status).toBe(403);
+    expect(mock.updates.find((u) => u.table === 'insert:tasks')).toBeUndefined();
+  });
 });
 
 describe('tasks.assignees — scoped assignable users', () => {

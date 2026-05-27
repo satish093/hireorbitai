@@ -37,6 +37,43 @@ async function getCallerConsultantRowId(userId: string): Promise<string | null> 
   return (data as { id?: string } | null)?.id ?? null;
 }
 
+/**
+ * Assert the caller may act on (create/check/submit for) the given consultant:
+ *   - ADMIN_TIER  → unscoped
+ *   - GROUP LEAD  → only consultants in their group
+ *   - RECRUITER   → only their assigned consultants
+ *   - CONSULTANT  → only themselves
+ * Throws 403 otherwise. Fail-closed for any other role.
+ */
+async function assertCanActOnConsultant(
+  caller: { id: string; role: Role; group_id?: string | null },
+  consultantId: string,
+): Promise<void> {
+  if (isAdminTier(caller.role)) return;
+  if (isGroupLead(caller.role)) {
+    if (await leadCanAccessConsultant(caller, consultantId)) return;
+    throw httpError(403, 'Forbidden');
+  }
+  if (caller.role === 'RECRUITER') {
+    const myRecId = await getCallerRecruiterRowId(caller.id);
+    if (!myRecId) throw httpError(403, 'Forbidden');
+    const { data: cons } = await db
+      .from('consultants')
+      .select('id')
+      .eq('id', consultantId)
+      .eq('recruiter_id', myRecId)
+      .maybeSingle();
+    if (!cons) throw httpError(403, 'Forbidden');
+    return;
+  }
+  if (caller.role === 'CONSULTANT') {
+    const myConsId = await getCallerConsultantRowId(caller.id);
+    if (myConsId !== consultantId) throw httpError(403, 'Forbidden');
+    return;
+  }
+  throw httpError(403, 'Forbidden');
+}
+
 interface ApplicationOwnership {
   id: string;
   recruiter_id: string | null;
@@ -136,26 +173,9 @@ export const checkDuplicate: RequestHandler = async (req, res) => {
   const { consultant_id, job_id, vendor_id } = req.query as Record<string, string | undefined>;
   if (!consultant_id || !job_id) throw httpError(400, 'consultant_id and job_id required');
 
-  // Scope: non-managers may only check against their own consultant rows.
-  if (!isManagerTier(req.user.role)) {
-    if (req.user.role === 'RECRUITER') {
-      const myRecId = await getCallerRecruiterRowId(req.user.id);
-      if (!myRecId) throw httpError(403, 'Forbidden');
-      // Recruiter must own the consultant.
-      const { data: cons } = await db
-        .from('consultants')
-        .select('id')
-        .eq('id', consultant_id)
-        .eq('recruiter_id', myRecId)
-        .maybeSingle();
-      if (!cons) throw httpError(403, 'Forbidden');
-    } else if (req.user.role === 'CONSULTANT') {
-      const myConsId = await getCallerConsultantRowId(req.user.id);
-      if (myConsId !== consultant_id) throw httpError(403, 'Forbidden');
-    } else {
-      throw httpError(403, 'Forbidden');
-    }
-  }
+  // Scope: admin unscoped; group lead → own group; recruiter → own consultants;
+  // consultant → self.
+  await assertCanActOnConsultant(req.user, consultant_id);
 
   let qb = db
     .from('applications')
@@ -200,26 +220,11 @@ export const create: RequestHandler = async (req, res) => {
   if (!body.consultant_id || !body.job_id)
     throw httpError(400, 'consultant_id and job_id required');
 
-  // Scope: the caller must legitimately represent that consultant. Without
-  // this, any signed-in user could pin an application to any consultant.
-  if (!isManagerTier(req.user.role)) {
-    if (req.user.role === 'RECRUITER') {
-      const myRecId = await getCallerRecruiterRowId(req.user.id);
-      if (!myRecId) throw httpError(403, 'Forbidden');
-      const { data: cons } = await db
-        .from('consultants')
-        .select('id')
-        .eq('id', body.consultant_id)
-        .eq('recruiter_id', myRecId)
-        .maybeSingle();
-      if (!cons) throw httpError(403, 'Forbidden');
-    } else if (req.user.role === 'CONSULTANT') {
-      const myConsId = await getCallerConsultantRowId(req.user.id);
-      if (myConsId !== body.consultant_id) throw httpError(403, 'Forbidden');
-    } else {
-      throw httpError(403, 'Forbidden');
-    }
-  }
+  // Scope: the caller must legitimately represent that consultant (admin
+  // unscoped; group lead → own group; recruiter → own consultants; consultant →
+  // self). Without this, any signed-in user could pin an application to any
+  // consultant.
+  await assertCanActOnConsultant(req.user, body.consultant_id);
 
   // Duplicate guard.
   let dupQ = db
@@ -301,26 +306,10 @@ export const fromJob: RequestHandler = async (req, res) => {
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
 
-  // Scope the consultant id to the caller. Without this, any user could log
-  // an application "from" another consultant.
-  if (!isManagerTier(req.user.role)) {
-    if (req.user.role === 'RECRUITER') {
-      const myRecId = await getCallerRecruiterRowId(req.user.id);
-      if (!myRecId) throw httpError(403, 'Forbidden');
-      const { data: cons } = await db
-        .from('consultants')
-        .select('id')
-        .eq('id', parsed.data.consultant_id)
-        .eq('recruiter_id', myRecId)
-        .maybeSingle();
-      if (!cons) throw httpError(403, 'Forbidden');
-    } else if (req.user.role === 'CONSULTANT') {
-      const myConsId = await getCallerConsultantRowId(req.user.id);
-      if (myConsId !== parsed.data.consultant_id) throw httpError(403, 'Forbidden');
-    } else {
-      throw httpError(403, 'Forbidden');
-    }
-  }
+  // Scope the consultant id to the caller (admin unscoped; group lead → own
+  // group; recruiter → own consultants; consultant → self). Without this, any
+  // user could log an application "from" another consultant.
+  await assertCanActOnConsultant(req.user, parsed.data.consultant_id);
 
   // Identify the caller's recruiter row, if any — populates applications.recruiter_id.
   const { data: rec } = await db

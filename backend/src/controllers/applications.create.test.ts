@@ -90,4 +90,25 @@ describe('applications.create — mass-assignment guard', () => {
     expect(mock.inserted).not.toHaveProperty('force');
     expect(mock.inserted).not.toHaveProperty('recruiter_id');
   });
+
+  it('returns 403 when a group lead creates an application for an out-of-group consultant', async () => {
+    // Group lead with an empty group → leadCanAccessConsultant is false →
+    // fail-closed. No insert should happen.
+    const res = mkRes();
+    let err: { status?: number } | null = null;
+    try {
+      await (create as any)(
+        {
+          body: { consultant_id: 'c-1', job_id: 'j-1' },
+          user: { id: 'u-lead', role: 'MANAGER', group_id: 'g1', email: 'l@x.test' },
+        },
+        res,
+        vi.fn(),
+      );
+    } catch (e) {
+      err = e as { status?: number };
+    }
+    expect(err?.status).toBe(403);
+    expect(mock.inserted).toBeNull();
+  });
 });

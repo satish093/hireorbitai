@@ -514,7 +514,7 @@ export default function App() {
           <Route
             path="/admin/groups"
             element={
-              <ProtectedRoute allow={MANAGER_TIER} capability="user_groups">
+              <ProtectedRoute allow={ADMIN_TIER} capability="user_groups">
                 <UserGroups />
               </ProtectedRoute>
             }
@@ -619,7 +619,7 @@ export default function App() {
           <Route
             path="/training/assignments/:id"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allow={BUSINESS_ROLES}>
                 <FeatureGuard feature="training">
                   <LessonViewer />
                 </FeatureGuard>
@@ -629,7 +629,7 @@ export default function App() {
           <Route
             path="/training/assignments/:id/plan"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allow={BUSINESS_ROLES}>
                 <FeatureGuard feature="training">
                   <TrainingPlanView />
                 </FeatureGuard>
@@ -639,7 +639,7 @@ export default function App() {
           <Route
             path="/training/assignments/:id/quiz"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allow={BUSINESS_ROLES}>
                 <FeatureGuard feature="training">
                   <QuizPage />
                 </FeatureGuard>

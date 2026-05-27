@@ -10,6 +10,8 @@ import { Button } from '../components/Button';
 import { GroupBadge } from '../components/GroupBadge';
 import { Popover } from '../components/ui/Popover';
 import { api } from '../services/api';
+import { useAuth } from '../context/AuthContext';
+import { MANAGER_TIER } from '../types';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
 
@@ -123,6 +125,12 @@ function StatusSelect({
 }
 
 export function Consultants() {
+  const { profile } = useAuth();
+  // Only MANAGER_TIER may (re)assign recruiters — and only they may fetch the
+  // /recruiters directory (the backend now gates it to MANAGER_TIER). A
+  // RECRUITER sees the bench read-only, with no assign controls.
+  const canAssignRecruiter =
+    !!profile && (MANAGER_TIER as readonly string[]).includes(profile.role);
   const [rows, setRows] = useState<ConsultantRow[]>([]);
   const [recruiters, setRecruiters] = useState<RecruiterRow[]>([]);
   const [picked, setPicked] = useState<ConsultantRow | null>(null);
@@ -142,18 +150,22 @@ export function Consultants() {
   useEffect(() => {
     let cancelled = false;
     load();
-    api
-      .get('/recruiters')
-      .then((r) => {
-        if (!cancelled) setRecruiters(r.data ?? []);
-      })
-      .catch((e) => {
-        if (!cancelled) toast.error(e?.response?.data?.error ?? 'Failed to load recruiters');
-      });
+    // Recruiter directory is manager-only; don't even fetch it for a RECRUITER
+    // (the call would 403).
+    if (canAssignRecruiter) {
+      api
+        .get('/recruiters')
+        .then((r) => {
+          if (!cancelled) setRecruiters(r.data ?? []);
+        })
+        .catch((e) => {
+          if (!cancelled) toast.error(e?.response?.data?.error ?? 'Failed to load recruiters');
+        });
+    }
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [canAssignRecruiter]);
 
   function openAssign(c: ConsultantRow) {
     setPicked(c);
@@ -198,7 +210,11 @@ export function Consultants() {
     <Layout title="Consultants">
       <PageHeader
         title="Consultants"
-        description="Active bench. Assign recruiters, set marketing status, and open profiles for full context."
+        description={
+          canAssignRecruiter
+            ? 'Active bench. Assign recruiters, set marketing status, and open profiles for full context.'
+            : 'Active bench. Review profiles and update marketing status.'
+        }
       />
       <DataTable
         rows={rows}
@@ -283,16 +299,21 @@ export function Consultants() {
               <StatusSelect value={c.marketing_status} onChange={(v) => setStatus(c.id, v)} />
             ),
           },
-          {
-            key: 'actions',
-            header: '',
-            align: 'right',
-            render: (c: ConsultantRow) => (
-              <Button size="sm" variant="ghost" onClick={() => openAssign(c)}>
-                {c.recruiter ? 'Reassign' : 'Assign'}
-              </Button>
-            ),
-          },
+          // Assign/Reassign is manager-only; recruiters see the bench read-only.
+          ...(canAssignRecruiter
+            ? [
+                {
+                  key: 'actions',
+                  header: '',
+                  align: 'right' as const,
+                  render: (c: ConsultantRow) => (
+                    <Button size="sm" variant="ghost" onClick={() => openAssign(c)}>
+                      {c.recruiter ? 'Reassign' : 'Assign'}
+                    </Button>
+                  ),
+                },
+              ]
+            : []),
         ]}
       />
 

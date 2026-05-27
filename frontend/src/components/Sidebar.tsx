@@ -185,7 +185,7 @@ const sections: Section[] = [
         to: '/admin/groups',
         label: 'User Groups',
         icon: IconUsersCog,
-        roles: MANAGER_TIER,
+        roles: ADMIN_TIER,
         capability: 'user_groups',
       },
       {

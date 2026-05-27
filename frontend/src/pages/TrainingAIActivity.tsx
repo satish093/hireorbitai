@@ -4,6 +4,8 @@ import clsx from 'clsx';
 import { Layout } from '../components/Layout';
 import { api } from '../services/api';
 import { useRealtime } from '../hooks/useRealtime';
+import { useAuth } from '../context/AuthContext';
+import { ADMIN_TIER } from '../types';
 
 interface GenerationStatus {
   course_stats: Record<string, number>;
@@ -147,6 +149,10 @@ export function TrainingAIActivity() {
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [error, setError] = useState('');
   const [retrying, setRetrying] = useState(false);
+  const { profile } = useAuth();
+  // AI (re)generation spend is admin-only across the app — only ADMIN_TIER sees
+  // the Fix / Retry / Regenerate controls (the backend retry route is admin-tier).
+  const canRegenerate = !!profile && (ADMIN_TIER as readonly string[]).includes(profile.role);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   type FeedKind = 'info' | 'ok' | 'err' | 'done';
@@ -347,8 +353,10 @@ export function TrainingAIActivity() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
-                  {/* Fix status: course stuck as FAILED but all lessons done */}
-                  {focused.content_status === 'FAILED' &&
+                  {/* Fix status: course stuck as FAILED but all lessons done.
+                      AI regeneration spend is ADMIN_TIER-only. */}
+                  {canRegenerate &&
+                    focused.content_status === 'FAILED' &&
                     focusedReadyCount === focusedTotal &&
                     focusedTotal > 0 && (
                       <button
@@ -359,8 +367,9 @@ export function TrainingAIActivity() {
                         {retrying ? 'Fixing…' : 'Fix status'}
                       </button>
                     )}
-                  {/* Retry: there are failed or pending lessons */}
-                  {(focusedFailedCount > 0 || focusedPendingCount > 0) &&
+                  {/* Retry: there are failed or pending lessons (admin-only) */}
+                  {canRegenerate &&
+                    (focusedFailedCount > 0 || focusedPendingCount > 0) &&
                     focused.content_status !== 'GENERATING' && (
                       <button
                         onClick={() => retryGeneration(focused.id, false)}
@@ -372,16 +381,19 @@ export function TrainingAIActivity() {
                           : `Retry ${focusedFailedCount + focusedPendingCount} lesson${focusedFailedCount + focusedPendingCount === 1 ? '' : 's'}`}
                       </button>
                     )}
-                  {/* Regenerate all: all lessons ready, allow re-run with improved prompts */}
-                  {focusedReady && focused.content_status === 'READY' && focusedTotal > 0 && (
-                    <button
-                      onClick={() => retryGeneration(focused.id, true)}
-                      disabled={retrying}
-                      className="text-xs text-muted border border-border rounded-lg px-2.5 py-1 hover:bg-surface-hover disabled:opacity-50"
-                    >
-                      {retrying ? 'Queuing…' : '↺ Regenerate all'}
-                    </button>
-                  )}
+                  {/* Regenerate all: all lessons ready, allow re-run (admin-only) */}
+                  {canRegenerate &&
+                    focusedReady &&
+                    focused.content_status === 'READY' &&
+                    focusedTotal > 0 && (
+                      <button
+                        onClick={() => retryGeneration(focused.id, true)}
+                        disabled={retrying}
+                        className="text-xs text-muted border border-border rounded-lg px-2.5 py-1 hover:bg-surface-hover disabled:opacity-50"
+                      >
+                        {retrying ? 'Queuing…' : '↺ Regenerate all'}
+                      </button>
+                    )}
                   <Link
                     to={`/training/courses/${focused.id}`}
                     className="text-xs text-accent hover:underline"
@@ -623,7 +635,7 @@ export function TrainingAIActivity() {
                       <div className="flex items-center gap-2 ml-4 shrink-0">
                         <span className="text-xs text-muted">{relativeTime(c.updated_at)}</span>
                         <StatusPill status={c.content_status} />
-                        {stuckDone && (
+                        {canRegenerate && stuckDone && (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -635,18 +647,21 @@ export function TrainingAIActivity() {
                             Fix
                           </button>
                         )}
-                        {!stuckDone && hasFailedLessons && c.content_status !== 'GENERATING' && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              retryGeneration(c.id, false);
-                            }}
-                            disabled={retrying}
-                            className="text-[11px] text-red-700 dark:text-red-400 border border-red-300 dark:border-red-600 rounded px-1.5 py-0.5 hover:bg-red-50 dark:hover:bg-red-950/30 disabled:opacity-50"
-                          >
-                            Retry
-                          </button>
-                        )}
+                        {canRegenerate &&
+                          !stuckDone &&
+                          hasFailedLessons &&
+                          c.content_status !== 'GENERATING' && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                retryGeneration(c.id, false);
+                              }}
+                              disabled={retrying}
+                              className="text-[11px] text-red-700 dark:text-red-400 border border-red-300 dark:border-red-600 rounded px-1.5 py-0.5 hover:bg-red-50 dark:hover:bg-red-950/30 disabled:opacity-50"
+                            >
+                              Retry
+                            </button>
+                          )}
                       </div>
                     </div>
                     {c.total_lessons > 0 && (

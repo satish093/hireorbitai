@@ -430,7 +430,11 @@ export function UserDetailPane({
                   disabled={isSelf}
                 />
                 <QuickAction label="End sessions" onClick={quickEndSessions} disabled={isSelf} />
-                <QuickAction label="Impersonate" onClick={quickImpersonate} disabled={isSelf} />
+                {/* Impersonation is SUPER_ADMIN-only on the backend — only show
+                    it to a SUPER_ADMIN so no one else hits a predictable 403. */}
+                {viewerIsSuperAdmin && (
+                  <QuickAction label="Impersonate" onClick={quickImpersonate} disabled={isSelf} />
+                )}
               </div>
             </div>
 

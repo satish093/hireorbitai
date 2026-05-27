@@ -9,7 +9,13 @@ import {
   TaskPriority,
   MANAGER_TIER,
 } from '../types';
-import { managerGroupUserIds, isAdminTier, isGroupLead } from '../services/groupScope';
+import {
+  managerGroupUserIds,
+  isAdminTier,
+  isGroupLead,
+  leadCanAccessConsultant,
+  leadCanAccessUser,
+} from '../services/groupScope';
 import type { Role } from '../types';
 
 const SELECT_WITH_JOINS = `
@@ -32,6 +38,40 @@ async function leadInScopeForAssignee(
 ): Promise<boolean> {
   const ids = await managerGroupUserIds(caller);
   return !!(ids && assigneeId && ids.includes(assigneeId));
+}
+
+/** For a group-lead caller, every target a task points at (assignee + related
+ *  consultant/recruiter) must be inside their group. Admin tier is unscoped;
+ *  non-leads are gated by the route. Throws 403 on an out-of-group target. */
+async function assertTaskTargetsInScope(
+  caller: { id: string; role: Role; group_id?: string | null },
+  t: {
+    assignee_id?: string | null;
+    related_consultant_id?: string | null;
+    related_recruiter_id?: string | null;
+  },
+): Promise<void> {
+  if (!isGroupLead(caller.role)) return; // admin unscoped; others gated elsewhere
+  if (t.assignee_id && !(await leadInScopeForAssignee(caller, t.assignee_id))) {
+    throw httpError(403, 'You can only assign tasks to users in your group.');
+  }
+  if (
+    t.related_consultant_id &&
+    !(await leadCanAccessConsultant(caller, t.related_consultant_id))
+  ) {
+    throw httpError(403, 'The related consultant must be in your group.');
+  }
+  if (t.related_recruiter_id) {
+    const { data } = await db
+      .from('recruiters')
+      .select('user_id')
+      .eq('id', t.related_recruiter_id)
+      .maybeSingle();
+    const uid = (data as { user_id?: string | null } | null)?.user_id ?? null;
+    if (!uid || !(await leadCanAccessUser(caller, uid))) {
+      throw httpError(403, 'The related recruiter must be in your group.');
+    }
+  }
 }
 
 // The db shim only resolves embedded FK selects (assignee:users!…) on a plain
@@ -131,6 +171,14 @@ export const create: RequestHandler = async (req, res) => {
     due_at: b.due_at ?? null,
     created_by: req.user.id,
   };
+  // Group leads can only point a task at users/consultants/recruiters inside
+  // their own group; admin tier is unscoped.
+  await assertTaskTargetsInScope(req.user, {
+    assignee_id: payload.assignee_id as string | null,
+    related_consultant_id: payload.related_consultant_id as string | null,
+    related_recruiter_id: payload.related_recruiter_id as string | null,
+  });
+
   // Only include `tags` when actually provided and the column exists. Tries
   // first with tags; on the schema-cache error, retries without — keeps task
   // creation working even before database/tasks-tags.sql has been applied.
@@ -193,6 +241,15 @@ export const update: RequestHandler = async (req, res) => {
   if (allowed.status && !TASK_STATUSES.includes(allowed.status as TaskStatus)) {
     throw httpError(400, 'Invalid status');
   }
+
+  // A group lead reassigning the task (or its related entities) may only point
+  // it at members of their own group.
+  await assertTaskTargetsInScope(req.user, {
+    assignee_id: (allowed.assignee_id as string | null | undefined) ?? undefined,
+    related_consultant_id:
+      (allowed.related_consultant_id as string | null | undefined) ?? undefined,
+    related_recruiter_id: (allowed.related_recruiter_id as string | null | undefined) ?? undefined,
+  });
 
   let { error } = await db.from('tasks').update(allowed).eq('id', id).select('*').single();
   // Retry without `tags` if the column hasn't been migrated in yet, so other

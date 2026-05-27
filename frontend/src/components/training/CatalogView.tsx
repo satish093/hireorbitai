@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
+import { useAuth } from '../../context/AuthContext';
+import { MANAGER_TIER } from '../../types';
 import { api } from '../../services/api';
 import { invalidate } from '../../hooks/useInvalidate';
 import { SkeletonCard } from '../Skeleton';
@@ -15,11 +17,15 @@ function CatalogCard({
   onEnroll,
   busy,
   navigate,
+  canOpenCourse,
 }: {
   course: CatalogCourse;
   onEnroll: (c: CatalogCourse) => void;
   busy: boolean;
   navigate: (to: string) => void;
+  /** Only MANAGER_TIER may open the course-detail (authoring) page; learners
+   *  see a non-navigating title and use Enroll / Open-assignment instead. */
+  canOpenCourse: boolean;
 }) {
   const hours = course.estimated_duration_hours;
   const badge = course.compliance_category
@@ -53,12 +59,18 @@ function CatalogCard({
       </div>
 
       <div className="p-3 flex flex-col flex-1 min-w-0">
-        <button
-          onClick={() => navigate(`/training/courses/${course.id}`)}
-          className="text-sm font-semibold text-ink text-left leading-tight line-clamp-2 hover:underline"
-        >
-          {course.title}
-        </button>
+        {canOpenCourse ? (
+          <button
+            onClick={() => navigate(`/training/courses/${course.id}`)}
+            className="text-sm font-semibold text-ink text-left leading-tight line-clamp-2 hover:underline"
+          >
+            {course.title}
+          </button>
+        ) : (
+          <span className="text-sm font-semibold text-ink text-left leading-tight line-clamp-2">
+            {course.title}
+          </span>
+        )}
         <div className="text-[12px] text-muted mt-0.5">{course.category ?? 'General'}</div>
 
         {course.tags && course.tags.length > 0 && (
@@ -107,6 +119,8 @@ function CatalogCard({
 
 export function CatalogView() {
   const navigate = useNavigate();
+  const { profile } = useAuth();
+  const canOpenCourse = !!profile && (MANAGER_TIER as readonly string[]).includes(profile.role);
   const [courses, setCourses] = useState<CatalogCourse[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState('');
@@ -258,6 +272,7 @@ export function CatalogView() {
                 onEnroll={enroll}
                 busy={enrolling === c.id}
                 navigate={navigate}
+                canOpenCourse={canOpenCourse}
               />
             ))}
           </div>

@@ -19,11 +19,13 @@ import { api } from '../../services/api';
 import { invalidate, useInvalidationListener } from '../../hooks/useInvalidate';
 import { Popover } from '../ui/Popover';
 
+import { useAuth } from '../../context/AuthContext';
 import { type TaskRow, type Subtask, type TaskActivity, type TaskUser } from './types';
 import {
   TASK_STATUSES,
   TASK_STATUS_LABEL,
   TASK_PRIORITIES,
+  MANAGER_TIER,
   type TaskStatus,
   type TaskPriority,
 } from '../../types';
@@ -258,6 +260,11 @@ export function TaskDetailPane({
   users: TaskUser[];
   onChanged: () => void;
 }): JSX.Element {
+  // Manager-tier may edit every field; a non-manager assignee may only move
+  // status + use subtasks/comments (matches the backend update allowlist).
+  const { profile } = useAuth();
+  const canManage = !!profile && (MANAGER_TIER as readonly string[]).includes(profile.role);
+
   // ---- data state ----------------------------------------------------------
   const [task, setTask] = useState<TaskRow | null>(null);
   const [subtasks, setSubtasks] = useState<Subtask[]>([]);
@@ -625,12 +632,16 @@ export function TaskDetailPane({
               onBlur={commitTitle}
               onKeyDown={handleTitleKeyDown}
             />
-          ) : (
+          ) : canManage ? (
             <h2
               className="text-base font-semibold text-ink cursor-text hover:bg-hover rounded px-1 py-0.5 -mx-1 transition-colors"
               onClick={startEditTitle}
               title="Click to edit"
             >
+              {task?.title ?? '—'}
+            </h2>
+          ) : (
+            <h2 className="text-base font-semibold text-ink px-1 py-0.5 -mx-1">
               {task?.title ?? '—'}
             </h2>
           )}
@@ -665,9 +676,12 @@ export function TaskDetailPane({
             </div>
           ) : (
             <div
-              className="cursor-text hover:bg-hover rounded px-1 py-0.5 -mx-1 transition-colors"
-              onClick={startEditDesc}
-              title="Click to edit"
+              className={clsx(
+                'rounded px-1 py-0.5 -mx-1 transition-colors',
+                canManage && 'cursor-text hover:bg-hover',
+              )}
+              onClick={canManage ? startEditDesc : undefined}
+              title={canManage ? 'Click to edit' : undefined}
             >
               {task?.description ? (
                 <p className="text-[13px] text-ink-2 whitespace-pre-wrap">{task.description}</p>
@@ -721,126 +735,157 @@ export function TaskDetailPane({
               </Popover>
             </PropRow>
 
-            {/* Priority */}
+            {/* Priority — editable for managers, read-only badge otherwise */}
             <PropRow label="Priority">
-              <Popover
-                align="right"
-                button={(open) => (
-                  <button
-                    type="button"
-                    className={clsx(
-                      'focus:outline-none rounded',
-                      open && 'ring-2 ring-accent ring-offset-1',
-                    )}
-                  >
-                    <PriorityBadge priority={task.priority} />
-                  </button>
-                )}
-              >
-                {(close) => (
-                  <div className="space-y-0.5">
-                    {TASK_PRIORITIES.map((p) => (
-                      <button
-                        key={p}
-                        type="button"
-                        className={clsx(
-                          'flex items-center w-full px-2 py-1.5 rounded-md text-[13px] text-ink hover:bg-hover transition-colors gap-2',
-                          p === task.priority && 'bg-accent-soft text-accent',
-                        )}
-                        onClick={() => {
-                          close();
-                          patchTask({ priority: p as TaskPriority });
-                        }}
-                      >
-                        <PriorityBadge priority={p as TaskPriority} />
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </Popover>
-            </PropRow>
-
-            {/* Assignee */}
-            <PropRow label="Assignee">
-              <Popover
-                align="right"
-                button={() => (
-                  <button
-                    type="button"
-                    className="flex items-center gap-1.5 focus:outline-none rounded hover:bg-hover px-1 py-0.5 transition-colors"
-                  >
-                    {task.assignee ? (
-                      <>
-                        <Avatar
-                          name={task.assignee.full_name}
-                          email={task.assignee.email}
-                          size={20}
-                        />
-                        <span className="text-[13px] text-ink truncate max-w-[120px]">
-                          {task.assignee.full_name ?? task.assignee.email}
-                        </span>
-                      </>
-                    ) : (
-                      <span className="text-[13px] text-muted italic">Unassigned</span>
-                    )}
-                  </button>
-                )}
-              >
-                {(close) => (
-                  <div className="space-y-0.5">
-                    {/* Unassign option */}
+              {canManage ? (
+                <Popover
+                  align="right"
+                  button={(open) => (
                     <button
                       type="button"
                       className={clsx(
-                        'flex items-center w-full px-2 py-1.5 rounded-md text-[13px] text-muted italic hover:bg-hover transition-colors',
-                        !task.assignee_id && 'bg-accent-soft text-accent',
+                        'focus:outline-none rounded',
+                        open && 'ring-2 ring-accent ring-offset-1',
                       )}
-                      onClick={() => {
-                        close();
-                        patchTask({ assignee_id: null });
-                      }}
                     >
-                      Unassign
+                      <PriorityBadge priority={task.priority} />
                     </button>
-                    {users.map((u) => (
+                  )}
+                >
+                  {(close) => (
+                    <div className="space-y-0.5">
+                      {TASK_PRIORITIES.map((p) => (
+                        <button
+                          key={p}
+                          type="button"
+                          className={clsx(
+                            'flex items-center w-full px-2 py-1.5 rounded-md text-[13px] text-ink hover:bg-hover transition-colors gap-2',
+                            p === task.priority && 'bg-accent-soft text-accent',
+                          )}
+                          onClick={() => {
+                            close();
+                            patchTask({ priority: p as TaskPriority });
+                          }}
+                        >
+                          <PriorityBadge priority={p as TaskPriority} />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </Popover>
+              ) : (
+                <PriorityBadge priority={task.priority} />
+              )}
+            </PropRow>
+
+            {/* Assignee — editable for managers, read-only otherwise */}
+            <PropRow label="Assignee">
+              {!canManage ? (
+                <span className="flex items-center gap-1.5">
+                  {task.assignee ? (
+                    <>
+                      <Avatar
+                        name={task.assignee.full_name}
+                        email={task.assignee.email}
+                        size={20}
+                      />
+                      <span className="text-[13px] text-ink truncate max-w-[120px]">
+                        {task.assignee.full_name ?? task.assignee.email}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-[13px] text-muted italic">Unassigned</span>
+                  )}
+                </span>
+              ) : (
+                <Popover
+                  align="right"
+                  button={() => (
+                    <button
+                      type="button"
+                      className="flex items-center gap-1.5 focus:outline-none rounded hover:bg-hover px-1 py-0.5 transition-colors"
+                    >
+                      {task.assignee ? (
+                        <>
+                          <Avatar
+                            name={task.assignee.full_name}
+                            email={task.assignee.email}
+                            size={20}
+                          />
+                          <span className="text-[13px] text-ink truncate max-w-[120px]">
+                            {task.assignee.full_name ?? task.assignee.email}
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-[13px] text-muted italic">Unassigned</span>
+                      )}
+                    </button>
+                  )}
+                >
+                  {(close) => (
+                    <div className="space-y-0.5">
+                      {/* Unassign option */}
                       <button
-                        key={u.id}
                         type="button"
                         className={clsx(
-                          'flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-[13px] text-ink hover:bg-hover transition-colors',
-                          u.id === task.assignee_id && 'bg-accent-soft text-accent',
+                          'flex items-center w-full px-2 py-1.5 rounded-md text-[13px] text-muted italic hover:bg-hover transition-colors',
+                          !task.assignee_id && 'bg-accent-soft text-accent',
                         )}
                         onClick={() => {
                           close();
-                          patchTask({ assignee_id: u.id });
+                          patchTask({ assignee_id: null });
                         }}
                       >
-                        <Avatar name={u.full_name} email={u.email} size={20} />
-                        <span className="truncate">{u.full_name ?? u.email}</span>
+                        Unassign
                       </button>
-                    ))}
-                  </div>
-                )}
-              </Popover>
+                      {users.map((u) => (
+                        <button
+                          key={u.id}
+                          type="button"
+                          className={clsx(
+                            'flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-[13px] text-ink hover:bg-hover transition-colors',
+                            u.id === task.assignee_id && 'bg-accent-soft text-accent',
+                          )}
+                          onClick={() => {
+                            close();
+                            patchTask({ assignee_id: u.id });
+                          }}
+                        >
+                          <Avatar name={u.full_name} email={u.email} size={20} />
+                          <span className="truncate">{u.full_name ?? u.email}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </Popover>
+              )}
             </PropRow>
 
-            {/* Due date */}
+            {/* Due date — editable for managers, read-only otherwise */}
             <PropRow label="Due">
-              <input
-                type="date"
-                value={formatDateValue(task.due_at)}
-                className="text-[13px] text-ink bg-transparent border border-border rounded px-1.5 py-0.5 focus:outline-none focus:border-accent cursor-pointer hover:border-border-strong transition-colors"
-                onChange={(e) => {
-                  const val = e.target.value;
-                  patchTask({ due_at: val ? `${val}T00:00:00.000Z` : null });
-                }}
-              />
+              {canManage ? (
+                <input
+                  type="date"
+                  value={formatDateValue(task.due_at)}
+                  className="text-[13px] text-ink bg-transparent border border-border rounded px-1.5 py-0.5 focus:outline-none focus:border-accent cursor-pointer hover:border-border-strong transition-colors"
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    patchTask({ due_at: val ? `${val}T00:00:00.000Z` : null });
+                  }}
+                />
+              ) : (
+                <span className="text-[13px] text-ink">
+                  {task.due_at ? formatDateValue(task.due_at) : '—'}
+                </span>
+              )}
             </PropRow>
 
-            {/* Related to */}
-            <PropRow label="Related to">
-              <RelatedTo />
-            </PropRow>
+            {/* Related to — relation editing is manager-only */}
+            {canManage && (
+              <PropRow label="Related to">
+                <RelatedTo />
+              </PropRow>
+            )}
           </div>
         )}
 

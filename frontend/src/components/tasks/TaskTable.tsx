@@ -4,9 +4,10 @@ import { TaskStatusBadge, PriorityBadge, DuePill, Avatar } from '../TaskBits';
 import { Button } from '../Button';
 import { Popover } from '../ui/Popover';
 import { api } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
 import { type TaskRow, type TaskUser } from './types';
-import { TASK_STATUSES, TASK_STATUS_LABEL, type TaskStatus } from '../../types';
+import { TASK_STATUSES, TASK_STATUS_LABEL, MANAGER_TIER, type TaskStatus } from '../../types';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -155,6 +156,10 @@ export function TaskTable({
   onChanged: () => void;
 }): JSX.Element {
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  // Assign / Tag / Delete are manager-only; status move stays (the backend lets
+  // an assignee change status).
+  const { profile } = useAuth();
+  const canManage = !!profile && (MANAGER_TIER as readonly string[]).includes(profile.role);
 
   // ---- Checkbox helpers ----
 
@@ -224,11 +229,13 @@ export function TaskTable({
         <div className="px-4 py-2 border-b border-border bg-bg-sunken flex items-center gap-2 flex-wrap">
           <span className="text-sm font-medium text-ink">{selected.size} selected</span>
           <MoveToPopover onMove={bulkMove} />
-          <AssignPopover users={users} onAssign={bulkAssign} />
-          <TagPopover onAddTag={bulkTag} />
-          <Button variant="danger" size="sm" onClick={bulkDelete}>
-            Delete
-          </Button>
+          {canManage && <AssignPopover users={users} onAssign={bulkAssign} />}
+          {canManage && <TagPopover onAddTag={bulkTag} />}
+          {canManage && (
+            <Button variant="danger" size="sm" onClick={bulkDelete}>
+              Delete
+            </Button>
+          )}
           <Button variant="ghost" size="sm" onClick={() => setSelected(new Set())}>
             Clear
           </Button>

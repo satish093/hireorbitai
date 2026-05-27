@@ -1,13 +1,16 @@
 import { Router } from 'express';
 import { requireRoleOrCapability } from '../middleware/auth';
-import { MANAGER_TIER, OPERATOR_TIER } from '../types';
+import { ADMIN_TIER, OPERATOR_TIER } from '../types';
 import * as c from '../controllers/userGroups.controller';
 
 export const userGroupsRouter = Router();
 
-const gate = requireRoleOrCapability(MANAGER_TIER, 'user_groups');
+// Groups are global, workspace-wide objects: only ADMIN_TIER (or a DEVELOPER
+// granted `user_groups`) may create/edit/delete them or move members. Group
+// leads are scoped to their OWN group elsewhere and don't administer groups.
+const gate = requireRoleOrCapability(ADMIN_TIER, 'user_groups');
 
-// Diagnostics expose org/group structure — manager-tier (or DEVELOPER granted
+// Diagnostics expose org/group structure — admin-tier (or DEVELOPER granted
 // `user_groups`) only.
 userGroupsRouter.get('/diag', gate, c.diag);
 // The group list backs selectors (invite form, group badges) used across the

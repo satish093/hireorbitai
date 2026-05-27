@@ -178,6 +178,11 @@ export const addManager: RequestHandler = async (req, res) => {
   const t = target as { id: string; role: string };
   if (!(MANAGER_TIER as readonly string[]).includes(t.role))
     throw httpError(400, 'Assigned user must be manager-tier');
+  // A group lead can only assign a manager who is also in their own group — not
+  // an arbitrary manager-tier user from another group. Admin tier is unscoped.
+  if (isGroupLead(req.user.role) && !(await leadCanAccessUser(req.user, t.id))) {
+    throw httpError(403, 'The selected manager must be in your group.');
+  }
 
   // Probe whether the junction table exists.
   const { data: existing, error: existErr } = await db
@@ -247,6 +252,10 @@ export const removeManager: RequestHandler = async (req, res) => {
     .maybeSingle();
   if (!recRow) throw httpError(404, 'Recruiter not found');
   await assertRecruiterInScope(req.user, (recRow as { user_id: string | null }).user_id);
+  // A group lead may only detach a manager who is in their own group.
+  if (isGroupLead(req.user.role) && !(await leadCanAccessUser(req.user, managerId))) {
+    throw httpError(403, 'The selected manager must be in your group.');
+  }
 
   const { data: removed, error: lookupErr } = await db
     .from('recruiter_managers')
@@ -307,6 +316,10 @@ export const setPrimaryManager: RequestHandler = async (req, res) => {
     .maybeSingle();
   if (!recRow) throw httpError(404, 'Recruiter not found');
   await assertRecruiterInScope(req.user, (recRow as { user_id: string | null }).user_id);
+  // A group lead may only mark a manager primary if that manager is in-group.
+  if (isGroupLead(req.user.role) && !(await leadCanAccessUser(req.user, managerId))) {
+    throw httpError(403, 'The selected manager must be in your group.');
+  }
 
   const { data: existing, error: lookupErr } = await db
     .from('recruiter_managers')

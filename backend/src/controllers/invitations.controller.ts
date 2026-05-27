@@ -51,6 +51,15 @@ export const create: RequestHandler = async (req, res) => {
     throw httpError(403, `You are not permitted to invite the role ${requestedRole}.`);
   }
 
+  // Group ceiling: admin tier may pre-assign any group; everyone else (group
+  // leads + recruiters) may only assign their OWN group or no group at all.
+  if (!(ADMIN_TIER as Role[]).includes(req.user.role)) {
+    const gid = parsed.data.group_id ?? null;
+    if (gid && gid !== (req.user.group_id ?? null)) {
+      throw httpError(403, 'You can only invite users into your own group.');
+    }
+  }
+
   // ── Parent assignment ───────────────────────────────────────────────────
   let parentUserId: string | null = null;
   let assignedMode: 'auto' | 'manual' = 'auto';
