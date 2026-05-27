@@ -18,8 +18,18 @@ import type { Request } from 'express';
 
 const MB = 1024 * 1024;
 
-const RESUME_MIME = new Set(['application/pdf', 'image/jpeg', 'image/png', 'image/webp']);
-const RESUME_EXT = /\.(pdf|jpe?g|png|webp)$/i;
+const RESUME_MIME = new Set([
+  'application/pdf',
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  // Word documents — .doc (legacy binary) + .docx (OOXML). Some browsers send a
+  // generic octet-stream for .doc, so the extension check below is the backstop.
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/octet-stream',
+]);
+const RESUME_EXT = /\.(pdf|jpe?g|png|webp|docx?)$/i;
 
 const ATTACHMENT_MIME = new Set([
   'application/pdf',

@@ -27,7 +27,8 @@ type Channel =
   | 'applications'
   | 'invitations'
   | 'feature-flags'
-  | 'interviews';
+  | 'interviews'
+  | 'messages';
 
 interface ChannelState {
   // Monotonic counter; incremented on every notify(). Subscribers read

@@ -7,6 +7,7 @@ import { StatusBadge } from '../components/StatusBadge';
 import { PageHeader } from '../components/PageHeader';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { MyResumeCard } from '../components/resumes/MyResumeCard';
 import toast from 'react-hot-toast';
 
 export function ConsultantDashboard() {
@@ -81,6 +82,12 @@ export function ConsultantDashboard() {
             accent="green"
           />
           <DashboardCard label="Offers" value={offers} accent="slate" />
+        </div>
+      )}
+
+      {consultant?.id && (
+        <div className="mb-6">
+          <MyResumeCard consultantId={consultant.id} />
         </div>
       )}
 

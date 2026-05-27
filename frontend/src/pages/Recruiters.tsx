@@ -24,6 +24,7 @@ interface RecruiterRow {
   team?: string | null;
   target_submissions_per_week?: number | null;
   notes?: string | null;
+  consultant_count?: number;
   user?: {
     id: string;
     full_name?: string | null;
@@ -137,6 +138,25 @@ export function Recruiters() {
             header: 'Group',
             hideOnMobile: true,
             render: (r: RecruiterRow) => <GroupBadge groupId={r.user?.group_id ?? null} />,
+          },
+          {
+            key: 'consultants',
+            header: 'Consultants',
+            align: 'right',
+            render: (r: RecruiterRow) => {
+              const n = r.consultant_count ?? 0;
+              if (n === 0) return <span className="text-xs text-muted">0</span>;
+              // Drill-down: jump to the consultants list filtered to this recruiter.
+              return (
+                <Link
+                  to={`/consultants?recruiter=${r.id}`}
+                  className="inline-flex items-center justify-center min-w-[1.75rem] rounded-full bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-700 hover:bg-brand-100"
+                  title={`View ${n} consultant${n === 1 ? '' : 's'} assigned to this recruiter`}
+                >
+                  {n}
+                </Link>
+              );
+            },
           },
           {
             key: 'managers',

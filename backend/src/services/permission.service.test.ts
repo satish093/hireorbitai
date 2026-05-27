@@ -209,11 +209,11 @@ describe('permission.service — admin override', () => {
   });
 });
 
-describe('permission.service — recruiter scope', () => {
-  it('recruiter can message their assigned consultants', async () => {
+describe('permission.service — recruiter scope (org-wide staff chat)', () => {
+  it('recruiter can message their own assigned consultants', async () => {
     setupDb({
+      users: [],
       recruiters: [{ id: 'r-1', user_id: 'u-recruiter', manager_id: null }],
-      recruiter_managers: [],
       consultants: [
         { recruiter_id: 'r-1', user_id: 'u-consultant-1' },
         { recruiter_id: 'r-1', user_id: 'u-consultant-2' },
@@ -224,27 +224,95 @@ describe('permission.service — recruiter scope', () => {
     expect(ids.has('u-consultant-2')).toBe(true);
   });
 
-  it("recruiter cannot message another recruiter's consultants", async () => {
+  it("recruiter CANNOT message another recruiter's consultant (consultants stay assignment-bound)", async () => {
     setupDb({
+      users: [],
       recruiters: [
         { id: 'r-mine', user_id: 'u-recruiter', manager_id: null },
         { id: 'r-other', user_id: 'u-other-recruiter', manager_id: null },
       ],
-      recruiter_managers: [],
       consultants: [{ recruiter_id: 'r-other', user_id: 'u-other-consultant' }],
     });
     const ids = await getAccessibleUserIds({ id: 'u-recruiter', role: 'RECRUITER' });
     expect(ids.has('u-other-consultant')).toBe(false);
   });
 
-  it('recruiter can message their assigned managers (via recruiter_managers)', async () => {
+  it('recruiter can message ANY active staff user (managers, other recruiters, admins) org-wide', async () => {
     setupDb({
+      users: [
+        { id: 'u-recruiter', role: 'RECRUITER', is_active: true },
+        { id: 'u-manager', role: 'MANAGER', is_active: true },
+        { id: 'u-hr', role: 'HR_MANAGER', is_active: true },
+        { id: 'u-other-recruiter', role: 'RECRUITER', is_active: true },
+        { id: 'u-director', role: 'DIRECTOR', is_active: true },
+        { id: 'u-inactive-mgr', role: 'MANAGER', is_active: false },
+        { id: 'u-some-consultant', role: 'CONSULTANT', is_active: true },
+      ],
       recruiters: [{ id: 'r-1', user_id: 'u-recruiter', manager_id: null }],
-      recruiter_managers: [{ recruiter_id: 'r-1', manager_id: 'u-manager' }],
       consultants: [],
     });
     const ids = await getAccessibleUserIds({ id: 'u-recruiter', role: 'RECRUITER' });
+    // Any active staff (not just their manager) is reachable.
     expect(ids.has('u-manager')).toBe(true);
+    expect(ids.has('u-hr')).toBe(true);
+    expect(ids.has('u-other-recruiter')).toBe(true);
+    expect(ids.has('u-director')).toBe(true);
+    // Inactive staff excluded; a consultant who isn't theirs is excluded.
+    expect(ids.has('u-inactive-mgr')).toBe(false);
+    expect(ids.has('u-some-consultant')).toBe(false);
+    // Self never appears.
+    expect(ids.has('u-recruiter')).toBe(false);
+  });
+
+  it('reverse: a non-managing MANAGER can view/reply to a recruiter-initiated thread', async () => {
+    // The recruiter reaches all staff (incl. this manager), so the manager must
+    // be able to read/reply even though the recruiter is not in their subtree.
+    setupDb({
+      users: [
+        { id: 'u-recruiter', role: 'RECRUITER', is_active: true },
+        { id: 'u-manager', role: 'MANAGER', is_active: true },
+      ],
+      recruiters: [{ id: 'r-1', user_id: 'u-recruiter', manager_id: null }],
+      recruiter_managers: [],
+      consultants: [],
+    });
+    const ok = await canMessageUser({ id: 'u-manager', role: 'MANAGER' }, 'u-recruiter');
+    expect(ok).toBe(true);
+  });
+
+  it('reverse does NOT let a consultant reach an arbitrary recruiter', async () => {
+    setupDb({
+      users: [
+        { id: 'u-recruiter', role: 'RECRUITER', is_active: true },
+        { id: 'u-consultant', role: 'CONSULTANT', is_active: true },
+      ],
+      consultants: [{ user_id: 'u-consultant', recruiter_id: 'r-other' }],
+      recruiters: [
+        { id: 'r-1', user_id: 'u-recruiter', manager_id: null },
+        { id: 'r-other', user_id: 'u-their-recruiter', manager_id: null },
+      ],
+      recruiter_managers: [],
+    });
+    // u-recruiter is not this consultant's recruiter; the recruiter's staff set
+    // excludes consultants, so neither direction grants access.
+    const ok = await canMessageUser({ id: 'u-consultant', role: 'CONSULTANT' }, 'u-recruiter');
+    expect(ok).toBe(false);
+  });
+
+  it('reverse never makes an admin universally reachable', async () => {
+    // A consultant must NOT be able to message an admin just because the admin
+    // reaches everyone. The reverse check skips admin-tier targets.
+    setupDb({
+      users: [
+        { id: 'u-admin', role: 'SUPER_ADMIN', is_active: true },
+        { id: 'u-consultant', role: 'CONSULTANT', is_active: true },
+      ],
+      consultants: [{ user_id: 'u-consultant', recruiter_id: 'r-1' }],
+      recruiters: [{ id: 'r-1', user_id: 'u-recruiter', manager_id: null }],
+      recruiter_managers: [],
+    });
+    const ok = await canMessageUser({ id: 'u-consultant', role: 'CONSULTANT' }, 'u-admin');
+    expect(ok).toBe(false);
   });
 });
 

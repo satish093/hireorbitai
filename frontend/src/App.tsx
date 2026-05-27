@@ -330,7 +330,7 @@ export default function App() {
           <Route
             path="/jobs"
             element={
-              <ProtectedRoute allow={BUSINESS_ROLES}>
+              <ProtectedRoute allow={OPERATOR_TIER}>
                 <JobSearch />
               </ProtectedRoute>
             }
@@ -338,7 +338,7 @@ export default function App() {
           <Route
             path="/jobs/:id"
             element={
-              <ProtectedRoute allow={BUSINESS_ROLES}>
+              <ProtectedRoute allow={OPERATOR_TIER}>
                 <JobDetail />
               </ProtectedRoute>
             }

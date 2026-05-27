@@ -67,11 +67,38 @@ function isDocx(mimetype: string, name: string): boolean {
   );
 }
 
+function isDoc(mimetype: string, name: string): boolean {
+  return mimetype === 'application/msword' || /\.doc$/i.test(name);
+}
+
 function isImage(mimetype: string, name: string): boolean {
   return (
     ['image/jpeg', 'image/png', 'image/webp'].includes(mimetype) ||
     /\.(jpe?g|png|webp)$/i.test(name)
   );
+}
+
+/** Extract text from a .docx (OOXML) via mammoth — pure-JS, no AI cost. */
+async function extractDocx(buffer: Buffer): Promise<string> {
+  // Lazy import so the parser only loads when a Word doc is actually uploaded.
+  const mod = (await import('mammoth')) as unknown as {
+    extractRawText?: (o: { buffer: Buffer }) => Promise<{ value: string }>;
+    default?: { extractRawText: (o: { buffer: Buffer }) => Promise<{ value: string }> };
+  };
+  const extractRawText = mod.extractRawText ?? mod.default?.extractRawText;
+  if (!extractRawText) return '';
+  const { value } = await extractRawText({ buffer });
+  return value ?? '';
+}
+
+/** Extract text from a legacy binary .doc via word-extractor. */
+async function extractDoc(buffer: Buffer): Promise<string> {
+  const mod = (await import('word-extractor')) as unknown as {
+    default: new () => { extract: (b: Buffer) => Promise<{ getBody: () => string }> };
+  };
+  const WordExtractor = mod.default;
+  const doc = await new WordExtractor().extract(buffer);
+  return doc.getBody() ?? '';
 }
 
 /**
@@ -334,6 +361,14 @@ export async function extractResumeText(file: {
       const { text } = await extractText(pdf, { mergePages: true });
       const joined = Array.isArray(text) ? text.join('\n') : (text ?? '');
       return normalize(cleanExtractedText(joined));
+    }
+    if (isDocx(file.mimetype, file.originalname)) {
+      const text = await extractDocx(file.buffer);
+      return normalize(cleanExtractedText(text));
+    }
+    if (isDoc(file.mimetype, file.originalname)) {
+      const text = await extractDoc(file.buffer);
+      return normalize(cleanExtractedText(text));
     }
     if (isImage(file.mimetype, file.originalname)) {
       // 1. Gemini vision — free tier.

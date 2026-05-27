@@ -19,9 +19,12 @@
  *   whose access comes only from explicit capability grants, none of which is a
  *   messaging/visibility grant. So a DEVELOPER sees nobody here by default.
  *
- *   RECRUITER
- *     → their assigned managers (recruiter_managers + legacy manager_id)
- *     → their assigned consultants (consultants.recruiter_id)
+ *   RECRUITER (org-wide staff chat — product decision)
+ *     → every active STAFF user (OPERATOR_TIER: recruiters, group leads, admins)
+ *     → their own assigned consultants (consultants.recruiter_id)
+ *     Consultants who are not theirs are NOT reachable — consultants stay
+ *     assignment-bound. The recipient side is handled by the reverse check in
+ *     canMessageUser so staff can read/reply to a recruiter-initiated thread.
  *
  *   CONSULTANT
  *     → their assigned recruiter
@@ -35,9 +38,13 @@
 
 import { db } from '../config/db';
 import { logger } from '../config/logger';
-import { ADMIN_TIER, type Role } from '../types';
+import { ADMIN_TIER, OPERATOR_TIER, type Role } from '../types';
 
 const ADMIN_ROLES = ADMIN_TIER as readonly Role[];
+// Staff roles (operators) — every business role EXCEPT CONSULTANT and DEVELOPER.
+// A recruiter may chat with all active staff org-wide; consultants are NOT in
+// this set, so they stay assignment-bound on both sides.
+const STAFF_ROLES = OPERATOR_TIER as readonly Role[];
 // Group leads only. DEVELOPER is intentionally excluded — it has no default
 // business visibility (capability-gated elsewhere), so it falls through to the
 // empty peer set below.
@@ -179,26 +186,26 @@ export async function getAccessibleUserIds(caller: PermissionCaller): Promise<Se
   }
 
   // ── RECRUITER ─────────────────────────────────────────────────────────────
-  // Sees: their assigned managers + their assigned consultants only.
+  // Org-wide STAFF chat (product decision): a recruiter may message every active
+  // staff user (OPERATOR_TIER — recruiters, group leads, admins), PLUS their own
+  // assigned consultants. Consultants who are NOT theirs are intentionally
+  // excluded so consultants stay assignment-bound on both sides.
   if (caller.role === 'RECRUITER') {
+    const { data: staff } = await db
+      .from('users')
+      .select('id')
+      .in('role', STAFF_ROLES as unknown as string[])
+      .neq('is_active', false);
+    for (const u of (staff ?? []) as Array<{ id: string }>) peerIds.add(u.id);
+
+    // Plus this recruiter's own assigned consultants.
     const { data: myRec } = await db
       .from('recruiters')
-      .select('id, manager_id')
+      .select('id')
       .eq('user_id', caller.id)
       .maybeSingle();
-    const recRow = myRec as { id?: string; manager_id?: string | null } | null;
+    const recRow = myRec as { id?: string } | null;
     if (recRow?.id) {
-      // Legacy single-manager column.
-      if (recRow.manager_id) peerIds.add(recRow.manager_id);
-      // Many-to-many junction (canonical going forward).
-      const { data: mgrs } = await db
-        .from('recruiter_managers')
-        .select('manager_id')
-        .eq('recruiter_id', recRow.id);
-      for (const m of (mgrs ?? []) as Array<{ manager_id: string }>) {
-        if (m.manager_id) peerIds.add(m.manager_id);
-      }
-      // Assigned consultants.
       const { data: cons } = await db
         .from('consultants')
         .select('user_id')
@@ -264,7 +271,27 @@ export async function canMessageUser(caller: PermissionCaller, targetId: string)
     return !!t?.id && t.is_active !== false;
   }
   const allowed = await getAccessibleUserIds(caller);
-  return allowed.has(targetId);
+  if (allowed.has(targetId)) return true;
+
+  // Reverse direction. A conversation needs BOTH participants to be able to view
+  // it, so if the target is permitted to open a thread with the caller, the
+  // caller may view/reply too (e.g. a recruiter with org-wide staff reach
+  // messaged this user — the recipient must be able to read and reply).
+  //
+  // We deliberately do NOT grant reverse access when the target is admin-tier:
+  // an admin's accessible set is "everyone", so a symmetric admin rule would let
+  // any user message any admin. Admins still initiate to anyone (above); they
+  // are reached only by users who already have them in their forward set.
+  const { data } = await db
+    .from('users')
+    .select('role, is_active')
+    .eq('id', targetId)
+    .maybeSingle();
+  const t = data as { role?: Role; is_active?: boolean | null } | null;
+  if (!t?.role || t.is_active === false) return false;
+  if (ADMIN_ROLES.includes(t.role)) return false;
+  const reverse = await getAccessibleUserIds({ id: targetId, role: t.role });
+  return reverse.has(caller.id);
 }
 
 /**

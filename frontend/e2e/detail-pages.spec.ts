@@ -547,17 +547,14 @@ test.describe('JobDetail page', () => {
     expect(errors).toHaveLength(0);
   });
 
-  test('CONSULTANT sees job detail without bench matches (read-only)', async ({ page }) => {
-    const errors = trackPageErrors(page);
-
+  test('CONSULTANT is denied /jobs/:id — jobs are operator-only', async ({ page }) => {
+    // Policy: consultants don't browse jobs. The route guard (OPERATOR_TIER)
+    // sends them to /unauthorized rather than rendering the job.
     await setupConsultant(page, {
       '/jobs/j-1': { json: MOCK_JOB_DETAIL },
     });
     await page.goto('/jobs/j-1');
-    await page.waitForLoadState('load');
 
-    await expect(page.getByText('Senior Software Engineer')).toBeVisible({ timeout: 8000 });
-
-    expect(errors).toHaveLength(0);
+    await expect(page).toHaveURL(/\/unauthorized$/);
   });
 });

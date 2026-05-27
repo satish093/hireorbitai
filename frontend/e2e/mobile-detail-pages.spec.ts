@@ -582,20 +582,14 @@ test.describe('Mobile — JobDetail page (MANAGER)', () => {
   });
 });
 
-test.describe('Mobile — JobDetail page (CONSULTANT)', () => {
-  test('CONSULTANT sees job detail read-only with no overflow', async ({ page }) => {
-    const errors = trackPageErrors(page);
-
+test.describe('Mobile — JobDetail page (CONSULTANT denied)', () => {
+  test('CONSULTANT is denied /jobs/:id — jobs are operator-only', async ({ page }) => {
+    // Policy: consultants don't browse jobs; the route guard redirects them.
     await setupConsultant(page, {
       '/jobs/j-1': { json: MOCK_JOB_DETAIL },
     });
     await page.goto('/jobs/j-1');
-    await page.waitForLoadState('networkidle');
 
-    await expect(page.getByText('Senior Software Engineer')).toBeVisible({ timeout: 8000 });
-
-    expect(await hasHorizontalOverflow(page)).toBe(false);
-    await screenshotAndAxe(page, 'job-detail-consultant');
-    expect(errors).toHaveLength(0);
+    await expect(page).toHaveURL(/\/unauthorized$/);
   });
 });

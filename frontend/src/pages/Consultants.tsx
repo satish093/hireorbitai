@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { DataTable } from '../components/DataTable';
 import { Modal } from '../components/Modal';
@@ -131,6 +131,11 @@ export function Consultants() {
   // RECRUITER sees the bench read-only, with no assign controls.
   const canAssignRecruiter =
     !!profile && (MANAGER_TIER as readonly string[]).includes(profile.role);
+  // Drill-down from the Recruiters page: ?recruiter=<recruiterId> filters the
+  // bench to consultants assigned to that recruiter. The backend honours
+  // ?recruiter_id= for manager-tier and re-applies group scoping.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const recruiterFilter = searchParams.get('recruiter');
   const [rows, setRows] = useState<ConsultantRow[]>([]);
   const [recruiters, setRecruiters] = useState<RecruiterRow[]>([]);
   const [picked, setPicked] = useState<ConsultantRow | null>(null);
@@ -141,7 +146,7 @@ export function Consultants() {
   function load() {
     setListLoading(true);
     api
-      .get('/consultants')
+      .get('/consultants', recruiterFilter ? { params: { recruiter_id: recruiterFilter } } : {})
       .then((r) => setRows(r.data ?? []))
       .catch((e) => toast.error(e?.response?.data?.error ?? 'Failed to load consultants'))
       .finally(() => setListLoading(false));
@@ -165,7 +170,16 @@ export function Consultants() {
     return () => {
       cancelled = true;
     };
-  }, [canAssignRecruiter]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canAssignRecruiter, recruiterFilter]);
+
+  // Name for the active recruiter filter banner (best-effort from the directory
+  // or from a loaded row's recruiter embed).
+  const filteredRecruiterName = recruiterFilter
+    ? (recruiters.find((r) => r.id === recruiterFilter)?.user?.full_name ??
+      rows.find((r) => r.recruiter_id === recruiterFilter)?.recruiter?.user?.full_name ??
+      'selected recruiter')
+    : null;
 
   function openAssign(c: ConsultantRow) {
     setPicked(c);
@@ -216,6 +230,24 @@ export function Consultants() {
             : 'Active bench. Review profiles and update marketing status.'
         }
       />
+      {recruiterFilter && (
+        <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-sm text-brand-800">
+          <span>
+            Showing consultants assigned to{' '}
+            <span className="font-semibold">{filteredRecruiterName}</span>
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              searchParams.delete('recruiter');
+              setSearchParams(searchParams, { replace: true });
+            }}
+            className="text-xs font-medium text-brand-700 hover:underline"
+          >
+            Clear filter
+          </button>
+        </div>
+      )}
       <DataTable
         rows={rows}
         loading={listLoading}

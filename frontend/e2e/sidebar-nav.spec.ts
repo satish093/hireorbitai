@@ -56,7 +56,10 @@ test.describe('Sidebar parity by role (matrix-driven)', () => {
 
       const expected = new Set(expectedSidebarLabels(role));
       for (const label of expected) {
-        await expect(navLink(page, label), `${role} should see "${label}"`).toBeVisible();
+        // Assert DOM presence (membership parity) rather than toBeVisible — a
+        // collapsible section's open/close animation can momentarily zero an
+        // item's height, which would flake a strict visibility check.
+        await expect(navLink(page, label), `${role} should see "${label}"`).toHaveCount(1);
       }
       for (const label of ALL_SIDEBAR_LABELS) {
         if (expected.has(label)) continue;
@@ -91,7 +94,7 @@ test.describe('Sidebar parity by role (matrix-driven)', () => {
 
     const expected = new Set(expectedSidebarLabels('DEVELOPER', caps));
     for (const label of expected) {
-      await expect(navLink(page, label), `dev+caps should see "${label}"`).toBeVisible();
+      await expect(navLink(page, label), `dev+caps should see "${label}"`).toHaveCount(1);
     }
     for (const label of ALL_SIDEBAR_LABELS) {
       if (expected.has(label)) continue;

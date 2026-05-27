@@ -15,6 +15,7 @@ import {
   type DeveloperCapability,
 } from '../types';
 import { api } from '../services/api';
+import { useInvalidationListener } from '../hooks/useInvalidate';
 import { useFeatureFlags } from '../hooks/useFeatureFlags';
 import { Brand } from './Brand';
 import {
@@ -101,7 +102,9 @@ const sections: Section[] = [
     items: [
       { to: '/consultants', label: 'Consultants', icon: IconUsers, roles: OPERATOR_TIER },
       { to: '/recruiters', label: 'Recruiters', icon: IconUser, roles: MANAGER_TIER },
-      { to: '/jobs', label: 'Jobs', icon: IconBriefcase, roles: BUSINESS_ROLES },
+      // Jobs are a pipeline tool for operators (recruiters + managers/admins),
+      // NOT for consultants — a consultant browses nothing here.
+      { to: '/jobs', label: 'Jobs', icon: IconBriefcase, roles: OPERATOR_TIER },
       { to: '/applications', label: 'Applications', icon: IconFileText, roles: OPERATOR_TIER },
       {
         to: '/interviews',
@@ -422,6 +425,17 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps = {}
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.id]);
+
+  // Instant unread-badge refresh when a realtime message:new arrives (the
+  // RealtimeNotifications surface fires invalidate('messages')). Without this
+  // the badge would lag until the next 60s poll.
+  useInvalidationListener('messages', () => {
+    if (!profile) return;
+    void api
+      .get('/messages/unread-count')
+      .then((u) => setCounts((prev) => ({ ...prev, inbox: u?.data?.unread ?? prev.inbox })))
+      .catch(() => {});
+  });
 
   // ── Close on Escape (mobile) ─────────────────────────────────────────────
   useEffect(() => {

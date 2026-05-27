@@ -85,10 +85,10 @@ router.use('/consultants', consultantsRouter);
 router.use('/work-auth-docs', workAuthDocsRouter);
 router.use('/recruiters', recruitersRouter);
 router.use('/resumes', resumesRouter);
-// Business modules deny a capability-less DEVELOPER (BUSINESS_ROLES = every role
-// except DEVELOPER). DEVELOPER has no default business access — only the
-// capability-gated admin surfaces it has been granted.
-router.use('/jobs', requireRole(...BUSINESS_ROLES), jobsRouter);
+// Jobs are an operator pipeline tool — OPERATOR_TIER (admins, group leads,
+// recruiters) only. CONSULTANT is excluded (consultants don't browse jobs) and
+// so is a capability-less DEVELOPER (OPERATOR_TIER has no DEVELOPER).
+router.use('/jobs', requireRole(...OPERATOR_TIER), jobsRouter);
 router.use('/vendors', vendorsRouter);
 router.use('/clients', clientsRouter);
 router.use('/applications', applicationsRouter);

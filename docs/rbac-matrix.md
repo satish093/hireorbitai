@@ -53,7 +53,7 @@ surface only when granted the matching capability
 | `/reminders`            | Reminders     | BUSINESS_ROLES | —             | reminders  | requireRole(BUSINESS) + feature                                                       | owner        |
 | `/consultants`          | Consultants   | OPERATOR_TIER  | —             | —          | requireRole(OPERATOR) + ownership                                                     | group-scoped |
 | `/recruiters`           | Recruiters    | MANAGER_TIER   | —             | —          | requireRole(MANAGER) + group scope                                                    | group-scoped |
-| `/jobs`                 | Jobs          | BUSINESS_ROLES | —             | —          | requireRole(BUSINESS)                                                                 | global       |
+| `/jobs`                 | Jobs          | OPERATOR_TIER  | —             | —          | requireRole(OPERATOR) — CONSULTANT excluded                                           | global       |
 | `/applications`         | Applications  | OPERATOR_TIER  | —             | —          | requireRole(OPERATOR) + assertCanAccessConsultant                                     | group-scoped |
 | `/interviews`           | Interviews    | BUSINESS_ROLES | —             | interviews | requireRole(BUSINESS) + feature + ownership                                           | group-scoped |
 | `/resumes`              | Resumes       | OPERATOR_TIER  | —             | —          | requireRole(OPERATOR) + authorizeConsultantAccess                                     | group-scoped |
@@ -105,8 +105,8 @@ surface only when granted the matching capability
 - **Tasks** — create/delete/assign manager-gated (route + handler); assignee limited to status; assignee picker + create/update scoped via `assertTaskTargetsInScope`. No standalone bulk endpoint (bulk = per-row against gated endpoints).
 - **Training** — learner own-assignment only (404 otherwise); manager authoring/assignment/feedback; AI generation/backfill/retry/delete ADMIN_TIER; no learner link to manager-only course detail (catalog renders `<span>` for learners).
 - **Reports** — MANAGER_TIER or DEVELOPER+reports; global by design.
-- **Resumes** — OPERATOR_TIER (CONSULTANT denied at route); recruiter scoped to own consultants; empty-state link role-aware (admin → Users, else → Invitations).
-- **Messages** — strict current-assignment permission engine (no reports-to fallback, no prior-thread carve-out); consultant can reach only its recruiter + that recruiter's managers.
+- **Resumes** — the operator Resumes **page** (`/resumes`) stays OPERATOR_TIER (CONSULTANT denied at the route); recruiter scoped to own consultants; empty-state link role-aware (admin → Users, else → Invitations). A CONSULTANT manages **their own** resume from a "My resume" panel on their dashboard, which hits the same backend (self-scoped via `authorizeConsultantAccess`). Backend resume routes are `selfOrOperator` for the self endpoints (upload/list/download/set-current/view/delete/re-extract) and `operatorOnly` for the AI/tailoring tools. Uploads accept PDF, images, and Word (`.doc`/`.docx`, extracted via word-extractor / mammoth).
+- **Messages** — STAFF chat is broadened for recruiters (product decision): a RECRUITER may message **all active staff (OPERATOR_TIER)** org-wide plus their own assigned consultants. CONSULTANT stays assignment-bound (their recruiter + that recruiter's managers only). Conversations require both sides to view, so `canMessageUser` also allows the reverse direction (skipping admin-tier targets so admins aren't made universally reachable). Admins still reach everyone; no reports-to / prior-thread carve-out.
 
 ## Product decisions (confirmed against stated role expectations)
 

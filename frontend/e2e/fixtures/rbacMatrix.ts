@@ -130,10 +130,10 @@ export const RBAC_MATRIX: RoutePolicy[] = [
     path: '/jobs',
     sidebarLabel: 'Jobs',
     section: 'Talent',
-    allow: BUSINESS_ROLES,
-    backendGate: 'requireRole(...BUSINESS_ROLES)',
+    allow: OPERATOR_TIER,
+    backendGate: 'requireRole(...OPERATOR_TIER)',
     scope: 'global',
-    primaryActions: ['search/view jobs'],
+    primaryActions: ['search/view jobs (CONSULTANT excluded)'],
   },
   {
     path: '/applications',

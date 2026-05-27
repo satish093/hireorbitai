@@ -32,6 +32,27 @@ async function assertRecruiterInScope(
   }
 }
 
+/**
+ * Attach `consultant_count` (consultants assigned to each recruiter) to recruiter
+ * rows. Counts are inherently group-scoped: a group lead only ever passes the
+ * recruiters already filtered to their group, so the counts cover their group
+ * only. Admin-tier passes every recruiter and sees every count.
+ */
+async function attachConsultantCounts<T extends { id?: string }>(rows: T[]): Promise<T[]> {
+  if (!rows || rows.length === 0) return rows ?? [];
+  const ids = rows.map((r) => r.id).filter((x): x is string => !!x);
+  if (ids.length === 0) return rows.map((r) => ({ ...r, consultant_count: 0 }));
+  const { data: cons } = await db
+    .from('consultants')
+    .select('recruiter_id')
+    .in('recruiter_id', ids);
+  const counts = new Map<string, number>();
+  for (const c of (cons ?? []) as Array<{ recruiter_id: string | null }>) {
+    if (c.recruiter_id) counts.set(c.recruiter_id, (counts.get(c.recruiter_id) ?? 0) + 1);
+  }
+  return rows.map((r) => ({ ...r, consultant_count: r.id ? (counts.get(r.id) ?? 0) : 0 }));
+}
+
 const SELECT_WITH_JOINS =
   '*, user:users!user_id(id, email, full_name, group_id), ' +
   'manager:users!manager_id(id, email, full_name, group_id), ' +
@@ -74,11 +95,11 @@ export const list: RequestHandler = async (req, res) => {
     if (groupUserIds !== null) fq = fq.in('user_id', groupUserIds);
     const fallback = await fq;
     if (fallback.error) throw httpError(500, fallback.error.message);
-    res.json(fallback.data);
+    res.json(await attachConsultantCounts((fallback.data ?? []) as Array<{ id?: string }>));
     return;
   }
   if (error) throw httpError(500, 'Database error');
-  res.json(data);
+  res.json(await attachConsultantCounts((data ?? []) as Array<{ id?: string }>));
 };
 
 export const get: RequestHandler = async (req, res) => {
@@ -106,7 +127,8 @@ export const get: RequestHandler = async (req, res) => {
   }
   // Group leads only see recruiters in their own group; admin tier unscoped.
   await assertRecruiterInScope(req.user, row?.user_id ?? row?.user?.id ?? null);
-  res.json(row);
+  const [withCount] = await attachConsultantCounts([row as { id?: string }]);
+  res.json(withCount);
 };
 
 export const onboard: RequestHandler = async (req, res) => {
