@@ -91,164 +91,81 @@ pm2 logs hireorbit-api --raw --nostream | jq 'select(.req.id == "01H...")'
 
 ---
 
-## Backups
+## Backups & migration (`scripts/ops.sh`)
 
-The included script captures both the database and the uploads directory under a UTC-stamped folder.
+One operator tool covers off-site backups, restore drills, and host migration. It wraps the low-level
+primitives ([backup.sh](../../scripts/backup.sh), [restore.sh](../../scripts/restore.sh)) with memorable verbs.
+
+| Verb                                                | What it does                                                                                                                                       |
+| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ops.sh setup`                                      | Installs rclone, configures the **Cloudflare R2** remote from your API keys, creates the bucket, and installs the weekly cron. Turnkey — run once. |
+| `ops.sh backup [--prune-weeks N]`                   | Snapshot the DB + uploads locally, then copy the stamp to R2. This is what the weekly cron runs.                                                   |
+| `ops.sh verify`                                     | Restore-drill: loads the newest dump into a throwaway DB and prints canary row counts. Proves backups aren't silently broken.                      |
+| `ops.sh ship`                                       | Build a migration bundle (db + uploads + **`.env`**) and push it to R2. Run on the OLD host.                                                       |
+| `ops.sh land [name\|path] --force`                  | Pull/import a bundle, then `npm ci && build && migrate:up && pm2`. One command on the NEW host.                                                    |
+| `ops.sh restore <stamp> [db\|uploads\|all] --force` | Restore a local backup (passthrough to `restore.sh`).                                                                                              |
+
+Off-site target is **Cloudflare R2** — 10 GB free, **zero egress** (restores cost nothing), S3-compatible,
+and API-token auth that won't silently expire like an OAuth token. Any rclone remote works via
+`RCLONE_REMOTE` / `RCLONE_DEST`.
+
+### One-time setup
+
+In the Cloudflare dashboard → **R2** → **Manage API Tokens** → create a token with **Object Read & Write**;
+note the **Account ID**, **Access Key ID**, **Secret Access Key**. Then on the VPS:
 
 ```bash
-bash scripts/backup.sh
-# Writes ~/backups/<UTC-stamp>/{db.sql.gz, uploads.tar.gz, manifest.txt}
-
-ls -lhS ~/backups | head                  # newest first
+bash scripts/ops.sh setup     # prompts for the 3 R2 values, then wires rclone + bucket + weekly cron
+bash scripts/ops.sh backup    # test it — should appear under: rclone lsf r2:hireorbitai-backups
 ```
 
-### Daily cron
+`setup` installs this weekly cron (Sunday 03:00, prunes copies older than 8 weeks):
 
 ```cron
-0 3 * * * /home/hireorbitai/hireorbitai/scripts/backup.sh >> /home/hireorbitai/backups/backup.log 2>&1
+0 3 * * 0 /home/hireorbitai/hireorbitai/scripts/ops.sh backup --prune-weeks 8 >> /home/hireorbitai/backups/ops.log 2>&1
 ```
 
-### Retention
-
-`backup.sh` does not auto-prune. Add a separate cron job to discard old stamps:
-
-```cron
-0 4 * * * find /home/hireorbitai/backups -mindepth 1 -maxdepth 1 -type d -mtime +14 -exec rm -rf {} +
-```
-
-### Weekly off-site backup (Cloudflare R2)
-
-Daily backups on the same disk only protect against application-level mistakes — they die with the VPS.
-For real disaster recovery, push a copy off-host. [scripts/backup-offsite.sh](../../scripts/backup-offsite.sh)
-takes a fresh snapshot and copies it to **Cloudflare R2** via [rclone](https://rclone.org). R2 is the best
-free fit for backups: 10 GB free, **zero egress fees** (a full restore during a disaster costs nothing),
-S3-compatible, and it authenticates with non-expiring API tokens — so cron won't silently break the way an
-OAuth token (Google Drive) eventually does.
-
-> Any rclone remote works — the script is backend-agnostic. To use Backblaze B2, S3, or Drive instead,
-> just point `RCLONE_REMOTE` at that remote. R2 is the documented default.
-
-**One-time setup:**
-
-1. In the Cloudflare dashboard → **R2** → create a bucket named `hireorbitai-backups`.
-2. R2 → **Manage API Tokens** → create a token with **Object Read & Write**; note the **Access Key ID**,
-   **Secret Access Key**, and your **Account ID** (the endpoint is `https://<ACCOUNT_ID>.r2.cloudflarestorage.com`).
-3. On the VPS:
+### Verify a backup is restorable
 
 ```bash
-# Install rclone
-curl https://rclone.org/install.sh | sudo bash
-
-# Create a remote named "r2": type → s3, provider → Cloudflare,
-# access_key_id / secret_access_key → the R2 token pair,
-# region → auto, endpoint → https://<ACCOUNT_ID>.r2.cloudflarestorage.com
-rclone config
-
-# Verify the remote + bucket are reachable
-rclone lsd r2:
+bash scripts/ops.sh verify
+# Creates hireorbitai_verify_<ts> (via sudo→postgres), loads the newest dump,
+# prints row counts for users/recruiters/consultants/jobs/applications, then drops it.
 ```
 
-**Run it once by hand** to confirm the upload lands:
+### Migrate to a new VPS
+
+The migration bundle is db + uploads + **`.env`**, so the new host comes up byte-identical — existing
+signed file URLs and refresh tokens keep working because `STORAGE_URL_SECRET` / `JWT_SECRET` /
+`COOKIE_SECRET` travel with it.
+
+> ⚠ **The bundle holds live secrets.** It moves only over your **private** R2 bucket (or `scp`), is written
+> `chmod 600`, and `land`/`ship` remind you to delete it from every host **and** R2 once verified.
 
 ```bash
-bash scripts/backup-offsite.sh
-rclone lsf r2:hireorbitai-backups                # should list the new <stamp>/ folder
+# OLD host:
+bash scripts/ops.sh ship                       # bundle → R2 (prints scp fallback too)
+
+# NEW host (provisioned per "First-time setup", repo cloned):
+bash scripts/ops.sh setup                      # so rclone can reach R2
+bash scripts/ops.sh land                       # dry run — prints what it will do
+bash scripts/ops.sh land --force               # pull + restore db/uploads/.env + npm ci/build/migrate/pm2
 ```
 
-**Weekly cron** (end of week — Sunday 03:00, as the `hireorbitai` user via `crontab -e`):
+No host-to-host SSH needed (the bundle rides through R2). For a direct transfer instead, `ship` prints an
+`scp` command and `land` accepts a local path: `ops.sh land ~/migrate/<bundle>.tar.gz --force`.
 
-```cron
-0 3 * * 0 /home/hireorbitai/hireorbitai/scripts/backup-offsite.sh >> /home/hireorbitai/backups/backup-offsite.log 2>&1
-```
+`land` backs up any existing `backend/.env` to `.pre-migrate.<unix>` and moves the live uploads dir aside to
+`<UPLOADS_DIR>.pre-migrate.<unix>` before extracting — same roll-back safety as `restore`.
 
-To cap storage, add `--prune-weeks N` (deletes remote copies older than N weeks):
+> **DB name guard:** `DB_GUARD` keys on the database name in `DATABASE_URL`. Keep the new host's db named
+> `hireorbitai*`, or set `DB_GUARD=off` in `.env`.
 
-```cron
-0 3 * * 0 /home/hireorbitai/hireorbitai/scripts/backup-offsite.sh --prune-weeks 8 >> /home/hireorbitai/backups/backup-offsite.log 2>&1
-```
+### Primitives (advanced / manual)
 
-Env overrides: `RCLONE_REMOTE` (default `r2`), `RCLONE_DEST` (default `hireorbitai-backups`).
-Use `--no-snapshot` to push the newest existing local stamp without taking a fresh dump.
-
----
-
-## Restore
-
-```bash
-ls ~/backups                                  # list available stamps
-bash scripts/restore.sh <stamp>               # both DB + uploads
-bash scripts/restore.sh <stamp> db            # DB only
-bash scripts/restore.sh <stamp> uploads       # uploads only
-```
-
-The script **refuses to run without `--force`** — restoring is a destructive operation. After confirming you really mean it:
-
-```bash
-bash scripts/restore.sh <stamp> all --force
-pm2 restart hireorbit-api --update-env
-```
-
-The existing uploads directory is moved aside to `<UPLOADS_DIR>.pre-restore.<unix>` before extract — if the restored tree is bad you can roll back manually with a single `mv`.
-
----
-
-## VPS-to-VPS migration
-
-[scripts/migrate.sh](../../scripts/migrate.sh) packs the database, the uploads directory, **and**
-`backend/.env` into one portable tarball so a new host comes up byte-identical — existing signed file
-URLs and refresh tokens keep working because `STORAGE_URL_SECRET` / `JWT_SECRET` / `COOKIE_SECRET`
-travel with the bundle.
-
-> ⚠ **The bundle contains live secrets.** Move it only over `scp`/SSH or your **private** R2 bucket —
-> never email, public links, or shared drives. It is written `chmod 600`. Delete it from every host
-> **and from R2** once the new VPS is verified.
-
-**On the OLD host** — build the bundle:
-
-```bash
-cd ~/hireorbitai
-bash scripts/migrate.sh export
-# → ~/migrate/hireorbitai-migrate-<stamp>.tar.gz  (db + uploads + .env)
-```
-
-Then move it to the new host with **either** transport:
-
-**Option A — direct scp** (needs SSH between the two hosts):
-
-```bash
-scp ~/migrate/hireorbitai-migrate-<stamp>.tar.gz  hireorbitai@NEW_HOST:~/migrate/
-```
-
-**Option B — via R2** (no host-to-host SSH; reuses the rclone `r2` remote from the backup setup):
-
-```bash
-# old host: upload the newest bundle to <bucket>/migrate/
-bash scripts/migrate.sh push
-# new host (after rclone config): download it
-bash scripts/migrate.sh pull
-```
-
-**On the NEW host** — provision per "First-time setup" above, then restore:
-
-```bash
-git clone <repo-url> ~/hireorbitai && cd ~/hireorbitai
-bash scripts/migrate.sh import ~/migrate/hireorbitai-migrate-<stamp>.tar.gz          # dry run — prints the plan
-bash scripts/migrate.sh import ~/migrate/hireorbitai-migrate-<stamp>.tar.gz --force  # restore db + uploads + .env
-
-npm ci
-npm run build
-npm --prefix backend run migrate:up        # apply any migrations newer than the dump
-pm2 start backend/ecosystem.config.cjs     # or: pm2 reload hireorbit-api --update-env
-curl -fsS http://127.0.0.1:${PORT:-4000}/api/health
-```
-
-The import backs up any existing `backend/.env` to `backend/.env.pre-migrate.<unix>` and moves the live
-uploads dir aside to `<UPLOADS_DIR>.pre-migrate.<unix>` before extracting — same roll-back safety as restore.
-
-> **DB name guard:** the backend's `DB_GUARD` check keys on the database name in `DATABASE_URL`. Keep the
-> same `hireorbitai_prod` / `hireorbitai_dev` naming on the new host, or set `DB_GUARD=off` in `.env`.
-> Finally, **delete the bundle** everywhere: `rm ~/migrate/hireorbitai-migrate-<stamp>.tar.gz` on both
-> hosts, and if you used R2, `rclone deletefile r2:hireorbitai-backups/migrate/hireorbitai-migrate-<stamp>.tar.gz`.
+`scripts/backup.sh` writes `~/backups/<UTC-stamp>/{db.sql.gz, uploads.tar.gz, manifest.txt}` (no off-site,
+no prune). `scripts/restore.sh <stamp> [db|uploads|all] --force` restores one stamp with move-aside
+rollback. `ops.sh` is the front door; reach for these only when you need a step in isolation.
 
 ---
 
