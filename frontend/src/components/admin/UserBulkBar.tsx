@@ -1,6 +1,7 @@
 import { Popover } from '../ui/Popover';
 import { Button } from '../Button';
-import { ALL_ROLES, Role, ROLE_LABEL } from '../../types';
+import { Role, ROLE_LABEL, assignableRolesFor } from '../../types';
+import { useAuth } from '../../context/AuthContext';
 import type { GroupLite } from './types';
 
 /**
@@ -27,6 +28,9 @@ export function UserBulkBar({
   onDeactivate: () => void;
   onClear: () => void;
 }) {
+  const { profile } = useAuth();
+  // Only roles the current admin may actually assign (rank ceiling).
+  const roleChoices = profile ? assignableRolesFor(profile.role) : [];
   return (
     <div className="flex flex-wrap items-center gap-2 mb-3 px-3 h-12 rounded-lg bg-accent-soft border border-accent/30">
       <span className="text-sm font-medium text-accent">{count} selected</span>
@@ -48,7 +52,7 @@ export function UserBulkBar({
         >
           {(close) => (
             <div className="min-w-[160px] max-h-64 overflow-y-auto">
-              {ALL_ROLES.map((r) => (
+              {roleChoices.map((r) => (
                 <button
                   key={r}
                   onClick={() => {

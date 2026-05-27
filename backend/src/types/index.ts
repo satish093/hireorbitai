@@ -22,11 +22,15 @@ export {
   OPERATOR_TIER,
   ALL_ROLES,
   GROUP_LEAD_ROLES,
+  ROLE_ORDER,
   DEVELOPER_CAPABILITIES,
   TASK_STATUSES,
   TASK_PRIORITIES,
   isAdmin,
   isManagerOrUp,
+  roleRank,
+  outranks,
+  assignableRolesFor,
 } from '@hireorbitai/shared';
 export type { Role, DeveloperCapability, TaskStatus, TaskPriority } from '@hireorbitai/shared';
 

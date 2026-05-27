@@ -9,6 +9,7 @@ import {
   getExpectedParentRoles,
   getAllValidParentRoles,
   wireHierarchy,
+  canManageRole,
 } from '../services/invitationHierarchy.service';
 import { canViewUser } from '../services/permission.service';
 import { validatePasswordStrength } from '../utils/password';
@@ -42,18 +43,19 @@ export const create: RequestHandler = async (req, res) => {
   const parsed = createSchema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
 
-  // Privilege ceiling: only admin-tier can invite an admin-tier role, and only
-  // a SUPER_ADMIN can invite a SUPER_ADMIN. Without this a MANAGER could mint
-  // a fresh DIRECTOR account and self-escalate via that login.
+  // Privilege ceiling: a user may only invite a role STRICTLY below their own
+  // rank — never an equal- or higher-ranked role (which would let them mint an
+  // account they could then sign in as to self-escalate). SUPER_ADMIN is the
+  // sole exception: only a SUPER_ADMIN may invite another SUPER_ADMIN, and a
+  // SUPER_ADMIN may invite any role.
   const requestedRole = parsed.data.role as Role;
-  if (requestedRole === 'SUPER_ADMIN' && req.user.role !== 'SUPER_ADMIN') {
-    throw httpError(403, 'Only a SUPER_ADMIN can invite another SUPER_ADMIN.');
-  }
-  if (
-    (ADMIN_TIER as Role[]).includes(requestedRole) &&
-    !(ADMIN_TIER as Role[]).includes(req.user.role)
-  ) {
-    throw httpError(403, 'Admin-tier roles can only be invited by an admin.');
+  if (req.user.role !== 'SUPER_ADMIN') {
+    if (requestedRole === 'SUPER_ADMIN') {
+      throw httpError(403, 'Only a SUPER_ADMIN can invite another SUPER_ADMIN.');
+    }
+    if (!canManageRole(req.user.role, requestedRole)) {
+      throw httpError(403, 'You can only invite roles below your own.');
+    }
   }
 
   // ── Parent assignment ───────────────────────────────────────────────────

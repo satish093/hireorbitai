@@ -127,7 +127,10 @@ const RECRUITER_ROW = { id: 'r-1' };
 const CONSULTANT_OWNER = { id: OWNER_USER_ID, role: 'CONSULTANT' };
 const CONSULTANT_OTHER = { id: OTHER_USER_ID, role: 'CONSULTANT' };
 const RECRUITER_ASSIGNED = { id: RECRUITER_USER_ID, role: 'RECRUITER' };
-const MANAGER = { id: 'u-manager', role: 'HR_MANAGER' };
+// Admin tier is unscoped; a group lead (HR_MANAGER/MANAGER) is confined to its
+// group (resolved via managerGroupUserIds → reads `users` by group_id).
+const ADMIN = { id: 'u-director', role: 'DIRECTOR' };
+const GROUP_LEAD = { id: 'u-lead', role: 'MANAGER', group_id: 'g1' };
 
 // ---------------------------------------------------------------------------
 // list — ownership via authorizeConsultantAccess
@@ -172,13 +175,32 @@ describe('workAuthDocs.list — authorizeConsultantAccess', () => {
     expect(err?.status).toBe(404);
   });
 
-  it("allows a MANAGER to list any consultant's documents", async () => {
+  it("allows an ADMIN-tier user to list any consultant's documents", async () => {
     mock.rows.consultants = [CONSULTANT_ROW];
     mock.rows.work_auth_documents = [];
-    const { err } = await call(workAuthDocs.list as Handler, MANAGER, {
+    const { err } = await call(workAuthDocs.list as Handler, ADMIN, {
       params: { consultantId: 'c-1' },
     });
     expect(err).toBeNull();
+  });
+
+  it('allows a group lead to list documents for a consultant in their group', async () => {
+    mock.rows.consultants = [CONSULTANT_ROW];
+    mock.rows.users = [{ id: OWNER_USER_ID }]; // owner in the lead's group
+    mock.rows.work_auth_documents = [];
+    const { err } = await call(workAuthDocs.list as Handler, GROUP_LEAD, {
+      params: { consultantId: 'c-1' },
+    });
+    expect(err).toBeNull();
+  });
+
+  it('returns 404 when a group lead requests docs for a consultant outside their group', async () => {
+    mock.rows.consultants = [CONSULTANT_ROW];
+    mock.rows.users = []; // not in the lead's group → fail-closed
+    const { err } = await call(workAuthDocs.list as Handler, GROUP_LEAD, {
+      params: { consultantId: 'c-1' },
+    });
+    expect(err?.status).toBe(404);
   });
 
   it('returns 404 when the consultant row does not exist', async () => {

@@ -16,8 +16,12 @@ import {
   MANAGER_TIER,
   OPERATOR_TIER,
   ALL_ROLES,
+  GROUP_LEAD_ROLES,
   isAdmin,
   isManagerOrUp,
+  outranks,
+  roleRank,
+  assignableRolesFor,
   type Role,
 } from '@hireorbitai/shared';
 
@@ -62,5 +66,55 @@ describe('role tier ladder', () => {
       expect(isManagerOrUp(role)).toBe(MANAGER_TIER.includes(role));
     }
     expect(isManagerOrUp(undefined)).toBe(false);
+  });
+
+  it('treats HR_MANAGER and MANAGER as the group-lead roles inside MANAGER_TIER', () => {
+    expect(GROUP_LEAD_ROLES).toEqual(['HR_MANAGER', 'MANAGER']);
+    for (const r of GROUP_LEAD_ROLES) expect(MANAGER_TIER).toContain(r);
+    expect(ADMIN_TIER).not.toContain('HR_MANAGER');
+    expect(ADMIN_TIER).not.toContain('MANAGER');
+  });
+});
+
+describe('rank ceiling (roleRank / outranks / assignableRolesFor)', () => {
+  it('ranks roles in the canonical seniority order', () => {
+    expect(roleRank('SUPER_ADMIN')).toBeGreaterThan(roleRank('CEO'));
+    expect(roleRank('CEO')).toBeGreaterThan(roleRank('CTO'));
+    expect(roleRank('CTO')).toBeGreaterThan(roleRank('DIRECTOR'));
+    expect(roleRank('DIRECTOR')).toBeGreaterThan(roleRank('HR_MANAGER'));
+    expect(roleRank('HR_MANAGER')).toBeGreaterThan(roleRank('MANAGER'));
+    expect(roleRank('MANAGER')).toBeGreaterThan(roleRank('DEVELOPER'));
+    expect(roleRank('DEVELOPER')).toBeGreaterThan(roleRank('RECRUITER'));
+    expect(roleRank('RECRUITER')).toBeGreaterThan(roleRank('CONSULTANT'));
+  });
+
+  it('outranks is strict (equal rank does not outrank)', () => {
+    expect(outranks('DIRECTOR', 'MANAGER')).toBe(true);
+    expect(outranks('DIRECTOR', 'DIRECTOR')).toBe(false);
+    expect(outranks('MANAGER', 'DIRECTOR')).toBe(false);
+  });
+
+  it('assignableRolesFor: a SUPER_ADMIN may assign every role (incl. SUPER_ADMIN)', () => {
+    const a = assignableRolesFor('SUPER_ADMIN');
+    for (const r of ALL_ROLES) expect(a).toContain(r);
+  });
+
+  it('assignableRolesFor: non-super never gets SUPER_ADMIN or an equal/higher role', () => {
+    const dir = assignableRolesFor('DIRECTOR');
+    expect(dir).not.toContain('SUPER_ADMIN');
+    expect(dir).not.toContain('CEO');
+    expect(dir).not.toContain('CTO');
+    expect(dir).not.toContain('DIRECTOR'); // equal rank excluded
+    expect(dir).toContain('HR_MANAGER');
+    expect(dir).toContain('MANAGER');
+    expect(dir).toContain('CONSULTANT');
+  });
+
+  it('assignableRolesFor: a RECRUITER may only assign CONSULTANT', () => {
+    expect(assignableRolesFor('RECRUITER')).toEqual(['CONSULTANT']);
+  });
+
+  it('assignableRolesFor: a CONSULTANT may assign nothing', () => {
+    expect(assignableRolesFor('CONSULTANT')).toEqual([]);
   });
 });

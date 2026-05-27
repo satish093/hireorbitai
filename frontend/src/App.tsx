@@ -8,7 +8,7 @@ import { ProductTour } from './components/ProductTour';
 import { useAuth } from './context/AuthContext';
 import { useSessionRevoke } from './hooks/useSessionRevoke';
 import { config } from './config/env';
-import { ADMIN_TIER, MANAGER_TIER, OPERATOR_TIER, OWNER_TIER } from './types';
+import { ADMIN_TIER, MANAGER_TIER, OPERATOR_TIER, OWNER_TIER, hasCapability } from './types';
 
 // DEV-ONLY test panel. Gated by the build-time flag VITE_DEV_TOOLS so the
 // import lands in a dead branch and is tree-shaken out of production builds
@@ -166,11 +166,34 @@ function RouteFallback() {
   );
 }
 
+/** Minimal landing for a DEVELOPER with no obvious capability home. The manager
+ *  dashboard would fire manager-only data calls (now 403/empty for DEVELOPER),
+ *  so we show a neutral page and let them pick a granted area from the nav. */
+function DeveloperHome() {
+  return (
+    <div className="min-h-dvh flex flex-col items-center justify-center gap-2 text-center px-6">
+      <h1 className="text-lg font-semibold text-ink">Developer account</h1>
+      <p className="text-sm text-muted max-w-md">
+        Your access is scoped to the capabilities granted to you. Choose a permitted area from the
+        navigation to get started.
+      </p>
+    </div>
+  );
+}
+
 function DashboardRouter() {
   const { profile } = useAuth();
   if (!profile) return null;
   if (profile.role === 'CONSULTANT') return <ConsultantDashboard />;
   if (profile.role === 'RECRUITER') return <RecruiterDashboard />;
+  // DEVELOPER has no default business dashboard — never the ManagerDashboard
+  // (its data calls are manager-scoped). Route to a granted capability area if
+  // there is an obvious one, otherwise a neutral landing.
+  if (profile.role === 'DEVELOPER') {
+    if (hasCapability(profile, 'users')) return <Navigate to="/admin/users" replace />;
+    if (hasCapability(profile, 'reports')) return <Navigate to="/reports" replace />;
+    return <DeveloperHome />;
+  }
   // Everyone manager-and-above (incl. the group leads HR_MANAGER + MANAGER)
   // lands on the manager dashboard.
   return <ManagerDashboard />;
@@ -508,7 +531,7 @@ export default function App() {
           <Route
             path="/admin/users/:id"
             element={
-              <ProtectedRoute allow={ADMIN_TIER}>
+              <ProtectedRoute allow={ADMIN_TIER} capability="users">
                 <AdminUserRedirect />
               </ProtectedRoute>
             }

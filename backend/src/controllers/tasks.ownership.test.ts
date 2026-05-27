@@ -113,6 +113,10 @@ beforeEach(() => {
 const CONSULTANT = { id: 'u-consultant', role: 'CONSULTANT' };
 const STRANGER = { id: 'u-stranger', role: 'RECRUITER' };
 const MANAGER = { id: 'u-manager', role: 'HR_MANAGER' };
+// Admin tier is unscoped; a group lead may only edit tasks for their group
+// (resolved via managerGroupUserIds → reads `users` by group_id).
+const ADMIN = { id: 'u-director', role: 'DIRECTOR' };
+const GROUP_LEAD = { id: 'u-lead', role: 'MANAGER', group_id: 'g1' };
 
 describe('tasks.controller — assertCanAccessTask ownership (via listSubtasks)', () => {
   it('returns 404 (not 403) for a non-manager who is neither assignee nor creator', async () => {
@@ -176,15 +180,39 @@ describe('tasks.controller — update field restriction for non-manager assignee
     expect(mock.updates.find((u) => u.table === 'tasks')).toBeUndefined();
   });
 
-  it('a manager may patch non-status fields (no restriction)', async () => {
+  it('an ADMIN-tier user may patch non-status fields (no restriction)', async () => {
     mock.rows.tasks = [{ id: 't-1', assignee_id: 'u-owner' }];
-    const err = await call(tasks.update as Handler, MANAGER, {
+    const err = await call(tasks.update as Handler, ADMIN, {
       params: { id: 't-1' },
       body: { title: 'Renamed', priority: 'HIGH' },
     });
     expect(err).toBeNull();
     const patch = mock.updates.find((u) => u.table === 'tasks')?.payload;
     expect(patch).toMatchObject({ title: 'Renamed', priority: 'HIGH' });
+  });
+
+  it('a group lead may patch a task assigned within their group', async () => {
+    mock.rows.tasks = [{ id: 't-1', assignee_id: 'u-owner' }];
+    mock.rows.users = [{ id: 'u-owner' }]; // assignee is in the lead's group
+    const err = await call(tasks.update as Handler, GROUP_LEAD, {
+      params: { id: 't-1' },
+      body: { title: 'Renamed' },
+    });
+    expect(err).toBeNull();
+    expect(mock.updates.find((u) => u.table === 'tasks')?.payload).toMatchObject({
+      title: 'Renamed',
+    });
+  });
+
+  it('a group lead gets 403 patching a task outside their group', async () => {
+    mock.rows.tasks = [{ id: 't-1', assignee_id: 'u-owner' }];
+    mock.rows.users = []; // assignee not in the lead's group
+    const err = await call(tasks.update as Handler, GROUP_LEAD, {
+      params: { id: 't-1' },
+      body: { title: 'Renamed' },
+    });
+    expect(err?.status).toBe(403);
+    expect(mock.updates.find((u) => u.table === 'tasks')).toBeUndefined();
   });
 });
 

@@ -17,11 +17,41 @@
  */
 
 import { db } from '../config/db';
-import { GROUP_LEAD_ROLES, type Role } from '../types';
+import { ADMIN_TIER, GROUP_LEAD_ROLES, type Role } from '../types';
 
 interface Caller {
   role: Role;
   group_id?: string | null;
+}
+
+/** True for the group-scoped lead roles (HR_MANAGER + MANAGER). */
+export function isGroupLead(role: Role): boolean {
+  return GROUP_LEAD_ROLES.includes(role);
+}
+
+/** True for admin-tier callers, who are never group-scoped (see all groups). */
+export function isAdminTier(role: Role): boolean {
+  return (ADMIN_TIER as Role[]).includes(role);
+}
+
+/**
+ * Detail/update authorization for group leads, keyed by the record's owning
+ * USER id. Returns true only when the caller is a group lead AND the owner is in
+ * their group. (Admin-tier callers should be allowed BEFORE calling this — they
+ * are not group-scoped.) A lead with no group returns false (fail-closed).
+ */
+export async function leadCanAccessUser(caller: Caller, ownerUserId: string): Promise<boolean> {
+  const ids = await managerGroupUserIds(caller);
+  return ids !== null && ids.includes(ownerUserId);
+}
+
+/** Same as leadCanAccessUser but keyed by a consultant row id. */
+export async function leadCanAccessConsultant(
+  caller: Caller,
+  consultantId: string,
+): Promise<boolean> {
+  const ids = await managerGroupConsultantIds(caller);
+  return ids !== null && ids.includes(consultantId);
 }
 
 /**

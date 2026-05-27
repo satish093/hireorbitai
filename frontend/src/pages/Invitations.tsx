@@ -10,20 +10,8 @@ import { Button } from '../components/Button';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { invalidate } from '../hooks/useInvalidate';
-import { ADMIN_TIER, OWNER_TIER } from '../types';
+import { ADMIN_TIER, ROLE_LABEL, assignableRolesFor } from '../types';
 import toast from 'react-hot-toast';
-
-const ALL_INVITE_OPTIONS = [
-  { value: 'CONSULTANT', label: 'Consultant' },
-  { value: 'RECRUITER', label: 'Recruiter' },
-  { value: 'DEVELOPER', label: 'Developer' },
-  { value: 'HR_MANAGER', label: 'HR Manager' },
-  { value: 'MANAGER', label: 'Manager' },
-  { value: 'DIRECTOR', label: 'Director' },
-  { value: 'CTO', label: 'CTO' },
-  { value: 'CEO', label: 'CEO' },
-  { value: 'SUPER_ADMIN', label: 'Super admin' },
-];
 
 type ParentUser = { id: string; full_name: string | null; email: string; role: string };
 
@@ -36,10 +24,12 @@ export function Invitations() {
   const { profile } = useAuth();
   const isAdmin = !!profile && (ADMIN_TIER as string[]).includes(profile.role);
 
-  const ROLE_OPTIONS =
-    profile?.role != null && (OWNER_TIER as readonly string[]).includes(profile.role)
-      ? ALL_INVITE_OPTIONS
-      : ALL_INVITE_OPTIONS.filter((o) => o.value !== 'SUPER_ADMIN');
+  // Only show roles this actor may actually invite (strictly below their own
+  // rank; SUPER_ADMIN may invite anyone). Mirrors the backend ceiling so the
+  // dropdown never offers a role the server will reject.
+  const ROLE_OPTIONS = profile?.role
+    ? assignableRolesFor(profile.role).map((r) => ({ value: r, label: ROLE_LABEL[r] }))
+    : [];
 
   const [rows, setRows] = useState<any[]>([]);
   const [open, setOpen] = useState(false);

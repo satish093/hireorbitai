@@ -1,7 +1,7 @@
 import { RequestHandler } from 'express';
 import { z } from 'zod';
 import { db, pool } from '../config/db';
-import { httpError, ALL_ROLES, ADMIN_TIER, DEVELOPER_CAPABILITIES, Role } from '../types';
+import { httpError, ALL_ROLES, GROUP_LEAD_ROLES, DEVELOPER_CAPABILITIES, Role } from '../types';
 import { audit } from '../services/audit.service';
 import { requestPasswordReset } from '../services/auth.service';
 import { logger } from '../config/logger';
@@ -912,8 +912,12 @@ export const setRole: RequestHandler = async (req, res) => {
   assertOutranks(actor, row.role); // can't touch equal/higher users
   assertOutranks(actor, newRole); // can't promote to your own tier or above
 
-  // Only MANAGER role is group-scoped; HR_MANAGER and DEVELOPER may have no group
-  if (actor.role === 'MANAGER') {
+  // Group leads (HR_MANAGER + MANAGER) are group-scoped: they may only change
+  // roles of users in their OWN group. Admin-tier is not group-scoped. A lead
+  // with no group can change nobody (fail-closed). DEVELOPER reaches this route
+  // only via the `users` capability and is not a group lead, so it is not
+  // additionally group-scoped here (its rank ceiling still applies above).
+  if (GROUP_LEAD_ROLES.includes(actor.role)) {
     // Load actor's group_id from DB (not always in the JWT)
     const { data: actorRow } = await db
       .from('users')

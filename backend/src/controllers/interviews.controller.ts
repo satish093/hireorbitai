@@ -1,8 +1,13 @@
 import { RequestHandler } from 'express';
 import { z } from 'zod';
 import { db } from '../config/db';
-import { httpError, MANAGER_TIER } from '../types';
-import { managerGroupConsultantIds } from '../services/groupScope';
+import { httpError, MANAGER_TIER, type Role } from '../types';
+import {
+  managerGroupConsultantIds,
+  isAdminTier,
+  isGroupLead,
+  leadCanAccessConsultant,
+} from '../services/groupScope';
 import { syncInterviewReminders } from '../services/interviewReminders.service';
 import { publishToUser } from '../services/realtime.service';
 
@@ -76,7 +81,7 @@ interface InterviewOwnership {
 }
 
 async function loadAndAuthorize(
-  caller: { id: string; role: string },
+  caller: { id: string; role: Role; group_id?: string | null },
   interviewId: string,
 ): Promise<InterviewOwnership> {
   const { data, error } = await db
@@ -88,7 +93,13 @@ async function loadAndAuthorize(
   if (!data) throw httpError(404, 'Interview not found');
   const row = data as InterviewOwnership;
 
-  if (isManagerTier(caller.role)) return row;
+  // Admin tier is unscoped. Group leads (HR_MANAGER/MANAGER) may only touch
+  // interviews for consultants in their own group.
+  if (isAdminTier(caller.role)) return row;
+  if (isGroupLead(caller.role)) {
+    if (row.consultant_id && (await leadCanAccessConsultant(caller, row.consultant_id))) return row;
+    throw httpError(404, 'Interview not found');
+  }
 
   // Anyone listed as the creator may keep editing their own row (e.g. a
   // recruiter who scheduled a peer's mock and needs to amend it).
@@ -115,11 +126,15 @@ async function loadAndAuthorize(
 
 /** Verify that the caller may schedule for the supplied consultant_id. */
 async function authorizeCreateForConsultant(
-  caller: { id: string; role: string },
+  caller: { id: string; role: Role; group_id?: string | null },
   consultantId: string | undefined | null,
 ): Promise<void> {
   if (!consultantId) throw httpError(400, 'consultant_id is required');
-  if (isManagerTier(caller.role)) return;
+  if (isAdminTier(caller.role)) return;
+  if (isGroupLead(caller.role)) {
+    if (await leadCanAccessConsultant(caller, consultantId)) return;
+    throw httpError(403, 'Forbidden');
+  }
   if (caller.role === 'RECRUITER') {
     const myRecId = await getCallerRecruiterRowId(caller.id);
     if (!myRecId) throw httpError(403, 'Forbidden');
@@ -200,9 +215,17 @@ type InterviewScope = { all: true } | { all: false; consultantIds: string[] } | 
 
 async function resolveInterviewScope(caller: {
   id: string;
-  role: string;
+  role: Role;
+  group_id?: string | null;
 }): Promise<InterviewScope> {
-  if (isManagerTier(caller.role)) return { all: true };
+  // Admin tier sees everything. Group leads are scoped to their group's
+  // consultants; a lead with no group (or empty group) sees nothing.
+  if (isAdminTier(caller.role)) return { all: true };
+  if (isGroupLead(caller.role)) {
+    const ids = await managerGroupConsultantIds(caller);
+    if (!ids || ids.length === 0) return null;
+    return { all: false, consultantIds: ids };
+  }
   if (caller.role === 'RECRUITER') {
     const myRecId = await getCallerRecruiterRowId(caller.id);
     if (!myRecId) return null;

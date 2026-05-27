@@ -79,5 +79,45 @@ export function isManagerOrUp(role: Role | undefined): boolean {
   return !!role && MANAGER_TIER.includes(role);
 }
 
+/**
+ * Seniority ladder, most-senior first. Single source of truth for "who outranks
+ * whom" — the backend rank tables (invitationHierarchy / adminUsers) mirror this
+ * order. Index 0 is the most senior.
+ */
+export const ROLE_ORDER: Role[] = [
+  'SUPER_ADMIN',
+  'CEO',
+  'CTO',
+  'DIRECTOR',
+  'HR_MANAGER',
+  'MANAGER',
+  'DEVELOPER',
+  'RECRUITER',
+  'CONSULTANT',
+];
+
+/** Numeric rank — higher = more senior. Unknown roles rank 0 (lowest). */
+export function roleRank(role: Role): number {
+  const i = ROLE_ORDER.indexOf(role);
+  return i === -1 ? 0 : ROLE_ORDER.length - i;
+}
+
+/** Actor strictly outranks target (the rank ceiling for create/invite/assign). */
+export function outranks(actor: Role, target: Role): boolean {
+  return roleRank(actor) > roleRank(target);
+}
+
+/**
+ * Roles `actorRole` is allowed to create / invite / assign. A SUPER_ADMIN may
+ * assign any role (incl. SUPER_ADMIN); everyone else may only assign roles
+ * STRICTLY below their own rank and never SUPER_ADMIN. Mirrors the backend
+ * ceiling (canManageRole + the SUPER_ADMIN special-case) so frontend dropdowns
+ * never offer a role the server will reject.
+ */
+export function assignableRolesFor(actorRole: Role): Role[] {
+  if (actorRole === 'SUPER_ADMIN') return [...ALL_ROLES];
+  return ALL_ROLES.filter((r) => r !== 'SUPER_ADMIN' && outranks(actorRole, r));
+}
+
 // ROLE_LABEL stays in `frontend/src/types/index.ts` — display capitalisation
 // is a UI concern, not a domain-model concern. Backend never reads it.

@@ -14,8 +14,8 @@ import { ConfirmDialog, type ConfirmSpec } from './ConfirmDialog';
 import { useUserDetail } from './useUserDetail';
 import { useAuth } from '../../context/AuthContext';
 import {
-  ALL_ROLES,
   DEVELOPER_CAPABILITIES,
+  assignableRolesFor,
   type Role,
   type DeveloperCapability,
 } from '@hireorbitai/shared';
@@ -491,7 +491,16 @@ export function UserDetailPane({
                       label="Role"
                       value={role}
                       onChange={(e) => setRole(e.target.value as Role)}
-                      options={ALL_ROLES.map((r) => ({ value: r, label: r }))}
+                      options={(() => {
+                        // Only roles this admin may assign (rank ceiling). Keep
+                        // the target's current role visible even if it's above
+                        // what the actor can assign (the Save is server-guarded).
+                        const choices = profile ? assignableRolesFor(profile.role) : [];
+                        const withCurrent = choices.includes(user.role as Role)
+                          ? choices
+                          : [user.role as Role, ...choices];
+                        return withCurrent.map((r) => ({ value: r, label: r }));
+                      })()}
                     />
                   </div>
                   <Button

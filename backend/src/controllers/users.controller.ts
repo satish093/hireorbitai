@@ -1,11 +1,12 @@
 import { RequestHandler } from 'express';
 import { z } from 'zod';
 import { db } from '../config/db';
-import { httpError, ADMIN_TIER, MANAGER_TIER, Role, ALL_ROLES } from '../types';
+import { httpError, ADMIN_TIER, MANAGER_TIER, GROUP_LEAD_ROLES, Role, ALL_ROLES } from '../types';
 import { logger } from '../config/logger';
 import * as authSvc from '../services/auth.service';
 import { assertOutranks } from './adminUsers.controller';
 import { canViewUser } from '../services/permission.service';
+import { managerGroupUserIds } from '../services/groupScope';
 
 /** Refuse to mutate an equal- or higher-ranked user. Loads the target's role
  *  and defers to the canonical rank ladder in adminUsers.controller. Without
@@ -45,12 +46,35 @@ async function canViewProfile(
   return canViewUser({ id: caller.id, role: caller.role }, targetUserId);
 }
 
-/** Can the calling user edit the target user's profile?
- *   - MANAGER_TIER: yes (full org admin).
+/** Can the calling user edit the target user's profile (role-level gate)?
+ *   - Self: always.
+ *   - MANAGER_TIER: yes at the role level — group scoping for the non-admin
+ *     group leads is enforced separately by assertProfileEditScope().
  *   - Anyone else: only their own profile. */
 function canEditProfile(caller: { id: string; role: Role }, targetUserId: string): boolean {
   if (caller.id === targetUserId) return true;
   return isManagerTier(caller.role);
+}
+
+/** Group-scope guard for profile edits. Admin-tier may edit anyone; a non-admin
+ *  group lead (HR_MANAGER / MANAGER) may only edit users in their OWN group; a
+ *  lead with no group can edit nobody (fail-closed). Self-edits already passed
+ *  canEditProfile and skip this. Throws 403 on a cross-group attempt. */
+async function assertProfileEditScope(
+  caller: { id: string; role: Role; group_id?: string | null },
+  targetUserId: string,
+): Promise<void> {
+  if (caller.id === targetUserId) return;
+  if ((ADMIN_TIER as Role[]).includes(caller.role)) return;
+  if (GROUP_LEAD_ROLES.includes(caller.role)) {
+    const groupUserIds = await managerGroupUserIds({
+      role: caller.role,
+      group_id: caller.group_id ?? null,
+    });
+    if (groupUserIds !== null && !groupUserIds.includes(targetUserId)) {
+      throw httpError(403, 'You can only edit users in your group.');
+    }
+  }
 }
 
 /** GET /users/:id — fetch one user's profile (scoped). */
@@ -119,6 +143,7 @@ export const get: RequestHandler = async (req, res) => {
 export const update: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   if (!canEditProfile(req.user, req.params.id)) throw httpError(403, 'Forbidden');
+  await assertProfileEditScope(req.user, req.params.id);
 
   // URL fields restrict to http(s) so a stored `javascript:` or `data:`
   // URL can't render later in another user's browser. Same refinement we
@@ -245,11 +270,15 @@ export const adminCreate: RequestHandler = async (req, res) => {
   const parsed = adminCreateSchema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, parsed.error.issues[0]?.message ?? 'Invalid input');
 
-  // Only an existing SUPER_ADMIN can mint another SUPER_ADMIN. Otherwise a
-  // DIRECTOR / CTO with admin-tier access could quietly self-escalate by
-  // creating a SUPER_ADMIN account and signing in as it.
-  if (parsed.data.role === 'SUPER_ADMIN' && req.user.role !== 'SUPER_ADMIN') {
-    throw httpError(403, 'Only a SUPER_ADMIN can create another SUPER_ADMIN.');
+  // Privilege ceiling: only a SUPER_ADMIN can mint another SUPER_ADMIN, and no
+  // one may create a role equal to or above their own rank (otherwise a
+  // DIRECTOR could create a peer DIRECTOR — or a CEO — and sign in to
+  // self-escalate). SUPER_ADMIN is exempt (may create any role).
+  if (req.user.role !== 'SUPER_ADMIN') {
+    if (parsed.data.role === 'SUPER_ADMIN') {
+      throw httpError(403, 'Only a SUPER_ADMIN can create another SUPER_ADMIN.');
+    }
+    assertOutranks({ role: req.user.role }, parsed.data.role);
   }
 
   const { user_id } = await authSvc.adminCreateUser({

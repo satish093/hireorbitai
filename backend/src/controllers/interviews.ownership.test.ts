@@ -94,7 +94,7 @@ function mkRes() {
 }
 
 async function callUpdate(
-  user: { id: string; role: string },
+  user: { id: string; role: string; group_id?: string | null },
   id: string,
 ): Promise<{ status?: number } | null> {
   try {
@@ -111,10 +111,25 @@ beforeEach(() => {
 });
 
 describe('interviews.controller — loadAndAuthorize (via update)', () => {
-  it('MANAGER_TIER caller is authorized for any interview', async () => {
+  it('ADMIN-tier caller is authorized for any interview', async () => {
     mock.rows.interviews = [{ id: 'iv-1', consultant_id: 'c-1', created_by: 'u-other' }];
-    const err = await callUpdate({ id: 'u-mgr', role: 'HR_MANAGER' }, 'iv-1');
+    const err = await callUpdate({ id: 'u-dir', role: 'DIRECTOR' }, 'iv-1');
     expect(err).toBeNull();
+  });
+
+  it('a group lead is authorized for an interview in their group', async () => {
+    mock.rows.interviews = [{ id: 'iv-1', consultant_id: 'c-1', created_by: 'u-other' }];
+    mock.rows.users = [{ id: 'cu-1', group_id: 'g1' }]; // group members (filtered by group_id)
+    mock.rows.consultants = [{ id: 'c-1' }]; // the group's consultants include c-1
+    const err = await callUpdate({ id: 'u-lead', role: 'HR_MANAGER', group_id: 'g1' }, 'iv-1');
+    expect(err).toBeNull();
+  });
+
+  it('a group lead gets 404 for an interview outside their group', async () => {
+    mock.rows.interviews = [{ id: 'iv-1', consultant_id: 'c-1', created_by: 'u-other' }];
+    mock.rows.users = []; // empty group → fail-closed
+    const err = await callUpdate({ id: 'u-lead', role: 'MANAGER', group_id: 'g1' }, 'iv-1');
+    expect(err?.status).toBe(404);
   });
 
   it('the creator is authorized even as a non-manager (created_by bypass)', async () => {

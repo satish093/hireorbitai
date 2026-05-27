@@ -10,10 +10,14 @@
  *   ADMIN_TIER (SUPER_ADMIN, CEO, CTO, DIRECTOR)
  *     → every active user in the workspace
  *
- *   SUB_MANAGER (MANAGER, HR_MANAGER, DEVELOPER)
+ *   SUB_MANAGER (MANAGER, HR_MANAGER) — the group leads
  *     → admin-tier users (upward escalation)
  *     → recruiters they directly manage (recruiter_managers + legacy manager_id)
  *     → consultants of those recruiters
+ *
+ *   DEVELOPER holds NO default messaging visibility — it is a scoped super-admin
+ *   whose access comes only from explicit capability grants, none of which is a
+ *   messaging/visibility grant. So a DEVELOPER sees nobody here by default.
  *
  *   RECRUITER
  *     → their assigned managers (recruiter_managers + legacy manager_id)
@@ -34,7 +38,10 @@ import { logger } from '../config/logger';
 import { ADMIN_TIER, type Role } from '../types';
 
 const ADMIN_ROLES = ADMIN_TIER as readonly Role[];
-const SUB_MGR_ROLES: Role[] = ['MANAGER', 'HR_MANAGER', 'DEVELOPER'];
+// Group leads only. DEVELOPER is intentionally excluded — it has no default
+// business visibility (capability-gated elsewhere), so it falls through to the
+// empty peer set below.
+const SUB_MGR_ROLES: Role[] = ['MANAGER', 'HR_MANAGER'];
 
 export interface PermissionCaller {
   id: string;

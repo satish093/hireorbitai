@@ -1,8 +1,36 @@
 import { RequestHandler } from 'express';
 import { z } from 'zod';
 import { db } from '../config/db';
-import { httpError, MANAGER_TIER } from '../types';
-import { managerGroupUserIds } from '../services/groupScope';
+import { httpError, MANAGER_TIER, type Role } from '../types';
+import {
+  managerGroupUserIds,
+  isAdminTier,
+  isGroupLead,
+  leadCanAccessUser,
+} from '../services/groupScope';
+
+interface Caller {
+  id: string;
+  role: Role;
+  group_id?: string | null;
+}
+
+/**
+ * Detail/mutation scope for a recruiter record. Admin-tier is unscoped; a group
+ * lead (HR_MANAGER/MANAGER) may only touch a recruiter whose owning user is in
+ * their group; a plain RECRUITER caller is left to the route's role gate.
+ * Throws 404 on a cross-group reach so it can't be used as an existence oracle.
+ */
+async function assertRecruiterInScope(
+  caller: Caller,
+  recruiterUserId: string | null,
+): Promise<void> {
+  if (isAdminTier(caller.role)) return;
+  if (isGroupLead(caller.role)) {
+    if (recruiterUserId && (await leadCanAccessUser(caller, recruiterUserId))) return;
+    throw httpError(404, 'Recruiter not found');
+  }
+}
 
 const SELECT_WITH_JOINS =
   '*, user:users!user_id(id, email, full_name, group_id), ' +
@@ -54,6 +82,8 @@ export const list: RequestHandler = async (req, res) => {
 };
 
 export const get: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  let row: any = null;
   const { data, error } = await db
     .from('recruiters')
     .select(SELECT_WITH_JOINS + ', phone, avatar_url')
@@ -68,11 +98,15 @@ export const get: RequestHandler = async (req, res) => {
       .eq('id', req.params.id)
       .single();
     if (fb.error) throw httpError(404, fb.error.message);
-    res.json(fb.data);
-    return;
+    row = fb.data;
+  } else if (error) {
+    throw httpError(404, error.message);
+  } else {
+    row = data;
   }
-  if (error) throw httpError(404, error.message);
-  res.json(data);
+  // Group leads only see recruiters in their own group; admin tier unscoped.
+  await assertRecruiterInScope(req.user, row?.user_id ?? row?.user?.id ?? null);
+  res.json(row);
 };
 
 export const onboard: RequestHandler = async (req, res) => {
@@ -128,10 +162,12 @@ export const addManager: RequestHandler = async (req, res) => {
 
   const { data: rec } = await db
     .from('recruiters')
-    .select('id')
+    .select('id, user_id')
     .eq('id', recruiterId)
     .maybeSingle();
   if (!rec) throw httpError(404, 'Recruiter not found');
+  // A group lead may only re-org recruiters in their own group.
+  await assertRecruiterInScope(req.user, (rec as { user_id: string | null }).user_id);
 
   const { data: target } = await db
     .from('users')
@@ -204,6 +240,14 @@ export const removeManager: RequestHandler = async (req, res) => {
   const recruiterId = req.params.id;
   const managerId = req.params.managerId;
 
+  const { data: recRow } = await db
+    .from('recruiters')
+    .select('id, user_id')
+    .eq('id', recruiterId)
+    .maybeSingle();
+  if (!recRow) throw httpError(404, 'Recruiter not found');
+  await assertRecruiterInScope(req.user, (recRow as { user_id: string | null }).user_id);
+
   const { data: removed, error: lookupErr } = await db
     .from('recruiter_managers')
     .select('is_primary')
@@ -255,6 +299,14 @@ export const setPrimaryManager: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   const recruiterId = req.params.id;
   const managerId = req.params.managerId;
+
+  const { data: recRow } = await db
+    .from('recruiters')
+    .select('id, user_id')
+    .eq('id', recruiterId)
+    .maybeSingle();
+  if (!recRow) throw httpError(404, 'Recruiter not found');
+  await assertRecruiterInScope(req.user, (recRow as { user_id: string | null }).user_id);
 
   const { data: existing, error: lookupErr } = await db
     .from('recruiter_managers')

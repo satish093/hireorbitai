@@ -9,7 +9,8 @@ import {
   TaskPriority,
   MANAGER_TIER,
 } from '../types';
-import { managerGroupUserIds } from '../services/groupScope';
+import { managerGroupUserIds, isAdminTier, isGroupLead } from '../services/groupScope';
+import type { Role } from '../types';
 
 const SELECT_WITH_JOINS = `
   *,
@@ -21,6 +22,16 @@ const SELECT_WITH_JOINS = `
 
 function isManagerLike(role?: string): boolean {
   return !!role && (MANAGER_TIER as string[]).includes(role);
+}
+
+/** A group lead may only act on a task whose assignee is in their group.
+ *  Returns true if the caller (a group lead) is in-scope for `assigneeId`. */
+async function leadInScopeForAssignee(
+  caller: { role: Role; group_id?: string | null },
+  assigneeId: string | null,
+): Promise<boolean> {
+  const ids = await managerGroupUserIds(caller);
+  return !!(ids && assigneeId && ids.includes(assigneeId));
 }
 
 // The db shim only resolves embedded FK selects (assignee:users!…) on a plain
@@ -55,8 +66,8 @@ export const list: RequestHandler = async (req, res) => {
   if (!isManagerLike(req.user.role)) {
     qb = qb.eq('assignee_id', req.user.id);
   } else {
-    // A MANAGER only sees tasks assigned to people in their own group;
-    // HR_MANAGER + admin-tier see all.
+    // Group leads (HR_MANAGER + MANAGER) only see tasks assigned to people in
+    // their own group; admin-tier sees all (managerGroupUserIds returns null).
     const groupUserIds = await managerGroupUserIds(req.user);
     if (groupUserIds !== null) {
       if (groupUserIds.length === 0) {
@@ -83,7 +94,17 @@ export const get: RequestHandler = async (req, res) => {
     .eq('id', req.params.id)
     .single();
   if (error || !data) throw httpError(404, 'Task not found');
-  if (!isManagerLike(req.user.role) && data.assignee_id !== req.user.id) {
+  // Admin tier: any task. Group leads: only tasks for their group. Everyone
+  // else: only their own assignments.
+  if (isAdminTier(req.user.role)) {
+    // unscoped
+  } else if (isGroupLead(req.user.role)) {
+    if (
+      !(await leadInScopeForAssignee(req.user, data.assignee_id)) &&
+      data.assignee_id !== req.user.id
+    )
+      throw httpError(403, 'Forbidden');
+  } else if (data.assignee_id !== req.user.id) {
     throw httpError(403, 'Forbidden');
   }
   res.json(data);
@@ -138,6 +159,11 @@ export const update: RequestHandler = async (req, res) => {
   const isMgr = isManagerLike(req.user.role);
   const isAssignee = existing.assignee_id === req.user.id;
   if (!isMgr && !isAssignee) throw httpError(403, 'Forbidden');
+  // Group leads may only edit tasks within their group (unless it's their own).
+  if (isGroupLead(req.user.role) && !isAssignee) {
+    if (!(await leadInScopeForAssignee(req.user, existing.assignee_id)))
+      throw httpError(403, 'Forbidden');
+  }
 
   const allowed: Record<string, unknown> = {};
   const b = req.body ?? {};
@@ -202,7 +228,15 @@ export const updateStatus: RequestHandler = async (req, res) => {
     .eq('id', req.params.id)
     .single();
   if (e0 || !existing) throw httpError(404, 'Task not found');
-  if (!isManagerLike(req.user.role) && existing.assignee_id !== req.user.id) {
+  if (isAdminTier(req.user.role)) {
+    // unscoped
+  } else if (isGroupLead(req.user.role)) {
+    if (
+      !(await leadInScopeForAssignee(req.user, existing.assignee_id)) &&
+      existing.assignee_id !== req.user.id
+    )
+      throw httpError(403, 'Forbidden');
+  } else if (existing.assignee_id !== req.user.id) {
     throw httpError(403, 'Forbidden');
   }
 
@@ -246,7 +280,7 @@ export const teamTasks: RequestHandler = async (req, res) => {
   if (!isManagerLike(req.user.role)) throw httpError(403, 'Forbidden');
 
   let assigneeIds: string[] | null = null;
-  if (req.user.role === 'MANAGER') {
+  if (isGroupLead(req.user.role)) {
     // Direct reports: recruiters managed by this user.
     const { data: recs, error: re } = await db
       .from('recruiters')

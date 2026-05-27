@@ -1,6 +1,7 @@
 import { Router } from 'express';
-import { requireAuth, blockIfMustChangePassword } from '../middleware/auth';
+import { requireAuth, blockIfMustChangePassword, requireRole } from '../middleware/auth';
 import { requireFeature } from '../middleware/featureFlag';
+import { OPERATOR_TIER } from '../types';
 import { authRouter } from './auth.routes';
 import { devAuthRouter } from './devAuth.routes';
 import { devToolsRouter } from './devTools.routes';
@@ -110,7 +111,10 @@ router.use('/ai-usage', aiUsageRouter);
 router.use('/interviews', requireFeature('interviews'), interviewsRouter);
 router.use('/reminders', requireFeature('reminders'), remindersRouter);
 router.use('/reports', requireFeature('reports'), reportsRouter);
-router.use('/ai', requireFeature('ai_email'), aiRouter);
+// AI email assistance is an operator tool: OPERATOR_TIER (admins, group leads,
+// recruiters) only — not CONSULTANT, and not a capability-less DEVELOPER. The
+// feature flag gates availability per group; the role gate gates who may call.
+router.use('/ai', requireRole(...OPERATOR_TIER), requireFeature('ai_email'), aiRouter);
 router.use('/tasks', requireFeature('tasks'), tasksRouter);
 router.use('/task-views', requireFeature('tasks'), taskViewsRouter);
 router.use('/messages', requireFeature('messages'), messagesRouter);

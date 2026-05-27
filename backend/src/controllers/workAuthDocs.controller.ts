@@ -1,19 +1,23 @@
 import { RequestHandler } from 'express';
 import { z } from 'zod';
 import { db } from '../config/db';
-import { httpError, MANAGER_TIER } from '../types';
+import { httpError, type Role } from '../types';
 import { audit } from '../services/audit.service';
+import { isAdminTier, isGroupLead, leadCanAccessUser } from '../services/groupScope';
 
 const WORK_AUTH_BUCKET = 'work-auth-docs';
 
-function isManagerTier(role?: string): boolean {
-  return !!role && (MANAGER_TIER as string[]).includes(role);
+interface Caller {
+  id: string;
+  role: Role;
+  group_id?: string | null;
 }
 
 // ---------------------------------------------------------------------------
 // Authorization helper — mirrors resumes.controller.ts authorizeConsultantAccess.
 //
-//   MANAGER_TIER+ : unrestricted
+//   ADMIN_TIER    : unrestricted (oversees all groups)
+//   GROUP LEAD    : only consultants whose owning user is in their group
 //   RECRUITER     : only their assigned consultants
 //   CONSULTANT    : only themselves
 // ---------------------------------------------------------------------------
@@ -25,7 +29,7 @@ interface ConsultantOwnerRow {
 
 async function authorizeConsultantAccess(
   consultantId: string,
-  caller: { id: string; role: string },
+  caller: Caller,
 ): Promise<ConsultantOwnerRow> {
   const { data: cons, error } = await db
     .from('consultants')
@@ -36,7 +40,13 @@ async function authorizeConsultantAccess(
   if (!cons) throw httpError(404, 'Not found');
   const row = cons as ConsultantOwnerRow;
 
-  if (isManagerTier(caller.role)) return row;
+  // Admin tier is unscoped. Group leads (HR_MANAGER/MANAGER) are confined to
+  // their own group — a lead from another group is treated as "not found".
+  if (isAdminTier(caller.role)) return row;
+  if (isGroupLead(caller.role)) {
+    if (await leadCanAccessUser(caller, row.user_id)) return row;
+    throw httpError(404, 'Not found');
+  }
 
   if (caller.role === 'CONSULTANT') {
     if (row.user_id !== caller.id) throw httpError(404, 'Not found');

@@ -3,7 +3,12 @@ import { z } from 'zod';
 import { db } from '../config/db';
 import { httpError, MANAGER_TIER } from '../types';
 import { invalidatePermissionCache } from '../services/permission.service';
-import { managerGroupUserIds } from '../services/groupScope';
+import {
+  managerGroupUserIds,
+  isAdminTier,
+  isGroupLead,
+  leadCanAccessUser,
+} from '../services/groupScope';
 import { audit } from '../services/audit.service';
 
 function isManagerTier(role?: string): boolean {
@@ -166,16 +171,19 @@ export const get: RequestHandler = async (req, res) => {
   const row = data as any;
 
   // Scope: same rules as list. Return 404 (not 403) so the endpoint can't
-  // be used to probe whether a consultant id exists.
-  if (!isManagerTier(req.user.role)) {
-    if (req.user.role === 'RECRUITER') {
-      const myRecId = await getCallerRecruiterRowId(req.user.id);
-      if (!myRecId || row.recruiter_id !== myRecId) throw httpError(404, 'Not found');
-    } else if (req.user.role === 'CONSULTANT') {
-      if (row.user_id !== req.user.id) throw httpError(404, 'Not found');
-    } else {
-      throw httpError(404, 'Not found');
-    }
+  // be used to probe whether a consultant id exists. Admin tier is unscoped;
+  // group leads (HR_MANAGER/MANAGER) are confined to their own group.
+  if (isAdminTier(req.user.role)) {
+    // unscoped — full visibility
+  } else if (isGroupLead(req.user.role)) {
+    if (!(await leadCanAccessUser(req.user, row.user_id))) throw httpError(404, 'Not found');
+  } else if (req.user.role === 'RECRUITER') {
+    const myRecId = await getCallerRecruiterRowId(req.user.id);
+    if (!myRecId || row.recruiter_id !== myRecId) throw httpError(404, 'Not found');
+  } else if (req.user.role === 'CONSULTANT') {
+    if (row.user_id !== req.user.id) throw httpError(404, 'Not found');
+  } else {
+    throw httpError(404, 'Not found');
   }
   res.json(row);
 };
@@ -232,17 +240,23 @@ export const update: RequestHandler = async (req, res) => {
   if (lookupErr) throw httpError(500, lookupErr.message);
   if (!row) throw httpError(404, 'Not found');
 
-  if (!isManagerTier(req.user.role)) {
-    if (req.user.role === 'RECRUITER') {
-      const myRecId = await getCallerRecruiterRowId(req.user.id);
-      if (!myRecId || (row as { recruiter_id: string | null }).recruiter_id !== myRecId) {
-        throw httpError(403, 'Forbidden');
-      }
-    } else if (req.user.role === 'CONSULTANT') {
-      if ((row as { user_id: string }).user_id !== req.user.id) throw httpError(403, 'Forbidden');
-    } else {
+  // Admin tier unscoped; group leads confined to their group; recruiter to
+  // their assigned consultants; consultant to their own row.
+  if (isAdminTier(req.user.role)) {
+    // unscoped
+  } else if (isGroupLead(req.user.role)) {
+    if (!(await leadCanAccessUser(req.user, (row as { user_id: string }).user_id))) {
       throw httpError(403, 'Forbidden');
     }
+  } else if (req.user.role === 'RECRUITER') {
+    const myRecId = await getCallerRecruiterRowId(req.user.id);
+    if (!myRecId || (row as { recruiter_id: string | null }).recruiter_id !== myRecId) {
+      throw httpError(403, 'Forbidden');
+    }
+  } else if (req.user.role === 'CONSULTANT') {
+    if ((row as { user_id: string }).user_id !== req.user.id) throw httpError(403, 'Forbidden');
+  } else {
+    throw httpError(403, 'Forbidden');
   }
 
   const { data, error } = await db
