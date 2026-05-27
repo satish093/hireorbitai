@@ -13,7 +13,19 @@ import { useAuth } from '../context/AuthContext';
 import { ROLE_LABEL, type Role } from '../types';
 import { listDevUsers, loginAsUser, type DevUser } from './devSession';
 
-const QUICK_ROLES: Role[] = ['SUPER_ADMIN', 'HR_MANAGER', 'RECRUITER', 'CONSULTANT'];
+// Every role except DEVELOPER (DEVELOPER is a configurable scoped-admin whose
+// access depends on per-account capability grants, so a one-click impersonation
+// doesn't represent a meaningful state).
+const QUICK_ROLES: Role[] = [
+  'SUPER_ADMIN',
+  'CEO',
+  'CTO',
+  'DIRECTOR',
+  'MANAGER',
+  'HR_MANAGER',
+  'RECRUITER',
+  'CONSULTANT',
+];
 
 export function DevToolbar() {
   const { profile, signOut } = useAuth();

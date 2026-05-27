@@ -1,5 +1,7 @@
-// Seed the leadership / org-chart: CEO Satish, CTO Rishi, Director Deepak,
-// Managers Neeraj + Nikhil, Recruiters Sai + Bharth + Ashok.
+// Seed the leadership / org-chart: Super Admin, CEO Satish, CTO Rishi,
+// Director Deepak, HR Manager Harini, Managers Neeraj + Nikhil, Recruiters
+// Sai + Bharth + Ashok. Covers every role except DEVELOPER so the dev toolbar's
+// quick-login buttons all resolve to a real user.
 // Wires public.users.reports_to + public.recruiters.manager_id so the chain
 // is queryable. Idempotent — re-run anytime.
 //
@@ -38,6 +40,12 @@ if (PASSWORD.length < 8) throw new Error('SEED_PASSWORD must be at least 8 chara
 const PASSWORD_HASH = await bcrypt.hash(PASSWORD, 10);
 
 // Order matters — each level references the one above it via reports_to.
+const superAdmin = {
+  email: 'admin@hireorbitai.test',
+  full_name: 'Dev Admin',
+  role: 'SUPER_ADMIN',
+  reports_to_email: null,
+};
 const ceo = {
   email: 'satish@hireorbitai.test',
   full_name: 'Satish Kurelly',
@@ -55,6 +63,15 @@ const director = {
   full_name: 'Deepak',
   role: 'DIRECTOR',
   reports_to_email: 'rishi@hireorbitai.test',
+};
+
+// HR Manager — group lead, reports to the Director (the active group-scoped
+// role; MANAGER is parked).
+const hrManager = {
+  email: 'harini@hireorbitai.test',
+  full_name: 'Harini',
+  role: 'HR_MANAGER',
+  reports_to_email: 'deepak@hireorbitai.test',
 };
 
 const managers = [
@@ -99,7 +116,7 @@ const recruiters = [
   },
 ];
 
-const all = [ceo, cto, director, ...managers, ...recruiters];
+const all = [superAdmin, ceo, cto, director, hrManager, ...managers, ...recruiters];
 const idByEmail = new Map();
 
 try {
@@ -150,9 +167,11 @@ try {
   }
 
   console.log('\n--- Org chart ---');
+  console.log(`  SUPER_ADMIN  Dev Admin`);
   console.log(`  CEO       Satish Kurelly`);
   console.log(`   └─ CTO       Rishi`);
   console.log(`        └─ DIRECTOR  Deepak`);
+  console.log(`             ├─ HR_MANAGER Harini  (group lead)`);
   console.log(`             ├─ MANAGER   Neeraj`);
   console.log(`             │   ├─ RECRUITER Sai     (Pod Gamma)`);
   console.log(`             │   └─ RECRUITER Bharth  (Pod Gamma)`);
