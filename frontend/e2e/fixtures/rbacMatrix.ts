@@ -192,7 +192,7 @@ export const RBAC_MATRIX: RoutePolicy[] = [
     scope: 'global',
     primaryActions: ['view org analytics'],
     workspaceWideException:
-      'Analytics are workspace-wide for all of MANAGER_TIER incl. group leads — aggregate org metrics, not row-level PII. See reports.controller.ts RBAC POLICY comment + reports.global.test.ts.',
+      'Analytics are workspace-wide for all of MANAGER_TIER incl. group leads — aggregate org metrics, not row-level PII. See reports.controller.ts RBAC POLICY comment + rbac.workspaceWide.test.ts.',
   },
 
   // ── Training ─────────────────────────────────────────────────────────────
@@ -217,7 +217,7 @@ export const RBAC_MATRIX: RoutePolicy[] = [
     scope: 'global',
     primaryActions: ['author/manage courses (manual)', 'AI generation (admin only)'],
     workspaceWideException:
-      'Course/assignment administration is workspace-wide for MANAGER_TIER incl. group leads — org training catalog, not PII. See training.controller.ts RBAC POLICY comment + training.workspaceWide.test.ts.',
+      'Course/assignment administration is workspace-wide for MANAGER_TIER incl. group leads — org training catalog, not PII. See training.controller.ts RBAC POLICY comment + rbac.workspaceWide.test.ts.',
   },
   {
     path: '/training/assignments',
@@ -229,7 +229,7 @@ export const RBAC_MATRIX: RoutePolicy[] = [
     scope: 'global',
     primaryActions: ['assign training to any org user', 'give assignment feedback'],
     workspaceWideException:
-      'Assignment to any org user is intentional for MANAGER_TIER — see training.workspaceWide.test.ts.',
+      'Assignment to any org user is intentional for MANAGER_TIER — see rbac.workspaceWide.test.ts.',
   },
   {
     path: '/training/reports',
