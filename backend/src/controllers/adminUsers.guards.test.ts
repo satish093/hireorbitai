@@ -115,6 +115,24 @@ describe('assertOutranks', () => {
     expect(() => assertOutranks({ role: 'CONSULTANT' }, null)).not.toThrow();
     expect(() => assertOutranks({ role: 'CONSULTANT' }, undefined)).not.toThrow();
   });
+
+  it('SUPER_ADMIN is absolute — bypasses the rank ceiling for every role', () => {
+    // Including acting on another SUPER_ADMIN (equal rank). The last-SA and
+    // self guards are enforced separately, not by assertOutranks.
+    for (const target of [
+      'SUPER_ADMIN',
+      'CEO',
+      'CTO',
+      'DIRECTOR',
+      'HR_MANAGER',
+      'MANAGER',
+      'DEVELOPER',
+      'RECRUITER',
+      'CONSULTANT',
+    ] as const) {
+      expect(() => assertOutranks({ role: 'SUPER_ADMIN' }, target)).not.toThrow();
+    }
+  });
 });
 
 describe('assertNotLastSuperAdmin', () => {

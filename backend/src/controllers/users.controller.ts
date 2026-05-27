@@ -1,7 +1,15 @@
 import { RequestHandler } from 'express';
 import { z } from 'zod';
 import { db } from '../config/db';
-import { httpError, ADMIN_TIER, MANAGER_TIER, GROUP_LEAD_ROLES, Role, ALL_ROLES } from '../types';
+import {
+  httpError,
+  ADMIN_TIER,
+  MANAGER_TIER,
+  GROUP_LEAD_ROLES,
+  canAssignRole,
+  Role,
+  ALL_ROLES,
+} from '../types';
 import { logger } from '../config/logger';
 import * as authSvc from '../services/auth.service';
 import { assertOutranks } from './adminUsers.controller';
@@ -270,15 +278,12 @@ export const adminCreate: RequestHandler = async (req, res) => {
   const parsed = adminCreateSchema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, parsed.error.issues[0]?.message ?? 'Invalid input');
 
-  // Privilege ceiling: only a SUPER_ADMIN can mint another SUPER_ADMIN, and no
-  // one may create a role equal to or above their own rank (otherwise a
-  // DIRECTOR could create a peer DIRECTOR — or a CEO — and sign in to
-  // self-escalate). SUPER_ADMIN is exempt (may create any role).
-  if (req.user.role !== 'SUPER_ADMIN') {
-    if (parsed.data.role === 'SUPER_ADMIN') {
-      throw httpError(403, 'Only a SUPER_ADMIN can create another SUPER_ADMIN.');
-    }
-    assertOutranks({ role: req.user.role }, parsed.data.role);
+  // Privilege ceiling: SUPER_ADMIN may create any role; everyone else may only
+  // create a role STRICTLY below their own rank, and never a SUPER_ADMIN-only
+  // role (SUPER_ADMIN itself or DEVELOPER — both SA-only). Stops a DIRECTOR from
+  // minting a peer/higher account or a capability-bearing DEVELOPER.
+  if (!canAssignRole(req.user.role, parsed.data.role)) {
+    throw httpError(403, `You cannot create a user with the role ${parsed.data.role}.`);
   }
 
   const { user_id } = await authSvc.adminCreateUser({

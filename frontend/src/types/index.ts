@@ -21,6 +21,8 @@ export {
   ALL_ROLES,
   GROUP_LEAD_ROLES,
   ROLE_ORDER,
+  BUSINESS_ROLES,
+  SUPER_ADMIN_ONLY_ROLES,
   DEVELOPER_CAPABILITIES,
   TASK_STATUSES,
   TASK_PRIORITIES,
@@ -28,6 +30,7 @@ export {
   isManagerOrUp,
   roleRank,
   outranks,
+  canAssignRole,
   assignableRolesFor,
 } from '@hireorbitai/shared';
 export type { Role, DeveloperCapability, TaskStatus, TaskPriority } from '@hireorbitai/shared';

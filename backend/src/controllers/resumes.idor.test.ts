@@ -141,7 +141,10 @@ const RECRUITER_ROW = { id: 'r-1' };
 const CONSULTANT_OWNER = { id: OWNER_USER_ID, role: 'CONSULTANT' };
 const CONSULTANT_OTHER = { id: OTHER_USER_ID, role: 'CONSULTANT' };
 const RECRUITER_ASSIGNED = { id: RECRUITER_USER_ID, role: 'RECRUITER' };
-const MANAGER = { id: 'u-manager', role: 'HR_MANAGER' };
+// Admin tier is unscoped; a group lead is confined to its group (resolved via
+// managerGroupUserIds → reads `users` by group_id).
+const ADMIN = { id: 'u-director', role: 'DIRECTOR' };
+const GROUP_LEAD = { id: 'u-lead', role: 'HR_MANAGER', group_id: 'g1' };
 const UNKNOWN_ROLE = { id: 'u-unknown', role: 'VENDOR' };
 
 // ---------------------------------------------------------------------------
@@ -186,12 +189,30 @@ describe('resumes.listForConsultant — authorizeConsultantAccess', () => {
     expect(err?.message).toBe('Not found');
   });
 
-  it("allows a MANAGER to list any consultant's resumes", async () => {
+  it("allows an ADMIN-tier user to list any consultant's resumes", async () => {
     mock.rows.consultants = [CONSULTANT_ROW];
-    const { err } = await call(resumes.listForConsultant as Handler, MANAGER, {
+    const { err } = await call(resumes.listForConsultant as Handler, ADMIN, {
       params: { consultantId: 'c-1' },
     });
     expect(err).toBeNull();
+  });
+
+  it('allows a group lead to list resumes for a consultant in their group', async () => {
+    mock.rows.consultants = [CONSULTANT_ROW];
+    mock.rows.users = [{ id: OWNER_USER_ID }]; // owner in the lead's group
+    const { err } = await call(resumes.listForConsultant as Handler, GROUP_LEAD, {
+      params: { consultantId: 'c-1' },
+    });
+    expect(err).toBeNull();
+  });
+
+  it('returns 404 when a group lead lists resumes for a consultant outside their group', async () => {
+    mock.rows.consultants = [CONSULTANT_ROW];
+    mock.rows.users = []; // not in the lead's group → fail-closed
+    const { err } = await call(resumes.listForConsultant as Handler, GROUP_LEAD, {
+      params: { consultantId: 'c-1' },
+    });
+    expect(err?.status).toBe(404);
   });
 
   it('returns 404 for an unknown role', async () => {

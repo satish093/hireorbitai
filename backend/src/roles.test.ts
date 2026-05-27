@@ -22,6 +22,9 @@ import {
   outranks,
   roleRank,
   assignableRolesFor,
+  canAssignRole,
+  SUPER_ADMIN_ONLY_ROLES,
+  BUSINESS_ROLES,
   type Role,
 } from '@hireorbitai/shared';
 
@@ -116,5 +119,45 @@ describe('rank ceiling (roleRank / outranks / assignableRolesFor)', () => {
 
   it('assignableRolesFor: a CONSULTANT may assign nothing', () => {
     expect(assignableRolesFor('CONSULTANT')).toEqual([]);
+  });
+});
+
+describe('canAssignRole (SUPER_ADMIN absolute + SA-only roles)', () => {
+  it('SUPER_ADMIN may assign every role, including SUPER_ADMIN and DEVELOPER', () => {
+    for (const r of ALL_ROLES) expect(canAssignRole('SUPER_ADMIN', r)).toBe(true);
+  });
+
+  it('only SUPER_ADMIN may assign the SA-only roles (SUPER_ADMIN + DEVELOPER)', () => {
+    expect(SUPER_ADMIN_ONLY_ROLES).toEqual(['SUPER_ADMIN', 'DEVELOPER']);
+    for (const actor of [
+      'CEO',
+      'CTO',
+      'DIRECTOR',
+      'HR_MANAGER',
+      'MANAGER',
+      'RECRUITER',
+    ] as Role[]) {
+      expect(canAssignRole(actor, 'SUPER_ADMIN')).toBe(false);
+      expect(canAssignRole(actor, 'DEVELOPER')).toBe(false);
+    }
+  });
+
+  it('a RECRUITER may assign CONSULTANT and nothing else', () => {
+    expect(canAssignRole('RECRUITER', 'CONSULTANT')).toBe(true);
+    for (const r of ['RECRUITER', 'MANAGER', 'HR_MANAGER', 'DIRECTOR', 'DEVELOPER'] as Role[]) {
+      expect(canAssignRole('RECRUITER', r)).toBe(false);
+    }
+  });
+
+  it('a non-super may assign strictly-lower non-SA-only roles (DIRECTOR → HR_MANAGER)', () => {
+    expect(canAssignRole('DIRECTOR', 'HR_MANAGER')).toBe(true);
+    expect(canAssignRole('DIRECTOR', 'DIRECTOR')).toBe(false); // equal rank
+  });
+
+  it('BUSINESS_ROLES is every role except DEVELOPER', () => {
+    expect(BUSINESS_ROLES).not.toContain('DEVELOPER');
+    for (const r of ALL_ROLES) {
+      if (r !== 'DEVELOPER') expect(BUSINESS_ROLES).toContain(r);
+    }
   });
 });

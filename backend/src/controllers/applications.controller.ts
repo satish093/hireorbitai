@@ -2,8 +2,13 @@ import { RequestHandler } from 'express';
 import { z } from 'zod';
 import { db } from '../config/db';
 import { atsScore } from '../services/ai.service';
-import { httpError, MANAGER_TIER } from '../types';
-import { managerGroupConsultantIds } from '../services/groupScope';
+import { httpError, MANAGER_TIER, type Role } from '../types';
+import {
+  managerGroupConsultantIds,
+  isAdminTier,
+  isGroupLead,
+  leadCanAccessConsultant,
+} from '../services/groupScope';
 
 // ---------------------------------------------------------------------------
 // Authorization helpers
@@ -41,7 +46,7 @@ interface ApplicationOwnership {
 /** Throws 404 if the application doesn't exist, 403 if the caller can't see
  *  it. Returns the loaded row for downstream use. */
 async function loadAndAuthorize(
-  caller: { id: string; role: string },
+  caller: { id: string; role: Role; group_id?: string | null },
   applicationId: string,
 ): Promise<ApplicationOwnership> {
   const { data, error } = await db
@@ -53,7 +58,13 @@ async function loadAndAuthorize(
   if (!data) throw httpError(404, 'Application not found');
   const row = data as ApplicationOwnership;
 
-  if (isManagerTier(caller.role)) return row;
+  // Admin tier unscoped; group leads (HR_MANAGER/MANAGER) only for consultants
+  // in their group.
+  if (isAdminTier(caller.role)) return row;
+  if (isGroupLead(caller.role)) {
+    if (row.consultant_id && (await leadCanAccessConsultant(caller, row.consultant_id))) return row;
+    throw httpError(404, 'Application not found');
+  }
 
   if (caller.role === 'RECRUITER') {
     const myRecId = await getCallerRecruiterRowId(caller.id);

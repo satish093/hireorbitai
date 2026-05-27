@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { requireAuth, blockIfMustChangePassword, requireRole } from '../middleware/auth';
 import { requireFeature } from '../middleware/featureFlag';
-import { OPERATOR_TIER } from '../types';
+import { OPERATOR_TIER, BUSINESS_ROLES } from '../types';
 import { authRouter } from './auth.routes';
 import { devAuthRouter } from './devAuth.routes';
 import { devToolsRouter } from './devTools.routes';
@@ -85,7 +85,10 @@ router.use('/consultants', consultantsRouter);
 router.use('/work-auth-docs', workAuthDocsRouter);
 router.use('/recruiters', recruitersRouter);
 router.use('/resumes', resumesRouter);
-router.use('/jobs', jobsRouter);
+// Business modules deny a capability-less DEVELOPER (BUSINESS_ROLES = every role
+// except DEVELOPER). DEVELOPER has no default business access — only the
+// capability-gated admin surfaces it has been granted.
+router.use('/jobs', requireRole(...BUSINESS_ROLES), jobsRouter);
 router.use('/vendors', vendorsRouter);
 router.use('/clients', clientsRouter);
 router.use('/applications', applicationsRouter);
@@ -108,17 +111,29 @@ router.use('/ai-usage', aiUsageRouter);
 //   1. Insert into public.feature_flags (key, enabled).
 //   2. Add `router.use('/X', requireFeature('flag_name'), xRouter)` here.
 //   3. Add the flagKey to the matching Sidebar entry + ProtectedRoute guard.
-router.use('/interviews', requireFeature('interviews'), interviewsRouter);
-router.use('/reminders', requireFeature('reminders'), remindersRouter);
+// Business modules also deny a capability-less DEVELOPER (BUSINESS_ROLES = every
+// role except DEVELOPER) on top of the per-group feature flag.
+router.use(
+  '/interviews',
+  requireRole(...BUSINESS_ROLES),
+  requireFeature('interviews'),
+  interviewsRouter,
+);
+router.use(
+  '/reminders',
+  requireRole(...BUSINESS_ROLES),
+  requireFeature('reminders'),
+  remindersRouter,
+);
 router.use('/reports', requireFeature('reports'), reportsRouter);
 // AI email assistance is an operator tool: OPERATOR_TIER (admins, group leads,
 // recruiters) only — not CONSULTANT, and not a capability-less DEVELOPER. The
 // feature flag gates availability per group; the role gate gates who may call.
 router.use('/ai', requireRole(...OPERATOR_TIER), requireFeature('ai_email'), aiRouter);
-router.use('/tasks', requireFeature('tasks'), tasksRouter);
-router.use('/task-views', requireFeature('tasks'), taskViewsRouter);
-router.use('/messages', requireFeature('messages'), messagesRouter);
-router.use('/training', requireFeature('training'), trainingRouter);
+router.use('/tasks', requireRole(...BUSINESS_ROLES), requireFeature('tasks'), tasksRouter);
+router.use('/task-views', requireRole(...BUSINESS_ROLES), requireFeature('tasks'), taskViewsRouter);
+router.use('/messages', requireRole(...BUSINESS_ROLES), requireFeature('messages'), messagesRouter);
+router.use('/training', requireRole(...BUSINESS_ROLES), requireFeature('training'), trainingRouter);
 
 // Realtime SSE stream — generic push channel used by messages,
 // notifications, and any future feature that wants to push to a logged-in

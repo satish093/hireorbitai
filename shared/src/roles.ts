@@ -108,16 +108,38 @@ export function outranks(actor: Role, target: Role): boolean {
 }
 
 /**
- * Roles `actorRole` is allowed to create / invite / assign. A SUPER_ADMIN may
- * assign any role (incl. SUPER_ADMIN); everyone else may only assign roles
- * STRICTLY below their own rank and never SUPER_ADMIN. Mirrors the backend
- * ceiling (canManageRole + the SUPER_ADMIN special-case) so frontend dropdowns
- * never offer a role the server will reject.
+ * Roles only a SUPER_ADMIN may create / invite / promote into:
+ *  - SUPER_ADMIN — the absolute role; only an existing SA mints another.
+ *  - DEVELOPER   — a scoped super-admin whose capability grants are SA-only, so
+ *    minting the account itself is SA-only too.
  */
-export function assignableRolesFor(actorRole: Role): Role[] {
-  if (actorRole === 'SUPER_ADMIN') return [...ALL_ROLES];
-  return ALL_ROLES.filter((r) => r !== 'SUPER_ADMIN' && outranks(actorRole, r));
+export const SUPER_ADMIN_ONLY_ROLES: Role[] = ['SUPER_ADMIN', 'DEVELOPER'];
+
+/**
+ * Can `actor` create / invite / promote a user into `target`?
+ *  - SUPER_ADMIN may assign ANY role (incl. SUPER_ADMIN + DEVELOPER).
+ *  - Everyone else: never a SUPER_ADMIN-only role, and only a role STRICTLY
+ *    below their own rank (so a RECRUITER may assign CONSULTANT, nothing else).
+ * Single source of truth shared by frontend dropdowns and backend guards.
+ */
+export function canAssignRole(actor: Role, target: Role): boolean {
+  if (actor === 'SUPER_ADMIN') return true;
+  if (SUPER_ADMIN_ONLY_ROLES.includes(target)) return false;
+  return outranks(actor, target);
 }
+
+/** Roles `actorRole` may create / invite / assign — drives frontend dropdowns. */
+export function assignableRolesFor(actorRole: Role): Role[] {
+  return ALL_ROLES.filter((r) => canAssignRole(actorRole, r));
+}
+
+/**
+ * Business/staff roles for the day-to-day app surface (tasks, jobs, interviews,
+ * inbox, reminders, training, etc.). Everyone EXCEPT DEVELOPER, which is a
+ * scoped admin with no default business access — it reaches only the capability-
+ * gated admin areas it has been granted.
+ */
+export const BUSINESS_ROLES: Role[] = ALL_ROLES.filter((r) => r !== 'DEVELOPER');
 
 // ROLE_LABEL stays in `frontend/src/types/index.ts` — display capitalisation
 // is a UI concern, not a domain-model concern. Backend never reads it.

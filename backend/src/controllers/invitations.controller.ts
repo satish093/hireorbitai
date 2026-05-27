@@ -9,11 +9,10 @@ import {
   getExpectedParentRoles,
   getAllValidParentRoles,
   wireHierarchy,
-  canManageRole,
 } from '../services/invitationHierarchy.service';
 import { canViewUser } from '../services/permission.service';
 import { validatePasswordStrength } from '../utils/password';
-import { httpError, ADMIN_TIER, Role } from '../types';
+import { httpError, ADMIN_TIER, canAssignRole, Role } from '../types';
 
 const createSchema = z.object({
   email: z.string().email(),
@@ -43,19 +42,13 @@ export const create: RequestHandler = async (req, res) => {
   const parsed = createSchema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
 
-  // Privilege ceiling: a user may only invite a role STRICTLY below their own
-  // rank — never an equal- or higher-ranked role (which would let them mint an
-  // account they could then sign in as to self-escalate). SUPER_ADMIN is the
-  // sole exception: only a SUPER_ADMIN may invite another SUPER_ADMIN, and a
-  // SUPER_ADMIN may invite any role.
+  // Privilege ceiling: SUPER_ADMIN may invite any role; everyone else may only
+  // invite a role STRICTLY below their own rank, and never a SUPER_ADMIN-only
+  // role (SUPER_ADMIN or DEVELOPER). This is what lets a RECRUITER invite a
+  // CONSULTANT (rank 2 > 1) but nothing else.
   const requestedRole = parsed.data.role as Role;
-  if (req.user.role !== 'SUPER_ADMIN') {
-    if (requestedRole === 'SUPER_ADMIN') {
-      throw httpError(403, 'Only a SUPER_ADMIN can invite another SUPER_ADMIN.');
-    }
-    if (!canManageRole(req.user.role, requestedRole)) {
-      throw httpError(403, 'You can only invite roles below your own.');
-    }
+  if (!canAssignRole(req.user.role, requestedRole)) {
+    throw httpError(403, `You are not permitted to invite the role ${requestedRole}.`);
   }
 
   // ── Parent assignment ───────────────────────────────────────────────────

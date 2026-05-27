@@ -366,9 +366,30 @@ export const metrics: RequestHandler = async (req, res) => {
     due_at: string | null;
     completed_at: string | null;
   }
-  const { data, error } = await db.from('tasks').select('status, priority, due_at, completed_at');
-  if (error) throw httpError(500, 'Database error');
-  const rows = (data ?? []) as MetricsRow[];
+  // Group leads see metrics only for their group's tasks; admin tier sees all.
+  let rows: MetricsRow[] = [];
+  if (isGroupLead(req.user.role)) {
+    const groupUserIds = await managerGroupUserIds(req.user);
+    if (groupUserIds === null) {
+      const { data, error } = await db
+        .from('tasks')
+        .select('status, priority, due_at, completed_at');
+      if (error) throw httpError(500, 'Database error');
+      rows = (data ?? []) as MetricsRow[];
+    } else if (groupUserIds.length > 0) {
+      const { data, error } = await db
+        .from('tasks')
+        .select('status, priority, due_at, completed_at')
+        .in('assignee_id', groupUserIds);
+      if (error) throw httpError(500, 'Database error');
+      rows = (data ?? []) as MetricsRow[];
+    }
+    // empty group → rows stays [] (all-zero metrics)
+  } else {
+    const { data, error } = await db.from('tasks').select('status, priority, due_at, completed_at');
+    if (error) throw httpError(500, 'Database error');
+    rows = (data ?? []) as MetricsRow[];
+  }
 
   // Seed with every enum value so the UI doesn't have to defend against missing
   // keys; narrowed to the canonical enum so a stray status from the DB doesn't

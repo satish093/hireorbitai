@@ -8,7 +8,14 @@ import { ProductTour } from './components/ProductTour';
 import { useAuth } from './context/AuthContext';
 import { useSessionRevoke } from './hooks/useSessionRevoke';
 import { config } from './config/env';
-import { ADMIN_TIER, MANAGER_TIER, OPERATOR_TIER, OWNER_TIER, hasCapability } from './types';
+import {
+  ADMIN_TIER,
+  MANAGER_TIER,
+  OPERATOR_TIER,
+  OWNER_TIER,
+  BUSINESS_ROLES,
+  hasCapability,
+} from './types';
 
 // DEV-ONLY test panel. Gated by the build-time flag VITE_DEV_TOOLS so the
 // import lands in a dead branch and is tree-shaken out of production builds
@@ -323,7 +330,7 @@ export default function App() {
           <Route
             path="/jobs"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allow={BUSINESS_ROLES}>
                 <JobSearch />
               </ProtectedRoute>
             }
@@ -331,7 +338,7 @@ export default function App() {
           <Route
             path="/jobs/:id"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allow={BUSINESS_ROLES}>
                 <JobDetail />
               </ProtectedRoute>
             }
@@ -347,7 +354,7 @@ export default function App() {
           <Route
             path="/interviews"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allow={BUSINESS_ROLES}>
                 <FeatureGuard feature="interviews">
                   <Interviews />
                 </FeatureGuard>
@@ -357,7 +364,7 @@ export default function App() {
           <Route
             path="/calendar"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allow={BUSINESS_ROLES}>
                 <Calendar />
               </ProtectedRoute>
             }
@@ -389,7 +396,7 @@ export default function App() {
           <Route
             path="/reminders"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allow={BUSINESS_ROLES}>
                 <FeatureGuard feature="reminders">
                   <Reminders />
                 </FeatureGuard>
@@ -427,7 +434,7 @@ export default function App() {
           <Route
             path="/invitations"
             element={
-              <ProtectedRoute allow={MANAGER_TIER} capability="invitations">
+              <ProtectedRoute allow={OPERATOR_TIER} capability="invitations">
                 <Invitations />
               </ProtectedRoute>
             }
@@ -435,7 +442,7 @@ export default function App() {
           <Route
             path="/tasks"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allow={BUSINESS_ROLES}>
                 <FeatureGuard feature="tasks">
                   <Tasks />
                 </FeatureGuard>
@@ -445,7 +452,7 @@ export default function App() {
           <Route
             path="/tasks/me"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allow={BUSINESS_ROLES}>
                 <FeatureGuard feature="tasks">
                   <TasksAssignedToMe />
                 </FeatureGuard>
@@ -455,7 +462,7 @@ export default function App() {
           <Route
             path="/tasks/:id"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allow={BUSINESS_ROLES}>
                 <FeatureGuard feature="tasks">
                   <TaskDetail />
                 </FeatureGuard>
@@ -465,7 +472,7 @@ export default function App() {
           <Route
             path="/messages"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allow={BUSINESS_ROLES}>
                 <FeatureGuard feature="messages">
                   <Messages />
                 </FeatureGuard>
@@ -552,7 +559,7 @@ export default function App() {
           <Route
             path="/training"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allow={BUSINESS_ROLES}>
                 <FeatureGuard feature="training">
                   <MyTraining />
                 </FeatureGuard>

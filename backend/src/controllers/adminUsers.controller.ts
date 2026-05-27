@@ -1,7 +1,14 @@
 import { RequestHandler } from 'express';
 import { z } from 'zod';
 import { db, pool } from '../config/db';
-import { httpError, ALL_ROLES, GROUP_LEAD_ROLES, DEVELOPER_CAPABILITIES, Role } from '../types';
+import {
+  httpError,
+  ALL_ROLES,
+  GROUP_LEAD_ROLES,
+  DEVELOPER_CAPABILITIES,
+  canAssignRole,
+  Role,
+} from '../types';
 import { audit } from '../services/audit.service';
 import { requestPasswordReset } from '../services/auth.service';
 import { logger } from '../config/logger';
@@ -27,9 +34,16 @@ export const ROLE_RANK: Record<Role, number> = {
 };
 
 /** Throws 403 if the actor is trying to mutate an equal- or higher-ranked
- *  user — admins below SUPER_ADMIN can never reach above their own tier. */
+ *  user — admins below SUPER_ADMIN can never reach above their own tier.
+ *
+ *  SUPER_ADMIN is absolute: it bypasses the rank ceiling entirely (it may act on
+ *  any role, including another SUPER_ADMIN). The remaining safety rails — never
+ *  act on yourself, never remove the last active SUPER_ADMIN — are enforced
+ *  SEPARATELY (assertNotSelf / assertNotLastSuperAdmin) so they still apply to a
+ *  SUPER_ADMIN actor. */
 export function assertOutranks(actor: { role: Role }, targetRole: Role | null | undefined): void {
   if (!targetRole) return;
+  if (actor.role === 'SUPER_ADMIN') return; // absolute — bounded only by the safety guards
   const a = ROLE_RANK[actor.role] ?? 0;
   const t = ROLE_RANK[targetRole] ?? 0;
   if (t >= a) {
@@ -816,7 +830,15 @@ export const bulk: RequestHandler = async (req, res) => {
       } else if (action === 'change-role') {
         const newRole = payload?.role;
         if (!newRole) throw httpError(400, 'A role is required.');
-        assertOutranks(actor, newRole); // can't promote to a tier you don't outrank
+        // SUPER_ADMIN-only roles (incl. DEVELOPER) require a SUPER_ADMIN actor;
+        // everyone else may only assign strictly-lower roles.
+        if (!canAssignRole(actor.role, newRole)) {
+          throw httpError(403, `You cannot assign the role ${newRole}.`);
+        }
+        // Don't let a bulk demotion strip the last active SUPER_ADMIN.
+        if (row.role === 'SUPER_ADMIN' && newRole !== 'SUPER_ADMIN') {
+          await assertNotLastSuperAdmin(id);
+        }
         const { error } = await db.from('users').update({ role: newRole }).eq('id', id);
         if (error) throw httpError(500, 'Database error');
         audit({
@@ -909,8 +931,16 @@ export const setRole: RequestHandler = async (req, res) => {
 
   const row = target as { id: string; email: string; role: Role; group_id: string | null };
 
-  assertOutranks(actor, row.role); // can't touch equal/higher users
-  assertOutranks(actor, newRole); // can't promote to your own tier or above
+  assertOutranks(actor, row.role); // can't touch equal/higher users (SA bypasses)
+  // Can't assign a role you're not allowed to (SUPER_ADMIN-only roles incl.
+  // DEVELOPER are SA-only; everyone else may only assign strictly-lower roles).
+  if (!canAssignRole(actor.role, newRole)) {
+    throw httpError(403, `You cannot assign the role ${newRole}.`);
+  }
+  // Demoting a SUPER_ADMIN out of the role must not remove the last active one.
+  if (row.role === 'SUPER_ADMIN' && newRole !== 'SUPER_ADMIN') {
+    await assertNotLastSuperAdmin(targetId);
+  }
 
   // Group leads (HR_MANAGER + MANAGER) are group-scoped: they may only change
   // roles of users in their OWN group. Admin-tier is not group-scoped. A lead

@@ -1,12 +1,15 @@
 import { Router } from 'express';
 import { requireRole } from '../middleware/auth';
-import { MANAGER_TIER, OPERATOR_TIER } from '../types';
+import { MANAGER_TIER } from '../types';
 import * as c from '../controllers/recruiters.controller';
 
 export const recruitersRouter = Router();
 
-recruitersRouter.get('/', requireRole(...OPERATOR_TIER), c.list);
-recruitersRouter.get('/:id', requireRole(...OPERATOR_TIER), c.get);
+// Recruiter directory is a management view — MANAGER_TIER and above (matches the
+// frontend, which hides /recruiters from a RECRUITER). Group leads are further
+// confined to their group inside the controller; admin tier is unscoped.
+recruitersRouter.get('/', requireRole(...MANAGER_TIER), c.list);
+recruitersRouter.get('/:id', requireRole(...MANAGER_TIER), c.get);
 // Recruiters onboard themselves; gate to the RECRUITER role only.
 recruitersRouter.post('/onboard', requireRole('RECRUITER'), c.onboard);
 

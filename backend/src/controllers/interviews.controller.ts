@@ -7,6 +7,7 @@ import {
   isAdminTier,
   isGroupLead,
   leadCanAccessConsultant,
+  leadCanAccessUser,
 } from '../services/groupScope';
 import { syncInterviewReminders } from '../services/interviewReminders.service';
 import { publishToUser } from '../services/realtime.service';
@@ -449,10 +450,16 @@ export const next: RequestHandler = async (req, res) => {
   if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
 
   // Decide whose interviews to look at. Non-managers can never target another
-  // user; their request is silently scoped back to themselves.
+  // user; their request is silently scoped back to themselves. Admin tier may
+  // target anyone; a group lead may only target a user in their own group
+  // (otherwise the request is silently scoped back to the caller).
   let targetUserId = req.user.id;
   if (parsed.data.for && isManagerTier(req.user.role)) {
-    targetUserId = parsed.data.for;
+    if (isAdminTier(req.user.role)) {
+      targetUserId = parsed.data.for;
+    } else if (isGroupLead(req.user.role) && (await leadCanAccessUser(req.user, parsed.data.for))) {
+      targetUserId = parsed.data.for;
+    }
   }
 
   // Resolve the target user's consultant scope. We use the consultant row to

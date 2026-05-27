@@ -16,30 +16,36 @@ import {
   extractJobRequirements,
 } from '../services/ai.service';
 import { extractResumeText } from '../services/resumeText.service';
-import { httpError, MANAGER_TIER } from '../types';
+import { httpError, type Role } from '../types';
 import { logger } from '../config/logger';
 import { audit } from '../services/audit.service';
+import { isAdminTier, isGroupLead, leadCanAccessUser } from '../services/groupScope';
 
-function isManagerTier(role?: string): boolean {
-  return !!role && (MANAGER_TIER as string[]).includes(role);
+interface Caller {
+  id: string;
+  role: Role;
+  group_id?: string | null;
 }
 
 /**
  * Authorize the caller to view/act on the given consultantId's resumes.
  * Throws 403 if they shouldn't see it.
  */
-async function authorizeConsultantAccess(
-  consultantId: string,
-  caller: { id: string; role: string },
-): Promise<void> {
-  if (isManagerTier(caller.role)) return; // admins + managers see all
-
+async function authorizeConsultantAccess(consultantId: string, caller: Caller): Promise<void> {
   const { data: cons } = await db
     .from('consultants')
     .select('id, user_id, recruiter_id')
     .eq('id', consultantId)
     .maybeSingle();
   if (!cons) throw httpError(404, 'Consultant not found');
+
+  // Admin tier unscoped; group leads (HR_MANAGER/MANAGER) only for consultants
+  // whose owning user is in their group.
+  if (isAdminTier(caller.role)) return;
+  if (isGroupLead(caller.role)) {
+    if (await leadCanAccessUser(caller, cons.user_id)) return;
+    throw httpError(404, 'Not found');
+  }
 
   if (caller.role === 'CONSULTANT') {
     if (cons.user_id !== caller.id) throw httpError(404, 'Not found');
@@ -677,7 +683,7 @@ const EDIT_COLS = 'id, section, before_text, after_text, ai_reason, status, ordi
 /** Load a resume version row by id and authorize the caller against its
  *  consultant. The single choke point every workspace endpoint runs through —
  *  IDOR protection lives here, not in the route. */
-async function loadResumeForCaller(id: string, caller: { id: string; role: string }): Promise<any> {
+async function loadResumeForCaller(id: string, caller: Caller): Promise<any> {
   const { data } = await db
     .from('resumes')
     .select(
