@@ -16,10 +16,11 @@ export const REPORT_TABS: { key: ReportTab; label: string }[] = [
  * two bespoke tabs that self-fetch their own non-uniform data: the manual daily
  * activity log (a mutation surface) and the time-in-app report.
  */
-export type PageTab = ReportTab | 'daily' | 'usertime';
+export type PageTab = ReportTab | 'submissions' | 'daily' | 'usertime';
 
 export const NAV_TABS: { key: PageTab; label: string }[] = [
   ...REPORT_TABS,
+  { key: 'submissions', label: 'Submissions' },
   { key: 'daily', label: 'Daily log' },
   { key: 'usertime', label: 'Time in app' },
 ];

@@ -12,6 +12,7 @@ import { ActivityStream } from '../components/dashboard/ActivityStream';
 import { TodaysFocus } from '../components/dashboard/TodaysFocus';
 import { WeeklyGoals } from '../components/dashboard/WeeklyGoals';
 import { PipelineCard } from '../components/dashboard/PipelineCard';
+import { SubmissionsReport } from '../components/reports/SubmissionsReport';
 
 /**
  * Recruiter command center. Above the fold it answers, top to bottom:
@@ -74,6 +75,13 @@ export function RecruiterDashboard() {
         </div>
 
         <PipelineCard apps={apps} consultants={consultants} />
+
+        {/* Self-service submission stats. The backend scopes these endpoints to
+            the recruiter's own assigned consultants/submissions. */}
+        <section>
+          <h2 className="text-sm font-semibold text-ink mb-3">My submissions</h2>
+          <SubmissionsReport showByRecruiter={false} />
+        </section>
       </div>
     </Layout>
   );

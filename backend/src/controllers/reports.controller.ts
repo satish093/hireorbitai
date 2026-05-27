@@ -1,7 +1,8 @@
 import { RequestHandler } from 'express';
 import { z } from 'zod';
 import { db, pool } from '../config/db';
-import { httpError, MANAGER_TIER } from '../types';
+import { httpError, MANAGER_TIER, type Role } from '../types';
+import { managerGroupConsultantIds, isAdminTier, isGroupLead } from '../services/groupScope';
 
 // ---------------------------------------------------------------------------
 // RBAC POLICY (intentional — roles audit phases 3 & 5): reports analytics are
@@ -1297,4 +1298,170 @@ export const sourcesReport: RequestHandler = async (req, res) => {
   ];
 
   res.json({ kpis, table });
+};
+
+// ---------------------------------------------------------------------------
+// Submissions reports — submissions grouped by consultant / by recruiter, with
+// daily / weekly / monthly (or explicit from–to) filters. Source of truth is
+// the `applications` table (one submission = one application row, dated by
+// `submitted_at`). Metrics: total + per-status breakdown + derived interviews
+// (status INTERVIEW), offers (OFFER), rejections (REJECTED).
+//
+// SCOPE (Phase 13 product decision):
+//   - ADMIN_TIER / DEVELOPER+reports  → all submissions org-wide
+//   - GROUP LEAD (HR_MANAGER/MANAGER) → only their group's consultants
+//                                       (fail-closed: no group ⇒ empty)
+//   - RECRUITER                       → only their own assigned submissions
+//   - CONSULTANT                      → denied at the route gate (not OPERATOR_TIER)
+//
+// TIMEZONE-SAFETY: the client computes the local start/end of the chosen day /
+// week / month and passes explicit `from`/`to` ISO instants; the backend filters
+// on those instants. The `period` shorthand below is a rolling-window fallback
+// (UTC) for direct API / tests. Aggregation is ALWAYS server-side.
+// ---------------------------------------------------------------------------
+
+const APPLICATION_STATUSES = [
+  'SUBMITTED',
+  'SCREENING',
+  'INTERVIEW',
+  'OFFER',
+  'REJECTED',
+  'WITHDRAWN',
+  'ARCHIVED',
+] as const;
+
+function submissionRange(req: { query: Record<string, any> }): { from: string; to: string } {
+  // Explicit from/to (client-computed, timezone-local boundaries) always wins.
+  if (req.query.from || req.query.to) {
+    return {
+      from: (req.query.from as string) ?? new Date(0).toISOString(),
+      to: (req.query.to as string) ?? new Date().toISOString(),
+    };
+  }
+  const now = new Date();
+  const days = req.query.period === 'daily' ? 1 : req.query.period === 'weekly' ? 7 : 30;
+  return { from: new Date(now.getTime() - days * 86400000).toISOString(), to: now.toISOString() };
+}
+
+interface SubmissionRow {
+  id: string;
+  status: string | null;
+  submitted_at: string | null;
+  consultant_id: string | null;
+  recruiter_id: string | null;
+  consultant?: { user?: { full_name?: string | null; email?: string | null } | null } | null;
+  recruiter?: { user?: { full_name?: string | null; email?: string | null } | null } | null;
+}
+
+/** Fetch the submissions visible to the caller within [from, to], scoped by role. */
+async function fetchScopedSubmissions(
+  caller: { id: string; role: Role; group_id?: string | null },
+  from: string,
+  to: string,
+): Promise<SubmissionRow[]> {
+  let q = db
+    .from('applications')
+    .select(
+      'id, status, submitted_at, consultant_id, recruiter_id, ' +
+        'consultant:consultants!consultant_id(id, user:users!user_id(full_name, email)), ' +
+        'recruiter:recruiters!recruiter_id(id, user:users!user_id(full_name, email))',
+    )
+    .gte('submitted_at', from)
+    .lte('submitted_at', to);
+
+  if (isAdminTier(caller.role) || caller.role === 'DEVELOPER') {
+    // Unscoped — admin-tier, or a DEVELOPER that holds the reports capability
+    // (already enforced by the route gate).
+  } else if (isGroupLead(caller.role)) {
+    const consIds = await managerGroupConsultantIds(caller);
+    if (!consIds || consIds.length === 0) return []; // fail-closed: no group ⇒ nobody
+    q = q.in('consultant_id', consIds);
+  } else if (caller.role === 'RECRUITER') {
+    const { data: rec } = await db
+      .from('recruiters')
+      .select('id')
+      .eq('user_id', caller.id)
+      .maybeSingle();
+    const recId = (rec as { id?: string } | null)?.id;
+    if (!recId) return [];
+    q = q.eq('recruiter_id', recId);
+  } else {
+    return []; // defensive — the gate already excludes CONSULTANT/other
+  }
+
+  const { data, error } = await q;
+  if (error) throw httpError(500, 'Database error');
+  return (data ?? []) as SubmissionRow[];
+}
+
+interface SubmissionAgg {
+  id: string;
+  name: string;
+  total: number;
+  by_status: Record<string, number>;
+  interviews: number;
+  offers: number;
+  rejections: number;
+}
+
+function emptyAgg(id: string, name: string): SubmissionAgg {
+  const by_status: Record<string, number> = {};
+  for (const s of APPLICATION_STATUSES) by_status[s] = 0;
+  return { id, name, total: 0, by_status, interviews: 0, offers: 0, rejections: 0 };
+}
+
+function tally(agg: SubmissionAgg, status: string | null): void {
+  agg.total++;
+  if (status) agg.by_status[status] = (agg.by_status[status] ?? 0) + 1;
+  if (status === 'INTERVIEW') agg.interviews++;
+  if (status === 'OFFER') agg.offers++;
+  if (status === 'REJECTED') agg.rejections++;
+}
+
+export const submissionsByConsultant: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const { from, to } = submissionRange(req);
+  const apps = await fetchScopedSubmissions(req.user, from, to);
+
+  const map = new Map<string, SubmissionAgg>();
+  for (const a of apps) {
+    if (!a.consultant_id) continue;
+    let agg = map.get(a.consultant_id);
+    if (!agg) {
+      const name = a.consultant?.user?.full_name ?? a.consultant?.user?.email ?? 'Unknown';
+      agg = emptyAgg(a.consultant_id, name);
+      map.set(a.consultant_id, agg);
+    }
+    tally(agg, a.status);
+  }
+
+  res.json({
+    from,
+    to,
+    consultants: Array.from(map.values()).sort((a, b) => b.total - a.total),
+  });
+};
+
+export const submissionsByRecruiter: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const { from, to } = submissionRange(req);
+  const apps = await fetchScopedSubmissions(req.user, from, to);
+
+  const map = new Map<string, SubmissionAgg>();
+  for (const a of apps) {
+    if (!a.recruiter_id) continue;
+    let agg = map.get(a.recruiter_id);
+    if (!agg) {
+      const name = a.recruiter?.user?.full_name ?? a.recruiter?.user?.email ?? 'Unknown';
+      agg = emptyAgg(a.recruiter_id, name);
+      map.set(a.recruiter_id, agg);
+    }
+    tally(agg, a.status);
+  }
+
+  res.json({
+    from,
+    to,
+    recruiters: Array.from(map.values()).sort((a, b) => b.total - a.total),
+  });
 };

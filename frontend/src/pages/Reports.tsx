@@ -28,6 +28,7 @@ import { SourcesReport } from '../components/reports/SourcesReport';
 import { AIUsageReport } from '../components/reports/AIUsageReport';
 import { DailyActivityReport } from '../components/reports/DailyActivityReport';
 import { TimeInAppReport } from '../components/reports/TimeInAppReport';
+import { SubmissionsReport } from '../components/reports/SubmissionsReport';
 
 const TAB_KEYS = NAV_TABS.map((t) => t.key);
 const isTab = (v: string | null): v is PageTab => !!v && (TAB_KEYS as string[]).includes(v);
@@ -81,6 +82,7 @@ function ReportsInner() {
           <SourcesReport data={data as SourcesPayload | null} loading={loading} />
         )}
         {tab === 'ai' && <AIUsageReport data={data as AIUsagePayload | null} loading={loading} />}
+        {tab === 'submissions' && <SubmissionsReport />}
         {tab === 'daily' && <DailyActivityReport />}
         {tab === 'usertime' && <TimeInAppReport />}
       </div>
