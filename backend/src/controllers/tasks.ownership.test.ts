@@ -235,3 +235,38 @@ describe('tasks.controller — create validation', () => {
     expect(insert?.title).toBe('Do thing');
   });
 });
+
+describe('tasks.assignees — scoped assignable users', () => {
+  it('returns 403 for a non-manager caller', async () => {
+    const err = await call(tasks.assignees as Handler, CONSULTANT, {});
+    expect(err?.status).toBe(403);
+  });
+
+  it('admin tier gets every active user (plus self)', async () => {
+    mock.rows.users = [
+      { id: 'u1', full_name: 'Dee', email: 'd@x', role: 'DIRECTOR' },
+      { id: 'u2', full_name: 'Nik', email: 'n@x', role: 'HR_MANAGER' },
+    ];
+    const res = mkRes();
+    await (tasks.assignees as Handler)(
+      { user: ADMIN, body: {}, params: {}, query: {}, log },
+      res,
+      vi.fn(),
+    );
+    const ids = (res.body as { id: string }[]).map((u) => u.id);
+    expect(ids).toEqual(expect.arrayContaining(['u1', 'u2', ADMIN.id]));
+  });
+
+  it('a group lead gets their group users (plus self)', async () => {
+    mock.rows.users = [{ id: 'g-user', full_name: 'G', email: 'g@x', role: 'RECRUITER' }];
+    const res = mkRes();
+    await (tasks.assignees as Handler)(
+      { user: GROUP_LEAD, body: {}, params: {}, query: {}, log },
+      res,
+      vi.fn(),
+    );
+    const ids = (res.body as { id: string }[]).map((u) => u.id);
+    expect(ids).toContain('g-user');
+    expect(ids).toContain(GROUP_LEAD.id);
+  });
+});

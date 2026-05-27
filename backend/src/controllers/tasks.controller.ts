@@ -311,6 +311,50 @@ export const teamTasks: RequestHandler = async (req, res) => {
   res.json(data);
 };
 
+/**
+ * Users the caller may assign tasks to. Manager-tier only (matches the create/
+ * assign surface). Admin-tier sees every active user; a group lead sees the
+ * active users in their own group. Always includes the caller themselves so a
+ * lead with an empty group can still self-assign. Returns a lean shape for the
+ * assignee picker.
+ */
+export const assignees: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  if (!isManagerLike(req.user.role)) throw httpError(403, 'Forbidden');
+
+  const COLS = 'id, full_name, email, role';
+  let rows: Array<{ id: string; full_name: string | null; email: string; role: string }> = [];
+
+  if (isAdminTier(req.user.role)) {
+    const { data, error } = await db.from('users').select(COLS).neq('is_active', false);
+    if (error) throw httpError(500, 'Database error');
+    rows = (data ?? []) as typeof rows;
+  } else {
+    // Group lead → their group's active users (managerGroupUserIds is fail-closed).
+    const ids = await managerGroupUserIds(req.user);
+    if (ids && ids.length > 0) {
+      const { data, error } = await db
+        .from('users')
+        .select(COLS)
+        .in('id', ids)
+        .neq('is_active', false);
+      if (error) throw httpError(500, 'Database error');
+      rows = (data ?? []) as typeof rows;
+    }
+  }
+
+  // Guarantee the caller is always assignable to themselves.
+  if (!rows.some((u) => u.id === req.user!.id)) {
+    rows.push({
+      id: req.user.id,
+      full_name: null,
+      email: req.user.email,
+      role: req.user.role,
+    });
+  }
+  res.json(rows);
+};
+
 /** Manager dashboard metrics: counts by status, by priority, overdue, completed-this-week. */
 export const metrics: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');

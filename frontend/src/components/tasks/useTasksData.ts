@@ -42,38 +42,39 @@ export function useTasksData() {
   }, [reloadTick]);
 
   // Assignable users (manager tier only) — for the assignee filter + detail pane.
+  // Backend scopes this: admin tier → everyone; group lead → their group. This
+  // includes manager-tier users (not just recruiters/consultants), so a task
+  // can be assigned to any teammate in scope.
   useEffect(() => {
     if (!isManager) return;
-    Promise.all([
-      api.get('/recruiters').catch(() => ({ data: [] })),
-      api.get('/consultants').catch(() => ({ data: [] })),
-    ]).then(([recs, cons]) => {
-      const seen = new Map<string, TaskUser>();
-      for (const r of recs.data ?? [])
-        if (r.user_id)
-          seen.set(r.user_id, {
-            id: r.user_id,
-            full_name: r.user?.full_name,
-            email: r.user?.email,
-            role: 'RECRUITER',
+    api
+      .get('/tasks/assignees')
+      .then((r) => {
+        const seen = new Map<string, TaskUser>();
+        for (const u of (r.data ?? []) as TaskUser[]) {
+          if (u.id) seen.set(u.id, u);
+        }
+        if (profile && !seen.has(profile.id))
+          seen.set(profile.id, {
+            id: profile.id,
+            full_name: profile.full_name,
+            email: profile.email,
+            role: profile.role,
           });
-      for (const c of cons.data ?? [])
-        if (c.user_id)
-          seen.set(c.user_id, {
-            id: c.user_id,
-            full_name: c.user?.full_name,
-            email: c.user?.email,
-            role: 'CONSULTANT',
-          });
-      if (profile)
-        seen.set(profile.id, {
-          id: profile.id,
-          full_name: profile.full_name,
-          email: profile.email,
-          role: profile.role,
-        });
-      setUsers(Array.from(seen.values()));
-    });
+        setUsers(Array.from(seen.values()));
+      })
+      .catch(() => {
+        // Fail-soft: at least let the caller self-assign.
+        if (profile)
+          setUsers([
+            {
+              id: profile.id,
+              full_name: profile.full_name,
+              email: profile.email,
+              role: profile.role,
+            },
+          ]);
+      });
   }, [isManager, profile]);
 
   /** Optimistic status change (drag-drop + detail pane). */

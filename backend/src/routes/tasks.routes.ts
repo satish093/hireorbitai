@@ -11,6 +11,7 @@ export const tasksRouter = Router();
 
 // More-specific routes BEFORE :id so they don't match as IDs.
 tasksRouter.get('/metrics', requireRole(...MANAGER_TIER), t.metrics);
+tasksRouter.get('/assignees', requireRole(...MANAGER_TIER), t.assignees);
 tasksRouter.get('/assigned-to-me', t.assignedToMe);
 tasksRouter.get('/team', requireRole(...MANAGER_TIER), t.teamTasks);
 
