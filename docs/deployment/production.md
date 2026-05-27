@@ -109,20 +109,32 @@ Off-site target is **Cloudflare R2** — 10 GB free, **zero egress** (restores c
 and API-token auth that won't silently expire like an OAuth token. Any rclone remote works via
 `RCLONE_REMOTE` / `RCLONE_DEST`.
 
-### One-time setup
+### One-time setup — auto-wired on deploy (recommended)
 
 In the Cloudflare dashboard → **R2** → **Manage API Tokens** → create a token with **Object Read & Write**;
-note the **Account ID**, **Access Key ID**, **Secret Access Key**. Then on the VPS:
+note the **Account ID**, **Access Key ID**, **Secret Access Key**. Add them to **`backend/.env` on the VPS**
+(they're committed nowhere — `.env` is gitignored):
 
-```bash
-bash scripts/ops.sh setup     # prompts for the 3 R2 values, then wires rclone + bucket + weekly cron
-bash scripts/ops.sh backup    # test it — should appear under: rclone lsf r2:hireorbitai-backups
+```dotenv
+R2_ACCOUNT_ID=...
+R2_ACCESS_KEY_ID=...
+R2_SECRET_ACCESS_KEY=...
 ```
 
-`setup` installs this weekly cron (Sunday 03:00, prunes copies older than 8 weeks):
+That's the only manual step. On the **next push to `main`**, `scripts/update.sh` calls `ops.sh ensure`,
+which idempotently creates the rclone `r2:` remote, the bucket, and the weekly cron — so backups stay wired
+across every deploy. rclone must be installed once (`curl https://rclone.org/install.sh | sudo bash`, or run
+`ops.sh setup`); after that, deploys handle the rest. The installed cron (Sunday 03:00, prunes >8 weeks):
 
 ```cron
 0 3 * * 0 /home/hireorbitai/hireorbitai/scripts/ops.sh backup --prune-weeks 8 >> /home/hireorbitai/backups/ops.log 2>&1
+```
+
+**Manual / first-time alternative** (also installs rclone, prompts if `R2_*` aren't in `.env` yet):
+
+```bash
+bash scripts/ops.sh setup     # installs rclone + configures R2 + weekly cron
+bash scripts/ops.sh backup    # test it — should appear under: rclone lsf r2:hireorbitai-backups
 ```
 
 ### Verify a backup is restorable

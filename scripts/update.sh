@@ -92,4 +92,10 @@ if [[ "$code" != "200" ]]; then
 fi
 echo "  ✓ HTTP 200 — $(cat /tmp/healthz.body)"
 
+# Reconcile off-site backup config (rclone R2 remote + weekly cron) from the
+# R2_* vars in backend/.env. Idempotent + non-interactive; best-effort so a
+# backup-setup hiccup never fails a healthy deploy.
+echo "→ reconcile backup config (ops ensure)"
+bash "$ROOT/scripts/ops.sh" ensure || echo "  (ops ensure skipped/failed — non-fatal)"
+
 echo "✓ deploy complete ($before_sha → $after_sha)"

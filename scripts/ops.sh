@@ -27,6 +27,7 @@ MIGRATE_DIR="${MIGRATE_DIR:-$HOME/migrate}"
 RCLONE_REMOTE="${RCLONE_REMOTE:-r2}"
 RCLONE_DEST="${RCLONE_DEST:-hireorbitai-backups}"
 R2_MIGRATE_PATH="${RCLONE_REMOTE}:${RCLONE_DEST}/migrate"
+PM2_NAME="${PM2_NAME:-hireorbitai-api}"
 CANARY_TABLES=(users recruiters consultants jobs applications)
 
 load_env() {
@@ -51,11 +52,39 @@ newest_stamp_dir() {
   find "$BACKUPS_DIR" -mindepth 1 -maxdepth 1 -type d -name '20*' 2>/dev/null | sort | tail -1
 }
 
+# Create the rclone R2 remote from R2_* env vars (sourced from backend/.env) if
+# it doesn't already exist. R2 uses API keys, so this is non-interactive.
+# Returns 0 if the remote exists or was created, 1 if creds are missing.
+ensure_r2_remote() {
+  rclone listremotes 2>/dev/null | grep -qx "${RCLONE_REMOTE}:" && return 0
+  if [[ -n "${R2_ACCOUNT_ID:-}" && -n "${R2_ACCESS_KEY_ID:-}" && -n "${R2_SECRET_ACCESS_KEY:-}" ]]; then
+    rclone config create "$RCLONE_REMOTE" s3 \
+      provider=Cloudflare \
+      access_key_id="$R2_ACCESS_KEY_ID" \
+      secret_access_key="$R2_SECRET_ACCESS_KEY" \
+      endpoint="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com" \
+      region=auto >/dev/null
+    return 0
+  fi
+  return 1
+}
+
+# Install the weekly backup cron (Sunday 03:00) idempotently. Written to be
+# set -e safe even when there's no existing crontab yet.
+install_weekly_cron() {
+  local line="0 3 * * 0 $ROOT/scripts/ops.sh backup --prune-weeks 8 >> $BACKUPS_DIR/ops.log 2>&1"
+  mkdir -p "$BACKUPS_DIR"
+  local current
+  current="$(crontab -l 2>/dev/null | grep -vF 'scripts/ops.sh backup' || true)"
+  printf '%s\n%s\n' "$current" "$line" | grep -v '^[[:space:]]*$' | crontab -
+}
+
 CMD="${1:-}"
 
 case "$CMD" in
   # ──────────────────────────────────────────────────────────────── setup ──
   setup)
+    load_env   # pick up R2_* if already in backend/.env
     # 1. rclone
     if ! command -v rclone >/dev/null 2>&1; then
       echo "→ installing rclone"
@@ -64,9 +93,11 @@ case "$CMD" in
       echo "→ rclone already installed ($(rclone version | head -1))"
     fi
 
-    # 2. R2 remote (non-interactive — R2 uses API keys, no OAuth)
+    # 2. R2 remote — from backend/.env if present, else prompt.
     if rclone listremotes 2>/dev/null | grep -qx "${RCLONE_REMOTE}:"; then
       echo "→ rclone remote '${RCLONE_REMOTE}:' already configured — leaving as is"
+    elif ensure_r2_remote; then
+      echo "→ rclone remote '${RCLONE_REMOTE}:' created from backend/.env (R2_*)"
     else
       echo "Configure Cloudflare R2 (dashboard → R2 → Manage API Tokens → Object Read & Write):"
       read -rp "  Cloudflare Account ID: " ACCT
@@ -80,6 +111,10 @@ case "$CMD" in
         endpoint="https://${ACCT}.r2.cloudflarestorage.com" \
         region=auto >/dev/null
       echo "  ✓ remote '${RCLONE_REMOTE}:' created"
+      echo "  TIP: add these to backend/.env so every deploy keeps backups wired:"
+      echo "       R2_ACCOUNT_ID=$ACCT"
+      echo "       R2_ACCESS_KEY_ID=$AK"
+      echo "       R2_SECRET_ACCESS_KEY=********"
     fi
 
     # 3. bucket
@@ -90,13 +125,29 @@ case "$CMD" in
       || echo "  ⚠ couldn't list ${RCLONE_REMOTE}: — double-check the keys"
 
     # 4. weekly cron (idempotent — Sunday 03:00)
-    CRON_LINE="0 3 * * 0 $ROOT/scripts/ops.sh backup --prune-weeks 8 >> $BACKUPS_DIR/ops.log 2>&1"
-    mkdir -p "$BACKUPS_DIR"
-    ( crontab -l 2>/dev/null | grep -vF "scripts/ops.sh backup"; echo "$CRON_LINE" ) | crontab -
-    echo "→ weekly cron installed:"
-    echo "    $CRON_LINE"
+    install_weekly_cron
+    echo "→ weekly cron installed (Sunday 03:00)"
     echo
     echo "✓ setup complete. Test it now:  bash scripts/ops.sh backup"
+    ;;
+
+  # ─────────────────────────────────────────────────────────────── ensure ──
+  # Idempotent, non-interactive, deploy-safe. Called by scripts/update.sh on
+  # every deploy so backups stay wired once R2_* is in backend/.env. Never
+  # fails the caller and never installs packages or prompts.
+  ensure)
+    load_env
+    if ! command -v rclone >/dev/null 2>&1; then
+      echo "→ ops ensure: rclone not installed — skipping (run 'ops.sh setup' once to enable backups)."
+      exit 0
+    fi
+    if ensure_r2_remote; then
+      rclone mkdir "${RCLONE_REMOTE}:${RCLONE_DEST}" 2>/dev/null || true
+      install_weekly_cron
+      echo "→ ops ensure: '${RCLONE_REMOTE}:' remote + weekly backup cron in place."
+    else
+      echo "→ ops ensure: R2 creds not set in backend/.env (R2_ACCOUNT_ID / R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY) — skipping backup auto-setup."
+    fi
     ;;
 
   # ─────────────────────────────────────────────────────────────── backup ──
@@ -292,8 +343,8 @@ case "$CMD" in
     echo "→ npm --prefix backend run migrate:up"
     ( cd "$ROOT" && npm --prefix backend run migrate:up )
     echo "→ pm2 reload / start"
-    if pm2 describe hireorbit-api >/dev/null 2>&1; then
-      pm2 reload hireorbit-api --update-env
+    if pm2 describe "$PM2_NAME" >/dev/null 2>&1; then
+      pm2 reload "$PM2_NAME" --update-env
     else
       ( cd "$ROOT" && pm2 start backend/ecosystem.config.cjs )
     fi
@@ -319,7 +370,8 @@ case "$CMD" in
     cat >&2 <<'USAGE'
 usage: scripts/ops.sh <verb> [args]
 
-  setup                              install rclone + configure R2 + weekly cron (turnkey)
+  setup                              install rclone + configure R2 + weekly cron (turnkey, interactive)
+  ensure                             idempotent non-interactive reconcile (run by deploys)
   backup [--prune-weeks N]           snapshot now + copy to R2  (run by the weekly cron)
   verify                             restore-drill the newest dump into a throwaway DB
   ship                               build a migration bundle (db+uploads+.env) and push to R2
