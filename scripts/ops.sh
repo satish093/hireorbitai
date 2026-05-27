@@ -3,19 +3,20 @@
 # restore drills, and host migration. Wraps the low-level primitives
 # (scripts/backup.sh, scripts/restore.sh) with practical, memorable verbs.
 #
-#   bash scripts/ops.sh setup                 install rclone + configure R2 + weekly cron (turnkey)
-#   bash scripts/ops.sh backup [--prune-weeks N]   snapshot now + copy to R2  (this is the weekly cron)
+#   bash scripts/ops.sh setup                 install rclone + configure Mega + weekly cron (turnkey)
+#   bash scripts/ops.sh backup [--prune-weeks N]   snapshot now + copy off-site  (this is the weekly cron)
 #   bash scripts/ops.sh verify                restore-drill the newest dump into a throwaway DB
-#   bash scripts/ops.sh ship                  build a migration bundle (db+uploads+.env) and push to R2
+#   bash scripts/ops.sh ship                  build a migration bundle (db+uploads+.env) and push off-site
 #   bash scripts/ops.sh land [name|path] --force   pull/import a bundle on a NEW host + rebuild + pm2
 #   bash scripts/ops.sh restore <stamp> [db|uploads|all] --force   restore a local backup (-> restore.sh)
 #
-# Off-site target is Cloudflare R2 (free 10 GB, zero egress, S3-compatible) but
-# any rclone remote works via RCLONE_REMOTE / RCLONE_DEST.
+# Off-site target is Mega (free 20 GB, no credit card) but any rclone remote
+# works via RCLONE_REMOTE / RCLONE_DEST.
 #
 # Env (read from backend/.env if present):
 #   DATABASE_URL, UPLOADS_DIR (default /var/lib/hireorbitai/uploads)
-#   RCLONE_REMOTE (default r2), RCLONE_DEST (default hireorbitai-backups)
+#   MEGA_EMAIL, MEGA_PASSWORD   — used to auto-configure the rclone remote
+#   RCLONE_REMOTE (default mega), RCLONE_DEST (default hireorbitai-backups)
 #   BACKUPS_DIR (default ~/backups), MIGRATE_DIR (default ~/migrate)
 #
 set -euo pipefail
@@ -24,9 +25,9 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENV_FILE="$ROOT/backend/.env"
 BACKUPS_DIR="${BACKUPS_DIR:-$HOME/backups}"
 MIGRATE_DIR="${MIGRATE_DIR:-$HOME/migrate}"
-RCLONE_REMOTE="${RCLONE_REMOTE:-r2}"
+RCLONE_REMOTE="${RCLONE_REMOTE:-mega}"
 RCLONE_DEST="${RCLONE_DEST:-hireorbitai-backups}"
-R2_MIGRATE_PATH="${RCLONE_REMOTE}:${RCLONE_DEST}/migrate"
+MIGRATE_PATH="${RCLONE_REMOTE}:${RCLONE_DEST}/migrate"
 PM2_NAME="${PM2_NAME:-hireorbitai-api}"
 CANARY_TABLES=(users recruiters consultants jobs applications)
 
@@ -52,18 +53,16 @@ newest_stamp_dir() {
   find "$BACKUPS_DIR" -mindepth 1 -maxdepth 1 -type d -name '20*' 2>/dev/null | sort | tail -1
 }
 
-# Create the rclone R2 remote from R2_* env vars (sourced from backend/.env) if
-# it doesn't already exist. R2 uses API keys, so this is non-interactive.
+# Create the rclone Mega remote from MEGA_* env vars (sourced from backend/.env)
+# if it doesn't already exist. Mega authenticates with email + password, so this
+# is fully non-interactive (the password is obscured via `rclone obscure`).
 # Returns 0 if the remote exists or was created, 1 if creds are missing.
-ensure_r2_remote() {
+ensure_remote() {
   rclone listremotes 2>/dev/null | grep -qx "${RCLONE_REMOTE}:" && return 0
-  if [[ -n "${R2_ACCOUNT_ID:-}" && -n "${R2_ACCESS_KEY_ID:-}" && -n "${R2_SECRET_ACCESS_KEY:-}" ]]; then
-    rclone config create "$RCLONE_REMOTE" s3 \
-      provider=Cloudflare \
-      access_key_id="$R2_ACCESS_KEY_ID" \
-      secret_access_key="$R2_SECRET_ACCESS_KEY" \
-      endpoint="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com" \
-      region=auto >/dev/null
+  if [[ -n "${MEGA_EMAIL:-}" && -n "${MEGA_PASSWORD:-}" ]]; then
+    rclone config create "$RCLONE_REMOTE" mega \
+      user="$MEGA_EMAIL" \
+      pass="$(rclone obscure "$MEGA_PASSWORD")" >/dev/null
     return 0
   fi
   return 1
@@ -84,7 +83,7 @@ CMD="${1:-}"
 case "$CMD" in
   # ──────────────────────────────────────────────────────────────── setup ──
   setup)
-    load_env   # pick up R2_* if already in backend/.env
+    load_env   # pick up MEGA_* if already in backend/.env
     # 1. rclone
     if ! command -v rclone >/dev/null 2>&1; then
       echo "→ installing rclone"
@@ -93,36 +92,31 @@ case "$CMD" in
       echo "→ rclone already installed ($(rclone version | head -1))"
     fi
 
-    # 2. R2 remote — from backend/.env if present, else prompt.
+    # 2. Mega remote — from backend/.env if present, else prompt.
     if rclone listremotes 2>/dev/null | grep -qx "${RCLONE_REMOTE}:"; then
       echo "→ rclone remote '${RCLONE_REMOTE}:' already configured — leaving as is"
-    elif ensure_r2_remote; then
-      echo "→ rclone remote '${RCLONE_REMOTE}:' created from backend/.env (R2_*)"
+    elif ensure_remote; then
+      echo "→ rclone remote '${RCLONE_REMOTE}:' created from backend/.env (MEGA_*)"
     else
-      echo "Configure Cloudflare R2 (dashboard → R2 → Manage API Tokens → Object Read & Write):"
-      read -rp "  Cloudflare Account ID: " ACCT
-      read -rp "  R2 Access Key ID:      " AK
-      read -rsp "  R2 Secret Access Key:  " SK; echo
-      [[ -z "$ACCT" || -z "$AK" || -z "$SK" ]] && { echo "✗ all three values are required" >&2; exit 1; }
-      rclone config create "$RCLONE_REMOTE" s3 \
-        provider=Cloudflare \
-        access_key_id="$AK" \
-        secret_access_key="$SK" \
-        endpoint="https://${ACCT}.r2.cloudflarestorage.com" \
-        region=auto >/dev/null
+      echo "Configure Mega (your free mega.nz account — no credit card needed):"
+      read -rp "  Mega email:    " MEGA_EMAIL
+      read -rsp "  Mega password: " MEGA_PASSWORD; echo
+      [[ -z "$MEGA_EMAIL" || -z "$MEGA_PASSWORD" ]] && { echo "✗ email and password are required" >&2; exit 1; }
+      rclone config create "$RCLONE_REMOTE" mega \
+        user="$MEGA_EMAIL" \
+        pass="$(rclone obscure "$MEGA_PASSWORD")" >/dev/null
       echo "  ✓ remote '${RCLONE_REMOTE}:' created"
       echo "  TIP: add these to backend/.env so every deploy keeps backups wired:"
-      echo "       R2_ACCOUNT_ID=$ACCT"
-      echo "       R2_ACCESS_KEY_ID=$AK"
-      echo "       R2_SECRET_ACCESS_KEY=********"
+      echo "       MEGA_EMAIL=$MEGA_EMAIL"
+      echo "       MEGA_PASSWORD=********"
     fi
 
-    # 3. bucket
-    echo "→ ensuring bucket ${RCLONE_REMOTE}:${RCLONE_DEST}"
+    # 3. destination folder
+    echo "→ ensuring folder ${RCLONE_REMOTE}:${RCLONE_DEST}"
     rclone mkdir "${RCLONE_REMOTE}:${RCLONE_DEST}" 2>/dev/null || true
     rclone lsd "${RCLONE_REMOTE}:" >/dev/null 2>&1 \
-      && echo "  ✓ R2 reachable" \
-      || echo "  ⚠ couldn't list ${RCLONE_REMOTE}: — double-check the keys"
+      && echo "  ✓ Mega reachable" \
+      || echo "  ⚠ couldn't list ${RCLONE_REMOTE}: — double-check the email/password"
 
     # 4. weekly cron (idempotent — Sunday 03:00)
     install_weekly_cron
@@ -133,7 +127,7 @@ case "$CMD" in
 
   # ─────────────────────────────────────────────────────────────── ensure ──
   # Idempotent, non-interactive, deploy-safe. Called by scripts/update.sh on
-  # every deploy so backups stay wired once R2_* is in backend/.env. Never
+  # every deploy so backups stay wired once MEGA_* is in backend/.env. Never
   # fails the caller and never installs packages or prompts.
   ensure)
     load_env
@@ -141,12 +135,12 @@ case "$CMD" in
       echo "→ ops ensure: rclone not installed — skipping (run 'ops.sh setup' once to enable backups)."
       exit 0
     fi
-    if ensure_r2_remote; then
+    if ensure_remote; then
       rclone mkdir "${RCLONE_REMOTE}:${RCLONE_DEST}" 2>/dev/null || true
       install_weekly_cron
       echo "→ ops ensure: '${RCLONE_REMOTE}:' remote + weekly backup cron in place."
     else
-      echo "→ ops ensure: R2 creds not set in backend/.env (R2_ACCOUNT_ID / R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY) — skipping backup auto-setup."
+      echo "→ ops ensure: Mega creds not set in backend/.env (MEGA_EMAIL / MEGA_PASSWORD) — skipping backup auto-setup."
     fi
     ;;
 
@@ -253,16 +247,16 @@ case "$CMD" in
     echo "✓ bundle: $BUNDLE ($(stat -c%s "$BUNDLE" 2>/dev/null || wc -c < "$BUNDLE") bytes, mode 600)"
 
     if command -v rclone >/dev/null 2>&1 && rclone listremotes 2>/dev/null | grep -qx "${RCLONE_REMOTE}:"; then
-      echo "→ pushing to $R2_MIGRATE_PATH/"
+      echo "→ pushing to $MIGRATE_PATH/"
       rclone mkdir "${RCLONE_REMOTE}:${RCLONE_DEST}" 2>/dev/null || true
-      rclone copyto "$BUNDLE" "$R2_MIGRATE_PATH/$(basename "$BUNDLE")"
-      echo "  ✓ on R2. On the NEW host:  bash scripts/ops.sh land --force"
+      rclone copyto "$BUNDLE" "$MIGRATE_PATH/$(basename "$BUNDLE")"
+      echo "  ✓ off-site. On the NEW host:  bash scripts/ops.sh land --force"
     else
-      echo "  (R2 not configured — use scp instead)"
+      echo "  (off-site remote not configured — use scp instead)"
     fi
     echo
     echo "scp fallback:  scp \"$BUNDLE\" hireorbitai@NEW_HOST:~/migrate/"
-    echo "⚠ Bundle holds secrets — delete it from every host AND R2 after the new VPS is verified."
+    echo "⚠ Bundle holds secrets — delete it from every host AND the remote after the new VPS is verified."
     ;;
 
   # ───────────────────────────────────────────────────────────────── land ──
@@ -276,19 +270,19 @@ case "$CMD" in
       esac
     done
 
-    # Resolve the bundle: explicit local path, else pull newest from R2.
+    # Resolve the bundle: explicit local path, else pull newest from the remote.
     if [[ -n "$SRC" && -f "$SRC" ]]; then
       BUNDLE="$SRC"
     else
       require_rclone
       NAME="$SRC"
       if [[ -z "$NAME" ]]; then
-        NAME="$(rclone lsf "$R2_MIGRATE_PATH/" 2>/dev/null | grep '\.tar\.gz$' | sort | tail -1)"
-        [[ -z "$NAME" ]] && { echo "✗ no bundles under $R2_MIGRATE_PATH/" >&2; exit 1; }
+        NAME="$(rclone lsf "$MIGRATE_PATH/" 2>/dev/null | grep '\.tar\.gz$' | sort | tail -1)"
+        [[ -z "$NAME" ]] && { echo "✗ no bundles under $MIGRATE_PATH/" >&2; exit 1; }
       fi
       mkdir -p "$MIGRATE_DIR"
-      echo "→ pulling $NAME from R2"
-      rclone copyto "$R2_MIGRATE_PATH/$NAME" "$MIGRATE_DIR/$NAME"
+      echo "→ pulling $NAME from ${RCLONE_REMOTE}:"
+      rclone copyto "$MIGRATE_PATH/$NAME" "$MIGRATE_DIR/$NAME"
       BUNDLE="$MIGRATE_DIR/$NAME"
       chmod 600 "$BUNDLE"
     fi
@@ -355,7 +349,7 @@ case "$CMD" in
     echo
     echo "✓ land complete. Delete the bundle now (it holds secrets):"
     echo "    rm \"$BUNDLE\""
-    [[ -n "${NAME:-}" ]] && echo "    rclone deletefile \"$R2_MIGRATE_PATH/$NAME\""
+    [[ -n "${NAME:-}" ]] && echo "    rclone deletefile \"$MIGRATE_PATH/$NAME\""
     echo "  Note: keep the new DATABASE_URL's db name as hireorbitai* or set DB_GUARD=off in .env."
     ;;
 
@@ -370,15 +364,15 @@ case "$CMD" in
     cat >&2 <<'USAGE'
 usage: scripts/ops.sh <verb> [args]
 
-  setup                              install rclone + configure R2 + weekly cron (turnkey, interactive)
+  setup                              install rclone + configure Mega + weekly cron (turnkey, interactive)
   ensure                             idempotent non-interactive reconcile (run by deploys)
-  backup [--prune-weeks N]           snapshot now + copy to R2  (run by the weekly cron)
+  backup [--prune-weeks N]           snapshot now + copy off-site  (run by the weekly cron)
   verify                             restore-drill the newest dump into a throwaway DB
-  ship                               build a migration bundle (db+uploads+.env) and push to R2
+  ship                               build a migration bundle (db+uploads+.env) and push off-site
   land [name|path] --force           pull/import a bundle on a NEW host + rebuild + pm2
   restore <stamp> [db|uploads|all] --force   restore a local backup (-> scripts/restore.sh)
 
-Off-site target defaults to Cloudflare R2 (RCLONE_REMOTE=r2, RCLONE_DEST=hireorbitai-backups).
+Off-site target defaults to Mega (RCLONE_REMOTE=mega, RCLONE_DEST=hireorbitai-backups).
 USAGE
     exit 1
     ;;

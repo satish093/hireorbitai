@@ -96,45 +96,43 @@ pm2 logs hireorbit-api --raw --nostream | jq 'select(.req.id == "01H...")'
 One operator tool covers off-site backups, restore drills, and host migration. It wraps the low-level
 primitives ([backup.sh](../../scripts/backup.sh), [restore.sh](../../scripts/restore.sh)) with memorable verbs.
 
-| Verb                                                | What it does                                                                                                                                       |
-| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ops.sh setup`                                      | Installs rclone, configures the **Cloudflare R2** remote from your API keys, creates the bucket, and installs the weekly cron. Turnkey — run once. |
-| `ops.sh backup [--prune-weeks N]`                   | Snapshot the DB + uploads locally, then copy the stamp to R2. This is what the weekly cron runs.                                                   |
-| `ops.sh verify`                                     | Restore-drill: loads the newest dump into a throwaway DB and prints canary row counts. Proves backups aren't silently broken.                      |
-| `ops.sh ship`                                       | Build a migration bundle (db + uploads + **`.env`**) and push it to R2. Run on the OLD host.                                                       |
-| `ops.sh land [name\|path] --force`                  | Pull/import a bundle, then `npm ci && build && migrate:up && pm2`. One command on the NEW host.                                                    |
-| `ops.sh restore <stamp> [db\|uploads\|all] --force` | Restore a local backup (passthrough to `restore.sh`).                                                                                              |
+| Verb                                                | What it does                                                                                                                                    |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ops.sh setup`                                      | Installs rclone, configures the **Mega** remote from your email/password, creates the folder, and installs the weekly cron. Turnkey — run once. |
+| `ops.sh backup [--prune-weeks N]`                   | Snapshot the DB + uploads locally, then copy the stamp off-site. This is what the weekly cron runs.                                             |
+| `ops.sh verify`                                     | Restore-drill: loads the newest dump into a throwaway DB and prints canary row counts. Proves backups aren't silently broken.                   |
+| `ops.sh ship`                                       | Build a migration bundle (db + uploads + **`.env`**) and push it off-site. Run on the OLD host.                                                 |
+| `ops.sh land [name\|path] --force`                  | Pull/import a bundle, then `npm ci && build && migrate:up && pm2`. One command on the NEW host.                                                 |
+| `ops.sh restore <stamp> [db\|uploads\|all] --force` | Restore a local backup (passthrough to `restore.sh`).                                                                                           |
 
-Off-site target is **Cloudflare R2** — 10 GB free, **zero egress** (restores cost nothing), S3-compatible,
-and API-token auth that won't silently expire like an OAuth token. Any rclone remote works via
-`RCLONE_REMOTE` / `RCLONE_DEST`.
+Off-site target is **[Mega](https://mega.nz)** — 20 GB free, **no credit card**, and rclone configures it
+non-interactively from an email + password (so the auto-setup below stays fully hands-off). Any rclone
+remote works via `RCLONE_REMOTE` / `RCLONE_DEST` if you prefer another provider.
 
 ### One-time setup — auto-wired on deploy (recommended)
 
-In the Cloudflare dashboard → **R2** → **Manage API Tokens** → create a token with **Object Read & Write**;
-note the **Account ID**, **Access Key ID**, **Secret Access Key**. Add them to **`backend/.env` on the VPS**
-(they're committed nowhere — `.env` is gitignored):
+Create a free account at [mega.nz](https://mega.nz) (use a dedicated account for backups, not your personal
+one). Add the credentials to **`backend/.env` on the VPS** (it's gitignored — never committed):
 
 ```dotenv
-R2_ACCOUNT_ID=...
-R2_ACCESS_KEY_ID=...
-R2_SECRET_ACCESS_KEY=...
+MEGA_EMAIL=backups@example.com
+MEGA_PASSWORD=...
 ```
 
 That's the only manual step. On the **next push to `main`**, `scripts/update.sh` calls `ops.sh ensure`,
-which idempotently creates the rclone `r2:` remote, the bucket, and the weekly cron — so backups stay wired
-across every deploy. rclone must be installed once (`curl https://rclone.org/install.sh | sudo bash`, or run
-`ops.sh setup`); after that, deploys handle the rest. The installed cron (Sunday 03:00, prunes >8 weeks):
+which idempotently creates the rclone `mega:` remote, the destination folder, and the weekly cron — so
+backups stay wired across every deploy. rclone must be installed once (`curl https://rclone.org/install.sh | sudo bash`,
+or run `ops.sh setup`); after that, deploys handle the rest. The installed cron (Sunday 03:00, prunes >8 weeks):
 
 ```cron
 0 3 * * 0 /home/hireorbitai/hireorbitai/scripts/ops.sh backup --prune-weeks 8 >> /home/hireorbitai/backups/ops.log 2>&1
 ```
 
-**Manual / first-time alternative** (also installs rclone, prompts if `R2_*` aren't in `.env` yet):
+**Manual / first-time alternative** (also installs rclone, prompts if `MEGA_*` aren't in `.env` yet):
 
 ```bash
-bash scripts/ops.sh setup     # installs rclone + configures R2 + weekly cron
-bash scripts/ops.sh backup    # test it — should appear under: rclone lsf r2:hireorbitai-backups
+bash scripts/ops.sh setup     # installs rclone + configures Mega + weekly cron
+bash scripts/ops.sh backup    # test it — should appear under: rclone lsf mega:hireorbitai-backups
 ```
 
 ### Verify a backup is restorable
@@ -151,20 +149,20 @@ The migration bundle is db + uploads + **`.env`**, so the new host comes up byte
 signed file URLs and refresh tokens keep working because `STORAGE_URL_SECRET` / `JWT_SECRET` /
 `COOKIE_SECRET` travel with it.
 
-> ⚠ **The bundle holds live secrets.** It moves only over your **private** R2 bucket (or `scp`), is written
-> `chmod 600`, and `land`/`ship` remind you to delete it from every host **and** R2 once verified.
+> ⚠ **The bundle holds live secrets.** It moves only over your private Mega account (or `scp`), is written
+> `chmod 600`, and `land`/`ship` remind you to delete it from every host **and** the remote once verified.
 
 ```bash
 # OLD host:
-bash scripts/ops.sh ship                       # bundle → R2 (prints scp fallback too)
+bash scripts/ops.sh ship                       # bundle → Mega (prints scp fallback too)
 
 # NEW host (provisioned per "First-time setup", repo cloned):
-bash scripts/ops.sh setup                      # so rclone can reach R2
+bash scripts/ops.sh setup                      # so rclone can reach Mega
 bash scripts/ops.sh land                       # dry run — prints what it will do
 bash scripts/ops.sh land --force               # pull + restore db/uploads/.env + npm ci/build/migrate/pm2
 ```
 
-No host-to-host SSH needed (the bundle rides through R2). For a direct transfer instead, `ship` prints an
+No host-to-host SSH needed (the bundle rides through Mega). For a direct transfer instead, `ship` prints an
 `scp` command and `land` accepts a local path: `ops.sh land ~/migrate/<bundle>.tar.gz --force`.
 
 `land` backs up any existing `backend/.env` to `.pre-migrate.<unix>` and moves the live uploads dir aside to
