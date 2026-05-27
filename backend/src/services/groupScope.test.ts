@@ -1,8 +1,8 @@
 /**
- * Group-scoped visibility helper. Only the group lead (HR_MANAGER) is confined
- * to its group; admin-tier (incl. DIRECTOR) sees all groups (null = no scope),
- * and MANAGER is parked. An HR_MANAGER without a group is fail-closed to an
- * empty set (sees nobody), never org-wide.
+ * Group-scoped visibility helper. The group leads (HR_MANAGER + MANAGER) are
+ * confined to their group; admin-tier (incl. DIRECTOR) sees all groups (null =
+ * no scope). A group lead without a group is fail-closed to an empty set (sees
+ * nobody), never org-wide.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -38,17 +38,18 @@ describe('managerGroupUserIds', () => {
     expect(await managerGroupUserIds({ role: 'SUPER_ADMIN' })).toBeNull();
   });
 
-  it('returns null for MANAGER (parked) and lower roles — not the scoped role', async () => {
-    expect(await managerGroupUserIds({ role: 'MANAGER', group_id: 'g1' })).toBeNull();
+  it('returns null for RECRUITER and lower roles — not a group-lead role', async () => {
     expect(await managerGroupUserIds({ role: 'RECRUITER', group_id: 'g1' })).toBeNull();
+    expect(await managerGroupUserIds({ role: 'CONSULTANT', group_id: 'g1' })).toBeNull();
   });
 
-  it('returns the group user ids for an HR_MANAGER (group lead) with a group', async () => {
+  it('returns the group user ids for a group lead (HR_MANAGER or MANAGER) with a group', async () => {
     expect(await managerGroupUserIds({ role: 'HR_MANAGER', group_id: 'g1' })).toEqual(['u1', 'u2']);
+    expect(await managerGroupUserIds({ role: 'MANAGER', group_id: 'g1' })).toEqual(['u1', 'u2']);
   });
 
-  it('fail-closes to an empty set for an HR_MANAGER with no group', async () => {
+  it('fail-closes to an empty set for a group lead with no group', async () => {
     expect(await managerGroupUserIds({ role: 'HR_MANAGER', group_id: null })).toEqual([]);
-    expect(await managerGroupUserIds({ role: 'HR_MANAGER' })).toEqual([]);
+    expect(await managerGroupUserIds({ role: 'MANAGER' })).toEqual([]);
   });
 });

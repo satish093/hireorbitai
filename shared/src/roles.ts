@@ -27,24 +27,29 @@ export const OWNER_TIER: Role[] = ['SUPER_ADMIN', 'CEO'];
 export const ADMIN_TIER: Role[] = ['SUPER_ADMIN', 'CEO', 'CTO', 'DIRECTOR'];
 
 /**
- * Admin tier + the group lead (HR_MANAGER).
+ * Admin tier + the group leads (HR_MANAGER and MANAGER).
  *
- * Two roles are intentionally NOT here:
- *  - HR_MANAGER IS here — it's the group lead (scoped to one group via groupScope).
- *  - DEVELOPER — a "scoped super-admin" whose access is **nothing by default**,
- *    granted explicitly per-account via `capabilities` (DEVELOPER_CAPABILITIES +
- *    requireRoleOrCapability).
- *  - MANAGER — **parked**: it has no tier access for now (a valid login that
- *    lands on nothing) until we give it a defined purpose. Re-add it here to
- *    restore manager access.
+ * - HR_MANAGER and MANAGER are the **group leads** — functionally identical:
+ *   each is assigned to ONE group and only sees the people in that group (see
+ *   groupScope + GROUP_LEAD_ROLES). DIRECTOR and above oversee ALL groups.
+ * - DEVELOPER is intentionally NOT here — a "scoped super-admin" whose access is
+ *   **nothing by default**, granted explicitly per-account via `capabilities`
+ *   (DEVELOPER_CAPABILITIES + requireRoleOrCapability).
  */
-export const MANAGER_TIER: Role[] = [...ADMIN_TIER, 'HR_MANAGER'];
+export const MANAGER_TIER: Role[] = [...ADMIN_TIER, 'HR_MANAGER', 'MANAGER'];
 
 /** Manager tier + Recruiter — operates on the talent pipeline. */
 export const OPERATOR_TIER: Role[] = [...MANAGER_TIER, 'RECRUITER'];
 
-/** Every authenticated role. MANAGER + DEVELOPER + CONSULTANT hold no access tier. */
-export const ALL_ROLES: Role[] = [...OPERATOR_TIER, 'MANAGER', 'DEVELOPER', 'CONSULTANT'];
+/** Every authenticated role. DEVELOPER + CONSULTANT hold no access tier. */
+export const ALL_ROLES: Role[] = [...OPERATOR_TIER, 'DEVELOPER', 'CONSULTANT'];
+
+/**
+ * Group leads — confined to their single group by groupScope. DIRECTOR+ (admin
+ * tier) are NOT group-scoped: they oversee every group. Add a role here to make
+ * it group-scoped.
+ */
+export const GROUP_LEAD_ROLES: Role[] = ['HR_MANAGER', 'MANAGER'];
 
 /**
  * DEVELOPER capability catalog — the fixed set of switches a SUPER_ADMIN ticks
