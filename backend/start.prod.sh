@@ -1,8 +1,8 @@
 #!/bin/sh
 # Production startup wrapper for PM2.
-# Sources .env so all variables are in process.env before Node starts.
-# This is more reliable than Node's --env-file flag inside PM2 node_args.
-set -a
-. "$(dirname "$0")/.env"
-set +a
-exec node "$(dirname "$0")/dist/server.js"
+#
+# Use Node 22's built-in --env-file parser rather than `. .env`. Sourcing makes
+# the shell EXECUTE each value, so a secret containing a space / '!' / '#' / '('
+# (all valid for --env-file) breaks the launcher and silently drops or truncates
+# that variable. --env-file parses KEY=VALUE without executing anything.
+exec node --env-file="$(dirname "$0")/.env" "$(dirname "$0")/dist/server.js"

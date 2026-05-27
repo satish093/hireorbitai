@@ -47,8 +47,9 @@ module.exports = {
   apps: [
     {
       name: 'hireorbitai-api',
-      // Shell wrapper sources .env before handing off to Node — more reliable
-      // than --env-file in node_args, which PM2 does not propagate consistently.
+      // Shell wrapper runs `node --env-file=.env` so env vars load via Node's
+      // own parser (handles secrets with spaces/special chars; PM2 doesn't
+      // propagate --env-file in node_args consistently).
       interpreter: '/bin/sh',
       script: 'start.prod.sh',
       cwd: __dirname,
