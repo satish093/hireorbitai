@@ -47,12 +47,13 @@ export const directory: RequestHandler = async (req, res) => {
   const me = req.user;
 
   // Single source of truth — the permission engine resolves who this user is
-  // permitted to reach (manager-tier sees workspace; recruiter sees their
-  // consultants + managers; consultant sees their recruiter + that
-  // recruiter's managers; reports-to chain + existing-thread legitimacy
-  // included). When the engine grows new hierarchy rules, every messaging
-  // surface picks them up automatically — no risk of directory drifting
-  // from the per-endpoint canMessageUser() checks.
+  // permitted to reach (admin-tier sees all active users; manager/HR sees their
+  // recruiters + those recruiters' consultants; recruiter sees their assigned
+  // managers + consultants; consultant sees only their assigned recruiter + that
+  // recruiter's managers). Scope is STRICT assignment-only — there is no
+  // reports-to fallback and no "we already have a thread so it's allowed" carve-
+  // out. The directory and the per-endpoint canMessageUser() checks read the
+  // same engine, so they can't drift.
   const peerIds = await getAccessibleUserIds({ id: me.id, role: me.role });
   if (peerIds.size === 0) {
     res.json([]);
@@ -152,9 +153,10 @@ export const thread: RequestHandler = async (req, res) => {
   if (me === other) throw httpError(400, "Can't chat with yourself");
 
   // Authorize the thread fetch. Without this, any signed-in user could read
-  // any thread by walking UUIDs (the original IDOR). canViewConversation
-  // applies the same hierarchy rules as the directory + lets prior-thread
-  // legitimacy carry over so reassignments don't kill in-flight chats.
+  // any thread by walking UUIDs (the original IDOR). canViewConversation is an
+  // alias for canMessageUser — the SAME strict current-assignment rule as the
+  // directory. There is no prior-thread carve-out: if a reassignment removes the
+  // relationship, the in-flight thread is no longer readable (fail-closed).
   const allowed = await canViewConversation({ id: me, role: req.user.role }, other);
   if (!allowed) {
     audit({

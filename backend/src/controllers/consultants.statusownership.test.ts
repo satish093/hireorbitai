@@ -8,7 +8,10 @@
  * Tests pin:
  *   - RECRUITER updating their own consultant → 200
  *   - RECRUITER blocked from updating another recruiter's consultant → 404
- *   - MANAGER can update any consultant → 200
+ *   - ADMIN_TIER (DIRECTOR) can update any consultant → 200 (unscoped)
+ *   - GROUP LEAD (HR_MANAGER) only within their own group → 200 in-group, 404
+ *     out-of-group (fail-closed) — a lead must not flip an out-of-group
+ *     consultant's marketing status.
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
@@ -134,7 +137,8 @@ const OTHER_CONS = {
 };
 
 const RECRUITER = { id: 'u-recruiter', role: 'RECRUITER' };
-const MANAGER_USER = { id: 'u-manager', role: 'HR_MANAGER' };
+const ADMIN_USER = { id: 'u-dir', role: 'DIRECTOR' };
+const LEAD = { id: 'u-lead', role: 'HR_MANAGER', group_id: 'g1' };
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -160,13 +164,33 @@ describe('consultants.setMarketingStatus — ownership', () => {
     expect(err?.status).toBe(404);
   });
 
-  it('MANAGER can set marketing status on any consultant', async () => {
+  it('ADMIN_TIER (DIRECTOR) can set marketing status on any consultant (unscoped)', async () => {
     mock.rows.consultants = [OTHER_CONS];
-    const { err } = await call(consultants.setMarketingStatus as Handler, MANAGER_USER, {
+    const { err } = await call(consultants.setMarketingStatus as Handler, ADMIN_USER, {
       body: { marketing_status: 'PLACED' },
       params: { id: 'cons-other' },
     });
     expect(err).toBeNull();
+  });
+
+  it('GROUP LEAD can set status on an in-group consultant', async () => {
+    mock.rows.consultants = [OTHER_CONS];
+    mock.rows.users = [{ id: 'u-other-cons' }]; // owner is in the lead's group
+    const { err } = await call(consultants.setMarketingStatus as Handler, LEAD, {
+      body: { marketing_status: 'PLACED' },
+      params: { id: 'cons-other' },
+    });
+    expect(err).toBeNull();
+  });
+
+  it('GROUP LEAD is blocked from an out-of-group consultant (fail-closed → 404)', async () => {
+    mock.rows.consultants = [OTHER_CONS];
+    mock.rows.users = []; // empty group — lead sees nobody
+    const { err } = await call(consultants.setMarketingStatus as Handler, LEAD, {
+      body: { marketing_status: 'PLACED' },
+      params: { id: 'cons-other' },
+    });
+    expect(err?.status).toBe(404);
   });
 
   it('rejects an invalid marketing_status value', async () => {

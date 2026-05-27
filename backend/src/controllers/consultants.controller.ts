@@ -343,16 +343,25 @@ export const setMarketingStatus: RequestHandler = async (req, res) => {
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid status');
 
-  // Non-manager callers (recruiters) can only update their own consultants.
-  if (!isManagerTier(req.user.role)) {
-    const myRecId = await getCallerRecruiterRowId(req.user.id);
+  // Scope the write: admin-tier is unscoped; group leads (HR_MANAGER/MANAGER)
+  // only their own group; recruiters only their own consultants. Mirrors the
+  // ownership pattern in `get`/`update`/`assignRecruiter` above — a group lead
+  // must NOT be able to flip the marketing status of an out-of-group consultant.
+  if (!isAdminTier(req.user.role)) {
     const { data: cons } = await db
       .from('consultants')
-      .select('recruiter_id')
+      .select('recruiter_id, user_id')
       .eq('id', req.params.id)
       .maybeSingle();
-    if (!cons || (cons as { recruiter_id: string | null }).recruiter_id !== myRecId)
-      throw httpError(404, 'Not found');
+    const row = cons as { recruiter_id: string | null; user_id: string | null } | null;
+    if (!row) throw httpError(404, 'Not found');
+    if (isGroupLead(req.user.role)) {
+      if (!row.user_id || !(await leadCanAccessUser(req.user, row.user_id)))
+        throw httpError(404, 'Not found');
+    } else {
+      const myRecId = await getCallerRecruiterRowId(req.user.id);
+      if (row.recruiter_id !== myRecId) throw httpError(404, 'Not found');
+    }
   }
 
   const { data, error } = await db
