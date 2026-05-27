@@ -60,4 +60,26 @@ describe('requireRoleOrCapability', () => {
   it('401s when unauthenticated', () => {
     expect(run(undefined).err?.status).toBe(401);
   });
+
+  it('feature-flag mutation gate (OWNER_TIER) blocks non-owners; admits owners + granted dev', () => {
+    const OWNER: Role[] = ['SUPER_ADMIN', 'CEO'];
+    const gate = (user: any): number => {
+      let passed = false;
+      try {
+        requireRoleOrCapability(OWNER, 'feature_flags')({ user } as any, {} as any, () => {
+          passed = true;
+        });
+      } catch (e) {
+        return (e as { status?: number }).status ?? 0;
+      }
+      return passed ? 200 : 0;
+    };
+    expect(gate({ role: 'MANAGER' })).toBe(403);
+    expect(gate({ role: 'DIRECTOR' })).toBe(403); // admin-tier but not owner
+    expect(gate({ role: 'RECRUITER' })).toBe(403);
+    expect(gate({ role: 'CEO' })).toBe(200);
+    expect(gate({ role: 'SUPER_ADMIN' })).toBe(200);
+    expect(gate({ role: 'DEVELOPER', capabilities: ['feature_flags'] })).toBe(200);
+    expect(gate({ role: 'DEVELOPER', capabilities: [] })).toBe(403);
+  });
 });

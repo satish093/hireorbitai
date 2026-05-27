@@ -39,8 +39,10 @@ export function RecruiterDashboard() {
         description={today}
         action={
           <>
-            <Button variant="outline" onClick={() => navigate('/consultants')}>
-              Add consultant
+            {/* Recruiters can't create consultants directly — they invite them.
+                Route to the invitation flow, not the read-only bench. */}
+            <Button variant="outline" onClick={() => navigate('/invitations')}>
+              Invite consultant
             </Button>
             <Button variant="outline" onClick={() => navigate('/jobs')}>
               Find jobs

@@ -38,6 +38,9 @@ export interface MockProfile {
   must_change_password?: boolean;
   consultant_id?: string | null;
   recruiter_id?: string | null;
+  /** DEVELOPER-only grants. A DEVELOPER reaches a gated surface only if its
+   *  capability string is listed here (mirrors the backend fail-closed gate). */
+  capabilities?: string[];
   /** Set to a timestamp so the first-run ProductTour overlay never auto-opens
    *  over the dashboard (it would otherwise intercept clicks in tests). */
   tour_completed_at?: string | null;
@@ -75,6 +78,19 @@ export const RECRUITER: MockProfile = {
   is_active: true,
   must_change_password: false,
   recruiter_id: 'r-1',
+  tour_completed_at: '2024-01-01T00:00:00.000Z',
+};
+
+/** A DEVELOPER with no capabilities — scoped super-admin with nothing granted.
+ *  Lands on the neutral DeveloperHome, never a business dashboard. Override
+ *  `capabilities` in a spec (via the /auth/me handler) to grant a surface. */
+export const DEVELOPER: MockProfile = {
+  id: 'u-developer',
+  email: 'developer@test.local',
+  full_name: 'Devon Developer',
+  role: 'DEVELOPER',
+  is_active: true,
+  must_change_password: false,
   tour_completed_at: '2024-01-01T00:00:00.000Z',
 };
 

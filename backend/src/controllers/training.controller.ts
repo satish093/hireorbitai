@@ -10,6 +10,17 @@ import { logger } from '../config/logger';
 import { evaluateAchievements, logStudyMinutes } from '../services/trainingAchievements.service';
 import { publishToUser } from '../services/realtime.service';
 
+// ---------------------------------------------------------------------------
+// RBAC POLICY (intentional — roles audit phases 3 & 5): training administration
+// (courses, assignments, reports, feedback) is WORKSPACE-WIDE for the whole
+// MANAGER_TIER, including the group leads (HR_MANAGER / MANAGER). Courses are
+// global org objects and the LMS is a shared workspace function, so training
+// admin is deliberately NOT group-scoped. Learners (CONSULTANT etc.) still only
+// see their own assignments via the assigned_to_user_id ownership checks below.
+// If training admin becomes per-group later, filter listAssignments/reports by
+// managerGroupUserIds and label the UI "Your group's training".
+// ---------------------------------------------------------------------------
+
 function isManagerTier(role?: string): boolean {
   return !!role && (MANAGER_TIER as string[]).includes(role);
 }

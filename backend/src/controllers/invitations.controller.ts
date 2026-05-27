@@ -11,6 +11,7 @@ import {
   wireHierarchy,
 } from '../services/invitationHierarchy.service';
 import { canViewUser } from '../services/permission.service';
+import { assertCanAssignGroup } from '../services/groupScope';
 import { validatePasswordStrength } from '../utils/password';
 import { httpError, ADMIN_TIER, canAssignRole, Role } from '../types';
 
@@ -53,12 +54,7 @@ export const create: RequestHandler = async (req, res) => {
 
   // Group ceiling: admin tier may pre-assign any group; everyone else (group
   // leads + recruiters) may only assign their OWN group or no group at all.
-  if (!(ADMIN_TIER as Role[]).includes(req.user.role)) {
-    const gid = parsed.data.group_id ?? null;
-    if (gid && gid !== (req.user.group_id ?? null)) {
-      throw httpError(403, 'You can only invite users into your own group.');
-    }
-  }
+  assertCanAssignGroup(req.user, parsed.data.group_id ?? null);
 
   // ── Parent assignment ───────────────────────────────────────────────────
   let parentUserId: string | null = null;

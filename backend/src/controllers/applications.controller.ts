@@ -8,6 +8,7 @@ import {
   isAdminTier,
   isGroupLead,
   leadCanAccessConsultant,
+  assertCanAccessConsultant,
 } from '../services/groupScope';
 
 // ---------------------------------------------------------------------------
@@ -37,42 +38,10 @@ async function getCallerConsultantRowId(userId: string): Promise<string | null> 
   return (data as { id?: string } | null)?.id ?? null;
 }
 
-/**
- * Assert the caller may act on (create/check/submit for) the given consultant:
- *   - ADMIN_TIER  → unscoped
- *   - GROUP LEAD  → only consultants in their group
- *   - RECRUITER   → only their assigned consultants
- *   - CONSULTANT  → only themselves
- * Throws 403 otherwise. Fail-closed for any other role.
- */
-async function assertCanActOnConsultant(
-  caller: { id: string; role: Role; group_id?: string | null },
-  consultantId: string,
-): Promise<void> {
-  if (isAdminTier(caller.role)) return;
-  if (isGroupLead(caller.role)) {
-    if (await leadCanAccessConsultant(caller, consultantId)) return;
-    throw httpError(403, 'Forbidden');
-  }
-  if (caller.role === 'RECRUITER') {
-    const myRecId = await getCallerRecruiterRowId(caller.id);
-    if (!myRecId) throw httpError(403, 'Forbidden');
-    const { data: cons } = await db
-      .from('consultants')
-      .select('id')
-      .eq('id', consultantId)
-      .eq('recruiter_id', myRecId)
-      .maybeSingle();
-    if (!cons) throw httpError(403, 'Forbidden');
-    return;
-  }
-  if (caller.role === 'CONSULTANT') {
-    const myConsId = await getCallerConsultantRowId(caller.id);
-    if (myConsId !== consultantId) throw httpError(403, 'Forbidden');
-    return;
-  }
-  throw httpError(403, 'Forbidden');
-}
+// Consultant-scope for create/checkDuplicate/fromJob is the canonical shared
+// guard (admin unscoped; group lead → own group; recruiter → own consultants;
+// consultant → self) — see services/groupScope.assertCanAccessConsultant.
+const assertCanActOnConsultant = assertCanAccessConsultant;
 
 interface ApplicationOwnership {
   id: string;

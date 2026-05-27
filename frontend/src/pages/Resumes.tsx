@@ -11,10 +11,16 @@ import { CenterPane } from '../components/resumes/CenterPane';
 import { TailorLauncher } from '../components/resumes/TailorLauncher';
 import { AiProgressCard } from '../components/AiProgressCard';
 import { useResumeWorkspace } from '../components/resumes/useResumeWorkspace';
+import { useAuth } from '../context/AuthContext';
+import { ADMIN_TIER } from '../types';
 
 export function Resumes() {
   const w = useResumeWorkspace();
   const navigate = useNavigate();
+  const { profile } = useAuth();
+  // Only admin tier can reach /admin/users; everyone else (recruiters, group
+  // leads) provisions consultants through the invitation flow.
+  const canManageUsers = !!profile && (ADMIN_TIER as readonly string[]).includes(profile.role);
   const [launcherOpen, setLauncherOpen] = useState(false);
   const { active, versions, consultantId } = w;
 
@@ -78,14 +84,22 @@ export function Resumes() {
           title={w.consultants.length === 0 ? 'No consultants yet' : 'Pick a consultant'}
           description={
             w.consultants.length === 0
-              ? 'No consultant profiles exist. Invite a consultant from the Users page first.'
+              ? canManageUsers
+                ? 'No consultant profiles exist yet. Invite a consultant from the Users page first.'
+                : 'No consultant profiles exist yet. Invite a consultant to get started.'
               : 'Select a consultant above to open their resumes.'
           }
           action={
             w.consultants.length === 0 ? (
-              <Button variant="accent" size="md" onClick={() => navigate('/admin/users')}>
-                Go to Users
-              </Button>
+              canManageUsers ? (
+                <Button variant="accent" size="md" onClick={() => navigate('/admin/users')}>
+                  Go to Users
+                </Button>
+              ) : (
+                <Button variant="accent" size="md" onClick={() => navigate('/invitations')}>
+                  Invite a consultant
+                </Button>
+              )
             ) : undefined
           }
         />

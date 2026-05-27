@@ -3,6 +3,17 @@ import { z } from 'zod';
 import { db, pool } from '../config/db';
 import { httpError, MANAGER_TIER } from '../types';
 
+// ---------------------------------------------------------------------------
+// RBAC POLICY (intentional — roles audit phases 3 & 5): reports analytics are
+// WORKSPACE-WIDE for the whole MANAGER_TIER, including the group leads
+// (HR_MANAGER / MANAGER). They are aggregate org metrics over global objects
+// (recruiter activity, placements, pipeline), NOT per-group PII reads, so they
+// are deliberately NOT group-scoped. The group-scoped surface is the PII
+// pipeline (consultants / applications / resumes / interviews / tasks). If this
+// becomes per-group later, add managerGroup* filters to every query here and a
+// "Your group" label in the UI.
+// ---------------------------------------------------------------------------
+
 const upsertDailySchema = z
   .object({
     recruiter_id: z.string().uuid(),

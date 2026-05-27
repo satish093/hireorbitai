@@ -64,7 +64,12 @@ vi.mock('../config/logger', () => ({
 }));
 
 // AFTER the mocks are registered.
-import { assertOutranks, assertNotLastSuperAdmin, ROLE_RANK } from './adminUsers.controller';
+import {
+  assertOutranks,
+  assertNotLastSuperAdmin,
+  ROLE_RANK,
+  impersonate,
+} from './adminUsers.controller';
 
 function setupUsers(rows: Record<string, unknown>[]) {
   mock.handlers.clear();
@@ -131,6 +136,27 @@ describe('assertOutranks', () => {
       'CONSULTANT',
     ] as const) {
       expect(() => assertOutranks({ role: 'SUPER_ADMIN' }, target)).not.toThrow();
+    }
+  });
+});
+
+describe('impersonate — SUPER_ADMIN only', () => {
+  async function callImpersonate(role: string): Promise<number | undefined> {
+    try {
+      await (impersonate as any)(
+        { user: { id: 'actor', role, email: 'a@x.test' }, params: { id: 'target' } },
+        { status: () => ({ json: () => undefined }), json: () => undefined },
+        () => undefined,
+      );
+      return undefined;
+    } catch (e) {
+      return (e as { status?: number }).status;
+    }
+  }
+
+  it('403s every non-SUPER_ADMIN caller (incl. admin-tier)', async () => {
+    for (const role of ['CEO', 'CTO', 'DIRECTOR', 'HR_MANAGER', 'MANAGER', 'RECRUITER']) {
+      expect(await callImpersonate(role)).toBe(403);
     }
   });
 });
