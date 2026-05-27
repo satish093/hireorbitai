@@ -13,7 +13,7 @@ import { useAuth } from '../context/AuthContext';
 import { ROLE_LABEL, type Role } from '../types';
 import { listDevUsers, loginAsUser, type DevUser } from './devSession';
 
-const QUICK_ROLES: Role[] = ['SUPER_ADMIN', 'MANAGER', 'RECRUITER', 'CONSULTANT'];
+const QUICK_ROLES: Role[] = ['SUPER_ADMIN', 'HR_MANAGER', 'RECRUITER', 'CONSULTANT'];
 
 export function DevToolbar() {
   const { profile, signOut } = useAuth();
