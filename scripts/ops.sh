@@ -31,12 +31,9 @@ MIGRATE_PATH="${RCLONE_REMOTE}:${RCLONE_DEST}/migrate"
 PM2_NAME="${PM2_NAME:-hireorbitai-api}"
 CANARY_TABLES=(users recruiters consultants jobs applications)
 
-load_env() {
-  if [[ -f "$ENV_FILE" ]]; then
-    # shellcheck disable=SC1090
-    set -a; source "$ENV_FILE"; set +a
-  fi
-}
+# Safe .env parsing (never executes values — see lib-env.sh). Provides load_env.
+# shellcheck source=scripts/lib-env.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lib-env.sh"
 
 require_rclone() {
   if ! command -v rclone >/dev/null 2>&1; then

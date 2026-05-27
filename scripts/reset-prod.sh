@@ -43,10 +43,9 @@ if [[ "${CONFIRM:-}" != "ERASE-PRODUCTION" ]]; then
   exit 2
 fi
 
-if [[ -f "$ENV_FILE" ]]; then
-  # shellcheck disable=SC1090
-  set -a; source "$ENV_FILE"; set +a
-fi
+# shellcheck source=scripts/lib-env.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lib-env.sh"
+load_env
 : "${DATABASE_URL:?DATABASE_URL not set (and backend/.env did not define it)}"
 UPLOADS_DIR="${UPLOADS_DIR:-/var/lib/hireorbitai/uploads}"
 
