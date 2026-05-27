@@ -119,7 +119,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const s = getSession();
     setLocalSession(s);
     if (s) {
-      loadProfile().finally(() => {
+      // Cap the bootstrap. /auth/me has no per-request timeout, so if the
+      // backend is down or restarting the call can hang indefinitely — which
+      // would pin the whole app on ProtectedRoute's "Loading…" gate forever.
+      // Resolve the loading state within 8s no matter what; ProtectedRoute then
+      // routes (to /login once the session clears, or /unauthorized if a token
+      // is present but currently unverifiable). loadProfile keeps running in the
+      // background and fills the profile in if /auth/me eventually answers.
+      const cap = new Promise<void>((resolve) => setTimeout(resolve, 8_000));
+      void Promise.race([loadProfile(), cap]).finally(() => {
         if (!cancelled) setLoading(false);
       });
     } else {
