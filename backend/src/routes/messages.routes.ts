@@ -22,6 +22,7 @@ messagesRouter.post('/', c.send);
 
 messagesRouter.get('/with/:userId', c.thread);
 messagesRouter.post('/with/:userId/read', c.markRead);
+messagesRouter.post('/with/:userId/typing', c.typing);
 
 // Sender-initiated retract + edit. Authorization (sender_id match) is
 // enforced inside the controller via a composite WHERE so a forged id

@@ -69,6 +69,12 @@ interface Conversation {
 // drops the per-tab steady-state load from ~45 req/min to ~9 req/min.
 const THREAD_POLL_MS = 8_000; // active thread only
 const SIDEBAR_POLL_MS = 60_000; // conversations + directory
+// Typing-indicator cadence + auto-clear. We ping the server at most once
+// per PING window while the user is actively typing; the recipient
+// silences the indicator after CLEAR ms of no follow-up event so a
+// dropped "stop typing" never leaves the indicator stuck.
+const TYPING_PING_MS = 2_500;
+const TYPING_CLEAR_MS = 3_500;
 
 export function Messages() {
   const { profile } = useAuth();
@@ -94,6 +100,17 @@ export function Messages() {
   // lines, then scrolls internally. Kills the "tiny one-line box for a
   // 3-paragraph message" feeling that single-row textareas have.
   const composerRef = useRef<HTMLTextAreaElement>(null);
+  // "X is typing…" indicator state for the active peer. Set when we
+  // receive a message:typing SSE event from the active peer; auto-clears
+  // after ~3.5s of no follow-up event. We also clear immediately when a
+  // real message:new arrives from them, so the indicator doesn't flash
+  // for a beat after the message lands.
+  const [peerTyping, setPeerTyping] = useState(false);
+  const peerTypingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Local throttle so we don't POST /typing on every keystroke — once
+  // every TYPING_PING_MS while text is being entered is plenty (server
+  // re-fires the SSE each time; the recipient's auto-clear keeps it live).
+  const lastTypingPingRef = useRef<number>(0);
   // True when the backend returned 403 for the currently-targeted thread.
   // Triggers the "you no longer have access" panel + suppresses message-
   // polling for the denied peer until the user picks a different peer.
@@ -323,7 +340,37 @@ export function Messages() {
       setMessages((arr) => arr.filter((x) => x.id !== id));
       void refresh();
     },
+    'message:typing': (raw) => {
+      const p = (raw ?? {}) as { from_user_id?: string };
+      // Only render the indicator for the open thread. Cross-thread
+      // typing pings still arrive but are ignored (the conversation
+      // list could surface them in a future pass — out of scope here).
+      if (!activePeerId || p.from_user_id !== activePeerId) return;
+      setPeerTyping(true);
+      if (peerTypingTimerRef.current) clearTimeout(peerTypingTimerRef.current);
+      peerTypingTimerRef.current = setTimeout(() => setPeerTyping(false), TYPING_CLEAR_MS);
+    },
   });
+
+  // When a real message arrives from the peer, kill the typing indicator
+  // immediately — leaving "Sarah is typing…" up for half a second after
+  // her message lands looks broken.
+  useEffect(() => {
+    if (!activePeerId) return;
+    const last = messages[messages.length - 1];
+    if (last?.sender_id === activePeerId) {
+      setPeerTyping(false);
+      if (peerTypingTimerRef.current) clearTimeout(peerTypingTimerRef.current);
+    }
+  }, [messages, activePeerId]);
+
+  // Cleanup on unmount / peer change so a stale timer can't fire into a
+  // dead component.
+  useEffect(() => {
+    return () => {
+      if (peerTypingTimerRef.current) clearTimeout(peerTypingTimerRef.current);
+    };
+  }, []);
 
   // Auto-scroll only when the user is already near the bottom.
   useEffect(() => {
@@ -830,12 +877,24 @@ export function Messages() {
                     <div ref={messagesEndRef} />
                   </div>
 
+                  {/* Typing indicator — only visible to the recipient of
+                      a freshly-typed character. Auto-clears after
+                      TYPING_CLEAR_MS or as soon as a real message:new
+                      arrives from the peer (see the useEffect on
+                      messages above). Sits flush above the composer so
+                      it doesn't push the chat history. */}
+                  {peerTyping && activePeer && (
+                    <div className="border-t border-border px-5 py-1.5 bg-surface text-[11px] text-muted flex items-center gap-1.5">
+                      <TypingDots />
+                      <span>{activePeer.full_name?.trim() || activePeer.email} is typing…</span>
+                    </div>
+                  )}
                   <form
                     onSubmit={(e) => {
                       e.preventDefault();
                       send();
                     }}
-                    className="border-t border-border bg-surface"
+                    className={clsx('bg-surface', peerTyping ? '' : 'border-t border-border')}
                   >
                     {/* Staged-attachments strip — shown above the composer
                         while files are pending. Image attachments show a
@@ -876,7 +935,20 @@ export function Messages() {
                       <textarea
                         ref={composerRef}
                         value={draft}
-                        onChange={(e) => setDraft(e.target.value)}
+                        onChange={(e) => {
+                          setDraft(e.target.value);
+                          // Throttled typing-ping: at most once per
+                          // TYPING_PING_MS while the field is non-empty.
+                          // The recipient's auto-clear keeps the indicator
+                          // live; we don't need to fire a "stopped typing"
+                          // explicitly. Tolerates network errors silently
+                          // (typing indicator is best-effort UX).
+                          if (!activePeerId || !e.target.value.trim()) return;
+                          const now = Date.now();
+                          if (now - lastTypingPingRef.current < TYPING_PING_MS) return;
+                          lastTypingPingRef.current = now;
+                          api.post(`/messages/with/${activePeerId}/typing`).catch(() => {});
+                        }}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' && !e.shiftKey) {
                             e.preventDefault();
@@ -1089,6 +1161,40 @@ function Bubble({
         )}
       </div>
     </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Three-dot bouncing animation for the "X is typing…" indicator. Plain CSS
+// (no extra dep) — three spans with a shared @keyframes that runs at the
+// same 1.4s cycle but staggered by 0.2s each.
+// ─────────────────────────────────────────────────────────────────────────────
+function TypingDots() {
+  return (
+    <>
+      <style>{`
+        @keyframes ho-typing-bounce {
+          0%, 60%, 100% { transform: translateY(0); opacity: 0.45; }
+          30%           { transform: translateY(-2px); opacity: 1; }
+        }
+        .ho-typing-dot {
+          display: inline-block;
+          width: 4px;
+          height: 4px;
+          margin-right: 2px;
+          border-radius: 50%;
+          background: currentColor;
+          animation: ho-typing-bounce 1.4s infinite ease-in-out;
+        }
+        .ho-typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .ho-typing-dot:nth-child(3) { animation-delay: 0.4s; }
+      `}</style>
+      <span aria-hidden className="inline-flex items-center">
+        <span className="ho-typing-dot" />
+        <span className="ho-typing-dot" />
+        <span className="ho-typing-dot" />
+      </span>
+    </>
   );
 }
 

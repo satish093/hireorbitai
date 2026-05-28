@@ -208,6 +208,34 @@ export const thread: RequestHandler = async (req, res) => {
   res.json(withAttachments);
 };
 
+/**
+ * POST /messages/with/:userId/typing — emit a transient "the caller is
+ * typing" SSE event to the peer. Fire-and-forget; no DB write, no audit.
+ *
+ * Authorization mirrors messages.send — without it any signed-in user could
+ * spam typing indicators at arbitrary peers (effectively a low-grade
+ * harassment + side-channel that reveals the peer is online).
+ *
+ * Client throttles itself (one POST per few seconds while text is being
+ * entered); the recipient's UI auto-clears the indicator after a short
+ * timeout, so a dropped "stop typing" never leaves the bubble stuck.
+ */
+export const typing: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const other = req.params.userId;
+  if (other === req.user.id) {
+    res.json({ ok: true });
+    return;
+  }
+  const allowed = await canMessageUser(
+    { id: req.user.id, role: req.user.role, group_id: req.user.group_id ?? null },
+    other,
+  );
+  if (!allowed) throw httpError(403, 'You cannot message this user.');
+  void publishToUser(other, 'message:typing', { from_user_id: req.user.id });
+  res.json({ ok: true });
+};
+
 /** POST /messages/with/:userId/read — mark all messages FROM :userId as read */
 export const markRead: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
