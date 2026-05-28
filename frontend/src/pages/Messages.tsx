@@ -106,7 +106,32 @@ export function Messages() {
       const r = await api.get(`/messages/with/${peerId}`);
       // Only apply if this response still matches the active peer.
       if (inflightPeerRef.current !== peerId) return;
-      setMessages(r.data ?? []);
+      // Merge, don't replace. Two races otherwise:
+      //   1) The user fires off a send, the optimistic tmp- row is in
+      //      local state, the poll fires the same tick — the poll
+      //      snapshot was generated BEFORE the POST hit the DB, so its
+      //      response doesn't include the new message. Plain replace
+      //      would wipe the optimistic row and the message would
+      //      "disappear" until the next poll.
+      //   2) A realtime message:new arrives during the poll's network
+      //      roundtrip — the SSE handler already inserted it locally,
+      //      but the poll snapshot was taken before the server row
+      //      existed. Plain replace would wipe it.
+      // Fix: take the server snapshot as authoritative for real-id
+      // rows, then append back any LOCAL rows the snapshot didn't
+      // know about — namely tmp- rows still in flight, plus any
+      // real-id rows the server hadn't seen yet at snapshot time.
+      const snapshot = (r.data ?? []) as Message[];
+      setMessages((prev) => {
+        const ids = new Set(snapshot.map((x) => x.id));
+        const missing = prev.filter((x) => !ids.has(x.id));
+        if (missing.length === 0) return snapshot;
+        // Re-sort by created_at so a late-arriving local row interleaves
+        // correctly with the snapshot.
+        return [...snapshot, ...missing].sort(
+          (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+        );
+      });
       setAccessDenied(false);
       // Best-effort mark-read (no toast on failure). Skipping when access
       // is denied so we don't fire a guaranteed-403 follow-up call.
@@ -224,14 +249,33 @@ export function Messages() {
     'message:new': (raw) => {
       const m = raw as Message;
       // Active-thread merge — only if this message belongs to the open
-      // conversation. Skip if we already have it (an optimistic local
-      // insert from our own send call may have beaten the push).
+      // conversation.
       if (
         activePeerId &&
         ((m.sender_id === activePeerId && m.recipient_id === profile?.id) ||
           (m.recipient_id === activePeerId && m.sender_id === profile?.id))
       ) {
-        setMessages((arr) => (arr.some((x) => x.id === m.id) ? arr : [...arr, m]));
+        setMessages((arr) => {
+          // 1. Already have it (POST response beat the SSE — dedupe by id).
+          if (arr.some((x) => x.id === m.id)) return arr;
+          // 2. Our own message, SSE beat the POST response. There's a
+          //    tmp- row in the array with the same body; swap it for
+          //    the real server row instead of appending a duplicate.
+          //    Without this the user sees their message TWICE (once as
+          //    optimistic, once as the SSE-delivered server row) until
+          //    the next poll merges things back together.
+          if (m.sender_id === profile?.id) {
+            const tmpIdx = arr.findIndex(
+              (x) => x.id.startsWith('tmp-') && x.body === m.body && x.sender_id === m.sender_id,
+            );
+            if (tmpIdx >= 0) {
+              const next = arr.slice();
+              next[tmpIdx] = m;
+              return next;
+            }
+          }
+          return [...arr, m];
+        });
         stickToBottomRef.current = true;
       }
       // Refresh the sidebar so the conversation list reorders + the
@@ -291,13 +335,20 @@ export function Messages() {
     setDraft('');
     stickToBottomRef.current = true;
     try {
-      // Replace the optimistic tmp-id row with the real server message
-      // BEFORE the realtime push can arrive. The SSE handler dedupes by
-      // message id, so if the real id is already in the array by the time
-      // the push lands, it short-circuits and we don't render a duplicate.
+      // The server fans out a message:new SSE to both ends, so by the
+      // time this resolves the SSE may have ALREADY swapped the tmp-
+      // row for the real one (see the 'message:new' handler's
+      // "SSE beat the POST response" branch). Be idempotent: if a row
+      // with the saved id is already present, drop the tmp- row and
+      // leave the SSE-delivered one in place. Otherwise do the swap.
       const res = await api.post('/messages', { recipient_id: activePeerId, body });
       const saved = res.data as Message;
-      setMessages((m) => m.map((x) => (x.id === optimistic.id ? saved : x)));
+      setMessages((m) => {
+        if (m.some((x) => x.id === saved.id)) {
+          return m.filter((x) => x.id !== optimistic.id);
+        }
+        return m.map((x) => (x.id === optimistic.id ? saved : x));
+      });
       // Refresh the conversation list (reorder, unread counts) but skip
       // loadThread — the optimistic row is now the canonical row, and any
       // peer message that arrived in the same window already came in via
@@ -521,9 +572,7 @@ export function Messages() {
                     {activePeer.role && ROLE_LABEL[activePeer.role]} · {activePeer.email}
                   </div>
                 </div>
-                {/* Header actions — visual affordances matching a standard chat
-                    header. Call/video are placeholders (no telephony backend);
-                    search toggles the chat-list search box focus. */}
+                {/* Call buttons — disabled while already in a call */}
                 <div className="ml-auto flex items-center gap-1 text-muted">
                   <Button
                     type="button"
@@ -531,7 +580,18 @@ export function Messages() {
                     size="sm"
                     iconOnly
                     leftIcon={<IconVideo size={18} />}
-                    title="Video call (coming soon)"
+                    title="Video call"
+                    disabled={call.status !== 'idle'}
+                    onClick={() =>
+                      call
+                        .startCall(
+                          activePeer.id,
+                          activePeer.full_name ?? null,
+                          activePeer.email,
+                          'video',
+                        )
+                        .catch((e: Error) => toast.error(e.message))
+                    }
                   />
                   <Button
                     type="button"
@@ -539,7 +599,18 @@ export function Messages() {
                     size="sm"
                     iconOnly
                     leftIcon={<IconPhone size={18} />}
-                    title="Voice call (coming soon)"
+                    title="Voice call"
+                    disabled={call.status !== 'idle'}
+                    onClick={() =>
+                      call
+                        .startCall(
+                          activePeer.id,
+                          activePeer.full_name ?? null,
+                          activePeer.email,
+                          'audio',
+                        )
+                        .catch((e: Error) => toast.error(e.message))
+                    }
                   />
                 </div>
               </header>
@@ -690,6 +761,23 @@ export function Messages() {
           )}
         </main>
       </div>
+
+      {/* Call modal — portaled to document.body, visible when a call is active */}
+      <CallModal
+        status={call.status}
+        callType={call.callType}
+        peer={call.peer}
+        incomingCall={call.incomingCall}
+        localStream={call.localStream}
+        remoteStream={call.remoteStream}
+        isMuted={call.isMuted}
+        isCameraOff={call.isCameraOff}
+        onAccept={call.acceptCall}
+        onReject={call.rejectCall}
+        onEnd={call.endCall}
+        onToggleMute={call.toggleMute}
+        onToggleCamera={call.toggleCamera}
+      />
     </Layout>
   );
 }
