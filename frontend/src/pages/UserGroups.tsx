@@ -36,16 +36,39 @@ export function UserGroups() {
   async function load() {
     setLoading(true);
     try {
-      const [g, cons, recs] = await Promise.all([
+      // /admin/users is the authoritative source — it returns every user with
+      // role + group_id, including MANAGER / HR_MANAGER / admin-tier rows the
+      // old /consultants + /recruiters roster missed (which made group leads
+      // invisible in their own group's member list). This page is admin-gated
+      // (allow=ADMIN_TIER + capability 'users' on /admin/groups), so the call
+      // always succeeds; the legacy roster endpoints stay as a fallback only.
+      const [g, admins, cons, recs] = await Promise.all([
         api.get('/user-groups'),
+        // /admin/users returns { rows, total, page, page_size }. Default page
+        // size is 50; request the max (200) so a small/mid org loads in one
+        // call. Anything bigger will need page-walking, but pre-200 orgs work.
+        api
+          .get('/admin/users', { params: { page_size: 200 } })
+          .catch(() => ({ data: { rows: [] } })),
         api.get('/consultants').catch(() => ({ data: [] })),
         api.get('/recruiters').catch(() => ({ data: [] })),
       ]);
       setGroups(g.data ?? []);
-      // Merge users from both consultants and recruiters lists (each row has
-      // an embedded user). De-dupe by user id so a person who shows up in
-      // both rosters isn't listed twice.
+      // De-dupe by user id; /admin/users wins because it's pushed first.
       const seen = new Map<string, UserLite>();
+      const pushUsers = (rows: any[]) => {
+        for (const u of rows ?? []) {
+          const id = u?.id;
+          if (!id || seen.has(id)) continue;
+          seen.set(id, {
+            id,
+            email: u.email ?? '',
+            full_name: u.full_name ?? null,
+            role: u.role ?? 'UNKNOWN',
+            group_id: u.group_id ?? null,
+          });
+        }
+      };
       const pushFromRoster = (rows: any[], defaultRole: string) => {
         for (const row of rows ?? []) {
           const u = row.user;
@@ -60,6 +83,7 @@ export function UserGroups() {
           });
         }
       };
+      pushUsers(admins.data?.rows ?? []);
       pushFromRoster(cons.data ?? [], 'CONSULTANT');
       pushFromRoster(recs.data ?? [], 'RECRUITER');
       setUsers(Array.from(seen.values()));
