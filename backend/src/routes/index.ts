@@ -22,6 +22,7 @@ import { aiRouter } from './ai.routes';
 import { tasksRouter } from './tasks.routes';
 import { taskViewsRouter } from './taskViews.routes';
 import { messagesRouter } from './messages.routes';
+import { callsRouter } from './calls.routes';
 import { realtimeRouter } from './realtime.routes';
 import * as realtimeCtl from '../controllers/realtime.controller';
 import { featureFlagsRouter } from './featureFlags.routes';
@@ -150,6 +151,8 @@ router.use(
   requireFeature('messages'),
   messagesRouter,
 );
+// Calls share the same permission model as messages (same hierarchy, same feature flag).
+router.use('/calls', requireRole(...MESSAGING_ROLES), requireFeature('messages'), callsRouter);
 router.use('/training', requireRole(...BUSINESS_ROLES), requireFeature('training'), trainingRouter);
 
 // Realtime SSE stream — generic push channel used by messages,

@@ -201,3 +201,28 @@ export const IconLogOut = ({ size, strokeWidth, ...p }: IconProps) => (
     <path d="M16 17l5-5-5-5M21 12H9" />
   </svg>
 );
+export const IconMic = ({ size, strokeWidth, ...p }: IconProps) => (
+  <svg {...base(size, strokeWidth)} {...p}>
+    <rect x="9" y="2" width="6" height="12" rx="3" />
+    <path d="M5 10a7 7 0 0 0 14 0M12 19v3M8 22h8" />
+  </svg>
+);
+export const IconMicOff = ({ size, strokeWidth, ...p }: IconProps) => (
+  <svg {...base(size, strokeWidth)} {...p}>
+    <line x1="2" y1="2" x2="22" y2="22" />
+    <path d="M18.89 13.23A7 7 0 0 0 19 12M5 10a7 7 0 0 0 12.66 4.14M15 9.34V6a3 3 0 0 0-5.68-1.33M9 9v3a3 3 0 0 0 5.12 2.12M12 19v3M8 22h8" />
+  </svg>
+);
+export const IconCameraOff = ({ size, strokeWidth, ...p }: IconProps) => (
+  <svg {...base(size, strokeWidth)} {...p}>
+    <line x1="2" y1="2" x2="22" y2="22" />
+    <path d="M7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h12a2 2 0 0 0 1.8-1.1M9.5 5H16a2 2 0 0 1 2 2v4.5M22 8l-6 4 6 4V8z" />
+  </svg>
+);
+export const IconPhoneOff = ({ size, strokeWidth, ...p }: IconProps) => (
+  <svg {...base(size, strokeWidth)} {...p}>
+    <path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.84.57 2.8.7a2 2 0 0 1 1.73 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07" />
+    <path d="M13.32 10.68A16 16 0 0 0 6.1 4.69M2 2l20 20" />
+    <path d="M6.6 6.6A19.5 19.5 0 0 0 3.07 8.67 2 2 0 0 0 2 10.72v3a2 2 0 0 0 1.72 2c.97.13 1.9.36 2.8.7a2 2 0 0 1 2.11-.45l.01-.01" />
+  </svg>
+);

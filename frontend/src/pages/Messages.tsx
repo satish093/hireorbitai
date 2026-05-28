@@ -7,11 +7,10 @@ import { GroupBadge } from '../components/GroupBadge';
 import { Button } from '../components/Button';
 import { IconSearch, IconVideo, IconPhone, IconSend } from '../components/Icons';
 import { NotificationToggle } from '../components/NotificationToggle';
-import { CallModal } from '../components/CallModal';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useRealtime } from '../hooks/useRealtime';
-import { useCall } from '../hooks/useCall';
+import { useCallContext } from '../context/CallContext';
 import { Role, ROLE_LABEL } from '../types';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
@@ -78,8 +77,8 @@ export function Messages() {
   // Monotonic counter so the optimistic id is unique even within the same ms.
   const tmpIdRef = useRef(0);
 
-  // WebRTC call state machine — handles outbound/inbound, signaling via SSE.
-  const call = useCall();
+  // Call state comes from the global CallProvider (mounted in App.tsx).
+  const call = useCallContext();
 
   // Pulls conversations + active thread on a poll.
   const refresh = useCallback(async () => {
@@ -292,7 +291,6 @@ export function Messages() {
       setMessages((arr) => arr.filter((x) => x.id !== id));
       void refresh();
     },
-    ...call.realtimeHandlers,
   });
 
   // Auto-scroll only when the user is already near the bottom.
@@ -761,23 +759,6 @@ export function Messages() {
           )}
         </main>
       </div>
-
-      {/* Call modal — portaled to document.body, visible when a call is active */}
-      <CallModal
-        status={call.status}
-        callType={call.callType}
-        peer={call.peer}
-        incomingCall={call.incomingCall}
-        localStream={call.localStream}
-        remoteStream={call.remoteStream}
-        isMuted={call.isMuted}
-        isCameraOff={call.isCameraOff}
-        onAccept={call.acceptCall}
-        onReject={call.rejectCall}
-        onEnd={call.endCall}
-        onToggleMute={call.toggleMute}
-        onToggleCamera={call.toggleCamera}
-      />
     </Layout>
   );
 }

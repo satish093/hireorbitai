@@ -6,6 +6,7 @@ import { AppChrome } from './components/AppChrome';
 import { FeatureGuard } from './hooks/useFeatureFlags';
 import { RealtimeNotifications } from './components/RealtimeNotifications';
 import { ProductTour } from './components/ProductTour';
+import { CallProvider } from './context/CallContext';
 import { useAuth } from './context/AuthContext';
 import { useSessionRevoke } from './hooks/useSessionRevoke';
 import { config } from './config/env';
@@ -265,455 +266,457 @@ export default function App() {
   }, [profile?.id]);
 
   return (
-    <Suspense fallback={<RouteFallback />}>
-      {profile?.id && <RealtimeNotifications key={profile.id} />}
-      {profile?.id && <ProductTour />}
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/reset-password" element={<ResetPassword />} />
-        <Route path="/unauthorized" element={<Unauthorized />} />
-        <Route path="/invite/accept" element={<AcceptInvitation />} />
+    <CallProvider>
+      <Suspense fallback={<RouteFallback />}>
+        {profile?.id && <RealtimeNotifications key={profile.id} />}
+        {profile?.id && <ProductTour />}
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/unauthorized" element={<Unauthorized />} />
+          <Route path="/invite/accept" element={<AcceptInvitation />} />
 
-        {/* Forced password change — protected so we know who's rotating, but
+          {/* Forced password change — protected so we know who's rotating, but
           bypasses the must_change_password gate to avoid an infinite redirect. */}
-        <Route
-          path="/change-password"
-          element={
-            <ProtectedRoute bypassPasswordChange bypassOnboarding>
-              <ChangePassword />
-            </ProtectedRoute>
-          }
-        />
+          <Route
+            path="/change-password"
+            element={
+              <ProtectedRoute bypassPasswordChange bypassOnboarding>
+                <ChangePassword />
+              </ProtectedRoute>
+            }
+          />
 
-        {/* Persistent app shell — the sidebar lives in <AppChrome> and stays
+          {/* Persistent app shell — the sidebar lives in <AppChrome> and stays
             mounted across every navigation below (no more reload/scroll jump). */}
-        <Route element={<AppChrome />}>
-          <Route
-            path="/onboarding/consultant"
-            element={
-              <ProtectedRoute allow={['CONSULTANT']} bypassOnboarding>
-                <ConsultantOnboarding />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/onboarding/recruiter"
-            element={
-              <ProtectedRoute allow={['RECRUITER']} bypassOnboarding>
-                <RecruiterOnboarding />
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute>
-                <DashboardRouter />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/consultants"
-            element={
-              <ProtectedRoute allow={OPERATOR_TIER}>
-                <Consultants />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/recruiters"
-            element={
-              <ProtectedRoute allow={MANAGER_TIER}>
-                <Recruiters />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/managers"
-            element={
-              <ProtectedRoute allow={MANAGER_TIER}>
-                <Managers />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/jobs"
-            element={
-              <ProtectedRoute allow={OPERATOR_TIER}>
-                <JobSearch />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/jobs/:id"
-            element={
-              <ProtectedRoute allow={OPERATOR_TIER}>
-                <JobDetail />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/applications"
-            element={
-              <ProtectedRoute allow={OPERATOR_TIER}>
-                <Applications />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/interviews"
-            element={
-              <ProtectedRoute allow={BUSINESS_ROLES}>
-                <FeatureGuard feature="interviews">
-                  <Interviews />
-                </FeatureGuard>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/calendar"
-            element={
-              <ProtectedRoute allow={BUSINESS_ROLES}>
-                <Calendar />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/resumes"
-            element={
-              <ProtectedRoute allow={OPERATOR_TIER}>
-                <Resumes />
-              </ProtectedRoute>
-            }
-          />
-          {/* Consultant self-service: a dedicated page so the resume upload is
-              one click from the sidebar, not buried on the dashboard. */}
-          <Route
-            path="/my-resume"
-            element={
-              <ProtectedRoute allow={['CONSULTANT']}>
-                <MyResume />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/vendors"
-            element={
-              <ProtectedRoute allow={OPERATOR_TIER}>
-                <Vendors />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/clients"
-            element={
-              <ProtectedRoute allow={OPERATOR_TIER}>
-                <Clients />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/reminders"
-            element={
-              <ProtectedRoute allow={BUSINESS_ROLES}>
-                <FeatureGuard feature="reminders">
-                  <Reminders />
-                </FeatureGuard>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/ai-email"
-            element={
-              <ProtectedRoute allow={OPERATOR_TIER}>
-                <FeatureGuard feature="ai_email">
-                  <AIEmail />
-                </FeatureGuard>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/ai-usage"
-            element={
-              <ProtectedRoute allow={MANAGER_TIER} capability="ai_usage">
-                <AIUsage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/reports"
-            element={
-              // RECRUITER may open /reports for their OWN submissions + daily
-              // numbers (backend gates each endpoint and self-scopes the rows
-              // inside the controller). The page itself filters the visible
-              // tabs to "Submissions" + "Daily log" for a recruiter — full
-              // analytics tabs stay manager-tier only.
-              <ProtectedRoute allow={OPERATOR_TIER} capability="reports">
-                <FeatureGuard feature="reports">
-                  <Reports />
-                </FeatureGuard>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/invitations"
-            element={
-              <ProtectedRoute allow={OPERATOR_TIER} capability="invitations">
-                <Invitations />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/tasks"
-            element={
-              <ProtectedRoute allow={BUSINESS_ROLES}>
-                <FeatureGuard feature="tasks">
-                  <Tasks />
-                </FeatureGuard>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/tasks/me"
-            element={
-              <ProtectedRoute allow={BUSINESS_ROLES}>
-                <FeatureGuard feature="tasks">
-                  <TasksAssignedToMe />
-                </FeatureGuard>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/tasks/:id"
-            element={
-              <ProtectedRoute allow={BUSINESS_ROLES}>
-                <FeatureGuard feature="tasks">
-                  <TaskDetail />
-                </FeatureGuard>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/messages"
-            element={
-              // MESSAGING_ROLES (= BUSINESS_ROLES + DEVELOPER) is the ONE
-              // exception that admits DEVELOPER, so every user can reach a
-              // developer for bug/error reporting and the developer can reply.
-              // Every other business route stays BUSINESS_ROLES.
-              <ProtectedRoute allow={MESSAGING_ROLES}>
-                <FeatureGuard feature="messages">
-                  <Messages />
-                </FeatureGuard>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/ai-settings"
-            element={
-              <ProtectedRoute allow={ADMIN_TIER}>
-                <AdminAISettings />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/audit-log"
-            element={
-              <ProtectedRoute allow={ADMIN_TIER}>
-                <AdminAuditLog />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/training/ai-activity"
-            element={
-              <ProtectedRoute allow={MANAGER_TIER}>
-                <FeatureGuard feature="training">
-                  <TrainingAIActivity />
-                </FeatureGuard>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/features"
-            element={
-              // Read access opens to ADMIN_TIER (CTO + Director need
-              // visibility into flag state) plus a DEVELOPER with the
-              // `feature_flags` capability. The PAGE itself disables
-              // write controls for non-OWNER_TIER callers and the
-              // backend rejects PATCH/PUT regardless of capability, so
-              // a CTO / Director / Developer here can only look.
-              <ProtectedRoute allow={ADMIN_TIER} capability="feature_flags">
-                <FeatureFlags />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/groups"
-            element={
-              <ProtectedRoute allow={ADMIN_TIER} capability="user_groups">
-                <UserGroups />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/deactivated"
-            element={
-              <ProtectedRoute allow={ADMIN_TIER}>
-                <DeactivatedAccounts />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/users"
-            element={
-              <ProtectedRoute allow={ADMIN_TIER} capability="users">
-                <AdminUsers />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/users/:id"
-            element={
-              <ProtectedRoute allow={ADMIN_TIER} capability="users">
-                <AdminUserRedirect />
-              </ProtectedRoute>
-            }
-          />
-          {/* Profile page. Access is controlled server-side: operator-tier sees everyone,
-          consultants only see their own. */}
-          <Route
-            path="/users/:id"
-            element={
-              <ProtectedRoute>
-                <UserProfile />
-              </ProtectedRoute>
-            }
-          />
-
-          {/* Training / LMS module. Manager-tier manages courses; everyone authed
-          can view their own assignments under /training/my. */}
-          <Route
-            path="/training"
-            element={
-              <ProtectedRoute allow={BUSINESS_ROLES}>
-                <FeatureGuard feature="training">
-                  <MyTraining />
-                </FeatureGuard>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/training/courses"
-            element={
-              <ProtectedRoute allow={MANAGER_TIER}>
-                <FeatureGuard feature="training">
-                  <TrainingCourses />
-                </FeatureGuard>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/training/courses/new"
-            element={
-              <ProtectedRoute allow={MANAGER_TIER}>
-                <FeatureGuard feature="training">
-                  <CreateTrainingCourse />
-                </FeatureGuard>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/training/courses/:id"
-            element={
-              <ProtectedRoute allow={MANAGER_TIER}>
-                <FeatureGuard feature="training">
-                  <TrainingCourseDetails />
-                </FeatureGuard>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/training/courses/:id/edit"
-            element={
-              <ProtectedRoute allow={MANAGER_TIER}>
-                <FeatureGuard feature="training">
-                  <EditTrainingCourse />
-                </FeatureGuard>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/training/assignments"
-            element={
-              <ProtectedRoute allow={MANAGER_TIER}>
-                <FeatureGuard feature="training">
-                  <TrainingAssignments />
-                </FeatureGuard>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/training/assignments/:id"
-            element={
-              <ProtectedRoute allow={BUSINESS_ROLES}>
-                <FeatureGuard feature="training">
-                  <LessonViewer />
-                </FeatureGuard>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/training/assignments/:id/plan"
-            element={
-              <ProtectedRoute allow={BUSINESS_ROLES}>
-                <FeatureGuard feature="training">
-                  <TrainingPlanView />
-                </FeatureGuard>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/training/assignments/:id/quiz"
-            element={
-              <ProtectedRoute allow={BUSINESS_ROLES}>
-                <FeatureGuard feature="training">
-                  <QuizPage />
-                </FeatureGuard>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/training/reports"
-            element={
-              <ProtectedRoute allow={MANAGER_TIER}>
-                <FeatureGuard feature="training">
-                  <TrainingReports />
-                </FeatureGuard>
-              </ProtectedRoute>
-            }
-          />
-          {/* Legacy student route — folded into the unified /training workspace. */}
-          <Route path="/training/my" element={<Navigate to="/training" replace />} />
-          <Route path="/training/my/*" element={<Navigate to="/training" replace />} />
-
-          {/* DEV-ONLY super-admin test panel. Registered only in dev builds with
-              VITE_DEV_TOOLS on; tree-shaken from production. */}
-          {config.isDevTools && DevPanel && (
+          <Route element={<AppChrome />}>
             <Route
-              path="/dev"
+              path="/onboarding/consultant"
               element={
-                <ProtectedRoute allow={['SUPER_ADMIN']}>
-                  <DevPanel />
+                <ProtectedRoute allow={['CONSULTANT']} bypassOnboarding>
+                  <ConsultantOnboarding />
                 </ProtectedRoute>
               }
             />
-          )}
+            <Route
+              path="/onboarding/recruiter"
+              element={
+                <ProtectedRoute allow={['RECRUITER']} bypassOnboarding>
+                  <RecruiterOnboarding />
+                </ProtectedRoute>
+              }
+            />
 
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
-        </Route>
-      </Routes>
-    </Suspense>
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute>
+                  <DashboardRouter />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/consultants"
+              element={
+                <ProtectedRoute allow={OPERATOR_TIER}>
+                  <Consultants />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/recruiters"
+              element={
+                <ProtectedRoute allow={MANAGER_TIER}>
+                  <Recruiters />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/managers"
+              element={
+                <ProtectedRoute allow={MANAGER_TIER}>
+                  <Managers />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/jobs"
+              element={
+                <ProtectedRoute allow={OPERATOR_TIER}>
+                  <JobSearch />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/jobs/:id"
+              element={
+                <ProtectedRoute allow={OPERATOR_TIER}>
+                  <JobDetail />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/applications"
+              element={
+                <ProtectedRoute allow={OPERATOR_TIER}>
+                  <Applications />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/interviews"
+              element={
+                <ProtectedRoute allow={BUSINESS_ROLES}>
+                  <FeatureGuard feature="interviews">
+                    <Interviews />
+                  </FeatureGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/calendar"
+              element={
+                <ProtectedRoute allow={BUSINESS_ROLES}>
+                  <Calendar />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/resumes"
+              element={
+                <ProtectedRoute allow={OPERATOR_TIER}>
+                  <Resumes />
+                </ProtectedRoute>
+              }
+            />
+            {/* Consultant self-service: a dedicated page so the resume upload is
+              one click from the sidebar, not buried on the dashboard. */}
+            <Route
+              path="/my-resume"
+              element={
+                <ProtectedRoute allow={['CONSULTANT']}>
+                  <MyResume />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/vendors"
+              element={
+                <ProtectedRoute allow={OPERATOR_TIER}>
+                  <Vendors />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/clients"
+              element={
+                <ProtectedRoute allow={OPERATOR_TIER}>
+                  <Clients />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/reminders"
+              element={
+                <ProtectedRoute allow={BUSINESS_ROLES}>
+                  <FeatureGuard feature="reminders">
+                    <Reminders />
+                  </FeatureGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/ai-email"
+              element={
+                <ProtectedRoute allow={OPERATOR_TIER}>
+                  <FeatureGuard feature="ai_email">
+                    <AIEmail />
+                  </FeatureGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/ai-usage"
+              element={
+                <ProtectedRoute allow={MANAGER_TIER} capability="ai_usage">
+                  <AIUsage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/reports"
+              element={
+                // RECRUITER may open /reports for their OWN submissions + daily
+                // numbers (backend gates each endpoint and self-scopes the rows
+                // inside the controller). The page itself filters the visible
+                // tabs to "Submissions" + "Daily log" for a recruiter — full
+                // analytics tabs stay manager-tier only.
+                <ProtectedRoute allow={OPERATOR_TIER} capability="reports">
+                  <FeatureGuard feature="reports">
+                    <Reports />
+                  </FeatureGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/invitations"
+              element={
+                <ProtectedRoute allow={OPERATOR_TIER} capability="invitations">
+                  <Invitations />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/tasks"
+              element={
+                <ProtectedRoute allow={BUSINESS_ROLES}>
+                  <FeatureGuard feature="tasks">
+                    <Tasks />
+                  </FeatureGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/tasks/me"
+              element={
+                <ProtectedRoute allow={BUSINESS_ROLES}>
+                  <FeatureGuard feature="tasks">
+                    <TasksAssignedToMe />
+                  </FeatureGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/tasks/:id"
+              element={
+                <ProtectedRoute allow={BUSINESS_ROLES}>
+                  <FeatureGuard feature="tasks">
+                    <TaskDetail />
+                  </FeatureGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/messages"
+              element={
+                // MESSAGING_ROLES (= BUSINESS_ROLES + DEVELOPER) is the ONE
+                // exception that admits DEVELOPER, so every user can reach a
+                // developer for bug/error reporting and the developer can reply.
+                // Every other business route stays BUSINESS_ROLES.
+                <ProtectedRoute allow={MESSAGING_ROLES}>
+                  <FeatureGuard feature="messages">
+                    <Messages />
+                  </FeatureGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/ai-settings"
+              element={
+                <ProtectedRoute allow={ADMIN_TIER}>
+                  <AdminAISettings />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/audit-log"
+              element={
+                <ProtectedRoute allow={ADMIN_TIER}>
+                  <AdminAuditLog />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/training/ai-activity"
+              element={
+                <ProtectedRoute allow={MANAGER_TIER}>
+                  <FeatureGuard feature="training">
+                    <TrainingAIActivity />
+                  </FeatureGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/features"
+              element={
+                // Read access opens to ADMIN_TIER (CTO + Director need
+                // visibility into flag state) plus a DEVELOPER with the
+                // `feature_flags` capability. The PAGE itself disables
+                // write controls for non-OWNER_TIER callers and the
+                // backend rejects PATCH/PUT regardless of capability, so
+                // a CTO / Director / Developer here can only look.
+                <ProtectedRoute allow={ADMIN_TIER} capability="feature_flags">
+                  <FeatureFlags />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/groups"
+              element={
+                <ProtectedRoute allow={ADMIN_TIER} capability="user_groups">
+                  <UserGroups />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/deactivated"
+              element={
+                <ProtectedRoute allow={ADMIN_TIER}>
+                  <DeactivatedAccounts />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/users"
+              element={
+                <ProtectedRoute allow={ADMIN_TIER} capability="users">
+                  <AdminUsers />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/users/:id"
+              element={
+                <ProtectedRoute allow={ADMIN_TIER} capability="users">
+                  <AdminUserRedirect />
+                </ProtectedRoute>
+              }
+            />
+            {/* Profile page. Access is controlled server-side: operator-tier sees everyone,
+          consultants only see their own. */}
+            <Route
+              path="/users/:id"
+              element={
+                <ProtectedRoute>
+                  <UserProfile />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Training / LMS module. Manager-tier manages courses; everyone authed
+          can view their own assignments under /training/my. */}
+            <Route
+              path="/training"
+              element={
+                <ProtectedRoute allow={BUSINESS_ROLES}>
+                  <FeatureGuard feature="training">
+                    <MyTraining />
+                  </FeatureGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/training/courses"
+              element={
+                <ProtectedRoute allow={MANAGER_TIER}>
+                  <FeatureGuard feature="training">
+                    <TrainingCourses />
+                  </FeatureGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/training/courses/new"
+              element={
+                <ProtectedRoute allow={MANAGER_TIER}>
+                  <FeatureGuard feature="training">
+                    <CreateTrainingCourse />
+                  </FeatureGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/training/courses/:id"
+              element={
+                <ProtectedRoute allow={MANAGER_TIER}>
+                  <FeatureGuard feature="training">
+                    <TrainingCourseDetails />
+                  </FeatureGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/training/courses/:id/edit"
+              element={
+                <ProtectedRoute allow={MANAGER_TIER}>
+                  <FeatureGuard feature="training">
+                    <EditTrainingCourse />
+                  </FeatureGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/training/assignments"
+              element={
+                <ProtectedRoute allow={MANAGER_TIER}>
+                  <FeatureGuard feature="training">
+                    <TrainingAssignments />
+                  </FeatureGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/training/assignments/:id"
+              element={
+                <ProtectedRoute allow={BUSINESS_ROLES}>
+                  <FeatureGuard feature="training">
+                    <LessonViewer />
+                  </FeatureGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/training/assignments/:id/plan"
+              element={
+                <ProtectedRoute allow={BUSINESS_ROLES}>
+                  <FeatureGuard feature="training">
+                    <TrainingPlanView />
+                  </FeatureGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/training/assignments/:id/quiz"
+              element={
+                <ProtectedRoute allow={BUSINESS_ROLES}>
+                  <FeatureGuard feature="training">
+                    <QuizPage />
+                  </FeatureGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/training/reports"
+              element={
+                <ProtectedRoute allow={MANAGER_TIER}>
+                  <FeatureGuard feature="training">
+                    <TrainingReports />
+                  </FeatureGuard>
+                </ProtectedRoute>
+              }
+            />
+            {/* Legacy student route — folded into the unified /training workspace. */}
+            <Route path="/training/my" element={<Navigate to="/training" replace />} />
+            <Route path="/training/my/*" element={<Navigate to="/training" replace />} />
+
+            {/* DEV-ONLY super-admin test panel. Registered only in dev builds with
+              VITE_DEV_TOOLS on; tree-shaken from production. */}
+            {config.isDevTools && DevPanel && (
+              <Route
+                path="/dev"
+                element={
+                  <ProtectedRoute allow={['SUPER_ADMIN']}>
+                    <DevPanel />
+                  </ProtectedRoute>
+                }
+              />
+            )}
+
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          </Route>
+        </Routes>
+      </Suspense>
+    </CallProvider>
   );
 }

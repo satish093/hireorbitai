@@ -2,6 +2,7 @@ import toast from 'react-hot-toast';
 import { useLocation } from 'react-router-dom';
 import { useRealtime } from '../hooks/useRealtime';
 import { useAuth } from '../context/AuthContext';
+import { useCallContext } from '../context/CallContext';
 import { invalidate } from '../hooks/useInvalidate';
 import { useInboxNotifications } from '../hooks/useInboxNotifications';
 
@@ -11,25 +12,18 @@ import { useInboxNotifications } from '../hooks/useInboxNotifications';
  * notification events into toasts.
  *
  * Handles:
- *   - `reminder:due`  — the reminders dispatcher fires (incl. interview lead-time
- *     reminders). The email still goes out; this is the instant in-app heads-up.
- *   - `message:new`   — a direct message arrived. Shows an unread alert toast
- *     (recipient only, suppressed while already viewing the inbox) and nudges
- *     the sidebar unread badge to refresh immediately.
+ *   - `reminder:due`  — the reminders dispatcher fires.
+ *   - `message:new`   — direct message arrived; toast + badge nudge.
+ *   - `call:*`        — WebRTC signaling events routed to the global CallContext.
  *
  * Mounted once at the App level and keyed by user id, so it survives route
- * changes (no reconnect per navigation) and reconnects cleanly on login as a
- * different user.
+ * changes (no reconnect per navigation) and reconnects cleanly on login.
  */
 export function RealtimeNotifications() {
   const { profile } = useAuth();
   const location = useLocation();
+  const call = useCallContext();
 
-  // Discord-style inbox plumbing: title-bar count + favicon dot + browser
-  // desktop notification (when the tab is hidden + permission granted) +
-  // optional notify sound (opt-in via the toggle on the Messages page).
-  // Mounted here because this component already lives at App level keyed
-  // by profile.id, which is exactly the lifecycle the hook needs.
   useInboxNotifications();
 
   useRealtime({
@@ -41,6 +35,7 @@ export function RealtimeNotifications() {
         duration: 6000,
       });
     },
+
     'message:new': (payload) => {
       const m = (payload ?? {}) as {
         sender_id?: string;
@@ -48,20 +43,39 @@ export function RealtimeNotifications() {
         sender?: { full_name?: string | null; email?: string | null } | null;
         body?: string | null;
       };
-      // The backend fans out to BOTH ends; only alert the recipient, never echo
-      // a message I just sent.
       if (!profile || m.sender_id === profile.id || m.recipient_id !== profile.id) return;
-      // Refresh the sidebar unread badge right away (it otherwise polls on an
-      // interval). Listeners on `messages` re-fetch their state.
       invalidate('messages');
-      // Don't toast while the user is already reading their inbox.
       if (location.pathname.startsWith('/messages')) return;
       const who = m.sender?.full_name?.trim() || m.sender?.email || 'Someone';
-      toast(`${who} sent you a message`, {
-        icon: '✉️',
-        duration: 6000,
-      });
+      toast(`${who} sent you a message`, { icon: '✉️', duration: 6000 });
+    },
+
+    // Call signaling — delegate to the global call state machine.
+    // The CallModal (rendered by CallProvider) handles the full UI.
+    // We additionally send a browser desktop notification when the tab is hidden.
+    ...call.realtimeHandlers,
+
+    // Wrap call:incoming to also fire a desktop notification when tab is hidden.
+    'call:incoming': (payload) => {
+      // First let the call state machine handle it (ring + modal).
+      call.realtimeHandlers['call:incoming']?.(payload);
+
+      // Desktop notification when tab not in focus.
+      const data = payload as { caller?: { full_name?: string | null; email?: string } };
+      const who = data?.caller?.full_name?.trim() || data?.caller?.email || 'Someone';
+      if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
+        const n = new Notification(`📞 ${who} is calling`, {
+          body: 'Tap to open and accept or decline.',
+          tag: 'incoming-call',
+          requireInteraction: true,
+        });
+        n.onclick = () => {
+          window.focus();
+          n.close();
+        };
+      }
     },
   });
+
   return null;
 }
