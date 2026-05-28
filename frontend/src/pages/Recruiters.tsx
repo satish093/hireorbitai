@@ -58,6 +58,7 @@ export function Recruiters() {
   // Group edit state
   const [groupPicked, setGroupPicked] = useState<RecruiterRow | null>(null);
   const [selectedGroup, setSelectedGroup] = useState('');
+  const [confirmGroupMoveOpen, setConfirmGroupMoveOpen] = useState(false);
   const [savingGroup, setSavingGroup] = useState(false);
 
   function load() {
@@ -88,17 +89,25 @@ export function Recruiters() {
   function openGroupEdit(r: RecruiterRow) {
     setGroupPicked(r);
     setSelectedGroup(r.user?.group_id ?? '');
+    setConfirmGroupMoveOpen(false);
   }
 
   async function saveGroup() {
+    if (!groupPicked) return;
+    setConfirmGroupMoveOpen(true);
+  }
+
+  async function confirmSaveGroup() {
     if (!groupPicked) return;
     setSavingGroup(true);
     try {
       await api.post(`/recruiters/${groupPicked.id}/move-group`, {
         group_id: selectedGroup || null,
+        confirm_unassign_consultants: true,
       });
       toast.success('Group updated');
       invalidateUserGroupsCache();
+      setConfirmGroupMoveOpen(false);
       setGroupPicked(null);
       load();
     } catch (e: any) {
@@ -283,6 +292,31 @@ export function Recruiters() {
             ).map((g) => ({ value: g.id, label: g.name }))}
           />
         </div>
+      </Modal>
+
+      <Modal
+        open={confirmGroupMoveOpen}
+        onClose={() => setConfirmGroupMoveOpen(false)}
+        title="Confirm group change"
+        description="Moving this recruiter will detach their consultant assignments."
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setConfirmGroupMoveOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={confirmSaveGroup} loading={savingGroup}>
+              Confirm
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-ink">
+          Move{' '}
+          <span className="font-semibold">
+            {groupPicked?.user?.full_name ?? groupPicked?.user?.email ?? 'this recruiter'}
+          </span>
+          ? All Consultants under this Recruiter will be unassigned.
+        </p>
       </Modal>
 
       {picked && (

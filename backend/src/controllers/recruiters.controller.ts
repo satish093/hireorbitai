@@ -381,13 +381,18 @@ export const setPrimaryManager: RequestHandler = async (req, res) => {
  *  - Admin tier: move to any group.
  *  - Group lead: only recruiters currently in their group, only to their own group.
  *
- * Safety: if the recruiter has assigned consultants whose user.group_id would
- * no longer match after the move, the endpoint returns 409 with the count so
- * the caller can reassign those consultants first.
+ * Safety: if the recruiter has assigned consultants and the group changes, the
+ * caller must pass confirm_unassign_consultants=true. The move then clears
+ * those consultant assignments before moving the recruiter.
  */
 export const moveGroup: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
-  const schema = z.object({ group_id: z.string().uuid().nullable() }).strict();
+  const schema = z
+    .object({
+      group_id: z.string().uuid().nullable(),
+      confirm_unassign_consultants: z.boolean().optional(),
+    })
+    .strict();
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
 
@@ -399,6 +404,14 @@ export const moveGroup: RequestHandler = async (req, res) => {
     .maybeSingle();
   if (!rec) throw httpError(404, 'Recruiter not found');
   const row = rec as { id: string; user_id: string | null };
+  if (!row.user_id) throw httpError(400, 'Recruiter has no linked user account.');
+
+  const { data: currentUser } = await db
+    .from('users')
+    .select('group_id')
+    .eq('id', row.user_id)
+    .maybeSingle();
+  const currentGroup = (currentUser as { group_id: string | null } | null)?.group_id ?? null;
 
   if (isAdminTier(req.user.role)) {
     // unscoped
@@ -416,36 +429,29 @@ export const moveGroup: RequestHandler = async (req, res) => {
     throw httpError(403, 'Forbidden');
   }
 
-  // Safety check: count consultants assigned to this recruiter whose group
-  // doesn't match the target group. Block the move if any exist.
-  if (parsed.data.group_id) {
-    const { data: assignedCons } = await db
-      .from('consultants')
-      .select('id, user_id')
-      .eq('recruiter_id', recruiterId);
-    const consUserIds = ((assignedCons ?? []) as Array<{ id: string; user_id: string | null }>)
-      .map((c) => c.user_id)
-      .filter(Boolean) as string[];
-
-    if (consUserIds.length > 0) {
-      const { data: consUsers } = await db
-        .from('users')
-        .select('id, group_id')
-        .in('id', consUserIds);
-      const mismatch = ((consUsers ?? []) as Array<{ id: string; group_id: string | null }>).filter(
-        (u) => u.group_id !== parsed.data.group_id,
-      );
-      if (mismatch.length > 0) {
-        throw httpError(
-          409,
-          `${mismatch.length} consultant${mismatch.length === 1 ? ' is' : 's are'} assigned to this recruiter but ` +
-            `belong to a different group. Reassign or move those consultants first.`,
-        );
-      }
-    }
+  const { data: assignedCons } = await db
+    .from('consultants')
+    .select('id, user_id')
+    .eq('recruiter_id', recruiterId);
+  const assignedRows = (assignedCons ?? []) as Array<{ id: string; user_id: string | null }>;
+  const changingGroup = parsed.data.group_id !== currentGroup;
+  if (changingGroup && assignedRows.length > 0 && !parsed.data.confirm_unassign_consultants) {
+    throw httpError(
+      409,
+      `${assignedRows.length} consultant${assignedRows.length === 1 ? ' is' : 's are'} assigned to this recruiter. Confirm to unassign them before moving.`,
+    );
   }
 
-  if (!row.user_id) throw httpError(400, 'Recruiter has no linked user account.');
+  if (changingGroup && assignedRows.length > 0) {
+    const { error: unassignErr } = await db
+      .from('consultants')
+      .update({ recruiter_id: null })
+      .eq('recruiter_id', recruiterId);
+    if (unassignErr) throw httpError(500, 'Database error');
+    for (const c of assignedRows) {
+      if (c.user_id) invalidatePermissionCache(c.user_id);
+    }
+  }
 
   const { error } = await db
     .from('users')
@@ -455,5 +461,9 @@ export const moveGroup: RequestHandler = async (req, res) => {
 
   if (row.user_id) invalidatePermissionCache(row.user_id);
 
-  res.json({ ok: true, group_id: parsed.data.group_id });
+  res.json({
+    ok: true,
+    group_id: parsed.data.group_id,
+    unassigned_consultants: assignedRows.length,
+  });
 };

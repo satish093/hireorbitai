@@ -150,6 +150,8 @@ export function Consultants() {
   // Group edit state
   const [groupPicked, setGroupPicked] = useState<ConsultantRow | null>(null);
   const [selectedGroup, setSelectedGroup] = useState<string>('');
+  const [selectedGroupRecruiter, setSelectedGroupRecruiter] = useState<string>('');
+  const [confirmGroupMoveOpen, setConfirmGroupMoveOpen] = useState(false);
   const [savingGroup, setSavingGroup] = useState(false);
 
   function load() {
@@ -223,18 +225,32 @@ export function Consultants() {
   function openGroupEdit(c: ConsultantRow) {
     setGroupPicked(c);
     setSelectedGroup(c.user?.group_id ?? '');
+    setSelectedGroupRecruiter(c.recruiter_id ?? '');
+    setConfirmGroupMoveOpen(false);
   }
 
   async function saveGroup() {
+    if (!groupPicked) return;
+    if (selectedGroup && !selectedGroupRecruiter) {
+      toast.error('Pick a recruiter in the selected group');
+      return;
+    }
+    setConfirmGroupMoveOpen(true);
+  }
+
+  async function confirmSaveGroup() {
     if (!groupPicked) return;
     setSavingGroup(true);
     try {
       await api.post(`/consultants/${groupPicked.id}/move-group`, {
         group_id: selectedGroup || null,
+        recruiter_id: selectedGroup ? selectedGroupRecruiter : null,
       });
       toast.success('Group updated');
       invalidateUserGroupsCache();
+      setConfirmGroupMoveOpen(false);
       setGroupPicked(null);
+      setSelectedGroupRecruiter('');
       load();
     } catch (e: any) {
       toast.error(e?.response?.data?.error ?? 'Failed to update group');
@@ -448,7 +464,10 @@ export function Consultants() {
             <Button
               onClick={saveGroup}
               loading={savingGroup}
-              disabled={selectedGroup === (groupPicked?.user?.group_id ?? '')}
+              disabled={
+                selectedGroup === (groupPicked?.user?.group_id ?? '') ||
+                (!!selectedGroup && !selectedGroupRecruiter)
+              }
             >
               {savingGroup ? 'Saving' : 'Save'}
             </Button>
@@ -470,7 +489,13 @@ export function Consultants() {
             label="Group"
             placeholder="No group (clear)"
             value={selectedGroup}
-            onChange={(e) => setSelectedGroup(e.target.value)}
+            onChange={(e) => {
+              const nextGroup = e.target.value;
+              setSelectedGroup(nextGroup);
+              const firstRecruiter =
+                recruiters.find((r) => r.user?.group_id === nextGroup)?.id ?? '';
+              setSelectedGroupRecruiter(firstRecruiter);
+            }}
             options={
               // Group leads only see their own group; admin tier sees all.
               (isAdminTierUser ? groups : groups.filter((g) => g.id === profile?.group_id)).map(
@@ -478,7 +503,55 @@ export function Consultants() {
               )
             }
           />
+          {selectedGroup && (
+            <SelectInput
+              label="Recruiter in selected group"
+              placeholder="Select a recruiter..."
+              value={selectedGroupRecruiter}
+              onChange={(e) => setSelectedGroupRecruiter(e.target.value)}
+              options={recruiters
+                .filter((r) => r.user?.group_id === selectedGroup)
+                .map((r) => ({
+                  value: r.id,
+                  label: `${r.user?.full_name ?? r.user?.email ?? r.id}${r.team ? ' - ' + r.team : ''}`,
+                }))}
+            />
+          )}
+          {selectedGroup &&
+            recruiters.filter((r) => r.user?.group_id === selectedGroup).length === 0 && (
+              <p className="text-xs text-danger">No recruiters are in the selected group.</p>
+            )}
         </div>
+      </Modal>
+      <Modal
+        open={confirmGroupMoveOpen}
+        onClose={() => setConfirmGroupMoveOpen(false)}
+        title="Confirm group change"
+        description="This change will update the consultant's group and recruiter assignment."
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setConfirmGroupMoveOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={confirmSaveGroup} loading={savingGroup}>
+              Confirm
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-ink">
+          Move{' '}
+          <span className="font-semibold">
+            {groupPicked?.user?.full_name ?? groupPicked?.user?.email ?? 'this consultant'}
+          </span>{' '}
+          to the selected group and assign them to{' '}
+          <span className="font-semibold">
+            {recruiters.find((r) => r.id === selectedGroupRecruiter)?.user?.full_name ??
+              recruiters.find((r) => r.id === selectedGroupRecruiter)?.user?.email ??
+              'the selected recruiter'}
+          </span>
+          ?
+        </p>
       </Modal>
     </Layout>
   );

@@ -134,10 +134,15 @@ async function callMoveConsultantGroup(
   caller: Record<string, unknown>,
   consultantId: string,
   groupId: string | null,
+  recruiterId?: string | null,
 ): Promise<{ status?: number } | null> {
   try {
     await (consultantMoveGroup as any)(
-      { user: caller, params: { id: consultantId }, body: { group_id: groupId } },
+      {
+        user: caller,
+        params: { id: consultantId },
+        body: { group_id: groupId, recruiter_id: recruiterId },
+      },
       mkRes(),
       vi.fn(),
     );
@@ -151,10 +156,15 @@ async function callMoveRecruiterGroup(
   caller: Record<string, unknown>,
   recruiterId: string,
   groupId: string | null,
+  confirm = false,
 ): Promise<{ status?: number } | null> {
   try {
     await (recruiterMoveGroup as any)(
-      { user: caller, params: { id: recruiterId }, body: { group_id: groupId } },
+      {
+        user: caller,
+        params: { id: recruiterId },
+        body: { group_id: groupId, confirm_unassign_consultants: confirm },
+      },
       mkRes(),
       vi.fn(),
     );
@@ -169,6 +179,7 @@ async function callMoveRecruiterGroup(
 // ---------------------------------------------------------------------------
 const G1 = '11111111-1111-4111-8111-111111111111';
 const G2 = '22222222-2222-4222-8222-222222222222';
+const R_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
 const ADMIN_USER = {
   id: 'u-admin',
@@ -192,11 +203,11 @@ state.users = {
   'u-lead': { id: 'u-lead', group_id: G1, role: 'MANAGER' },
 };
 state.consultants = {
-  'c-1': { id: 'c-1', user_id: 'u-cons-1', recruiter_id: 'r-a' },
+  'c-1': { id: 'c-1', user_id: 'u-cons-1', recruiter_id: R_A },
   'c-2': { id: 'c-2', user_id: 'u-cons-2', recruiter_id: null },
 };
 state.recruiters = {
-  'r-a': { id: 'r-a', user_id: 'u-rec-a' },
+  [R_A]: { id: R_A, user_id: 'u-rec-a' },
 };
 
 // ---------------------------------------------------------------------------
@@ -204,7 +215,7 @@ state.recruiters = {
 // ---------------------------------------------------------------------------
 describe('assertCanAccessConsultant - recruiter scope', () => {
   it('allows a recruiter to access their own assigned consultant', async () => {
-    // c-1 has recruiter_id = r-a; RECRUITER_A owns r-a
+    // c-1 has recruiter_id = R_A; RECRUITER_A owns R_A
     await expect(assertCanAccessConsultant(RECRUITER_A, 'c-1')).resolves.toBeUndefined();
   });
 
@@ -235,14 +246,14 @@ describe('consultants.moveGroup', () => {
   });
 
   it('admin can move consultant to any group', async () => {
-    const err = await callMoveConsultantGroup(ADMIN_USER, 'c-2', G1);
+    const err = await callMoveConsultantGroup(ADMIN_USER, 'c-2', G1, R_A);
     expect(err).toBeNull();
     expect(state.lastUserUpdate).toMatchObject({ id: 'u-cons-2', group_id: G1 });
   });
 
   it('group lead can move in-group consultant to own group', async () => {
     // c-1 user is in G1, LEAD_G1 group is G1, target is G1 (no-op but valid)
-    const err = await callMoveConsultantGroup(LEAD_G1, 'c-1', G1);
+    const err = await callMoveConsultantGroup(LEAD_G1, 'c-1', G1, R_A);
     expect(err).toBeNull();
   });
 
@@ -272,29 +283,29 @@ describe('recruiters.moveGroup', () => {
   });
 
   it('admin can move recruiter to any group', async () => {
-    // r-a user is in G1; move to G1 (same group - no consultant mismatch)
-    const err = await callMoveRecruiterGroup(ADMIN_USER, 'r-a', G1);
+    // R_A user is in G1; move to G1 (same group - no consultant mismatch)
+    const err = await callMoveRecruiterGroup(ADMIN_USER, R_A, G1);
     expect(err).toBeNull();
     expect(state.lastUserUpdate).toMatchObject({ id: 'u-rec-a', group_id: G1 });
   });
 
   it('blocks move when assigned consultants are in a different group', async () => {
-    // Assign c-1 to r-a; c-1 user is in G1. Try to move r-a to G2:
+    // Assign c-1 to R_A; c-1 user is in G1. Try to move R_A to G2:
     // c-1 user.group_id (G1) !== target (G2) => 409.
-    state.consultants['c-1'].recruiter_id = 'r-a';
+    state.consultants['c-1'].recruiter_id = R_A;
     state.users['u-cons-1'].group_id = G1;
 
-    const err = await callMoveRecruiterGroup(ADMIN_USER, 'r-a', G2);
+    const err = await callMoveRecruiterGroup(ADMIN_USER, R_A, G2);
     expect(err?.status).toBe(409);
     expect(state.lastUserUpdate).toBeNull(); // no write should happen
   });
 
-  it('allows move when all assigned consultants already match target group', async () => {
+  it('allows confirmed move and unassigns consultants', async () => {
     // Move c-1 user to G2 first so it matches the target.
     state.users['u-cons-1'].group_id = G2;
-    state.consultants['c-1'].recruiter_id = 'r-a';
+    state.consultants['c-1'].recruiter_id = R_A;
 
-    const err = await callMoveRecruiterGroup(ADMIN_USER, 'r-a', G2);
+    const err = await callMoveRecruiterGroup(ADMIN_USER, R_A, G2, true);
     expect(err).toBeNull();
     expect(state.lastUserUpdate).toMatchObject({ id: 'u-rec-a', group_id: G2 });
   });

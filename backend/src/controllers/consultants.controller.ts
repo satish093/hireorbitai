@@ -427,14 +427,18 @@ export const setMarketingStatus: RequestHandler = async (req, res) => {
  *    must currently be in their group (fail-closed against cross-group grabs).
  *  - Recruiter / Consultant: forbidden.
  *
- * Safety: if the consultant has a recruiter assigned who is NOT in the target
- * group, the endpoint rejects with 409 so the caller can first reassign the
- * recruiter.
+ * Safety: moving into a group requires choosing a recruiter in that group.
+ * Moving out of a group clears the consultant's recruiter assignment.
  */
 export const moveGroup: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
 
-  const schema = z.object({ group_id: z.string().uuid().nullable() }).strict();
+  const schema = z
+    .object({
+      group_id: z.string().uuid().nullable(),
+      recruiter_id: z.string().uuid().nullable().optional(),
+    })
+    .strict();
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
 
@@ -462,49 +466,77 @@ export const moveGroup: RequestHandler = async (req, res) => {
     throw httpError(403, 'Forbidden');
   }
 
-  // Safety: if the consultant's current recruiter does NOT belong to the target
-  // group, block the move so we don't silently leak them across groups.
-  if (parsed.data.group_id && row.recruiter_id) {
+  const targetGroup = parsed.data.group_id;
+  const targetRecruiterId = parsed.data.recruiter_id ?? null;
+
+  if (targetGroup && !targetRecruiterId) {
+    throw httpError(400, 'Pick a recruiter in the selected group before moving this consultant.');
+  }
+
+  if (targetRecruiterId) {
     const { data: rec } = await db
       .from('recruiters')
-      .select('user_id')
-      .eq('id', row.recruiter_id)
+      .select('id, user_id')
+      .eq('id', targetRecruiterId)
       .maybeSingle();
-    const recUserId = (rec as { user_id: string | null } | null)?.user_id;
-    if (recUserId) {
-      const { data: recUser } = await db
-        .from('users')
-        .select('group_id')
-        .eq('id', recUserId)
-        .maybeSingle();
-      const recGroup = (recUser as { group_id: string | null } | null)?.group_id;
-      if (recGroup && recGroup !== parsed.data.group_id) {
-        throw httpError(
-          409,
-          "The consultant's assigned recruiter is in a different group. " +
-            'Reassign the recruiter first, then move the group.',
-        );
-      }
+    const recUserId = (rec as { id: string; user_id: string | null } | null)?.user_id;
+    if (!recUserId) throw httpError(400, 'Recruiter not found');
+
+    const { data: recUser } = await db
+      .from('users')
+      .select('group_id')
+      .eq('id', recUserId)
+      .maybeSingle();
+    const recGroup = (recUser as { group_id: string | null } | null)?.group_id ?? null;
+    if (recGroup !== targetGroup) {
+      throw httpError(400, 'Selected recruiter is not in the target group.');
+    }
+    if (isGroupLead(req.user.role) && !(await leadCanAccessUser(req.user, recUserId))) {
+      throw httpError(403, 'Selected recruiter is not in your group.');
     }
   }
 
   if (!row.user_id) throw httpError(400, 'Consultant has no linked user account.');
 
-  const { error } = await db
-    .from('users')
-    .update({ group_id: parsed.data.group_id })
-    .eq('id', row.user_id);
+  const { error } = await db.from('users').update({ group_id: targetGroup }).eq('id', row.user_id);
   if (error) throw httpError(500, 'Database error');
 
+  const { error: consErr } = await db
+    .from('consultants')
+    .update({ recruiter_id: targetRecruiterId })
+    .eq('id', req.params.id);
+  if (consErr) throw httpError(500, 'Database error');
+
   if (row.user_id) invalidatePermissionCache(row.user_id);
+  if (row.recruiter_id) {
+    const { data: oldRec } = await db
+      .from('recruiters')
+      .select('user_id')
+      .eq('id', row.recruiter_id)
+      .maybeSingle();
+    if (oldRec?.user_id) invalidatePermissionCache(oldRec.user_id as string);
+  }
+  if (targetRecruiterId) {
+    const { data: newRec } = await db
+      .from('recruiters')
+      .select('user_id')
+      .eq('id', targetRecruiterId)
+      .maybeSingle();
+    if (newRec?.user_id) invalidatePermissionCache(newRec.user_id as string);
+  }
 
   await audit({
     action: 'group_user_moved',
     user_id: req.user.id,
     email: req.user.email ?? null,
     req,
-    metadata: { consultant_id: req.params.id, group_id: parsed.data.group_id },
+    metadata: {
+      consultant_id: req.params.id,
+      group_id: targetGroup,
+      old_recruiter_id: row.recruiter_id,
+      new_recruiter_id: targetRecruiterId,
+    },
   });
 
-  res.json({ ok: true, group_id: parsed.data.group_id });
+  res.json({ ok: true, group_id: targetGroup, recruiter_id: targetRecruiterId });
 };

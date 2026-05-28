@@ -33,6 +33,7 @@ export function Managers() {
   const [loading, setLoading] = useState(true);
   const [picked, setPicked] = useState<ManagerRow | null>(null);
   const [selectedGroup, setSelectedGroup] = useState('');
+  const [confirmGroupMoveOpen, setConfirmGroupMoveOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
   function load() {
@@ -51,17 +52,25 @@ export function Managers() {
   function openGroupEdit(m: ManagerRow) {
     setPicked(m);
     setSelectedGroup(m.group_id ?? '');
+    setConfirmGroupMoveOpen(false);
   }
 
   async function saveGroup() {
     if (!picked) return;
+    setConfirmGroupMoveOpen(true);
+  }
+
+  async function confirmSaveGroup() {
+    if (!picked) return;
     setSaving(true);
     try {
-      await api.patch(`/admin/users/${picked.id}/group`, {
+      await api.post(`/managers/${picked.id}/move-group`, {
         group_id: selectedGroup || null,
+        confirm_unassign_recruiters: true,
       });
       toast.success('Group updated');
       invalidateUserGroupsCache();
+      setConfirmGroupMoveOpen(false);
       setPicked(null);
       load();
     } catch (e: any) {
@@ -187,6 +196,31 @@ export function Managers() {
           onChange={(e) => setSelectedGroup(e.target.value)}
           options={groups.map((g) => ({ value: g.id, label: g.name }))}
         />
+      </Modal>
+
+      <Modal
+        open={confirmGroupMoveOpen}
+        onClose={() => setConfirmGroupMoveOpen(false)}
+        title="Confirm group change"
+        description="Moving this manager will detach their recruiter assignments."
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setConfirmGroupMoveOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={confirmSaveGroup} loading={saving}>
+              Confirm
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-ink">
+          Move{' '}
+          <span className="font-semibold">
+            {picked?.full_name ?? picked?.email ?? 'this manager'}
+          </span>
+          ? All Recruiters under this Manager will be unassigned.
+        </p>
       </Modal>
     </Layout>
   );
