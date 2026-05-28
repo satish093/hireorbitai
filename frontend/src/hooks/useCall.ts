@@ -174,13 +174,56 @@ export function useCall(): UseCallReturn {
 
   // -------------------------------------------------------------------------
   // Acquire local media
+  //
+  // Returns { stream, effectiveType } — if the caller asked for video but the
+  // browser has no camera (or it's locked by another tab), we fall back to
+  // audio-only rather than failing the whole call. The caller can show a toast
+  // when effectiveType !== requested type so the user knows what happened.
   // -------------------------------------------------------------------------
 
-  async function getMedia(type: CallType): Promise<MediaStream> {
-    return navigator.mediaDevices.getUserMedia({
-      audio: true,
-      video: type === 'video',
-    });
+  function mediaErrorMessage(err: unknown): string {
+    const e = err as { name?: string; message?: string };
+    switch (e?.name) {
+      case 'NotFoundError':
+      case 'DevicesNotFoundError':
+        return 'No camera or microphone found. Connect a device and try again.';
+      case 'NotAllowedError':
+      case 'PermissionDeniedError':
+        return 'Microphone / camera access was blocked. Allow it in the browser address bar and try again.';
+      case 'NotReadableError':
+      case 'TrackStartError':
+        return 'Camera or microphone is in use by another app or browser tab. Close it and try again.';
+      case 'OverconstrainedError':
+        return 'No device matches the requested call quality. Try a voice call instead.';
+      case 'SecurityError':
+        return 'Calls need a secure (HTTPS) connection.';
+      default:
+        return e?.message ?? 'Could not access camera / microphone.';
+    }
+  }
+
+  async function getMedia(
+    type: CallType,
+  ): Promise<{ stream: MediaStream; effectiveType: CallType }> {
+    // Voice call — only mic. NotFoundError here means no mic at all.
+    if (type === 'audio') {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      return { stream, effectiveType: 'audio' };
+    }
+    // Video call — try video+audio. If video fails (no camera, camera locked,
+    // etc.) but audio works, gracefully degrade to audio-only so the call
+    // still connects. Both failing means no input at all → re-throw.
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+      return { stream, effectiveType: 'video' };
+    } catch (videoErr) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        return { stream, effectiveType: 'audio' };
+      } catch {
+        throw videoErr; // surface the original (more specific) error
+      }
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -203,8 +246,11 @@ export function useCall(): UseCallReturn {
       }, CALL_TIMEOUT_MS);
 
       try {
-        const stream = await getMedia(type);
+        const { stream, effectiveType } = await getMedia(type);
         setLocalStream(stream);
+        // If a video call was downgraded to audio (no camera available)
+        // surface that to the in-call UI so it renders the audio layout.
+        if (effectiveType !== type) setCallType(effectiveType);
 
         const pc = buildPC(peerId);
         pcRef.current = pc;
@@ -215,14 +261,20 @@ export function useCall(): UseCallReturn {
 
         const res = await api.post('/calls/offer', {
           callee_id: peerId,
-          call_type: type,
+          call_type: effectiveType,
           sdp: offer.sdp,
         });
         callIdRef.current = res.data.call_id as string;
       } catch (err: unknown) {
         finalise('ended', false);
-        const e = err as { response?: { data?: { error?: string } }; message?: string };
-        throw new Error(e?.response?.data?.error ?? e?.message ?? 'Could not start call');
+        // Media errors get a friendly message; backend errors keep theirs.
+        const e = err as {
+          response?: { data?: { error?: string } };
+          name?: string;
+          message?: string;
+        };
+        const serverMsg = e?.response?.data?.error;
+        throw new Error(serverMsg ?? mediaErrorMessage(err));
       }
     },
     [status, finalise],
@@ -245,8 +297,11 @@ export function useCall(): UseCallReturn {
     setPeer({ id: caller.id, full_name: caller.full_name ?? null, email: caller.email });
 
     try {
-      const stream = await getMedia(call_type);
+      const { stream, effectiveType } = await getMedia(call_type);
       setLocalStream(stream);
+      // If the callee can't supply video (no camera), downgrade the UI but
+      // continue the call — the caller still gets our audio + their own video.
+      if (effectiveType !== call_type) setCallType(effectiveType);
 
       const pc = buildPC(caller.id);
       pcRef.current = pc;
