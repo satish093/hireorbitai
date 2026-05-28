@@ -6,9 +6,12 @@ import { PresenceDot, PresencePill } from '../components/PresenceDot';
 import { GroupBadge } from '../components/GroupBadge';
 import { Button } from '../components/Button';
 import { IconSearch, IconVideo, IconPhone, IconSend } from '../components/Icons';
+import { NotificationToggle } from '../components/NotificationToggle';
+import { CallModal } from '../components/CallModal';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useRealtime } from '../hooks/useRealtime';
+import { useCall } from '../hooks/useCall';
 import { Role, ROLE_LABEL } from '../types';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
@@ -74,6 +77,9 @@ export function Messages() {
   const stickToBottomRef = useRef(true);
   // Monotonic counter so the optimistic id is unique even within the same ms.
   const tmpIdRef = useRef(0);
+
+  // WebRTC call state machine — handles outbound/inbound, signaling via SSE.
+  const call = useCall();
 
   // Pulls conversations + active thread on a poll.
   const refresh = useCallback(async () => {
@@ -242,6 +248,7 @@ export function Messages() {
       setMessages((arr) => arr.filter((x) => x.id !== id));
       void refresh();
     },
+    ...call.realtimeHandlers,
   });
 
   // Auto-scroll only when the user is already near the bottom.
@@ -322,13 +329,16 @@ export function Messages() {
     if (!q) return true;
     return (c.peer.full_name ?? c.peer.email).toLowerCase().includes(q);
   });
-  // People not yet in a conversation — only surfaced once the user starts
-  // searching, so the list isn't cluttered with the whole directory by default.
-  const filteredDirectory = q
-    ? directory
-        .filter((p) => !conversationPeerIds.has(p.id))
-        .filter((p) => (p.full_name ?? p.email).toLowerCase().includes(q))
-    : [];
+  // Always surface the rest of the user's permitted directory under the
+  // existing conversations — Discord-style: every person you can DM is
+  // visible from the start, you don't have to "search to discover". The
+  // backend already scopes /messages/directory by permission.service rules
+  // (recruiter→assigned consultants + manager chain, consultant→recruiter
+  // + chain, every user→active developers, etc.), so what lands here is
+  // exactly the set the caller is allowed to chat with.
+  const filteredDirectory = directory
+    .filter((p) => !conversationPeerIds.has(p.id))
+    .filter((p) => !q || (p.full_name ?? p.email).toLowerCase().includes(q));
 
   return (
     <Layout
@@ -346,6 +356,13 @@ export function Messages() {
         >
           <div className="px-4 pt-3.5 pb-2 flex items-center justify-between">
             <h2 className="text-base font-semibold text-ink">Chats</h2>
+            {/* Discord-style notification toggle: prompts for browser
+                permission on first click; subsequent clicks toggle the
+                notify-sound preference. The actual delivery (title bar
+                count, favicon dot, desktop notification, ding) is wired
+                up in useInboxNotifications, mounted at App level via
+                RealtimeNotifications. */}
+            <NotificationToggle />
           </div>
 
           {/* Persistent search bar — filters chats and, once you type, also
@@ -368,8 +385,8 @@ export function Messages() {
           <div className="flex-1 overflow-y-auto">
             {filteredConversations.length === 0 && filteredDirectory.length === 0 ? (
               <p className="text-xs text-muted italic px-4 py-6 text-center">
-                {conversations.length === 0
-                  ? 'No messages yet. Search a name above to start a chat.'
+                {conversations.length === 0 && directory.length === 0
+                  ? 'No one is reachable yet. Ask an admin to assign your group / recruiter.'
                   : 'No matches.'}
               </p>
             ) : (
@@ -433,7 +450,7 @@ export function Messages() {
                 {filteredDirectory.length > 0 && (
                   <>
                     <div className="px-4 pt-3 pb-1 text-[10px] uppercase tracking-widest text-muted">
-                      People
+                      {q ? 'People' : 'Start a new chat'}
                     </div>
                     {filteredDirectory.map((p) => (
                       <button

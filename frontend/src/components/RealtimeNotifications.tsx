@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { useRealtime } from '../hooks/useRealtime';
 import { useAuth } from '../context/AuthContext';
 import { invalidate } from '../hooks/useInvalidate';
+import { useInboxNotifications } from '../hooks/useInboxNotifications';
 
 /**
  * App-wide realtime notification surface. Renders nothing; it just keeps a
@@ -23,6 +24,13 @@ import { invalidate } from '../hooks/useInvalidate';
 export function RealtimeNotifications() {
   const { profile } = useAuth();
   const location = useLocation();
+
+  // Discord-style inbox plumbing: title-bar count + favicon dot + browser
+  // desktop notification (when the tab is hidden + permission granted) +
+  // optional notify sound (opt-in via the toggle on the Messages page).
+  // Mounted here because this component already lives at App level keyed
+  // by profile.id, which is exactly the lifecycle the hook needs.
+  useInboxNotifications();
 
   useRealtime({
     'reminder:due': (payload) => {
