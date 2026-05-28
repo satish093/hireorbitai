@@ -500,8 +500,10 @@ async function callGroqTextWithFallback(
 }
 
 /** Gemini-primary structured: Gemini → Groq → Anthropic
- *  Use for analysis/scoring tasks where reasoning over context beats raw speed. */
-async function callGeminiStructuredWithFallback<T extends z.ZodType>(
+ *  Use for analysis/scoring tasks where reasoning over context beats raw speed.
+ *  Currently unused — kept for a planned rescore path; the underscore prefix
+ *  silences the unused-name lint until it gets wired up. */
+async function _callGeminiStructuredWithFallback<T extends z.ZodType>(
   callName: string,
   systemPrompt: string,
   userContent: string,

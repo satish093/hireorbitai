@@ -10,7 +10,6 @@ import {
   ALL_ROLES,
   BUSINESS_ROLES,
   MESSAGING_ROLES,
-  OWNER_TIER,
   ADMIN_TIER,
   hasCapability,
   type DeveloperCapability,

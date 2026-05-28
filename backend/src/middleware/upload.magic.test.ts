@@ -6,7 +6,7 @@
  * bytes and rejects mismatches.
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { bufferMatchesExtension, verifyUploadMagic } from './upload';
 
 // Real signatures we test against:
