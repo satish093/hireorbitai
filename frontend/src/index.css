@@ -424,8 +424,12 @@ body {
   }
 }
 
-/* Assign <main> a stable name so VT scopes to content, not the whole screen. */
-main {
+/* Assign the OUTER Layout <main> a stable name so VT scopes to content, not
+ * the whole screen. Scoped to .animate-page-enter (which only the Layout
+ * main carries) — pages that render their own nested <main> (e.g. the
+ * Messages chat pane) would otherwise duplicate the name and crash with
+ * "Unexpected duplicate view-transition-name: page". */
+main.animate-page-enter {
   view-transition-name: page;
 }
 
