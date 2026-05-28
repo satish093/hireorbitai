@@ -10,9 +10,13 @@ import { logger } from '../config/logger';
 // Schema helpers
 // ---------------------------------------------------------------------------
 
+// Voice-only by policy. Video has been stripped from the frontend; rejecting
+// it at the schema closes the gap where a crafted client could persist a
+// `video` row that downstream code (history, audit) wouldn't know how to
+// render. When/if video lands, widen to `z.enum(['audio', 'video'])`.
 const offerSchema = z.object({
   callee_id: z.string().uuid(),
-  call_type: z.enum(['audio', 'video']),
+  call_type: z.literal('audio'),
   sdp: z.string().min(1),
 });
 
@@ -171,15 +175,17 @@ export const end: RequestHandler = async (req, res) => {
   const { rows } = await pool.query<{ caller_id: string; callee_id: string }>(
     `UPDATE public.calls
      SET status = 'ended', ended_at = now()
-     WHERE id = $1 AND status NOT IN ('ended', 'rejected')
+     WHERE id = $1
+       AND status NOT IN ('ended', 'rejected')
+       AND (caller_id = $2 OR callee_id = $2)
      RETURNING caller_id, callee_id`,
-    [call_id],
+    [call_id, me.id],
   );
   if (!rows[0]) throw httpError(404, 'Call not found or already ended');
 
   const { caller_id, callee_id } = rows[0];
-  if (me.id !== caller_id && me.id !== callee_id) throw httpError(403, 'Not part of this call');
   if (peer_id !== caller_id && peer_id !== callee_id) throw httpError(403, 'Invalid peer');
+  if (peer_id === me.id) throw httpError(400, 'Cannot send call end to self');
 
   await publishToUser(peer_id, 'call:ended', { call_id });
 

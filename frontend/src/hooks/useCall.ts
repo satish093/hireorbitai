@@ -112,6 +112,7 @@ export function useCall(): UseCallReturn {
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const callIdRef = useRef<string | null>(null);
   const pendingCandidates = useRef<RTCIceCandidateInit[]>([]);
+  const pendingOutgoingCandidates = useRef<RTCIceCandidateInit[]>([]);
   const callTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const connectedAtRef = useRef<number | null>(null);
   const vibrateTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -180,6 +181,7 @@ export function useCall(): UseCallReturn {
     });
     setRemoteStream(null);
     pendingCandidates.current = [];
+    pendingOutgoingCandidates.current = [];
     callIdRef.current = null;
     connectedAtRef.current = null;
     setCallDuration(0);
@@ -205,16 +207,21 @@ export function useCall(): UseCallReturn {
     const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
 
     pc.onicecandidate = ({ candidate }) => {
-      if (!candidate || !callIdRef.current) return;
+      if (!candidate) return;
+      const payload = {
+        candidate: candidate.candidate,
+        sdpMid: candidate.sdpMid ?? null,
+        sdpMLineIndex: candidate.sdpMLineIndex ?? null,
+      };
+      if (!callIdRef.current) {
+        pendingOutgoingCandidates.current.push(payload);
+        return;
+      }
       api
         .post('/calls/ice-candidate', {
           call_id: callIdRef.current,
           peer_id: peerId,
-          candidate: {
-            candidate: candidate.candidate,
-            sdpMid: candidate.sdpMid ?? null,
-            sdpMLineIndex: candidate.sdpMLineIndex ?? null,
-          },
+          candidate: payload,
         })
         .catch(() => {});
     };
@@ -242,7 +249,27 @@ export function useCall(): UseCallReturn {
     pendingCandidates.current = [];
   }
 
+  function flushOutgoingCandidates(peerId: string, callId: string) {
+    const queued = pendingOutgoingCandidates.current.splice(0);
+    for (const candidate of queued) {
+      api
+        .post('/calls/ice-candidate', { call_id: callId, peer_id: peerId, candidate })
+        .catch(() => {});
+    }
+  }
+
   async function getMicStream(): Promise<MediaStream> {
+    // Guard for old / non-browser / insecure-context environments. getUserMedia
+    // is undefined on http:// (non-localhost) and on browsers without WebRTC
+    // (in-app webviews, very old Android stock browsers). Throwing a typed
+    // error here lets mediaErrorMessage map it to the SecurityError copy.
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+      const err = new Error(
+        'Voice calls are not supported in this browser. Use a recent Chrome, Safari, Firefox or Edge over HTTPS.',
+      ) as Error & { name?: string };
+      err.name = 'SecurityError';
+      throw err;
+    }
     return navigator.mediaDevices.getUserMedia({ audio: true, video: false });
   }
 
@@ -261,7 +288,11 @@ export function useCall(): UseCallReturn {
 
       // Auto-cancel if no answer within 45 s.
       callTimeoutRef.current = setTimeout(() => {
+        const callId = callIdRef.current;
         finalise('ended');
+        if (callId) {
+          api.post('/calls/end', { call_id: callId, peer_id: peerId }).catch(() => {});
+        }
       }, CALL_TIMEOUT_MS);
 
       try {
@@ -280,7 +311,9 @@ export function useCall(): UseCallReturn {
           call_type: 'audio',
           sdp: offer.sdp,
         });
-        callIdRef.current = res.data.call_id as string;
+        const callId = res.data.call_id as string;
+        callIdRef.current = callId;
+        flushOutgoingCandidates(peerId, callId);
       } catch (err: unknown) {
         finalise('ended', false);
         const e = err as { response?: { data?: { error?: string } } };
@@ -404,7 +437,8 @@ export function useCall(): UseCallReturn {
 
     'call:ice-candidate': async (raw) => {
       const { call_id, candidate } = raw as { call_id: string; candidate: RTCIceCandidateInit };
-      if (call_id !== callIdRef.current) return;
+      const activeCallId = callIdRef.current ?? incomingCall?.call_id ?? null;
+      if (call_id !== activeCallId) return;
       const pc = pcRef.current;
       if (!pc || !pc.remoteDescription) {
         pendingCandidates.current.push(candidate);
@@ -433,6 +467,17 @@ export function useCall(): UseCallReturn {
       return () => clearTimeout(t);
     }
   }, [status]);
+
+  // Unmount-safety net. If CallProvider is torn down mid-call (logout, route
+  // wrapper unmounts, hot reload), close the PC + release mic + stop ringtone
+  // and vibration. Without this, the mic LED stays on after sign-out and the
+  // ringtone keeps playing for a few seconds.
+  useEffect(() => {
+    return () => {
+      cleanup();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return {
     status,

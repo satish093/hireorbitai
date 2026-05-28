@@ -10,25 +10,62 @@ import {
 import { parseJobRequirements } from '../services/jobParser.service';
 import { tailorForJob as resumeTailorForJob } from './resumes.controller';
 import { fromJob as applicationsFromJob } from './applications.controller';
-import { httpError, MANAGER_TIER } from '../types';
+import { httpError, ADMIN_TIER, GROUP_LEAD_ROLES } from '../types';
 import { ANTHROPIC_ENABLED } from '../config/anthropic';
+import { leadCanAccessUser } from '../services/groupScope';
 
 // Light user join helper — explicit FK hint so the embed never collides.
 const JOB_SELECT = '*, client:clients(id, company_name), vendor:vendors(id, company_name)';
 
 /**
- * Authorize the caller to act on behalf of a given consultant. Manager-tier
- * sees all; a CONSULTANT only their own row; a RECRUITER only consultants they
- * own (consultants.recruiter_id == their recruiter row id). Throws 404 (not
- * 403) on mismatch so the endpoint isn't an existence oracle. Mirrors the
- * caller-principal scoping in applications.controller.ts:fromJob — used to
- * close the consultant_id IDOR on the "on-behalf-of" job endpoints.
+ * Authorize the caller to act on behalf of a given consultant.
+ *
+ *   ADMIN_TIER (SUPER_ADMIN/CEO/CTO/DIRECTOR) → access every consultant.
+ *   GROUP LEAD (HR_MANAGER / MANAGER)         → access ONLY when the
+ *     consultant's owning user is in the lead's group. Fail-closed when
+ *     the lead has no group_id (leadCanAccessUser returns false).
+ *   RECRUITER                                  → access ONLY consultants
+ *     they own (consultants.recruiter_id == their recruiter row id).
+ *   CONSULTANT                                  → only their own row.
+ *
+ * Throws 404 (not 403) on mismatch so the endpoint isn't an existence
+ * oracle. Mirrors the caller-principal scoping in
+ * applications.controller.ts:fromJob — used to close the consultant_id
+ * IDOR (and the group-scope leak that previously let an HR_MANAGER in
+ * pod A read pod B's consultant job data).
  */
 async function assertConsultantAccess(
-  caller: { id: string; role: string },
+  caller: { id: string; role: string; group_id?: string | null },
   consultantId: string,
 ): Promise<void> {
-  if ((MANAGER_TIER as string[]).includes(caller.role)) return;
+  // Admin-tier is unscoped — sees every consultant in the workspace.
+  if ((ADMIN_TIER as readonly string[]).includes(caller.role)) return;
+
+  // Group leads (HR_MANAGER / MANAGER): scope to consultants whose owning
+  // user is in their group. Need the consultant's user_id to call
+  // leadCanAccessUser, so look it up first.
+  if ((GROUP_LEAD_ROLES as readonly string[]).includes(caller.role)) {
+    const { data: cons } = await db
+      .from('consultants')
+      .select('user_id')
+      .eq('id', consultantId)
+      .maybeSingle();
+    const userId = (cons as { user_id?: string } | null)?.user_id;
+    if (
+      userId &&
+      (await leadCanAccessUser(
+        {
+          role: caller.role as Parameters<typeof leadCanAccessUser>[0]['role'],
+          group_id: caller.group_id ?? null,
+        },
+        userId,
+      ))
+    ) {
+      return;
+    }
+    throw httpError(404, 'Not found');
+  }
+
   if (caller.role === 'CONSULTANT') {
     const me = await getConsultantForUser(caller.id);
     if (me && (me as { id?: string }).id === consultantId) return;

@@ -133,7 +133,10 @@ beforeEach(() => {
 // Fixtures
 // ---------------------------------------------------------------------------
 const RECRUITER = { id: 'u-recruiter', role: 'RECRUITER' };
-const MANAGER_USER = { id: 'u-manager', role: 'HR_MANAGER' };
+// Admin-tier is unscoped — used for "manager can gap any consultant" coverage.
+const MANAGER_USER = { id: 'u-director', role: 'DIRECTOR' };
+// Group lead in pod A.
+const HR_IN_POD_A = { id: 'u-hr', role: 'HR_MANAGER', group_id: 'pod-a' };
 const CONSULTANT_USER = { id: 'u-consultant', role: 'CONSULTANT' };
 
 const MY_REC_ROW = { id: 'rec-mine', user_id: 'u-recruiter', manager_id: null };
@@ -180,7 +183,7 @@ describe('skillGap — IDOR protection', () => {
     expect(err?.status).toBeUndefined();
   });
 
-  it('MANAGER can gap-check any consultant', async () => {
+  it('ADMIN-TIER (DIRECTOR) can gap-check any consultant — unscoped', async () => {
     mock.rows.consultants = [OTHER_CONSULTANT_ROW];
     mock.rows.jobs = [JOB_ROW];
     const { err } = await call(jobs.skillGap as Handler, MANAGER_USER, {
@@ -188,6 +191,51 @@ describe('skillGap — IDOR protection', () => {
       query: { consultant_id: 'cons-other' },
     });
     expect(err?.status).toBeUndefined();
+  });
+
+  it('GROUP LEAD (HR_MANAGER) is denied an out-of-group consultant', async () => {
+    // HR is in pod-a; the consultant belongs to a user in pod-b.
+    mock.rows.consultants = [{ ...OTHER_CONSULTANT_ROW, user_id: 'u-other-consultant' }];
+    mock.rows.users = [
+      { id: 'u-other-consultant', group_id: 'pod-b' },
+      { id: 'u-some-other-user', group_id: 'pod-a' },
+    ];
+    mock.rows.jobs = [JOB_ROW];
+    const { err } = await call(jobs.skillGap as Handler, HR_IN_POD_A, {
+      params: { id: 'job-1' },
+      query: { consultant_id: 'cons-other' },
+    });
+    expect(err?.status).toBe(404);
+  });
+
+  it('GROUP LEAD (HR_MANAGER) can gap-check a consultant in their own group', async () => {
+    const IN_POD_A_CONSULTANT = {
+      id: 'cons-pod-a',
+      user_id: 'u-in-pod-a',
+      recruiter_id: 'rec-x',
+      primary_skill: 'Java',
+      skills: ['Java'],
+    };
+    mock.rows.consultants = [IN_POD_A_CONSULTANT];
+    mock.rows.users = [{ id: 'u-in-pod-a', group_id: 'pod-a' }];
+    mock.rows.jobs = [JOB_ROW];
+    const { err } = await call(jobs.skillGap as Handler, HR_IN_POD_A, {
+      params: { id: 'job-1' },
+      query: { consultant_id: 'cons-pod-a' },
+    });
+    expect(err?.status).toBeUndefined();
+  });
+
+  it('GROUP LEAD with NO group_id is fail-closed (cannot reach any consultant)', async () => {
+    mock.rows.consultants = [{ ...OTHER_CONSULTANT_ROW, user_id: 'u-x' }];
+    mock.rows.users = [{ id: 'u-x', group_id: 'pod-a' }];
+    mock.rows.jobs = [JOB_ROW];
+    const { err } = await call(
+      jobs.skillGap as Handler,
+      { id: 'u-hr', role: 'HR_MANAGER', group_id: null } as any,
+      { params: { id: 'job-1' }, query: { consultant_id: 'cons-other' } },
+    );
+    expect(err?.status).toBe(404);
   });
 
   it('CONSULTANT checking their own gap (no explicit consultant_id) succeeds', async () => {

@@ -268,14 +268,31 @@ export const markRead: RequestHandler = async (req, res) => {
     throw httpError(403, 'You cannot mark this conversation as read.');
   }
 
-  const { error } = await db
+  // Atomically flip read_at on every previously-unread message FROM the
+  // peer TO me. Returning the affected ids lets us push a precise
+  // `message:read` SSE event to the peer so their sent-tick (✓✓ blue)
+  // updates instantly instead of waiting for the next 60s poll.
+  const readAt = new Date().toISOString();
+  const { data: affected, error } = await db
     .from('messages')
-    .update({ read_at: new Date().toISOString() })
+    .update({ read_at: readAt })
     .eq('recipient_id', me)
     .eq('sender_id', other)
-    .is('read_at', null);
+    .is('read_at', null)
+    .is('deleted_at', null)
+    .select('id');
   if (error) throw httpError(500, 'Database error');
-  res.json({ ok: true });
+  const affectedIds = (affected ?? []).map((r: { id: string }) => r.id).filter(Boolean);
+  if (affectedIds.length > 0) {
+    // Fan out to the PEER only — the marker (me) doesn't need its own
+    // event since the markRead call itself is the local trigger.
+    void publishToUser(other, 'message:read', {
+      conversation_with: me,
+      read_at: readAt,
+      message_ids: affectedIds,
+    });
+  }
+  res.json({ ok: true, read: affectedIds.length });
 };
 
 // ---------------------------------------------------------------------------

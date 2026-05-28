@@ -103,6 +103,24 @@ export function Messages() {
   // attachment_ids and the server claims them. Empties on send / discard.
   const [pendingAttachments, setPendingAttachments] = useState<Attachment[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Belt-and-braces revoke of any localPreview object URLs that survive the
+  // component unmount. Normal flow revokes inline (upload-complete / unstage
+  // / send), but a route change mid-upload or a parent crash would otherwise
+  // leak the blob: URLs for the lifetime of the tab. The ref keeps the
+  // unmount handler reading the LATEST list rather than the initial empty
+  // closure capture.
+  const pendingAttachmentsRef = useRef<Attachment[]>([]);
+  useEffect(() => {
+    pendingAttachmentsRef.current = pendingAttachments;
+  }, [pendingAttachments]);
+  useEffect(() => {
+    return () => {
+      for (const att of pendingAttachmentsRef.current) {
+        if (att.localPreview) URL.revokeObjectURL(att.localPreview);
+      }
+    };
+  }, []);
   // Auto-grow composer textarea: re-measures on every keystroke up to ~6
   // lines, then scrolls internally. Kills the "tiny one-line box for a
   // 3-paragraph message" feeling that single-row textareas have.
@@ -140,6 +158,11 @@ export function Messages() {
   // Call state comes from the global CallProvider (mounted in App.tsx).
   const call = useCallContext();
 
+  // True until the first /conversations + /directory pair has returned. Lets
+  // the sidebar show a 3-row skeleton instead of either an empty state
+  // ("No one is reachable yet…") or a totally blank rail on first paint.
+  const [initialLoad, setInitialLoad] = useState(true);
+
   // Pulls conversations + active thread on a poll.
   const refresh = useCallback(async () => {
     try {
@@ -156,6 +179,8 @@ export function Messages() {
       } else {
         toast.error(msg);
       }
+    } finally {
+      setInitialLoad(false);
     }
   }, []);
 
@@ -216,8 +241,20 @@ export function Messages() {
   }, [refresh]);
   useEffect(() => {
     setReplyingTo(null); // any pending reply target belongs to the previous peer
+    // Clear the previous peer's messages SYNCHRONOUSLY before kicking off the
+    // new load. Without this, loadThread's "preserve missing local rows"
+    // merge (which is correct for within-peer polls + SSE races) treats the
+    // OLD peer's entire history as "missing" relative to the new peer's
+    // snapshot and appends every old message back in — chats appear not to
+    // switch, or appear interleaved with the previous thread, until the
+    // next poll tick.
+    setMessages([]);
+    setPeerTyping(false);
+    if (peerTypingTimerRef.current) {
+      clearTimeout(peerTypingTimerRef.current);
+      peerTypingTimerRef.current = null;
+    }
     if (!activePeerId) {
-      setMessages([]);
       setAccessDenied(false);
       inflightPeerRef.current = null;
       return;
@@ -362,6 +399,23 @@ export function Messages() {
       if (peerTypingTimerRef.current) clearTimeout(peerTypingTimerRef.current);
       peerTypingTimerRef.current = setTimeout(() => setPeerTyping(false), TYPING_CLEAR_MS);
     },
+    'message:read': (raw) => {
+      // The peer just marked our messages as read. Flip the local read_at
+      // on every affected row so the WhatsApp-style ✓✓ blue tick lights
+      // up instantly — without this, the sender had to wait for the next
+      // poll cycle to see the read state change.
+      const p = (raw ?? {}) as {
+        conversation_with?: string;
+        read_at?: string;
+        message_ids?: string[];
+      };
+      if (!p.message_ids?.length) return;
+      const readAt = p.read_at ?? new Date().toISOString();
+      const ids = new Set(p.message_ids);
+      setMessages((arr) =>
+        arr.map((x) => (ids.has(x.id) && !x.read_at ? { ...x, read_at: readAt } : x)),
+      );
+    },
   });
 
   // When a real message arrives from the peer, kill the typing indicator
@@ -409,13 +463,42 @@ export function Messages() {
     stickToBottomRef.current = distanceFromBottom < 80;
   }
 
+  // Direct loading of a peer via /users/:id so the chat header renders even
+  // before conversations/directory finish loading. Without this, opening
+  // /messages?with=<id> from a deep link / notification shows the empty
+  // "Select a conversation" state until two slow lists finish.
+  const [peerFallback, setPeerFallback] = useState<Party | null>(null);
+  useEffect(() => {
+    // Reset SYNCHRONOUSLY on every peer change so the chat header can never
+    // render the PREVIOUS peer's name/avatar/role while the new /users/:id
+    // fetch is in flight (which made the inbox feel like it hadn't switched).
+    setPeerFallback(null);
+    if (!activePeerId) return;
+    let cancelled = false;
+    api
+      .get(`/users/${activePeerId}`)
+      .then((r) => {
+        if (cancelled) return;
+        const u = r.data as Partial<Party> | null;
+        if (u?.id && u.id === activePeerId) setPeerFallback(u as Party);
+      })
+      .catch(() => {
+        /* falls through to undefined header until conversations/directory load */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activePeerId]);
+
   const activePeer: Party | undefined = useMemo(() => {
     if (!activePeerId) return undefined;
     return (
       conversations.find((c) => c.peer.id === activePeerId)?.peer ??
-      directory.find((p) => p.id === activePeerId)
+      directory.find((p) => p.id === activePeerId) ??
+      peerFallback ??
+      undefined
     );
-  }, [activePeerId, conversations, directory]);
+  }, [activePeerId, conversations, directory, peerFallback]);
 
   // Pick file(s) → upload each as an orphan attachment and stage it locally.
   // We start the upload immediately so by the time the user hits Send the
@@ -605,7 +688,19 @@ export function Messages() {
           </div>
 
           <div className="flex-1 overflow-y-auto">
-            {filteredConversations.length === 0 && filteredDirectory.length === 0 ? (
+            {initialLoad && conversations.length === 0 && directory.length === 0 ? (
+              <div className="px-3 py-2 space-y-2" aria-label="Loading conversations">
+                {[0, 1, 2, 3].map((i) => (
+                  <div key={i} className="flex items-center gap-3 px-1 py-2 animate-pulse">
+                    <div className="w-11 h-11 rounded-full bg-hover" />
+                    <div className="flex-1 space-y-1.5">
+                      <div className="h-3 rounded bg-hover w-3/4" />
+                      <div className="h-2.5 rounded bg-hover/70 w-1/2" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : filteredConversations.length === 0 && filteredDirectory.length === 0 ? (
               <p className="text-xs text-muted italic px-4 py-6 text-center">
                 {conversations.length === 0 && directory.length === 0
                   ? 'No one is reachable yet. Ask an admin to assign your group / recruiter.'
@@ -656,7 +751,7 @@ export function Messages() {
                             )}
                           >
                             {c.last_message.sender_id === profile?.id ? 'You: ' : ''}
-                            {c.last_message.body}
+                            {previewForConversation(c.last_message)}
                           </p>
                           {c.unread_count > 0 && (
                             <span className="shrink-0 bg-brand-500 text-white text-[10px] font-semibold rounded-full px-1.5 min-w-[18px] h-[18px] flex items-center justify-center">
@@ -1495,4 +1590,21 @@ function relative(iso: string): string {
   const d = Math.round(h / 24);
   if (d < 7) return `${d}d`;
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+/**
+ * Conversation-list preview text. Falls back to an attachment-shaped label
+ * when the body is empty but the message has attachments — without this, the
+ * sidebar would render a blank preview for image / file-only messages.
+ */
+function previewForConversation(m: Message): string {
+  if (m.body && m.body.trim()) return m.body;
+  const atts = m.attachments ?? [];
+  if (atts.length === 0) return m.body ?? '';
+  const images = atts.filter((a) => a.is_image).length;
+  const files = atts.length - images;
+  if (images > 0 && files === 0) return images === 1 ? 'Photo' : `${images} photos`;
+  if (files > 0 && images === 0)
+    return files === 1 ? `${atts[0]?.file_name ?? 'File'}` : `${files} files`;
+  return `${atts.length} attachments`;
 }

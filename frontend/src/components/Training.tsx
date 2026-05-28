@@ -964,17 +964,71 @@ export function FeedbackModal({
 }
 
 // ---------------------------------------------------------------------------
+// URL safety helpers — defence-in-depth on top of the backend allowlist.
+// Even though the backend (training.controller.ts safeContentUrl refinement)
+// rejects unsafe URLs at write time, the frontend MUST NOT trust DB values
+// either — DB rows may pre-date the backend hardening, or be set via direct
+// SQL during a manual import. Reject anything non-https here too.
+// ---------------------------------------------------------------------------
+function isSafeHttpsUrl(raw: string | undefined | null): raw is string {
+  if (!raw) return false;
+  try {
+    const u = new URL(raw);
+    return u.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+/** Extract a YouTube video id and validate the canonical 11-char shape, so
+ *  the id alone (not the full URL) goes into the iframe src. */
+function extractYouTubeId(raw: string): string | null {
+  if (!isSafeHttpsUrl(raw)) return null;
+  try {
+    const u = new URL(raw);
+    const host = u.hostname.toLowerCase().replace(/^www\./, '');
+    let id: string | null = null;
+    if (host === 'youtu.be') {
+      id = u.pathname.slice(1).split('/')[0] ?? null;
+    } else if (host === 'youtube.com' || host === 'youtube-nocookie.com') {
+      if (u.pathname.startsWith('/embed/')) {
+        id = u.pathname.slice('/embed/'.length).split('/')[0] ?? null;
+      } else if (u.pathname === '/watch') {
+        id = u.searchParams.get('v');
+      }
+    }
+    if (!id) return null;
+    return /^[A-Za-z0-9_-]{11}$/.test(id) ? id : null;
+  } catch {
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // VideoLessonPlayer — handles YouTube embed-style URL or raw mp4.
 // ---------------------------------------------------------------------------
 export function VideoLessonPlayer({ url }: { url: string }) {
-  const isYT = /youtube\.com\/watch\?v=|youtu\.be\//.test(url);
-  if (isYT) {
-    const id = url.split(/v=|youtu\.be\//)[1]?.split(/[&?]/)[0];
+  if (!isSafeHttpsUrl(url)) {
+    return (
+      <div className="border border-border rounded-xl p-3 text-xs text-muted bg-hover">
+        Video URL was rejected (must be https).
+      </div>
+    );
+  }
+  const ytId = extractYouTubeId(url);
+  if (ytId) {
     return (
       <div className="aspect-video w-full bg-black rounded-xl overflow-hidden">
         <iframe
           className="w-full h-full"
-          src={`https://www.youtube.com/embed/${id}`}
+          // Use youtube-nocookie + the validated 11-char id — never the raw URL.
+          src={`https://www.youtube-nocookie.com/embed/${ytId}`}
+          title="Lesson video"
+          // sandbox: scripts + same-origin needed so the YouTube player can
+          // run + postMessage. NO allow-top-navigation — the embed can't
+          // hijack the parent window.
+          sandbox="allow-scripts allow-same-origin allow-presentation"
+          referrerPolicy="no-referrer"
           allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
           allowFullScreen
         />
@@ -985,14 +1039,35 @@ export function VideoLessonPlayer({ url }: { url: string }) {
 }
 
 // ---------------------------------------------------------------------------
-// DocumentViewer — iframe-embeds PDFs/docs.
+// DocumentViewer — iframe-embeds PDFs/docs (https-only, sandboxed).
 // ---------------------------------------------------------------------------
 export function DocumentViewer({ url }: { url: string }) {
+  if (!isSafeHttpsUrl(url)) {
+    return (
+      <div className="border border-border rounded-xl p-3 text-xs text-muted bg-hover">
+        Document URL was rejected (must be https).
+      </div>
+    );
+  }
   return (
     <div className="border border-border rounded-xl overflow-hidden">
-      <iframe src={url} className="w-full h-[70dvh]" title="Document" />
+      <iframe
+        src={url}
+        className="w-full h-[70dvh]"
+        title="Document"
+        // allow-popups so PDF viewers can open links; popups-to-escape-sandbox
+        // so those new tabs aren't themselves sandboxed (would break almost
+        // every external link). Crucially no allow-top-navigation.
+        sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+        referrerPolicy="no-referrer"
+      />
       <div className="px-3 py-2 text-xs text-muted bg-hover border-t border-border">
-        <a href={url} target="_blank" rel="noreferrer" className="text-brand-600 hover:underline">
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-brand-600 hover:underline"
+        >
           Open in new tab ↗
         </a>
       </div>

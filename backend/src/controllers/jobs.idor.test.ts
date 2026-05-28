@@ -61,7 +61,10 @@ import {
 } from './jobs.controller';
 
 const CONSULTANT = { id: 'u-consultant', role: 'CONSULTANT' };
-const MANAGER = { id: 'u-manager', role: 'HR_MANAGER' };
+// Admin-tier is the unscoped "sees any consultant" role. The old fixture
+// used HR_MANAGER, which is now correctly group-scoped — group-lead
+// coverage lives in jobs.skillgap.idor.test.ts.
+const MANAGER = { id: 'u-director', role: 'DIRECTOR' };
 
 function mkRes() {
   const res: any = {

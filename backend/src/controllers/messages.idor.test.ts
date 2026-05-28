@@ -25,6 +25,11 @@ const mock = vi.hoisted(() => ({
   canSend: true,
   rows: {} as Record<string, unknown[]>,
   inserts: [] as { table: string; payload: Record<string, unknown> }[],
+  updates: [] as { table: string; payload: Record<string, unknown> }[],
+  // Records every filter clause the controller added, so assertions can prove
+  // the controller actually chained `.is('deleted_at', null)` (etc.) on the
+  // critical paths.
+  filters: [] as { table: string; method: 'eq' | 'is' | 'or'; args: unknown[] }[],
 }));
 
 // ---------------------------------------------------------------------------
@@ -46,13 +51,25 @@ vi.mock('../config/db', () => {
     const b: Record<string, unknown> = {};
     Object.assign(b, {
       select: () => b,
-      eq: () => b,
-      is: () => b,
-      or: () => b,
+      eq(col: string, val: unknown) {
+        mock.filters.push({ table, method: 'eq', args: [col, val] });
+        return b;
+      },
+      is(col: string, val: unknown) {
+        mock.filters.push({ table, method: 'is', args: [col, val] });
+        return b;
+      },
+      or(expr: string) {
+        mock.filters.push({ table, method: 'or', args: [expr] });
+        return b;
+      },
       in: () => b,
       order: () => b,
       limit: () => b,
-      update: () => b,
+      update(payload: Record<string, unknown>) {
+        mock.updates.push({ table, payload });
+        return b;
+      },
       insert(payload: Record<string, unknown>) {
         mock.inserts.push({ table, payload });
         return b;
@@ -74,6 +91,7 @@ vi.mock('../config/logger', () => ({
 
 import * as messages from './messages.controller';
 import { canViewConversation, canMessageUser } from '../services/permission.service';
+import { publishToUser } from '../services/realtime.service';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -122,8 +140,11 @@ beforeEach(() => {
   mock.canSend = true;
   for (const k of Object.keys(mock.rows)) delete mock.rows[k];
   mock.inserts.length = 0;
+  mock.updates.length = 0;
+  mock.filters.length = 0;
   vi.mocked(canViewConversation).mockImplementation(async () => mock.canView);
   vi.mocked(canMessageUser).mockImplementation(async () => mock.canSend);
+  vi.mocked(publishToUser).mockClear();
 });
 
 // ---------------------------------------------------------------------------
@@ -280,5 +301,164 @@ describe('messages.markRead — authorization guard', () => {
     });
     expect(err).toBeNull();
     expect(res.body).toMatchObject({ ok: true });
+  });
+
+  it('filters by deleted_at IS NULL so retracted messages do not get re-marked', async () => {
+    mock.canView = true;
+    await call(messages.markRead as Handler, ALICE, { params: { userId: BOB_ID } });
+    // The update chain must include `is('deleted_at', null)` — otherwise a
+    // retracted message would silently flip back to read_at = now() the next
+    // time the recipient opens the thread.
+    const sawDeletedAtFilter = mock.filters.some(
+      (f) => f.table === 'messages' && f.method === 'is' && f.args[0] === 'deleted_at',
+    );
+    expect(sawDeletedAtFilter).toBe(true);
+  });
+
+  it('publishes message:read to the peer with the affected ids', async () => {
+    mock.canView = true;
+    // Two previously-unread messages from BOB to ALICE — the update RETURNING
+    // clause hands them back so the handler can fan out a precise SSE event.
+    mock.rows.messages = [{ id: 'm-1' }, { id: 'm-2' }];
+    const { err, res } = await call(messages.markRead as Handler, ALICE, {
+      params: { userId: BOB_ID },
+    });
+    expect(err).toBeNull();
+    expect(res.body).toMatchObject({ ok: true, read: 2 });
+    expect(publishToUser).toHaveBeenCalledWith(
+      BOB_ID,
+      'message:read',
+      expect.objectContaining({
+        conversation_with: ALICE.id,
+        message_ids: ['m-1', 'm-2'],
+      }),
+    );
+    // Critical: ALICE (the marker) does NOT get an SSE event — only the
+    // peer needs the update.
+    const calledForAlice = vi
+      .mocked(publishToUser)
+      .mock.calls.some((c) => c[0] === ALICE.id && c[1] === 'message:read');
+    expect(calledForAlice).toBe(false);
+  });
+
+  it('does NOT publish message:read when no rows were affected', async () => {
+    mock.canView = true;
+    mock.rows.messages = []; // nothing was unread
+    await call(messages.markRead as Handler, ALICE, { params: { userId: BOB_ID } });
+    const calledForBob = vi
+      .mocked(publishToUser)
+      .mock.calls.some((c) => c[0] === BOB_ID && c[1] === 'message:read');
+    expect(calledForBob).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// typing() — POST /messages/with/:userId/typing
+// ---------------------------------------------------------------------------
+
+describe('messages.typing — authorization guard', () => {
+  it('returns 403 when canMessageUser denies access', async () => {
+    mock.canSend = false;
+    const { err } = await call(messages.typing as Handler, ALICE, {
+      params: { userId: BOB_ID },
+    });
+    expect(err?.status).toBe(403);
+    // And no SSE was emitted on the denied path.
+    const fired = vi.mocked(publishToUser).mock.calls.some((c) => c[1] === 'message:typing');
+    expect(fired).toBe(false);
+  });
+
+  it('publishes message:typing to the peer when canMessageUser allows', async () => {
+    mock.canSend = true;
+    const { err } = await call(messages.typing as Handler, ALICE, {
+      params: { userId: BOB_ID },
+    });
+    expect(err).toBeNull();
+    expect(publishToUser).toHaveBeenCalledWith(
+      BOB_ID,
+      'message:typing',
+      expect.objectContaining({ from_user_id: ALICE.id }),
+    );
+  });
+
+  it('returns 401 when req.user is missing', async () => {
+    const { err } = await call(messages.typing as Handler, undefined, {
+      params: { userId: BOB_ID },
+    });
+    expect(err?.status).toBe(401);
+  });
+
+  it('is a no-op when caller targets self (no permission check, no SSE)', async () => {
+    const { err, res } = await call(messages.typing as Handler, ALICE, {
+      params: { userId: ALICE.id },
+    });
+    expect(err).toBeNull();
+    expect(res.body).toMatchObject({ ok: true });
+    const fired = vi.mocked(publishToUser).mock.calls.length;
+    expect(fired).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// send() — reply-parent cross-conversation IDOR + soft-delete invariants
+// ---------------------------------------------------------------------------
+
+describe('messages.send — reply_to_message_id cross-conversation IDOR', () => {
+  const VALID_RECIPIENT_UUID = '00000000-0000-0000-0000-000000000002';
+  const FORGED_REPLY_UUID = '00000000-0000-0000-0000-000000000099';
+
+  beforeEach(() => {
+    // Recipient exists + active so we get past the recipient check.
+    mock.rows.users = [{ id: VALID_RECIPIENT_UUID, is_active: true }];
+    // Empty messages table — the reply-parent lookup will return null.
+    mock.rows.messages = [];
+    mock.canSend = true;
+  });
+
+  it('rejects a reply_to_message_id that is not in THIS conversation', async () => {
+    const { err } = await call(messages.send as Handler, ALICE, {
+      body: {
+        recipient_id: VALID_RECIPIENT_UUID,
+        body: 'hi',
+        reply_to_message_id: FORGED_REPLY_UUID,
+      },
+    });
+    // The handler couldn't find the parent in the (alice, recipient)
+    // pair, so it 400s without writing the row.
+    expect(err?.status).toBe(400);
+    expect(mock.inserts).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// conversations() — soft-delete invariant
+// ---------------------------------------------------------------------------
+
+describe('messages.conversations — soft-delete filter invariant', () => {
+  it('chains is(deleted_at, null) so retracted messages never reach the inbox', async () => {
+    mock.rows.messages = [];
+    await call(messages.conversations as Handler, ALICE, {});
+    const sawDeletedAtFilter = mock.filters.some(
+      (f) => f.table === 'messages' && f.method === 'is' && f.args[0] === 'deleted_at',
+    );
+    expect(sawDeletedAtFilter).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// unreadCount() — soft-delete + read_at invariants
+// ---------------------------------------------------------------------------
+
+describe('messages.unreadCount — counts only unread + non-deleted recipient rows', () => {
+  it('chains eq(recipient_id), is(read_at, null) AND is(deleted_at, null)', async () => {
+    await call(messages.unreadCount as Handler, ALICE, {});
+    const f = mock.filters.filter((x) => x.table === 'messages');
+    expect(f.some((x) => x.method === 'eq' && x.args[0] === 'recipient_id')).toBe(true);
+    expect(f.some((x) => x.method === 'is' && x.args[0] === 'read_at' && x.args[1] === null)).toBe(
+      true,
+    );
+    expect(
+      f.some((x) => x.method === 'is' && x.args[0] === 'deleted_at' && x.args[1] === null),
+    ).toBe(true);
   });
 });

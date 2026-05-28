@@ -37,6 +37,52 @@ function isManagerTier(role?: string): boolean {
   return !!role && (MANAGER_TIER as string[]).includes(role);
 }
 
+/**
+ * URLs that end up rendered inside an <iframe> / <video> / <img>. z.url() also
+ * accepts `javascript:`, `data:`, `ftp:`, `file:` — fine for a generic URL,
+ * dangerous for an unsanitised value that lands in src. This refinement
+ * narrows acceptance to:
+ *   - https:// only (no http: mixed-content + man-in-the-middle risk),
+ *   - a recognised allowlist of host suffixes (own domain + storage,
+ *     YouTube embeds, Vimeo, Wistia, Loom: the four sources we render
+ *     directly in the lesson player / document viewer).
+ *
+ * Anything else is rejected with a clear error message. When the allowlist
+ * needs a new host, add it to ALLOWED_CONTENT_HOST_SUFFIXES.
+ */
+const ALLOWED_CONTENT_HOST_SUFFIXES = [
+  'hireorbitai.com',
+  'youtube.com',
+  'youtu.be',
+  'vimeo.com',
+  'player.vimeo.com',
+  'wistia.com',
+  'loom.com',
+];
+
+const safeContentUrl = z
+  .string()
+  .url()
+  .refine(
+    (raw) => {
+      let u: URL;
+      try {
+        u = new URL(raw);
+      } catch {
+        return false;
+      }
+      if (u.protocol !== 'https:') return false;
+      const host = u.hostname.toLowerCase();
+      return ALLOWED_CONTENT_HOST_SUFFIXES.some(
+        (suffix) => host === suffix || host.endsWith('.' + suffix),
+      );
+    },
+    {
+      message:
+        'Content URLs must be https and from an approved host (hireorbitai.com storage, YouTube, Vimeo, Wistia, or Loom).',
+    },
+  );
+
 function isAdminTier(role?: string): boolean {
   return !!role && (ADMIN_TIER as string[]).includes(role);
 }
@@ -155,7 +201,7 @@ const courseSchema = z.object({
   title: z.string().min(1).max(200),
   description: z.string().nullable().optional(),
   category: z.string().min(1).max(80),
-  thumbnail_url: z.string().url().nullable().optional(),
+  thumbnail_url: safeContentUrl.nullable().optional(),
   difficulty: z.enum(['BEGINNER', 'INTERMEDIATE', 'ADVANCED']).default('BEGINNER'),
   estimated_duration_hours: z.number().nullable().optional(),
   tags: z.array(z.string()).default([]),
@@ -231,8 +277,8 @@ const lessonSchema = z.object({
   title: z.string().min(1).max(200),
   description: z.string().nullable().optional(),
   content: z.string().nullable().optional(),
-  video_url: z.string().url().nullable().optional(),
-  document_url: z.string().url().nullable().optional(),
+  video_url: safeContentUrl.nullable().optional(),
+  document_url: safeContentUrl.nullable().optional(),
   lesson_order: z.number().int().default(0),
   estimated_minutes: z.number().int().nullable().optional(),
   // Per-lesson gates (STEM OPT compliance spec).
@@ -449,7 +495,7 @@ export const updateProgress: RequestHandler = async (req, res) => {
 // UPLOADS — records the file URL; the file itself rides on local filesystem storage.
 // ---------------------------------------------------------------------------
 const uploadSchema = z.object({
-  file_url: z.string().url(),
+  file_url: safeContentUrl,
   file_name: z.string().min(1),
   mime_type: z.string().nullable().optional(),
   size_bytes: z.number().int().nullable().optional(),
