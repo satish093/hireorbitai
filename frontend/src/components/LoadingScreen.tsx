@@ -16,7 +16,26 @@
  * Keep this component dependency-free. It must work the moment React mounts.
  */
 
-const SPIN_KEYFRAME = `@keyframes ho-loading-spin { to { transform: rotate(360deg); } }`;
+/**
+ * Inline stylesheet:
+ *   - keyframe for the spinner ring;
+ *   - label colour that honours data-theme without depending on the Tailwind
+ *     bundle being loaded. A single hex can't clear WCAG-AA 4.5:1 on BOTH
+ *     #fafbfc (light bg) and #080b10 (dark bg), so we switch on the same
+ *     [data-theme='dark'] attribute the rest of the theme uses (set by the
+ *     pre-paint script in index.html before React mounts).
+ *
+ *   light: gray-600 #4b5563 ≈ 7.5:1 on light bg
+ *   dark:  gray-400 #9ca3af ≈ 7.0:1 on dark bg
+ *
+ * Both well above 4.5:1, replacing the previous inline #64748b which was
+ * 4.14:1 in dark mode (axe-core failure across every dark-mode-audit page).
+ */
+const LOADING_INLINE_CSS = `
+@keyframes ho-loading-spin { to { transform: rotate(360deg); } }
+.ho-loading-label { color: #4b5563; }
+[data-theme='dark'] .ho-loading-label { color: #9ca3af; }
+`;
 
 export function LoadingScreen({ label = 'Loading…' }: { label?: string }) {
   return (
@@ -33,7 +52,7 @@ export function LoadingScreen({ label = 'Loading…' }: { label?: string }) {
         width: '100%',
       }}
     >
-      <style>{SPIN_KEYFRAME}</style>
+      <style>{LOADING_INLINE_CSS}</style>
       <div
         className="flex flex-col items-center gap-3"
         style={{
@@ -59,9 +78,9 @@ export function LoadingScreen({ label = 'Loading…' }: { label?: string }) {
           }}
         />
         <span
+          className="ho-loading-label"
           style={{
             fontSize: '0.875rem',
-            color: '#64748b',
             fontFamily:
               'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif',
           }}
