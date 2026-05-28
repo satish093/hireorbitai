@@ -191,20 +191,34 @@ export const addManager: RequestHandler = async (req, res) => {
     .eq('id', recruiterId)
     .maybeSingle();
   if (!rec) throw httpError(404, 'Recruiter not found');
+  const recruiterUserId = (rec as { user_id: string | null }).user_id;
   // A group lead may only re-org recruiters in their own group.
-  await assertRecruiterInScope(req.user, (rec as { user_id: string | null }).user_id);
+  await assertRecruiterInScope(req.user, recruiterUserId);
+
+  let recruiterGroup: string | null = null;
+  if (recruiterUserId) {
+    const { data: recruiterUser } = await db
+      .from('users')
+      .select('group_id')
+      .eq('id', recruiterUserId)
+      .maybeSingle();
+    recruiterGroup = (recruiterUser as { group_id?: string | null } | null)?.group_id ?? null;
+  }
 
   const { data: target } = await db
     .from('users')
-    .select('id, role')
+    .select('id, role, group_id')
     .eq('id', parsed.data.manager_id)
     .maybeSingle();
   if (!target) throw httpError(404, 'Manager user not found');
-  const t = target as { id: string; role: string };
+  const t = target as { id: string; role: string; group_id: string | null };
   if (!(MANAGER_TIER as readonly string[]).includes(t.role))
     throw httpError(400, 'Assigned user must be manager-tier');
-  // A group lead can only assign a manager who is also in their own group — not
-  // an arbitrary manager-tier user from another group. Admin tier is unscoped.
+  // Supervisors are group-local, with one deliberate leadership exception:
+  // admin-tier callers may assign themselves as the supervisor.
+  if (isAdminTier(req.user.role) && t.id !== req.user.id && t.group_id !== recruiterGroup) {
+    throw httpError(403, 'The selected supervisor must be in the recruiter group.');
+  }
   if (isGroupLead(req.user.role) && !(await leadCanAccessUser(req.user, t.id))) {
     throw httpError(403, 'The selected manager must be in your group.');
   }

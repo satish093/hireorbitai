@@ -5,7 +5,7 @@ import { SkeletonCard } from '../components/Skeleton';
 import { Button } from '../components/Button';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import { canAssignRole, Role } from '../types';
+import { canAssignRole, Role, ROLE_LABEL } from '../types';
 
 interface UserGroup {
   id: string;
@@ -256,7 +256,12 @@ export function UserGroups() {
                     <ul className="space-y-1.5 mb-3">
                       {members.map((u) => (
                         <li key={u.id} className="flex items-center justify-between text-sm">
-                          <span className="text-ink truncate">{u.full_name ?? u.email}</span>
+                          <span className="min-w-0 flex items-center gap-2">
+                            <span className="text-ink truncate">{u.full_name ?? u.email}</span>
+                            <span className="shrink-0 rounded-full border border-border bg-hover px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted">
+                              {ROLE_LABEL[u.role as Role] ?? u.role}
+                            </span>
+                          </span>
                           <Button
                             variant="danger-ghost"
                             size="sm"

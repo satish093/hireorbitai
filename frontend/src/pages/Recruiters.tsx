@@ -49,6 +49,7 @@ interface CandidateUser {
   email: string;
   full_name?: string | null;
   role: Role;
+  group_id?: string | null;
 }
 
 interface ManagerCandidate {
@@ -177,6 +178,19 @@ export function Recruiters() {
     groupManagers.find((m) => m.id === selectedGroupManager)?.full_name ??
     groupManagers.find((m) => m.id === selectedGroupManager)?.email ??
     'the selected manager';
+  const supervisorCandidates =
+    profile && MANAGER_TIER_SET.has(profile.role)
+      ? [
+          ...candidates,
+          {
+            id: profile.id,
+            email: profile.email,
+            full_name: profile.full_name,
+            role: profile.role,
+            group_id: profile.group_id ?? null,
+          },
+        ].filter((u, idx, arr) => arr.findIndex((x) => x.id === u.id) === idx)
+      : candidates;
 
   return (
     <Layout title="Recruiters">
@@ -386,8 +400,9 @@ export function Recruiters() {
       {picked && (
         <ManageManagersModal
           recruiter={picked}
-          candidates={candidates}
+          candidates={supervisorCandidates}
           existing={effectiveManagers(picked)}
+          currentUserId={profile?.id ?? null}
           onClose={() => setPicked(null)}
           onChanged={async () => {
             // Refetch the recruiter list and re-pin `picked` to the
@@ -414,12 +429,14 @@ function ManageManagersModal({
   recruiter,
   candidates,
   existing,
+  currentUserId,
   onClose,
   onChanged,
 }: {
   recruiter: RecruiterRow;
   candidates: CandidateUser[];
   existing: ManagerLink[];
+  currentUserId: string | null;
   onClose: () => void;
   onChanged: () => void;
 }) {
@@ -427,7 +444,13 @@ function ManageManagersModal({
   const [picking, setPicking] = useState('');
 
   const existingIds = new Set(existing.map((m) => m.manager!.id));
-  const available = candidates.filter((u) => !existingIds.has(u.id) && u.id !== recruiter.user?.id);
+  const recruiterGroup = recruiter.user?.group_id ?? null;
+  const available = candidates.filter(
+    (u) =>
+      !existingIds.has(u.id) &&
+      u.id !== recruiter.user?.id &&
+      (u.id === currentUserId || u.group_id === recruiterGroup),
+  );
 
   async function add() {
     if (!picking) return;
@@ -550,7 +573,10 @@ function ManageManagersModal({
                   onChange={(e) => setPicking(e.target.value)}
                   options={available.map((u) => ({
                     value: u.id,
-                    label: (u.full_name ?? u.email) + (u.role ? ` (${ROLE_LABEL[u.role]})` : ''),
+                    label:
+                      (u.full_name ?? u.email) +
+                      (u.id === currentUserId ? ' (myself)' : '') +
+                      (u.role ? ` (${ROLE_LABEL[u.role]})` : ''),
                   }))}
                 />
               </div>
