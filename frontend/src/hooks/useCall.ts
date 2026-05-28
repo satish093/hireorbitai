@@ -219,19 +219,13 @@ export function useCall(): UseCallReturn {
         .catch(() => {});
     };
 
-    // Create the MediaStream up front and expose it via state. The CallModal
-    // attaches it to an <audio autoplay> element. Tracks are added as they
-    // arrive — modern browsers play newly-added audio tracks without re-binding.
-    const stream = new MediaStream();
-    setRemoteStream(stream);
+    // Bind the remote stream from ontrack DIRECTLY — don't pre-create an empty
+    // stream and try to swap it. Some mobile browsers (notably iOS Safari) won't
+    // switch the playing source if srcObject was set to an empty MediaStream
+    // first, which causes the "connected but silent" symptom.
     pc.ontrack = ({ track, streams }) => {
-      // Prefer the stream the browser hands us (some Safari versions don't
-      // hand-build incremental MediaStreams correctly).
-      if (streams && streams[0]) {
-        setRemoteStream(streams[0]);
-      } else {
-        stream.addTrack(track);
-      }
+      const stream = streams && streams[0] ? streams[0] : new MediaStream([track]);
+      setRemoteStream(stream);
     };
 
     return pc;

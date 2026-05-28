@@ -17,7 +17,7 @@
  * not relative to the transformed <main> (see frontend-responsive rules).
  */
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import clsx from 'clsx';
 import { Avatar } from './TaskBits';
@@ -51,28 +51,51 @@ export function CallModal({
 }: CallModalProps) {
   // ---- Remote audio playback --------------------------------------------
   // Use an <audio> element (not a hidden <video>) so display: none doesn't
-  // suppress audio. The element lives at the modal root so it stays mounted
-  // through the calling → connected transition. srcObject is rebound when
-  // remoteStream changes; .play() is called explicitly to side-step Chrome's
-  // autoplay heuristics in some edge cases.
+  // suppress audio. The element is permanently mounted at the modal root.
+  //
+  // Mobile autoplay reality: on iOS Safari (and some Android Chromes) the
+  // browser only honours .play() when called from a LIVE user gesture. The
+  // accept-call flow is async (getUserMedia → buildPC → setRemoteDescription
+  // → createAnswer → POST /answer → state update → useEffect), and by the
+  // time this effect runs the gesture from the Accept tap has already
+  // expired. If play() rejects, we flip `needsAudioTap` so the in-call UI
+  // surfaces a "Tap to hear" button that retries play() inside a fresh
+  // gesture.
   const remoteAudioRef = useRef<HTMLAudioElement>(null);
+  const [needsAudioTap, setNeedsAudioTap] = useState(false);
 
   useEffect(() => {
     const el = remoteAudioRef.current;
-    if (!el) return;
-    if (remoteStream && el.srcObject !== remoteStream) {
-      el.srcObject = remoteStream;
-    } else if (!remoteStream && el.srcObject) {
+    if (!el) {
+      setNeedsAudioTap(false);
+      return;
+    }
+    if (!remoteStream) {
       el.srcObject = null;
+      setNeedsAudioTap(false);
+      return;
     }
-    // Best-effort play. The accept/start button click counts as a user
-    // gesture, so this should not be blocked.
-    if (remoteStream) {
-      el.play().catch(() => {
-        /* paused by browser policy — user can tap a screen control to retry */
-      });
+    if (el.srcObject !== remoteStream) {
+      el.srcObject = remoteStream;
     }
+    el.muted = false;
+    el.volume = 1;
+    el.play()
+      .then(() => setNeedsAudioTap(false))
+      .catch(() => setNeedsAudioTap(true));
   }, [remoteStream]);
+
+  function manualPlay() {
+    const el = remoteAudioRef.current;
+    if (!el) return;
+    el.muted = false;
+    el.volume = 1;
+    el.play()
+      .then(() => setNeedsAudioTap(false))
+      .catch(() => {
+        /* still blocked — leave the button visible */
+      });
+  }
 
   if (status === 'idle') return null;
 
@@ -190,20 +213,35 @@ export function CallModal({
                 />
               </div>
             ) : (
-              <div className="flex items-center justify-center gap-6">
-                <CallToggleButton
-                  onClick={onToggleMute}
-                  active={isMuted}
-                  label={isMuted ? 'Unmute' : 'Mute'}
-                  activeIcon={<IconMicOff size={24} />}
-                  inactiveIcon={<IconMic size={24} />}
-                />
-                <CallActionButton
-                  onClick={onEnd}
-                  variant="reject"
-                  label="End call"
-                  icon={<IconPhoneOff size={28} />}
-                />
+              <div className="flex flex-col items-center gap-5">
+                {/* Mobile browsers (esp. iOS Safari) block autoplay when the
+                    user gesture has expired by the time srcObject is attached.
+                    If play() rejected, surface a button that retries inside a
+                    fresh, live gesture. Vanishes silently once audio is alive. */}
+                {needsAudioTap && (
+                  <button
+                    type="button"
+                    onClick={manualPlay}
+                    className="px-4 py-2 rounded-full bg-amber-400 text-slate-900 text-sm font-semibold shadow-lg animate-pulse focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-200"
+                  >
+                    🔈 Tap to hear the other person
+                  </button>
+                )}
+                <div className="flex items-center justify-center gap-6">
+                  <CallToggleButton
+                    onClick={onToggleMute}
+                    active={isMuted}
+                    label={isMuted ? 'Unmute' : 'Mute'}
+                    activeIcon={<IconMicOff size={24} />}
+                    inactiveIcon={<IconMic size={24} />}
+                  />
+                  <CallActionButton
+                    onClick={onEnd}
+                    variant="reject"
+                    label="End call"
+                    icon={<IconPhoneOff size={28} />}
+                  />
+                </div>
               </div>
             )}
           </div>
