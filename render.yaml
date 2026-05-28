@@ -24,7 +24,7 @@ services:
     plan: free
     branch: dev
     autoDeploy: true
-    buildCommand: npm ci && npm run shared:build && npm --prefix backend run build
+    buildCommand: npm ci && npm run shared:build && npm --prefix backend run build && npm --prefix backend run migrate:ci
     startCommand: node backend/dist/server.js
     healthCheckPath: /health
     envVars:
@@ -90,6 +90,10 @@ services:
         sync: false
       - key: JOB_SOURCES_MOCK
         value: 'true'
+      # Set to real Jooble key (jooble.org/api/index) to test live data.
+      # Leave unset to stay in mock mode (no API spend).
+      - key: JOOBLE_API_KEY
+        sync: false
 
   # --------------------------------------------------------------- frontend ---
   - type: web
