@@ -407,21 +407,85 @@ describe('consultant scope', () => {
   });
 });
 
-// ─── DEVELOPER ─────────────────────────────────────────────────────────────
-describe('developer — no chat by default', () => {
-  it('DEVELOPER has an empty accessible set', async () => {
+// ─── DEVELOPER (support-chat exception) ───────────────────────────────────
+//
+// Developers stay excluded from BUSINESS_ROLES everywhere else (no jobs /
+// tasks / training / etc.), but chat is the ONE exception so users can report
+// bugs/errors and the developer can reply.
+describe('developer — support-chat exception', () => {
+  it('DEVELOPER caller reaches every ACTIVE user (mirrors admin support reach)', async () => {
     setupDb({
       users: [
+        { id: 'u-dev', role: 'DEVELOPER', is_active: true },
         { id: 'u-dir', role: 'DIRECTOR', is_active: true },
         { id: 'u-rec', role: 'RECRUITER', is_active: true },
+        { id: 'u-cons', role: 'CONSULTANT', is_active: true },
+        { id: 'u-inactive', role: 'MANAGER', is_active: false },
       ],
     });
     const ids = await getAccessibleUserIds({ id: 'u-dev', role: 'DEVELOPER', group_id: null });
-    expect(ids.size).toBe(0);
+    expect(ids.has('u-dir')).toBe(true);
+    expect(ids.has('u-rec')).toBe(true);
+    expect(ids.has('u-cons')).toBe(true);
+    // Self excluded, inactive excluded.
+    expect(ids.has('u-dev')).toBe(false);
+    expect(ids.has('u-inactive')).toBe(false);
   });
 
-  it('DEVELOPER cannot message anyone (capability grants are for admin surfaces, not chat)', async () => {
-    expect(await canMessageUser({ id: 'u-dev', role: 'DEVELOPER', group_id: null }, 'u-rec')).toBe(
+  it('every non-admin caller reaches active developers (for bug/error reporting)', async () => {
+    setupDb({
+      users: [
+        { id: 'u-rec', role: 'RECRUITER', is_active: true },
+        { id: 'u-cons', role: 'CONSULTANT', is_active: true },
+        { id: 'u-mgr', role: 'MANAGER', is_active: true, group_id: 'g-a' },
+        { id: 'u-dev-active', role: 'DEVELOPER', is_active: true },
+        { id: 'u-dev-inactive', role: 'DEVELOPER', is_active: false },
+      ],
+      recruiters: [{ id: 'r1', user_id: 'u-rec', manager_id: null }],
+      recruiter_managers: [],
+      consultants: [{ user_id: 'u-cons', recruiter_id: 'r1' }],
+    });
+    // RECRUITER → can DM an active developer.
+    const recIds = await getAccessibleUserIds({ id: 'u-rec', role: 'RECRUITER', group_id: null });
+    expect(recIds.has('u-dev-active')).toBe(true);
+    expect(recIds.has('u-dev-inactive')).toBe(false);
+    // CONSULTANT → can DM an active developer.
+    const consIds = await getAccessibleUserIds({
+      id: 'u-cons',
+      role: 'CONSULTANT',
+      group_id: null,
+    });
+    expect(consIds.has('u-dev-active')).toBe(true);
+    expect(consIds.has('u-dev-inactive')).toBe(false);
+    // MANAGER → can DM an active developer.
+    const mgrIds = await getAccessibleUserIds({ id: 'u-mgr', role: 'MANAGER', group_id: 'g-a' });
+    expect(mgrIds.has('u-dev-active')).toBe(true);
+    expect(mgrIds.has('u-dev-inactive')).toBe(false);
+  });
+
+  it('admin-tier still reaches developers (via the existing admin all-users branch)', async () => {
+    setupDb({
+      users: [
+        { id: 'u-admin', role: 'SUPER_ADMIN', is_active: true },
+        { id: 'u-dev', role: 'DEVELOPER', is_active: true },
+      ],
+    });
+    expect(
+      await canMessageUser({ id: 'u-admin', role: 'SUPER_ADMIN', group_id: null }, 'u-dev'),
+    ).toBe(true);
+  });
+
+  it('canMessageUser denies an INACTIVE developer target (no support chat with inactive users)', async () => {
+    setupDb({
+      users: [
+        { id: 'u-rec', role: 'RECRUITER', is_active: true },
+        { id: 'u-dev', role: 'DEVELOPER', is_active: false },
+      ],
+      recruiters: [{ id: 'r1', user_id: 'u-rec', manager_id: null }],
+      recruiter_managers: [],
+      consultants: [],
+    });
+    expect(await canMessageUser({ id: 'u-rec', role: 'RECRUITER', group_id: null }, 'u-dev')).toBe(
       false,
     );
   });

@@ -9,6 +9,7 @@ import {
   MANAGER_TIER,
   ALL_ROLES,
   BUSINESS_ROLES,
+  MESSAGING_ROLES,
   OWNER_TIER,
   ADMIN_TIER,
   hasCapability,
@@ -83,7 +84,10 @@ const sections: Section[] = [
         to: '/messages',
         label: 'Inbox',
         icon: IconInbox,
-        roles: BUSINESS_ROLES,
+        // The ONE business-app surface DEVELOPER also sees, so users can DM a
+        // developer for bug/error reporting. Every other Workspace item stays
+        // BUSINESS_ROLES (developer excluded).
+        roles: MESSAGING_ROLES,
         badgeKey: 'inbox',
         flagKey: 'messages',
       },

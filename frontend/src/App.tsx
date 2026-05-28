@@ -15,6 +15,7 @@ import {
   OPERATOR_TIER,
   OWNER_TIER,
   BUSINESS_ROLES,
+  MESSAGING_ROLES,
   hasCapability,
 } from './types';
 
@@ -483,7 +484,11 @@ export default function App() {
           <Route
             path="/messages"
             element={
-              <ProtectedRoute allow={BUSINESS_ROLES}>
+              // MESSAGING_ROLES (= BUSINESS_ROLES + DEVELOPER) is the ONE
+              // exception that admits DEVELOPER, so every user can reach a
+              // developer for bug/error reporting and the developer can reply.
+              // Every other business route stays BUSINESS_ROLES.
+              <ProtectedRoute allow={MESSAGING_ROLES}>
                 <FeatureGuard feature="messages">
                   <Messages />
                 </FeatureGuard>

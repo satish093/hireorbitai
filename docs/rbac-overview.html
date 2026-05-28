@@ -317,7 +317,7 @@
         <div class="role-row">
           <span class="name">Developer</span>
           <span class="pill gray">capability-only</span>
-          <span class="scope">No default access. Super Admin grants specific capabilities (Users, Reports, Feature Flags, etc.).</span>
+          <span class="scope">No default business access. Super Admin grants specific capabilities (Users, Reports, Feature Flags, etc.). One exception: every user can DM a developer for bug/error reporting, and the developer can reply (chat only — no jobs, tasks, training, etc.).</span>
         </div>
         <div class="role-row">
           <span class="name">Recruiter</span>
@@ -488,21 +488,29 @@
           </tr>
           <tr>
             <td><strong>Recruiter</strong></td>
-            <td>All other Recruiters · Admin leadership · Your own manager / HR chain · Your own assigned consultants.</td>
+            <td>All other Recruiters · Admin leadership · Your own manager / HR chain · Your own assigned consultants · <em>any active Developer (for bug reports).</em></td>
             <td>Other recruiters' consultants · Out-of-group managers (unless they directly supervise you).</td>
           </tr>
           <tr>
             <td><strong>Consultant</strong></td>
-            <td>Your assigned recruiter · That recruiter's manager / HR chain.</td>
+            <td>Your assigned recruiter · That recruiter's manager / HR chain · <em>any active Developer (for bug reports).</em></td>
             <td>Other consultants · Recruiters who aren't yours.</td>
           </tr>
           <tr>
             <td><strong>Developer</strong></td>
-            <td>No one by default. Chat is for the business org.</td>
-            <td>Everyone.</td>
+            <td>Every active user — but <em>only</em> via the in-app messenger, for support follow-up. No jobs, tasks, training, applications, resumes, or admin pages.</td>
+            <td>—</td>
           </tr>
         </tbody>
       </table>
+
+      <div class="note">
+        <strong>Developer support exception.</strong> Every active user can DM an active
+        Developer for bug/error reporting, and the Developer can reply. This is the
+        <em>only</em> business surface Developers see — they remain blocked from jobs,
+        tasks, training, applications, resumes, vendors, clients and admin pages unless a
+        Super Admin explicitly grants them a capability.
+      </div>
 
       <div class="note">
         <strong>No "old chat" loophole.</strong> If we reassign a consultant from Recruiter A

@@ -39,9 +39,14 @@
  *       manager-tier users in the consultant's own group).
  *     NEVER other consultants, NEVER unrelated recruiters.
  *
- *   DEVELOPER
- *     → no chat by default. Capability grants are for admin surfaces, not
- *       messaging.
+ *   DEVELOPER (support-chat exception)
+ *     → every active user (so devs can reply to bug reports / support pings).
+ *     This is the only DEVELOPER access outside the explicit admin-page
+ *     capability grants; the role is still excluded from BUSINESS_ROLES, so
+ *     /jobs, /tasks, /training etc. remain blocked.
+ *
+ *   ALL ROLES → active DEVELOPERs are ALWAYS reachable (bug/error reporting).
+ *     Inactive DEVELOPERs are excluded, same as any other inactive target.
  *
  * Strict assignment + group only — no reports_to chain, no prior-thread
  * carry-over. If a reassignment removes a relationship, the in-flight thread
@@ -322,7 +327,33 @@ export async function getAccessibleUserIds(caller: PermissionCaller): Promise<Se
     }
   }
 
-  // DEVELOPER: no chat by default — the role falls through to the empty set.
+  // ── DEVELOPER (support-chat exception) ───────────────────────────────────
+  // A developer is excluded from BUSINESS_ROLES everywhere else, but for chat
+  // they need to be able to reply to bug-report pings from any user. So they
+  // reach every active user — mirroring the admin support reach. Capability
+  // grants are unrelated to this; this rule applies to every DEVELOPER.
+  if (caller.role === 'DEVELOPER') {
+    const { data } = await db
+      .from('users')
+      .select('id')
+      .neq('id', caller.id)
+      .neq('is_active', false);
+    for (const u of (data ?? []) as Array<{ id: string }>) peerIds.add(u.id);
+  }
+
+  // ── Universal: any active user can reach an active DEVELOPER ─────────────
+  // Bug/error reporting. Non-admin callers had no developer in their forward
+  // set above; admin-tier short-circuited earlier with the full user list (no
+  // role filter), so this only matters for non-admin callers. Inactive devs
+  // are filtered out, same as any other target.
+  if (!ADMIN_ROLES.includes(caller.role) && caller.role !== 'DEVELOPER') {
+    const { data: devs } = await db
+      .from('users')
+      .select('id')
+      .eq('role', 'DEVELOPER')
+      .neq('is_active', false);
+    for (const d of (devs ?? []) as Array<{ id: string }>) peerIds.add(d.id);
+  }
 
   peerIds.delete(caller.id);
   cacheSet(caller, peerIds);

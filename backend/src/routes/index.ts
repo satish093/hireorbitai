@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { requireAuth, blockIfMustChangePassword, requireRole } from '../middleware/auth';
 import { requireFeature } from '../middleware/featureFlag';
-import { OPERATOR_TIER, BUSINESS_ROLES } from '../types';
+import { OPERATOR_TIER, BUSINESS_ROLES, MESSAGING_ROLES } from '../types';
 import { authRouter } from './auth.routes';
 import { devAuthRouter } from './devAuth.routes';
 import { devToolsRouter } from './devTools.routes';
@@ -132,7 +132,17 @@ router.use('/reports', requireFeature('reports'), reportsRouter);
 router.use('/ai', requireRole(...OPERATOR_TIER), requireFeature('ai_email'), aiRouter);
 router.use('/tasks', requireRole(...BUSINESS_ROLES), requireFeature('tasks'), tasksRouter);
 router.use('/task-views', requireRole(...BUSINESS_ROLES), requireFeature('tasks'), taskViewsRouter);
-router.use('/messages', requireRole(...BUSINESS_ROLES), requireFeature('messages'), messagesRouter);
+// /messages is the ONE exception that admits DEVELOPER — see MESSAGING_ROLES in
+// shared/src/roles.ts. Lets every user reach a developer for bug/error reports
+// and lets the developer reply. All other business routes keep the
+// BUSINESS_ROLES gate, so DEVELOPER stays excluded from jobs / tasks / training
+// / etc. unless they have an explicit admin-page capability.
+router.use(
+  '/messages',
+  requireRole(...MESSAGING_ROLES),
+  requireFeature('messages'),
+  messagesRouter,
+);
 router.use('/training', requireRole(...BUSINESS_ROLES), requireFeature('training'), trainingRouter);
 
 // Realtime SSE stream — generic push channel used by messages,

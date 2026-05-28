@@ -68,22 +68,29 @@ test.describe('Sidebar parity by role (matrix-driven)', () => {
     });
   }
 
-  test('DEVELOPER with no capabilities sees only Dashboard', async ({ page }) => {
+  test('DEVELOPER with no capabilities sees Dashboard + Inbox (support-chat exception)', async ({
+    page,
+  }) => {
     const profile = profileFor('DEVELOPER');
     await seedSession(page, profile);
     await mockApi(page, { profile, flags: {} });
     await page.goto('/dashboard');
     await expect(navLink(page, 'Dashboard')).toBeVisible();
 
+    // Inbox is the ONE business-app surface DEVELOPER also sees so every user
+    // can reach them for bug/error reporting. Everything else stays hidden
+    // until a capability is granted.
     const expected = new Set(expectedSidebarLabels('DEVELOPER', []));
-    expect([...expected]).toEqual(['Dashboard']);
+    expect([...expected].sort()).toEqual(['Dashboard', 'Inbox']);
     for (const label of ALL_SIDEBAR_LABELS) {
-      if (label === 'Dashboard') continue;
+      if (expected.has(label)) continue;
       await expect(navLink(page, label), `dev should NOT see "${label}"`).toHaveCount(0);
     }
   });
 
-  test('DEVELOPER + [users, reports] sees Dashboard + Users + Analytics only', async ({ page }) => {
+  test('DEVELOPER + [users, reports] sees Dashboard + Inbox + Users + Analytics', async ({
+    page,
+  }) => {
     const caps: DeveloperCapability[] = ['users', 'reports'];
     const profile = profileFor('DEVELOPER', caps);
     await seedSession(page, profile);

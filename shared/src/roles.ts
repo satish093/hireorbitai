@@ -141,5 +141,15 @@ export function assignableRolesFor(actorRole: Role): Role[] {
  */
 export const BUSINESS_ROLES: Role[] = ALL_ROLES.filter((r) => r !== 'DEVELOPER');
 
+/**
+ * Roles that can use the in-app messenger. Same as BUSINESS_ROLES + DEVELOPER —
+ * the only exception we make to "DEVELOPER has no business access by default."
+ * Lets every user reach a developer for bug/error reporting and lets the
+ * developer reply, WITHOUT granting DEVELOPER access to jobs / tasks / training
+ * / etc. Only use this for the /messages route gate; everywhere else the
+ * BUSINESS_ROLES exclusion of DEVELOPER stays in force.
+ */
+export const MESSAGING_ROLES: Role[] = [...BUSINESS_ROLES, 'DEVELOPER'];
+
 // ROLE_LABEL stays in `frontend/src/types/index.ts` — display capitalisation
 // is a UI concern, not a domain-model concern. Backend never reads it.

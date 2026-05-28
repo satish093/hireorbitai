@@ -122,6 +122,19 @@ test.describe('Role-based access', () => {
     await expect(page).toHaveURL(/\/unauthorized$/);
   });
 
+  test('a DEVELOPER CAN reach /messages (support-chat exception)', async ({ page }) => {
+    // The ONE business-app surface DEVELOPER is admitted to so every user can
+    // DM a developer for bug/error reporting. All other business pages stay
+    // gated by BUSINESS_ROLES which excludes DEVELOPER.
+    await seedSession(page, DEVELOPER);
+    await mockApi(page, { profile: DEVELOPER, flags: { messages: true } });
+
+    await page.goto('/messages');
+
+    await expect(page).toHaveURL(/\/messages$/);
+    await expect(page).not.toHaveURL(/\/unauthorized$/);
+  });
+
   test('a DEVELOPER granted the users capability is routed to /admin/users', async ({ page }) => {
     const dev = { ...DEVELOPER, capabilities: ['users'] };
     await seedSession(page, dev);

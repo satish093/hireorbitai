@@ -16,6 +16,7 @@
 import {
   ALL_ROLES,
   BUSINESS_ROLES,
+  MESSAGING_ROLES,
   OPERATOR_TIER,
   MANAGER_TIER,
   ADMIN_TIER,
@@ -87,11 +88,17 @@ export const RBAC_MATRIX: RoutePolicy[] = [
     path: '/messages',
     sidebarLabel: 'Inbox',
     section: 'Workspace',
-    allow: BUSINESS_ROLES,
+    // ONE exception that admits DEVELOPER (= BUSINESS_ROLES + DEVELOPER) so
+    // every user can reach a developer for bug/error reporting. All other
+    // business routes stay BUSINESS_ROLES (developer excluded).
+    allow: MESSAGING_ROLES,
     flagKey: 'messages',
-    backendGate: 'requireRole(...BUSINESS_ROLES) + requireFeature(messages)',
+    backendGate: 'requireRole(...MESSAGING_ROLES) + requireFeature(messages)',
     scope: 'owner-scoped',
-    primaryActions: ['message permitted peers only (permission.service)'],
+    primaryActions: [
+      'message permitted peers only (permission.service)',
+      'developer support exception — anyone can DM an active developer',
+    ],
   },
   {
     path: '/reminders',
