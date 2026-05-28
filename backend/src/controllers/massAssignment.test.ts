@@ -34,6 +34,14 @@ vi.mock('../config/db', () => {
       eq: () => b,
       select: () => b,
       single: () => Promise.resolve({ data: { id: 'new-id' }, error: null }),
+      // Controllers' update() now loads the existing row via .maybeSingle()
+      // for the "owner OR manager" check before mutating. Return a stub
+      // row whose created_by matches ACTOR so non-manager updates pass
+      // the ownership branch and we still reach the payload-capture
+      // path. id: 'new-id' is preserved so the rest of the chain reads
+      // the same as the single() variant.
+      maybeSingle: () =>
+        Promise.resolve({ data: { id: 'new-id', created_by: 'u-actor' }, error: null }),
     });
     return b;
   }
