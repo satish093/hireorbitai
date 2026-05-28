@@ -102,27 +102,44 @@ describe('invitations.create — non-admin defaults group_id to caller.group_id'
     expect(createInvitationSpy).toHaveBeenCalledWith(expect.objectContaining({ groupId: G_REC }));
   });
 
-  it('RECRUITER passing a DIFFERENT group_id is rejected (assertCanAssignGroup → 403)', async () => {
+  it('RECRUITER passing a DIFFERENT group_id is silently forced back to their own group', async () => {
+    // The controller now FORCES the invitee into the caller's group rather
+    // than just defaulting it. An explicit body.group_id from a non-admin
+    // caller is ignored — the only way to land in a different group is to
+    // be admin-tier. This is the belt-and-braces fix for the recruiter
+    // invite edge case in docs/rbac-overview.html.
     const { err } = await call(RECRUITER, {
       email: 'c@x.test',
       role: 'CONSULTANT',
       group_id: G_ATTACKER,
     });
-    expect(err?.status).toBe(403);
-    expect(createInvitationSpy).not.toHaveBeenCalled();
+    expect(err).toBeNull();
+    expect(createInvitationSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ role: 'CONSULTANT', groupId: G_REC }),
+    );
   });
 
-  it('RECRUITER with NO group_id cannot invite anyone (defaults to null and stays null; group lead fail-closed expectation)', async () => {
-    // A recruiter without a group_id is anomalous, but if it happens the
-    // invitation lands in "no group" (null) — assertCanAssignGroup allows null
-    // by design. This pins that current behaviour so any future tighten-up is
-    // intentional, not accidental.
+  it('RECRUITER with NO group_id cannot invite anyone (403 — invitee would land with NULL group, escaping every scope check)', async () => {
+    // Previously a recruiter without a group_id would create a Consultant
+    // with users.group_id = NULL, which escapes every group-scope check
+    // downstream. The handler now refuses the invite up-front and instructs
+    // the user to ask an admin to place them in a group.
     const { err } = await call(
       { ...RECRUITER, group_id: null },
       { email: 'c@x.test', role: 'CONSULTANT' },
     );
-    expect(err).toBeNull();
-    expect(createInvitationSpy).toHaveBeenCalledWith(expect.objectContaining({ groupId: null }));
+    expect(err?.status).toBe(403);
+    expect((err as { message?: string }).message ?? '').toMatch(/assigned to a group/i);
+    expect(createInvitationSpy).not.toHaveBeenCalled();
+  });
+
+  it('HR_MANAGER with NO group_id cannot invite either (same fail-closed rule, not recruiter-only)', async () => {
+    const { err } = await call(
+      { ...HR_LEAD, group_id: null },
+      { email: 'r@x.test', role: 'RECRUITER' },
+    );
+    expect(err?.status).toBe(403);
+    expect(createInvitationSpy).not.toHaveBeenCalled();
   });
 
   it('ADMIN-TIER (DIRECTOR) with no group_id ⇒ stays "no group" (admin chooses freely)', async () => {

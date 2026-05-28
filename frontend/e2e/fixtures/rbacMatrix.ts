@@ -202,14 +202,20 @@ export const RBAC_MATRIX: RoutePolicy[] = [
     path: '/reports',
     sidebarLabel: 'Analytics',
     section: 'Talent',
-    allow: MANAGER_TIER,
+    // RECRUITER gets the link too — the Reports page strips the tab strip
+    // down to "Submissions" + "Daily log" for them and the backend
+    // self-scopes the rows on those endpoints. Aggregate analytics tabs
+    // (pipeline / recruiters / consultants / placements / sources / ai)
+    // stay manager-tier. CONSULTANT remains excluded by OPERATOR_TIER.
+    allow: OPERATOR_TIER,
     capability: 'reports',
     flagKey: 'reports',
-    backendGate: 'requireRoleOrCapability(MANAGER_TIER, reports) + requireFeature(reports)',
+    backendGate:
+      'requireRoleOrCapability(OPERATOR_TIER, reports) per-endpoint + requireFeature(reports)',
     scope: 'global',
-    primaryActions: ['view org analytics'],
+    primaryActions: ['view org analytics (mgrs+) · own submissions/daily (recruiter)'],
     workspaceWideException:
-      'Analytics are workspace-wide for all of MANAGER_TIER incl. group leads — aggregate org metrics, not row-level PII. See reports.controller.ts RBAC POLICY comment + rbac.workspaceWide.test.ts.',
+      'Aggregate analytics tabs are workspace-wide for all of MANAGER_TIER incl. group leads — aggregate org metrics, not row-level PII. Submissions + Daily log are group-scoped for leads and self-scoped for recruiters. See reports.controller.ts RBAC POLICY comment + rbac.workspaceWide.test.ts.',
   },
 
   // ── Training ─────────────────────────────────────────────────────────────

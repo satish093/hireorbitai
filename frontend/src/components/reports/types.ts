@@ -28,6 +28,28 @@ export const NAV_TABS: { key: PageTab; label: string }[] = [
 const ANALYTICS = new Set<string>(REPORT_TABS.map((t) => t.key));
 export const isAnalyticsTab = (t: PageTab): t is ReportTab => ANALYTICS.has(t);
 
+/**
+ * Tabs a RECRUITER may navigate to. The backend already self-scopes the
+ * rows on the submissions + daily endpoints, but the workspace-wide
+ * analytics tabs (pipeline / recruiters / consultants / placements /
+ * sources / ai / time-in-app) are manager-tier+. Strip them from the
+ * recruiter's nav and clamp the active tab.
+ */
+export const RECRUITER_TABS: PageTab[] = ['submissions', 'daily'];
+
+export function visibleTabsForRole(
+  role: string | undefined | null,
+): { key: PageTab; label: string }[] {
+  if (role === 'RECRUITER') {
+    return NAV_TABS.filter((t) => (RECRUITER_TABS as string[]).includes(t.key));
+  }
+  return NAV_TABS;
+}
+
+export function defaultTabForRole(role: string | undefined | null): PageTab {
+  return role === 'RECRUITER' ? 'submissions' : 'pipeline';
+}
+
 export type RangeKey = '7d' | '30d' | '90d' | 'qtd' | 'ytd' | 'custom';
 
 export interface CustomRange {

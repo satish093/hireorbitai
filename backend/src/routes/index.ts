@@ -91,7 +91,12 @@ router.use('/resumes', resumesRouter);
 router.use('/jobs', requireRole(...OPERATOR_TIER), jobsRouter);
 router.use('/vendors', vendorsRouter);
 router.use('/clients', clientsRouter);
-router.use('/applications', applicationsRouter);
+// Applications is an operator pipeline tool. CONSULTANT has no
+// dedicated "My Applications" page, and the operator view exposes
+// recruiter-side context (assigned recruiter, internal notes, ATS scoring)
+// that a consultant must not see. Gate at the mount so every applications
+// endpoint inherits OPERATOR_TIER (admins, group leads, recruiters).
+router.use('/applications', requireRole(...OPERATOR_TIER), applicationsRouter);
 router.use('/feature-flags', featureFlagsRouter);
 router.use('/user-groups', userGroupsRouter);
 router.use('/users', usersRouter);

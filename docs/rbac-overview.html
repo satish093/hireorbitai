@@ -270,8 +270,10 @@
             Consultants, and only Consultants.
           </li>
           <li>
-            <strong>Consultants</strong> are self-service only — they see their own data and chat
-            with their recruiter + that recruiter's managers.
+            <strong>Consultants</strong> are self-service only — they see their own training,
+            interviews, tasks, dashboard, and resume; they chat with their assigned recruiter +
+            that recruiter's manager chain. They do <strong>not</strong> see the Jobs page or
+            the Applications page (those are operator-side pipeline tools).
           </li>
           <li>
             <strong>Developer</strong> is a scoped admin role with no default access. Each
@@ -443,7 +445,51 @@
           </tr>
           <tr>
             <td>Feature Flags</td>
-            <td class="center y">read &amp; write</td><td class="center partial">CEO write · CTO/Director read</td><td class="center n">✗</td><td class="center n">✗</td><td class="center n">✗</td>
+            <td class="center y">read &amp; write</td><td class="center partial">CEO read &amp; write · CTO/Director read-only</td><td class="center n">✗</td><td class="center n">✗</td><td class="center n">✗</td>
+          </tr>
+          <tr>
+            <td>Vendors</td>
+            <td class="center y">all</td><td class="center y">all</td><td class="center partial">own group</td><td class="center y">✓</td><td class="center n">✗</td>
+          </tr>
+          <tr>
+            <td>Clients</td>
+            <td class="center y">all</td><td class="center y">all</td><td class="center partial">own group</td><td class="center y">✓</td><td class="center n">✗</td>
+          </tr>
+          <tr>
+            <td>AI Email</td>
+            <td class="center y">✓</td><td class="center y">✓</td><td class="center y">✓</td><td class="center y">✓</td><td class="center n">✗</td>
+          </tr>
+          <tr>
+            <td>AI Usage</td>
+            <td class="center y">✓</td><td class="center y">✓</td><td class="center y">✓</td><td class="center n">✗</td><td class="center n">✗</td>
+          </tr>
+          <tr>
+            <td>AI Settings</td>
+            <td class="center y">✓</td><td class="center y">✓</td><td class="center n">✗</td><td class="center n">✗</td><td class="center n">✗</td>
+          </tr>
+          <tr>
+            <td>Audit Log</td>
+            <td class="center y">✓</td><td class="center y">✓</td><td class="center n">✗</td><td class="center n">✗</td><td class="center n">✗</td>
+          </tr>
+          <tr>
+            <td>Deactivated Accounts</td>
+            <td class="center y">✓</td><td class="center y">✓</td><td class="center n">✗</td><td class="center n">✗</td><td class="center n">✗</td>
+          </tr>
+          <tr>
+            <td>Training — AI Activity</td>
+            <td class="center y">all</td><td class="center y">all</td><td class="center partial">own group</td><td class="center n">✗</td><td class="center n">✗</td>
+          </tr>
+          <tr>
+            <td>Training — course authoring (create/edit)</td>
+            <td class="center y">all</td><td class="center y">all</td><td class="center y">workspace-wide</td><td class="center n">✗</td><td class="center n">✗</td>
+          </tr>
+          <tr>
+            <td>Training — learner pages (My Training, Lesson, Quiz)</td>
+            <td class="center y">all</td><td class="center y">all</td><td class="center partial">own group's learners</td><td class="center y">own training</td><td class="center y">own training</td>
+          </tr>
+          <tr>
+            <td>User profile pages (/users/:id)</td>
+            <td class="center y">all</td><td class="center y">all</td><td class="center partial">own group</td><td class="center partial">own consultants + own chain</td><td class="center partial">own recruiter + chain only</td>
           </tr>
           <tr>
             <td>Impersonate another user</td>
@@ -575,9 +621,14 @@
         </thead>
         <tbody>
           <tr>
-            <td>Reports / Analytics</td>
-            <td>Aggregate org metrics (totals, ratios). Not row-level PII, so group-scoping would just be noise.</td>
+            <td>Reports / Analytics — aggregate tabs</td>
+            <td>The non-PII tabs (Pipeline, Recruiters, Consultants, Placements, Sources, AI Usage, Time in app) are workspace-wide totals/ratios. HR Manager &amp; Manager see the whole company; recruiters and consultants do not see them at all.</td>
             <td>Admin tier + HR Manager + Manager</td>
+          </tr>
+          <tr>
+            <td>Reports / Analytics — Submissions &amp; Daily log</td>
+            <td>Per-row PII (which recruiter submitted which consultant, daily activity per person). HR Manager &amp; Manager see only their own group. Admin tier sees everything. A RECRUITER sees only their own submissions / daily numbers (the two tabs are the only ones visible to them on /reports).</td>
+            <td>Admin tier (all) · HR Manager + Manager (own group) · Recruiter (own rows)</td>
           </tr>
           <tr>
             <td>Training — course catalog only</td>

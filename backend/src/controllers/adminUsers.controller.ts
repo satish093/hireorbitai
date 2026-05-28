@@ -642,6 +642,14 @@ export const setGroup: RequestHandler = async (req, res) => {
   // Same rank rule as setStatus — a DIRECTOR shouldn't be able to move a
   // SUPER_ADMIN out of their group.
   assertOutranks({ role: req.user.role }, beforeRow.role);
+  // DEVELOPER accounts may only be moved by a SUPER_ADMIN. Rank checks alone
+  // would let a CEO / CTO / Director shuffle a Developer between groups (or
+  // out of a group entirely), which contradicts the "Developer can never be
+  // moved by anyone except a Super Admin" rule in docs/rbac-overview.html and
+  // would let a non-SA actor relocate the support-chat exception target.
+  if (beforeRow.role === 'DEVELOPER' && req.user.role !== 'SUPER_ADMIN') {
+    throw httpError(403, 'Only a Super Admin can move a Developer account.');
+  }
 
   const { data, error } = await db
     .from('users')
@@ -857,6 +865,13 @@ export const bulk: RequestHandler = async (req, res) => {
           metadata: { from: row.role, to: newRole, by: actor.id, bulk: true },
         });
       } else if (action === 'move-group') {
+        // DEVELOPER accounts are SUPER_ADMIN-only to move (same rule as
+        // setGroup above). Without this guard, a bulk move-group from a
+        // CEO/CTO/Director would silently relocate Developers along with
+        // the rest of the batch.
+        if (row.role === 'DEVELOPER' && actor.role !== 'SUPER_ADMIN') {
+          throw httpError(403, 'Only a Super Admin can move a Developer account.');
+        }
         const { error } = await db
           .from('users')
           .update({ group_id: payload?.group_id ?? null })

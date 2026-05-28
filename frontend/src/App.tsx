@@ -436,7 +436,12 @@ export default function App() {
           <Route
             path="/reports"
             element={
-              <ProtectedRoute allow={MANAGER_TIER} capability="reports">
+              // RECRUITER may open /reports for their OWN submissions + daily
+              // numbers (backend gates each endpoint and self-scopes the rows
+              // inside the controller). The page itself filters the visible
+              // tabs to "Submissions" + "Daily log" for a recruiter — full
+              // analytics tabs stay manager-tier only.
+              <ProtectedRoute allow={OPERATOR_TIER} capability="reports">
                 <FeatureGuard feature="reports">
                   <Reports />
                 </FeatureGuard>
@@ -524,7 +529,13 @@ export default function App() {
           <Route
             path="/admin/features"
             element={
-              <ProtectedRoute allow={OWNER_TIER} capability="feature_flags">
+              // Read access opens to ADMIN_TIER (CTO + Director need
+              // visibility into flag state) plus a DEVELOPER with the
+              // `feature_flags` capability. The PAGE itself disables
+              // write controls for non-OWNER_TIER callers and the
+              // backend rejects PATCH/PUT regardless of capability, so
+              // a CTO / Director / Developer here can only look.
+              <ProtectedRoute allow={ADMIN_TIER} capability="feature_flags">
                 <FeatureFlags />
               </ProtectedRoute>
             }

@@ -9,9 +9,12 @@ import { downloadCsv, payloadToCsvRows, exportPanelPng } from '../components/rep
 import {
   NAV_TABS,
   isAnalyticsTab,
+  visibleTabsForRole,
+  defaultTabForRole,
   type PageTab,
   type ReportTab,
 } from '../components/reports/types';
+import { useAuth } from '../context/AuthContext';
 import type {
   PipelinePayload,
   RecruitersPayload,
@@ -35,8 +38,20 @@ const isTab = (v: string | null): v is PageTab => !!v && (TAB_KEYS as string[]).
 
 function ReportsInner() {
   const [params, setParams] = useSearchParams();
-  const tab: PageTab = isTab(params.get('tab')) ? (params.get('tab') as PageTab) : 'pipeline';
+  const { profile } = useAuth();
+  const role = profile?.role ?? null;
+  // Tabs this caller is allowed to see. A RECRUITER only gets the two
+  // self-scoped tabs (submissions, daily log); managers + admins see
+  // everything. The active tab from the URL is clamped to this set so a
+  // recruiter who navigates directly to /reports?tab=pipeline is bounced
+  // to their default.
+  const allowedTabs = visibleTabsForRole(role);
+  const allowedKeys = new Set(allowedTabs.map((t) => t.key));
+  const fallback = defaultTabForRole(role);
+  const urlTab = isTab(params.get('tab')) ? (params.get('tab') as PageTab) : fallback;
+  const tab: PageTab = allowedKeys.has(urlTab) ? urlTab : fallback;
   const setTab = (t: PageTab) => {
+    if (!allowedKeys.has(t)) return;
     const next = new URLSearchParams(params);
     next.set('tab', t);
     setParams(next);
@@ -62,7 +77,7 @@ function ReportsInner() {
       />
 
       <div className="mb-5">
-        <ReportTabs tab={tab} onTab={setTab} />
+        <ReportTabs tab={tab} onTab={setTab} tabs={allowedTabs} />
       </div>
 
       <div id="report-panel">

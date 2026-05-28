@@ -5,6 +5,8 @@ import { Button } from '../components/Button';
 import { api } from '../services/api';
 import { useFeatureFlags } from '../hooks/useFeatureFlags';
 import { invalidate } from '../hooks/useInvalidate';
+import { useAuth } from '../context/AuthContext';
+import { OWNER_TIER } from '../types';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
 
@@ -35,6 +37,12 @@ export function FeatureFlags() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
   const { refresh } = useFeatureFlags();
+  const { profile } = useAuth();
+  // Only OWNER_TIER (SUPER_ADMIN + CEO) can flip flags. CTO + Director and
+  // a DEVELOPER with the `feature_flags` capability get read-only access —
+  // the backend rejects PATCH/PUT regardless of capability, so hiding the
+  // toggle here is the UI half of the same guard.
+  const canWrite = !!profile && (OWNER_TIER as string[]).includes(profile.role);
 
   async function load() {
     setLoading(true);
@@ -125,6 +133,11 @@ export function FeatureFlags() {
     >
       <div className="max-w-5xl">
         <h1 className="text-2xl font-semibold tracking-tight text-ink mb-1">Feature flags</h1>
+        {!canWrite && (
+          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-500/30 dark:bg-amber-500/10 px-4 py-2.5 text-xs text-amber-900 dark:text-amber-100">
+            Read-only view. Only Super Admin and CEO can flip feature flags.
+          </div>
+        )}
         <p className="text-sm text-muted mb-6">
           Toggle modules across the entire workspace. Changes apply on next page load for users
           (sidebar refreshes automatically). Per-group overrides below let you enable or disable a
@@ -152,8 +165,8 @@ export function FeatureFlags() {
                 </div>
                 <Toggle
                   on={r.enabled}
-                  disabled={saving === r.key}
-                  onClick={() => toggle(r)}
+                  disabled={!canWrite || saving === r.key}
+                  onClick={() => canWrite && toggle(r)}
                   label={r.enabled ? 'Enabled' : 'Disabled'}
                 />
               </div>
@@ -203,8 +216,8 @@ export function FeatureFlags() {
                             <td key={g.id} className="text-center px-3 py-2.5">
                               <OverrideCell
                                 state={state}
-                                disabled={saving === id}
-                                onClick={() => cycleOverride(g.id, r.key)}
+                                disabled={!canWrite || saving === id}
+                                onClick={() => canWrite && cycleOverride(g.id, r.key)}
                               />
                             </td>
                           );

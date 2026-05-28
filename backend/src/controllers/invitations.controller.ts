@@ -53,16 +53,29 @@ export const create: RequestHandler = async (req, res) => {
   }
 
   // Group resolution. Admin-tier may pre-assign any group (or omit for "no
-  // group"). For everyone else (group leads + recruiters), the invitee MUST land
-  // in the caller's own group — so we DEFAULT a missing group_id to the
-  // caller's own group_id rather than letting it fall through to NULL. This
-  // satisfies the recruiter-invites-consultant invariant: a recruiter's invited
-  // consultant always ends up in the recruiter's group. assertCanAssignGroup
-  // then still rejects any explicit out-of-scope group_id.
+  // group"). For everyone else (group leads + recruiters), the invitee MUST
+  // land in the caller's own group — so we FORCE the invitee's group_id to
+  // the caller's group_id and require the caller to actually be in a group.
+  // A recruiter without a group_id cannot invite at all (otherwise the new
+  // consultant would land with users.group_id = NULL, escaping every
+  // group-scope check and leaking across pods). assertCanAssignGroup is
+  // belt-and-braces for the admin branch and to reject any client-side
+  // override that doesn't match the caller's group.
   const isAdminCallerForGroup = (ADMIN_TIER as Role[]).includes(req.user.role);
-  const groupId = isAdminCallerForGroup
-    ? (parsed.data.group_id ?? null)
-    : (parsed.data.group_id ?? req.user.group_id ?? null);
+  let groupId: string | null;
+  if (isAdminCallerForGroup) {
+    groupId = parsed.data.group_id ?? null;
+  } else {
+    if (!req.user.group_id) {
+      throw httpError(
+        403,
+        'You must be assigned to a group before inviting other users. Ask an admin to place you in a group first.',
+      );
+    }
+    // Force to caller's group — ignore any explicit body group_id so a
+    // recruiter / lead can't sneak the invitee into a peer group via curl.
+    groupId = req.user.group_id;
+  }
   assertCanAssignGroup(req.user, groupId);
 
   // ── Parent assignment ───────────────────────────────────────────────────

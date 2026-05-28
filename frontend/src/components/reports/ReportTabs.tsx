@@ -2,13 +2,23 @@ import clsx from 'clsx';
 import { useReportContext } from './ReportContext';
 import { NAV_TABS, type PageTab } from './types';
 
-/** Underline-style tab nav with a right-aligned mono echo of the date range. */
-export function ReportTabs({ tab, onTab }: { tab: PageTab; onTab: (t: PageTab) => void }) {
+/** Underline-style tab nav with a right-aligned mono echo of the date range.
+ *  Tabs can be passed in (used to hide manager-tier-only tabs from a RECRUITER);
+ *  defaults to the full NAV_TABS set for backwards compatibility. */
+export function ReportTabs({
+  tab,
+  onTab,
+  tabs = NAV_TABS,
+}: {
+  tab: PageTab;
+  onTab: (t: PageTab) => void;
+  tabs?: { key: PageTab; label: string }[];
+}) {
   const { resolved } = useReportContext();
   return (
     <div className="flex items-end justify-between gap-4 border-b border-border overflow-x-auto">
       <div className="flex items-end gap-5">
-        {NAV_TABS.map((t) => (
+        {tabs.map((t) => (
           <button
             key={t.key}
             type="button"

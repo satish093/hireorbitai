@@ -124,10 +124,14 @@ const sections: Section[] = [
       { to: '/vendors', label: 'Vendors', icon: IconBuilding, roles: OPERATOR_TIER },
       { to: '/clients', label: 'Clients', icon: IconBuilding2, roles: OPERATOR_TIER },
       {
+        // RECRUITER gets the link too — the /reports page filters the
+        // tab strip down to "Submissions" + "Daily log" for them and the
+        // backend self-scopes the rows. Consultants are excluded by
+        // OPERATOR_TIER.
         to: '/reports',
         label: 'Analytics',
         icon: IconBarChart,
-        roles: MANAGER_TIER,
+        roles: OPERATOR_TIER,
         flagKey: 'reports',
         capability: 'reports',
       },
@@ -214,10 +218,14 @@ const sections: Section[] = [
       },
       { to: '/admin/deactivated', label: 'Deactivated', icon: IconUserX, roles: ADMIN_TIER },
       {
+        // Visible to ADMIN_TIER (CTO + Director get read-only access)
+        // and any DEVELOPER granted `feature_flags`. The page disables
+        // toggles for non-OWNER_TIER callers and the backend rejects
+        // writes that aren't OWNER_TIER.
         to: '/admin/features',
         label: 'Feature Flags',
         icon: IconToggle,
-        roles: OWNER_TIER,
+        roles: ADMIN_TIER,
         capability: 'feature_flags',
       },
       { to: '/admin/ai-settings', label: 'AI Settings', icon: IconSparkles, roles: ADMIN_TIER },
