@@ -674,7 +674,16 @@ export async function bulkAssignCourse(input: {
 
 /** Manager reports: completion rate, overdue count, top consultants, plus
  *  quiz pass rate + time-spent analytics. */
-export async function reports(): Promise<{
+export async function reports(
+  opts: {
+    /** When provided, scope assignments + quiz attempts + lesson progress to
+     *  only these user-ids (HR_MANAGER / MANAGER group scope). Admin-tier and
+     *  workspace-wide callers omit this; an empty array means "no one"
+     *  (fail-closed) and returns zeroed aggregates. The course catalog itself
+     *  is workspace-wide regardless — it's not user-scoped data. */
+    scopeUserIds?: string[];
+  } = {},
+): Promise<{
   total_courses: number;
   active_courses: number;
   total_assignments: number;
@@ -691,16 +700,38 @@ export async function reports(): Promise<{
   by_compliance_category: Array<{ compliance_category: string; courses: number }>;
 }> {
   const { data: courses } = await repo.courses.list({});
-  const { data: assignments } = await repo.assignments.list({});
+  const { data: assignments } = await repo.assignments.list(
+    opts.scopeUserIds ? { assigned_to_user_id_in: opts.scopeUserIds } : {},
+  );
 
-  // Aggregate raw quiz attempts + lesson time directly (not exposed on the repo).
+  const allAssignmentsTmp = (assignments ?? []) as any[];
+  // For scoped (group-lead) reports, restrict quiz-attempts + lesson-progress
+  // aggregates to the same assignment-id set so a manager can't see a peer
+  // group's training time / pass-rate. Empty assignment set fails closed.
+  const scopedAssignmentIds = opts.scopeUserIds
+    ? allAssignmentsTmp.map((a) => a.id as string)
+    : null;
   const [{ data: attempts }, { data: progress }] = await Promise.all([
-    db.from('training_quiz_attempts').select('passed, is_correct'),
-    db.from('training_lesson_progress').select('time_spent_minutes'),
+    scopedAssignmentIds === null
+      ? db.from('training_quiz_attempts').select('passed, is_correct')
+      : scopedAssignmentIds.length === 0
+        ? Promise.resolve({ data: [], error: null })
+        : db
+            .from('training_quiz_attempts')
+            .select('passed, is_correct')
+            .in('assignment_id', scopedAssignmentIds),
+    scopedAssignmentIds === null
+      ? db.from('training_lesson_progress').select('time_spent_minutes')
+      : scopedAssignmentIds.length === 0
+        ? Promise.resolve({ data: [], error: null })
+        : db
+            .from('training_lesson_progress')
+            .select('time_spent_minutes')
+            .in('assignment_id', scopedAssignmentIds),
   ]);
 
   const allCourses = (courses ?? []) as any[];
-  const allAssignments = (assignments ?? []) as any[];
+  const allAssignments = allAssignmentsTmp;
 
   const completed = allAssignments.filter((a) => a.status === 'COMPLETED');
   const overdue = allAssignments.filter((a) => a.status === 'OVERDUE');

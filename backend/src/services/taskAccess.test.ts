@@ -53,7 +53,7 @@ vi.mock('../config/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
-import { assertCanAccessTask, canAccessTask } from './taskAccess';
+import { assertCanAccessTask, assertCanDeleteTaskChild, canAccessTask } from './taskAccess';
 
 const G_A = 'group-aaaa';
 const G_B = 'group-bbbb';
@@ -166,5 +166,48 @@ describe('assertCanAccessTask — missing task / boolean wrapper', () => {
       userGroups: { 'u-in-b': G_B },
     });
     expect(await canAccessTask(LEAD_A, 't-1')).toBe(false);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// assertCanDeleteTaskChild — stricter than assertCanAccessTask: only the
+// owner, admin-tier, or a group lead with in-group reach may delete someone
+// else's comment/attachment. The owner check is at the controller's call
+// site (this helper is only invoked when the caller is NOT the owner).
+// ─────────────────────────────────────────────────────────────────────────────
+describe('assertCanDeleteTaskChild — non-owner authorisation', () => {
+  it("ADMIN tier may delete anyone's child item", async () => {
+    setup({ assigneeId: 'u-other', userGroups: { 'u-other': G_B } });
+    await expect(assertCanDeleteTaskChild(ADMIN, 't-1')).resolves.toBeUndefined();
+  });
+
+  it('GROUP LEAD may delete when the parent task is in their group', async () => {
+    setup({ assigneeId: 'u-in-a', userGroups: { 'u-in-a': G_A } });
+    await expect(assertCanDeleteTaskChild(LEAD_A, 't-1')).resolves.toBeUndefined();
+  });
+
+  it('GROUP LEAD is DENIED for an out-of-group task', async () => {
+    setup({ assigneeId: 'u-in-b', userGroups: { 'u-in-b': G_B } });
+    await expect(assertCanDeleteTaskChild(LEAD_A, 't-1')).rejects.toMatchObject({ status: 404 });
+  });
+
+  it("plain RECRUITER who is the task ASSIGNEE is still DENIED on someone else's child", async () => {
+    // The recruiter is the task's assignee — assertCanAccessTask would let
+    // them READ the comment, but they must NOT be able to delete a comment
+    // they did not author. This is the regression the audit flagged.
+    setup({ assigneeId: REC.id });
+    await expect(assertCanDeleteTaskChild(REC, 't-1')).rejects.toMatchObject({ status: 403 });
+  });
+
+  it("plain CONSULTANT who CREATED the task is still DENIED on someone else's child", async () => {
+    const CONS = { id: 'u-cons', role: 'CONSULTANT' as const, group_id: null };
+    setup({ creatorId: CONS.id });
+    await expect(assertCanDeleteTaskChild(CONS, 't-1')).rejects.toMatchObject({ status: 403 });
+  });
+
+  it('DEVELOPER (no task connection) is DENIED', async () => {
+    const DEV = { id: 'u-dev', role: 'DEVELOPER' as const, group_id: null };
+    setup({ assigneeId: 'u-other', userGroups: { 'u-other': G_A } });
+    await expect(assertCanDeleteTaskChild(DEV, 't-1')).rejects.toMatchObject({ status: 403 });
   });
 });

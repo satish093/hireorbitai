@@ -1,13 +1,9 @@
 import { RequestHandler } from 'express';
 import { db } from '../config/db';
-import { httpError, ADMIN_TIER, type Role } from '../types';
-import { assertCanAccessTask } from '../services/taskAccess';
+import { httpError } from '../types';
+import { assertCanAccessTask, assertCanDeleteTaskChild } from '../services/taskAccess';
 
 const BUCKET = 'task-attachments';
-
-function isAdmin(role: Role): boolean {
-  return (ADMIN_TIER as Role[]).includes(role);
-}
 
 /** List attachments. Each entry includes a short-lived signed download URL. */
 export const list: RequestHandler = async (req, res) => {
@@ -76,13 +72,16 @@ export const remove: RequestHandler = async (req, res) => {
     .single();
   if (!row) throw httpError(404, 'Attachment not found');
 
-  // Uploader can always delete their own; otherwise require task-scoped
-  // access (admin unscoped, group lead in-group, plain user must be the
-  // task assignee/creator).
+  // Uploader can always delete their own. For someone else's attachment:
+  //   admin-tier        → allowed (workspace oversight)
+  //   group lead        → allowed only when the parent task is in their group
+  //   everyone else     → denied (a plain RECRUITER/CONSULTANT who is the task
+  //                       assignee or creator may READ + UPLOAD attachments,
+  //                       but NOT delete someone else's). Prior shape used
+  //                       assertCanAccessTask which let assignees/creators
+  //                       silently delete co-workers' files.
   if (row.uploaded_by !== req.user.id) {
-    if (!isAdmin(req.user.role as Role)) {
-      await assertCanAccessTask(req.user, row.task_id);
-    }
+    await assertCanDeleteTaskChild(req.user, row.task_id);
   }
 
   await db.storage.from(BUCKET).remove([row.storage_path]);

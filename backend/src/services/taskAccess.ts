@@ -97,3 +97,37 @@ export async function canAccessTask(caller: TaskAccessCaller, taskId: string): P
     return false;
   }
 }
+
+/**
+ * Authorisation for deleting a task COMMENT or ATTACHMENT that the caller does
+ * NOT own. (Owner-delete is checked at the call site — every controller lets
+ * the author/uploader delete their own item without going through this.)
+ *
+ * The rule, intentionally stricter than `assertCanAccessTask`:
+ *
+ *   ADMIN_TIER  → may delete any task child.
+ *   GROUP LEAD  → may delete only when the parent task is in their group
+ *                 (assertCanAccessTask covers this — admin unscoped, lead
+ *                 in-group, self-touched).
+ *   Everyone else (including a plain RECRUITER or CONSULTANT who is the task
+ *   assignee or creator) → DENIED. Being the task's assignee/creator lets you
+ *   read the comment and add your own, not delete someone else's contribution.
+ *
+ * Throws httpError(403) on denial — this is an authorisation refusal, not an
+ * existence oracle; the caller already loaded the child row and is acting on
+ * a known id.
+ */
+export async function assertCanDeleteTaskChild(
+  caller: TaskAccessCaller,
+  taskId: string,
+): Promise<void> {
+  if (isAdmin(caller.role)) return;
+  if (isGroupLead(caller.role)) {
+    // assertCanAccessTask already enforces "lead may only act on tasks whose
+    // assignee/creator is in their group, OR a task they personally touch."
+    // Either way we want the same group boundary here.
+    await assertCanAccessTask(caller, taskId);
+    return;
+  }
+  throw httpError(403, 'Forbidden');
+}

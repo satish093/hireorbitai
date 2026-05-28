@@ -426,8 +426,12 @@
             <td class="center y">✓</td><td class="center y">✓</td><td class="center y">org-wide</td><td class="center partial">own stats</td><td class="center n">✗</td>
           </tr>
           <tr>
-            <td>Training (courses, assignments)</td>
-            <td class="center y">all</td><td class="center y">all</td><td class="center y">workspace-wide</td><td class="center partial">own training</td><td class="center partial">own training</td>
+            <td>Training — course catalog</td>
+            <td class="center y">all</td><td class="center y">all</td><td class="center y">workspace-wide</td><td class="center y">workspace-wide</td><td class="center y">workspace-wide (read)</td>
+          </tr>
+          <tr>
+            <td>Training — assignments &amp; learner data</td>
+            <td class="center y">all</td><td class="center y">all</td><td class="center partial">own group</td><td class="center partial">own training</td><td class="center partial">own training</td>
           </tr>
           <tr>
             <td>User Groups admin</td>
@@ -545,7 +549,7 @@
         </div>
         <div class="card">
           <h3>6. Group leads are always group-scoped</h3>
-          <p>HR Manager &amp; Manager can never accidentally see another group's data — every list, every detail page, every analytics call is filtered by their own group.</p>
+          <p>HR Manager &amp; Manager can never accidentally see another group's data — every list, every detail page, every analytics call (including the training assignments, evaluations, supervision notes and compliance report) is filtered by their own group. The only training surface that stays workspace-wide is the shared course catalog itself.</p>
         </div>
         <div class="card">
           <h3>7. Consultants only see their own assignments</h3>
@@ -576,9 +580,9 @@
             <td>Admin tier + HR Manager + Manager</td>
           </tr>
           <tr>
-            <td>Training (courses, assignments, reports)</td>
-            <td>The training catalog is one workspace-wide library; each learner only sees their own assignments / progress.</td>
-            <td>Admin tier + HR Manager + Manager</td>
+            <td>Training — course catalog only</td>
+            <td>The catalog (courses, lessons, quizzes) is a shared learning library, not user data. Group leads can browse and assign from it. Assignment-level data (progress, quiz attempts, evaluations, supervision notes, the compliance report) is <strong>group-scoped</strong> for HR Manager &amp; Manager — they only see learners in their own group. Admin tier sees everything.</td>
+            <td>Admin tier (all) · HR Manager + Manager (catalog workspace-wide, learner data own group only)</td>
           </tr>
           <tr>
             <td>User Groups admin</td>

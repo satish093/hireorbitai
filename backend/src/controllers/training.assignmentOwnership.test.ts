@@ -43,6 +43,31 @@ vi.mock('../services/training.service', () => ({
   evaluateCompletion: vi.fn(() => Promise.resolve({ blockers: [], progress_percentage: 0 })),
 }));
 
+// The controller now imports groupScope helpers (which reach db). Stub both
+// so the real `pg` module never loads inside this test.
+vi.mock('../config/db', () => ({
+  db: {
+    from: () => ({ select: () => ({ eq: () => Promise.resolve({ data: [], error: null }) }) }),
+  },
+  pool: {},
+}));
+// Group-lead helpers — the test exercises three personas:
+//   • ADMIN_TIER (DIRECTOR) → unscoped, never reaches these helpers.
+//   • GROUP LEAD (HR_MANAGER) → leadCanAccessUser decides reach.
+//   • CONSULTANT non-owner → not a lead, falls straight through to 404.
+// `leadCanAccessUser` is set per-test via `mockGroupAccess`.
+const groupScope = vi.hoisted(() => ({
+  leadAllows: false as boolean,
+}));
+vi.mock('../services/groupScope', async () => {
+  const GROUP_LEAD = ['MANAGER', 'HR_MANAGER'];
+  return {
+    managerGroupUserIds: vi.fn(() => Promise.resolve([])),
+    leadCanAccessUser: vi.fn(() => Promise.resolve(groupScope.leadAllows)),
+    isGroupLead: (role: string) => GROUP_LEAD.includes(role),
+    isAdminTier: (role: string) => ['SUPER_ADMIN', 'CEO', 'CTO', 'DIRECTOR'].includes(role),
+  };
+});
 vi.mock('../config/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
@@ -91,12 +116,14 @@ async function call(
 
 beforeEach(() => {
   mock.assignment = null;
+  groupScope.leadAllows = false;
   vi.clearAllMocks();
 });
 
 const OWNER = { id: 'u-owner', role: 'CONSULTANT' };
 const OTHER = { id: 'u-other', role: 'CONSULTANT' };
-const MANAGER = { id: 'u-mgr', role: 'HR_MANAGER' };
+const ADMIN = { id: 'u-admin', role: 'DIRECTOR' };
+const LEAD = { id: 'u-lead', role: 'HR_MANAGER' };
 
 describe('training.controller — getAssignment ownership (inline)', () => {
   it('the assignment owner is allowed', async () => {
@@ -105,10 +132,24 @@ describe('training.controller — getAssignment ownership (inline)', () => {
     expect(err).toBeNull();
   });
 
-  it('a manager-tier caller is allowed for any assignment', async () => {
+  it('an ADMIN-tier caller is allowed for any assignment (workspace-wide)', async () => {
     mock.assignment = { id: 'a-1', assigned_to_user_id: OWNER.id, course_id: 'c-1' };
-    const err = await call(getAssignment as Handler, MANAGER);
+    const err = await call(getAssignment as Handler, ADMIN);
     expect(err).toBeNull();
+  });
+
+  it('a GROUP LEAD is allowed when the target user is in their group', async () => {
+    mock.assignment = { id: 'a-1', assigned_to_user_id: OWNER.id, course_id: 'c-1' };
+    groupScope.leadAllows = true;
+    const err = await call(getAssignment as Handler, LEAD);
+    expect(err).toBeNull();
+  });
+
+  it('a GROUP LEAD is DENIED (404) when the target user is OUT of their group', async () => {
+    mock.assignment = { id: 'a-1', assigned_to_user_id: OWNER.id, course_id: 'c-1' };
+    groupScope.leadAllows = false;
+    const err = await call(getAssignment as Handler, LEAD);
+    expect(err?.status).toBe(404);
   });
 
   it('a different consultant gets 404 (not 403)', async () => {
@@ -131,10 +172,24 @@ describe('training.controller — assertCanReadAssignment (via getAcknowledgemen
     expect(err).toBeNull();
   });
 
-  it('a manager-tier caller is allowed', async () => {
+  it('an ADMIN-tier caller is allowed', async () => {
     mock.assignment = { id: 'a-1', assigned_to_user_id: OWNER.id };
-    const err = await call(getAcknowledgement as Handler, MANAGER);
+    const err = await call(getAcknowledgement as Handler, ADMIN);
     expect(err).toBeNull();
+  });
+
+  it('a GROUP LEAD is allowed in-group', async () => {
+    mock.assignment = { id: 'a-1', assigned_to_user_id: OWNER.id };
+    groupScope.leadAllows = true;
+    const err = await call(getAcknowledgement as Handler, LEAD);
+    expect(err).toBeNull();
+  });
+
+  it('a GROUP LEAD is DENIED out-of-group', async () => {
+    mock.assignment = { id: 'a-1', assigned_to_user_id: OWNER.id };
+    groupScope.leadAllows = false;
+    const err = await call(getAcknowledgement as Handler, LEAD);
+    expect(err?.status).toBe(404);
   });
 
   it('a different consultant gets 404 (not 403)', async () => {

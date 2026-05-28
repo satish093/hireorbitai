@@ -1,13 +1,9 @@
 import { RequestHandler } from 'express';
 import { db } from '../config/db';
-import { httpError, ADMIN_TIER, type Role } from '../types';
-import { assertCanAccessTask } from '../services/taskAccess';
+import { httpError } from '../types';
+import { assertCanAccessTask, assertCanDeleteTaskChild } from '../services/taskAccess';
 
 const SELECT_WITH_AUTHOR = `*, author:users!author_id ( id, email, full_name )`;
-
-function isAdmin(role: Role): boolean {
-  return (ADMIN_TIER as Role[]).includes(role);
-}
 
 export const list: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
@@ -48,14 +44,16 @@ export const remove: RequestHandler = async (req, res) => {
     .single();
   if (!c) throw httpError(404, 'Comment not found');
 
-  // Author can always delete their own comment; otherwise require task-scoped
-  // access (admin unscoped, group lead in-group, plain user must be the
-  // task assignee/creator). Previously any MANAGER_TIER could delete any
-  // comment.
+  // Author can always delete their own comment. For someone else's comment:
+  //   admin-tier        → allowed (workspace oversight)
+  //   group lead        → allowed only when the parent task is in their group
+  //   everyone else     → denied (a plain RECRUITER/CONSULTANT who is the task
+  //                       assignee or creator may READ + ADD comments, but
+  //                       NOT delete someone else's). Prior shape used
+  //                       assertCanAccessTask which let assignees/creators
+  //                       silently delete co-workers' comments.
   if (c.author_id !== req.user.id) {
-    if (!isAdmin(req.user.role as Role)) {
-      await assertCanAccessTask(req.user, c.task_id);
-    }
+    await assertCanDeleteTaskChild(req.user, c.task_id);
   }
   const { error } = await db.from('task_comments').delete().eq('id', req.params.id);
   if (error) throw httpError(500, 'Database error');

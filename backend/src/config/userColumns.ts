@@ -76,5 +76,9 @@ export const SAFE_USER_ADMIN_DETAIL_COLUMNS = [
   'status_changed_at',
   'status_changed_by',
   'reports_to',
-  'notes',
+  // Real DB column is admin_notes (see database/admin-user-management.sql).
+  // The legacy "notes" column belongs to recruiters/consultants — selecting
+  // it here would either return NULL or fail with a column-not-found error
+  // on hosts whose users table doesn't have a stray `notes` column.
+  'admin_notes',
 ].join(', ');

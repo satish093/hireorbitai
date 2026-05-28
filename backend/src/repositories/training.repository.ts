@@ -117,13 +117,25 @@ export const lessons = {
 
 // ===== ASSIGNMENTS =====
 export const assignments = {
-  async list(filter: { status?: string; assigned_to_user_id?: string } = {}) {
+  async list(
+    filter: {
+      status?: string;
+      assigned_to_user_id?: string;
+      /** Group-scoping filter for HR_MANAGER / MANAGER: restrict to assignments
+       *  whose `assigned_to_user_id` is in this set. Admin-tier callers omit
+       *  this filter (unscoped). Empty array means "no one" (fail-closed). */
+      assigned_to_user_id_in?: string[];
+    } = {},
+  ) {
     let qb = db
       .from('training_assignments')
       .select(ASSIGNMENT_SELECT)
       .order('created_at', { ascending: false });
     if (filter.status) qb = qb.eq('status', filter.status);
     if (filter.assigned_to_user_id) qb = qb.eq('assigned_to_user_id', filter.assigned_to_user_id);
+    if (filter.assigned_to_user_id_in) {
+      qb = qb.in('assigned_to_user_id', filter.assigned_to_user_id_in);
+    }
     return qb;
   },
   async listForUser(userId: string) {
@@ -306,6 +318,11 @@ export const supervisionNotes = {
       .select('*, trainer:users!trainer_user_id(id, full_name, email)')
       .eq('assignment_id', assignmentId)
       .order('observed_on', { ascending: false });
+  },
+  /** Single note — used by update/delete handlers to scope by the parent
+   *  assignment's `assigned_to_user_id` before mutating. */
+  async get(id: string) {
+    return db.from('training_supervision_notes').select('id, assignment_id').eq('id', id).single();
   },
   async create(row: any) {
     return db.from('training_supervision_notes').insert(row).select().single();

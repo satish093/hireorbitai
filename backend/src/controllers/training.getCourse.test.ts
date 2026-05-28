@@ -29,6 +29,18 @@ vi.mock('../repositories/training.repository', () => ({
   courses: { get: vi.fn().mockImplementation(async () => ({ data: mock.course, error: null })) },
 }));
 // Heavy sibling imports — stub so importing the controller never reaches config/env.
+vi.mock('../config/db', () => ({
+  db: {
+    from: () => ({ select: () => ({ eq: () => Promise.resolve({ data: [], error: null }) }) }),
+  },
+  pool: {},
+}));
+vi.mock('../services/groupScope', () => ({
+  managerGroupUserIds: vi.fn(() => Promise.resolve([])),
+  leadCanAccessUser: vi.fn(() => Promise.resolve(true)),
+  isGroupLead: () => false,
+  isAdminTier: () => true,
+}));
 vi.mock('../config/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));

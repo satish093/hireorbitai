@@ -50,7 +50,7 @@ const LEAKY_USER_ROW = {
   status_changed_at: null,
   status_changed_by: null,
   reports_to: null,
-  notes: null,
+  admin_notes: 'Internal note for ops.',
   // Forbidden secrets — must never reach the wire.
   password_hash: '$2b$10$VERY_SECRET_HASH_VALUE',
   session_version: 7,
@@ -195,7 +195,9 @@ describe('adminUsers.get — admin detail must not leak auth secrets', () => {
     expectSafeSelect('/admin/users/:id');
     expectNoLeaks(body, '/admin/users/:id');
     expect((body as any).id).toBe('u-1');
-    // Admin detail still surfaces operational fields like status / notes.
-    expect(Object.keys(body as any)).toEqual(expect.arrayContaining(['status', 'notes']));
+    // Admin detail still surfaces operational fields. admin_notes is the real
+    // column (not "notes" — that belongs to recruiters/consultants).
+    expect(Object.keys(body as any)).toEqual(expect.arrayContaining(['status', 'admin_notes']));
+    expect((body as any).admin_notes).toBe('Internal note for ops.');
   });
 });

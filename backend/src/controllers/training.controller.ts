@@ -5,20 +5,32 @@ import * as svc from '../services/training.service';
 import * as ai from '../services/trainingAI.service';
 import { lessonCoach as runLessonCoach } from '../services/ai.service';
 import { ANTHROPIC_ENABLED } from '../config/anthropic';
-import { httpError, MANAGER_TIER, ADMIN_TIER } from '../types';
+import { httpError, MANAGER_TIER, ADMIN_TIER, type Role } from '../types';
 import { logger } from '../config/logger';
 import { evaluateAchievements, logStudyMinutes } from '../services/trainingAchievements.service';
 import { publishToUser } from '../services/realtime.service';
+import { managerGroupUserIds, leadCanAccessUser, isGroupLead } from '../services/groupScope';
 
 // ---------------------------------------------------------------------------
-// RBAC POLICY (intentional — roles audit phases 3 & 5): training administration
-// (courses, assignments, reports, feedback) is WORKSPACE-WIDE for the whole
-// MANAGER_TIER, including the group leads (HR_MANAGER / MANAGER). Courses are
-// global org objects and the LMS is a shared workspace function, so training
-// admin is deliberately NOT group-scoped. Learners (CONSULTANT etc.) still only
-// see their own assignments via the assigned_to_user_id ownership checks below.
-// If training admin becomes per-group later, filter listAssignments/reports by
-// managerGroupUserIds and label the UI "Your group's training".
+// RBAC POLICY:
+//
+//   COURSE CATALOG (listCourses, getCourse, createCourse, updateCourse,
+//                   lessons, quiz authoring, AI generation, etc.)
+//     → workspace-wide. The catalog is a shared org library; every manager-
+//       tier user sees the same courses. Learners read but never author.
+//
+//   ASSIGNMENTS, FEEDBACK, EVALUATIONS, REPORTS, FINAL ASSESSMENT,
+//   SUPERVISION NOTES (anything that exposes a per-user assignment row)
+//     → ADMIN_TIER (SUPER_ADMIN/CEO/CTO/DIRECTOR) sees everyone.
+//     → HR_MANAGER / MANAGER are group-scoped: they may list / assign /
+//       update / give feedback / grade / supervise ONLY assignments whose
+//       `assigned_to_user_id` is in their own group.
+//     → Learners (CONSULTANT / RECRUITER) only ever read or update their own
+//       assignment row.
+//
+// The shift from "workspace-wide for all MANAGER_TIER" to "group-scoped for
+// leads" closed the role leak audit Issue 3 raised — a group lead in pod A
+// could previously read/update training assignments for users in pod B.
 // ---------------------------------------------------------------------------
 
 function isManagerTier(role?: string): boolean {
@@ -27,6 +39,61 @@ function isManagerTier(role?: string): boolean {
 
 function isAdminTier(role?: string): boolean {
   return !!role && (ADMIN_TIER as string[]).includes(role);
+}
+
+/**
+ * Group-scope authorisation for a training assignment. The assignment is
+ * keyed by its target user (`assigned_to_user_id`).
+ *
+ *   ADMIN_TIER      → access every assignment.
+ *   GROUP LEAD      → access only when the target user is in their group
+ *                     (leadCanAccessUser; fail-closed if no group).
+ *   Everyone else   → access only their own assignment (target === caller.id).
+ *
+ * Throws httpError(404, 'Not found') on missing / out-of-scope — existence-
+ * oracle safe, same convention as assertCanAccessTask. Returns the loaded
+ * row on success so the caller doesn't re-fetch.
+ */
+async function assertAssignmentInScope(
+  caller: { id: string; role: Role; group_id?: string | null },
+  assignmentId: string,
+): Promise<{ id: string; assigned_to_user_id: string | null }> {
+  const { data, error } = await repo.assignments.get(assignmentId);
+  if (error || !data) throw httpError(404, 'Assignment not found');
+  const a = data as { id: string; assigned_to_user_id: string | null };
+  if (isAdminTier(caller.role)) return a;
+  if (a.assigned_to_user_id && a.assigned_to_user_id === caller.id) return a;
+  if (isGroupLead(caller.role)) {
+    if (a.assigned_to_user_id && (await leadCanAccessUser(caller, a.assigned_to_user_id))) return a;
+  }
+  throw httpError(404, 'Not found');
+}
+
+/**
+ * Validates the bulk-assign target list against the caller's scope.
+ *
+ *   ADMIN_TIER → any user.
+ *   GROUP LEAD → every target must be in the caller's group.
+ *   Anyone else → not allowed to assign (handler also requires manager-tier).
+ *
+ * Throws 403 on the first out-of-scope user so a lead can't sneak a foreign
+ * user into a batch of in-group ones.
+ */
+async function assertAssignTargetsInScope(
+  caller: { id: string; role: Role; group_id?: string | null },
+  userIds: string[],
+): Promise<void> {
+  if (isAdminTier(caller.role)) return;
+  if (!isGroupLead(caller.role)) {
+    throw httpError(403, 'Manager-tier only');
+  }
+  const groupIds = await managerGroupUserIds(caller);
+  const allowed = new Set(groupIds ?? []);
+  for (const uid of userIds) {
+    if (!allowed.has(uid)) {
+      throw httpError(403, 'One or more target users are outside your group.');
+    }
+  }
 }
 
 /** Assert caller may mutate this course (owner or admin-tier). Returns 404 on failure. */
@@ -233,6 +300,10 @@ export const assign: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   const parsed = assignSchema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
+  // Group leads (HR_MANAGER/MANAGER) may only bulk-assign to users in their
+  // own group; admin-tier is unscoped. Throws 403 on the first out-of-scope
+  // target so a lead can't smuggle a foreign user into a batch.
+  await assertAssignTargetsInScope(req.user, parsed.data.user_ids);
   const result = await svc.bulkAssignCourse({
     course_id: parsed.data.course_id,
     user_ids: parsed.data.user_ids,
@@ -246,9 +317,22 @@ export const listAssignments: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   await svc.flagOverdue(); // cheap pass to stamp OVERDUE rows
   const { status, user_id } = req.query as Record<string, string | undefined>;
+  // Group-scope: HR_MANAGER/MANAGER see only their group's assignments.
+  // Admin-tier sees everyone. A lead with no group_id sees [] (fail-closed,
+  // same as groupScope semantics elsewhere).
+  let assignedToIn: string[] | undefined;
+  if (isGroupLead(req.user.role)) {
+    const ids = await managerGroupUserIds(req.user);
+    if (!ids || ids.length === 0) {
+      res.json([]);
+      return;
+    }
+    assignedToIn = ids;
+  }
   const { data, error } = await repo.assignments.list({
     status,
     assigned_to_user_id: user_id,
+    assigned_to_user_id_in: assignedToIn,
   });
   if (error) throw httpError(500, 'Database error');
   res.json(data ?? []);
@@ -264,13 +348,12 @@ export const myTraining: RequestHandler = async (req, res) => {
 
 export const getAssignment: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
-  const { data: row, error } = await repo.assignments.get(req.params.id);
-  if (error || !row) throw httpError(404, 'Assignment not found');
+  // Centralised group-scope guard: admin unscoped, group lead in-group only,
+  // learner self-only. Throws 404 on missing/out-of-scope.
+  await assertAssignmentInScope(req.user, req.params.id);
+  const { data: row } = await repo.assignments.get(req.params.id);
+  if (!row) throw httpError(404, 'Assignment not found');
   const a: any = row;
-  // Auth: consultants/recruiters can only see their own; manager-tier sees all.
-  if (!isManagerTier(req.user.role) && a.assigned_to_user_id !== req.user.id) {
-    throw httpError(404, 'Not found');
-  }
   // Hydrate lesson progress + uploads + feedback + quiz attempts for the
   // assignment-detail view in one round-trip.
   const [pr, up, fb, qa, content] = await Promise.all([
@@ -316,6 +399,9 @@ const assignmentI983Schema = z.object({
 export const updateAssignment: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   if (!isManagerTier(req.user.role)) throw httpError(403, 'Manager-tier only');
+  // Admin unscoped; group lead must own this assignment via group scope.
+  // Throws 404 on out-of-scope (existence-oracle safe).
+  await assertAssignmentInScope(req.user, req.params.id);
   const parsed = assignmentI983Schema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
   // Strip empty-string emails so we don't store them.
@@ -337,12 +423,12 @@ export const updateProgress: RequestHandler = async (req, res) => {
   const parsed = progressSchema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
 
-  // Caller must own the assignment OR be manager-tier.
+  // Owner OR in-scope reviewer (admin-tier or group-lead with reach). The
+  // legacy `isManagerTier` shortcut let HR_MANAGER/MANAGER post progress on
+  // an out-of-group assignment — the audit's open updateProgress finding.
+  await assertAssignmentInScope(req.user, req.params.id);
   const { data: a } = await repo.assignments.get(req.params.id);
   if (!a) throw httpError(404, 'Assignment not found');
-  if ((a as any).assigned_to_user_id !== req.user.id && !isManagerTier(req.user.role)) {
-    throw httpError(404, 'Not found');
-  }
 
   await svc.markLessonProgress({
     assignment_id: req.params.id,
@@ -396,6 +482,8 @@ const feedbackSchema = z.object({
 export const addFeedback: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   if (!isManagerTier(req.user.role)) throw httpError(403, 'Manager-tier only');
+  // Group leads only on in-group assignments; admin unscoped.
+  await assertAssignmentInScope(req.user, req.params.id);
   const parsed = feedbackSchema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
   const { data, error } = await repo.feedback.create({
@@ -494,11 +582,8 @@ export const markLessonViewed: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   const parsed = viewedSchema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
-  const { data: a } = await repo.assignments.get(req.params.id);
-  if (!a) throw httpError(404, 'Not found');
-  if ((a as any).assigned_to_user_id !== req.user.id && !isManagerTier(req.user.role)) {
-    throw httpError(404, 'Not found');
-  }
+  // Group-scoped: admins unscoped, group leads only in-group, owner self-only.
+  await assertAssignmentInScope(req.user, req.params.id);
   await repo.assignments.update(req.params.id, { last_viewed_lesson_id: parsed.data.lesson_id });
   res.json({ ok: true });
 };
@@ -515,12 +600,10 @@ export const submitQuizAttempt: RequestHandler = async (req, res) => {
   const parsed = quizAttemptSchema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
 
-  // Caller must own the assignment OR be manager-tier.
+  // Owner OR in-scope reviewer (admin-tier or group-lead with reach).
+  await assertAssignmentInScope(req.user, req.params.id);
   const { data: a } = await repo.assignments.get(req.params.id);
   if (!a) throw httpError(404, 'Assignment not found');
-  if ((a as any).assigned_to_user_id !== req.user.id && !isManagerTier(req.user.role)) {
-    throw httpError(404, 'Not found');
-  }
 
   // Grade against the pinned version's answer key (the live quiz may have
   // changed or been deleted since this student was assigned).
@@ -561,12 +644,11 @@ export const lessonCoach: RequestHandler = async (req, res) => {
   const parsed = coachSchema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'A question is required', parsed.error.flatten());
 
-  // Caller must own the assignment OR be manager-tier (404, not 403).
+  // Owner OR in-scope reviewer (admin-tier or group-lead with reach). 404 on
+  // out-of-scope to avoid exposing assignment existence.
+  await assertAssignmentInScope(req.user, req.params.id);
   const { data: a } = await repo.assignments.get(req.params.id);
   if (!a) throw httpError(404, 'Assignment not found');
-  if ((a as any).assigned_to_user_id !== req.user.id && !isManagerTier(req.user.role)) {
-    throw httpError(404, 'Not found');
-  }
 
   // Ground the coach in the exact pinned version the learner is reading; this
   // also blocks lesson IDs that belong to other courses.
@@ -597,7 +679,17 @@ export const lessonCoach: RequestHandler = async (req, res) => {
 // ---------------------------------------------------------------------------
 // REPORTS
 // ---------------------------------------------------------------------------
-export const reports: RequestHandler = async (_req, res) => {
+export const reports: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  // Admin-tier sees the full workspace; HR_MANAGER / MANAGER see only their
+  // group's assignments + the derived quiz/time aggregates. The course
+  // catalog totals stay workspace-wide either way (course count is not
+  // user-scoped data). Empty group fails closed.
+  if (isGroupLead(req.user.role as Role)) {
+    const ids = await managerGroupUserIds(req.user);
+    res.json(await svc.reports({ scopeUserIds: ids ?? [] }));
+    return;
+  }
   res.json(await svc.reports());
 };
 
@@ -1129,25 +1221,36 @@ const evalSchema = z.object({
 
 async function assertCanWriteEval(req: any, assignmentId: string, kind?: string) {
   if (!req.user) throw httpError(401, 'Not authenticated');
+  // Admin-tier: unscoped. Group lead: only when assignment target is in their
+  // group (assertAssignmentInScope enforces this and throws 404 otherwise so
+  // we never leak the assignment's existence). Owner: only the
+  // student-facing eval kinds (SELF_12_MONTH / FINAL).
+  if (isAdminTier(req.user.role)) {
+    // Still confirm the assignment exists — keeps existing 404 behavior.
+    const { data: a } = await repo.assignments.get(assignmentId);
+    if (!a) throw httpError(404, 'Assignment not found');
+    return;
+  }
+  if (isGroupLead(req.user.role)) {
+    // Throws 404 on missing OR out-of-group — existence-oracle safe.
+    await assertAssignmentInScope(req.user, assignmentId);
+    return;
+  }
+  // Non-admin / non-lead → owner-only path.
   const { data: a } = await repo.assignments.get(assignmentId);
   if (!a) throw httpError(404, 'Assignment not found');
   const isOwner = (a as any).assigned_to_user_id === req.user.id;
-  const isMgr = isManagerTier(req.user.role);
-  if (isMgr) return;
-  // Non-owners can't even know the assignment exists — 404, not an oracle.
   if (!isOwner) throw httpError(404, 'Not found');
-  // Owner, but consultants may only write their own student-facing evals.
   if (kind === 'SELF_12_MONTH' || kind === 'FINAL') return;
   throw httpError(403, 'Only the assigned consultant can submit this evaluation type');
 }
 
 export const listEvaluations: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
-  const { data: a } = await repo.assignments.get(req.params.id);
-  if (!a) throw httpError(404, 'Assignment not found');
-  if (!isManagerTier(req.user.role) && (a as any).assigned_to_user_id !== req.user.id) {
-    throw httpError(404, 'Not found');
-  }
+  // Centralised group-scope: admins unscoped, group leads in-group only,
+  // learners self-only. The legacy `isManagerTier` shortcut let
+  // HR_MANAGER/MANAGER list a peer group's evaluations.
+  await assertAssignmentInScope(req.user, req.params.id);
   const { data, error } = await repo.evaluations.listForAssignment(req.params.id);
   if (error) throw httpError(500, 'Database error');
   res.json(data ?? []);
@@ -1181,6 +1284,10 @@ export const updateEvaluation: RequestHandler = async (req, res) => {
 export const deleteEvaluation: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   if (!isManagerTier(req.user.role)) throw httpError(403, 'Manager-tier only');
+  // Load the evaluation so we can scope by its parent assignment.
+  const { data: ev } = await repo.evaluations.get(req.params.evalId);
+  if (!ev) throw httpError(404, 'Evaluation not found');
+  await assertAssignmentInScope(req.user, (ev as { assignment_id: string }).assignment_id);
   const { error } = await repo.evaluations.remove(req.params.evalId);
   if (error) throw httpError(500, 'Database error');
   res.json({ ok: true });
@@ -1205,14 +1312,21 @@ export const aiSkillGap: RequestHandler = async (req, res) => {
 // ---------------------------------------------------------------------------
 // COMPLETION GATES — inspect what's blocking COMPLETED for an assignment.
 // ---------------------------------------------------------------------------
+/**
+ * Legacy guard kept for the many call sites in this controller. Now delegates
+ * to the centralised group-scoped check so a group lead can ONLY read an
+ * assignment whose target user is in their own group (admin unscoped,
+ * learner self-only). The previous shape admitted every MANAGER_TIER caller
+ * regardless of group.
+ */
 async function assertCanReadAssignment(req: any, assignmentId: string) {
   if (!req.user) throw httpError(401, 'Not authenticated');
-  const { data: a } = await repo.assignments.get(assignmentId);
-  if (!a) throw httpError(404, 'Assignment not found');
-  if (!isManagerTier(req.user.role) && (a as any).assigned_to_user_id !== req.user.id) {
-    throw httpError(404, 'Not found');
-  }
-  return a as any;
+  await assertAssignmentInScope(req.user, assignmentId);
+  // Return the full row so callers (e.g. submitFinalAssessment) keep their
+  // existing read of `assigned_to_user_id`.
+  const { data } = await repo.assignments.get(assignmentId);
+  if (!data) throw httpError(404, 'Assignment not found');
+  return data as any;
 }
 
 export const getCompletionGates: RequestHandler = async (req, res) => {
@@ -1399,6 +1513,10 @@ export const updateSupervisionNote: RequestHandler = async (req, res) => {
   if (!isManagerTier(req.user.role)) throw httpError(403, 'Manager-tier only');
   const parsed = supervisionSchema.partial().safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
+  // Scope by parent assignment — load note → resolve assignment → group check.
+  const { data: note } = await repo.supervisionNotes.get(req.params.noteId);
+  if (!note) throw httpError(404, 'Supervision note not found');
+  await assertAssignmentInScope(req.user, (note as { assignment_id: string }).assignment_id);
   const { data, error } = await repo.supervisionNotes.update(req.params.noteId, parsed.data);
   if (error) throw httpError(500, 'Database error');
   res.json(data);
@@ -1407,6 +1525,9 @@ export const updateSupervisionNote: RequestHandler = async (req, res) => {
 export const deleteSupervisionNote: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   if (!isManagerTier(req.user.role)) throw httpError(403, 'Manager-tier only');
+  const { data: note } = await repo.supervisionNotes.get(req.params.noteId);
+  if (!note) throw httpError(404, 'Supervision note not found');
+  await assertAssignmentInScope(req.user, (note as { assignment_id: string }).assignment_id);
   const { error } = await repo.supervisionNotes.remove(req.params.noteId);
   if (error) throw httpError(500, 'Database error');
   res.json({ ok: true });

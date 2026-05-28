@@ -19,6 +19,18 @@ const mockFlags = vi.hoisted(() => ({
 }));
 
 vi.mock('../config/db', () => ({ db: { from: () => ({}) }, pool: {} }));
+// Group-lead scope is consulted before grading. `leadAllows` flips between
+// the in-group ("allow") and out-of-group ("deny") cases below.
+const groupScope = vi.hoisted(() => ({ leadAllows: true }));
+vi.mock('../services/groupScope', () => {
+  const GROUP_LEAD = ['MANAGER', 'HR_MANAGER'];
+  return {
+    managerGroupUserIds: vi.fn(async () => []),
+    leadCanAccessUser: vi.fn(async () => groupScope.leadAllows),
+    isGroupLead: (role: string) => GROUP_LEAD.includes(role),
+    isAdminTier: (role: string) => ['SUPER_ADMIN', 'CEO', 'CTO', 'DIRECTOR'].includes(role),
+  };
+});
 vi.mock('../config/logger', () => ({
   logger: { warn: vi.fn(), info: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
@@ -117,6 +129,7 @@ async function call(req: {
 beforeEach(() => {
   mockFlags.anthropicEnabled = true;
   mockFlags.assignmentOwner = 'u-consultant';
+  groupScope.leadAllows = true;
   lessonCoachMock.mockClear();
   lessonCoachMock.mockResolvedValue('A grounded answer.');
 });
@@ -144,10 +157,31 @@ describe('lessonCoach — ownership + grounding', () => {
     expect(lessonCoachMock).not.toHaveBeenCalled();
   });
 
-  it('allows manager-tier on-behalf-of access', async () => {
+  it('allows a GROUP LEAD on-behalf-of access when the target is IN their group', async () => {
+    groupScope.leadAllows = true;
     const { err, res } = await call({
       body: { question: 'Explain this', lesson_id: KNOWN_LESSON },
       user: MANAGER,
+    });
+    expect(err).toBeNull();
+    expect(res.body).toEqual({ answer: 'A grounded answer.' });
+  });
+
+  it('DENIES a GROUP LEAD (404) when the assignment target is OUT of their group', async () => {
+    groupScope.leadAllows = false;
+    const { err } = await call({
+      body: { question: 'Explain this', lesson_id: KNOWN_LESSON },
+      user: MANAGER,
+    });
+    expect(err?.status).toBe(404);
+    expect(lessonCoachMock).not.toHaveBeenCalled();
+  });
+
+  it('allows ADMIN-tier on-behalf-of access regardless of group', async () => {
+    groupScope.leadAllows = false; // leads denied; admin still passes
+    const { err, res } = await call({
+      body: { question: 'Explain this', lesson_id: KNOWN_LESSON },
+      user: { id: 'u-dir', role: 'DIRECTOR' },
     });
     expect(err).toBeNull();
     expect(res.body).toEqual({ answer: 'A grounded answer.' });
