@@ -12,6 +12,7 @@ import {
 import { audit } from '../services/audit.service';
 import { requestPasswordReset } from '../services/auth.service';
 import { logger } from '../config/logger';
+import { SAFE_USER_ADMIN_DETAIL_COLUMNS } from '../config/userColumns';
 
 // Role-rank ladder. Used to refuse status / group / password-reset changes
 // when the actor would otherwise be tampering with an equal- or higher-rank
@@ -484,7 +485,14 @@ export const setCapabilities: RequestHandler = async (req, res) => {
 
 export const get: RequestHandler = async (req, res) => {
   const { id } = req.params;
-  const { data, error } = await db.from('users').select('*').eq('id', id).maybeSingle();
+  // Explicit allow-list — `select('*')` would leak password_hash,
+  // session_version, and any future auth-internal column. See
+  // backend/src/config/userColumns.ts.
+  const { data, error } = await db
+    .from('users')
+    .select(SAFE_USER_ADMIN_DETAIL_COLUMNS)
+    .eq('id', id)
+    .maybeSingle();
   if (error) throw httpError(500, 'Database error');
   if (!data) throw httpError(404, 'User not found');
 

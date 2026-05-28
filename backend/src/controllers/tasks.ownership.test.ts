@@ -145,10 +145,30 @@ describe('tasks.controller — assertCanAccessTask ownership (via listSubtasks)'
     expect(err).toBeNull();
   });
 
-  it('allows a manager-tier caller through to any task', async () => {
+  it('allows an admin-tier caller through to ANY task (workspace-wide)', async () => {
     mock.rows.tasks = [{ id: 't-1', assignee_id: 'u-owner', created_by: 'u-author' }];
     mock.rows.task_subtasks = [];
-    const err = await call(tasks.listSubtasks as Handler, MANAGER, { params: { id: 't-1' } });
+    const err = await call(tasks.listSubtasks as Handler, ADMIN, { params: { id: 't-1' } });
+    expect(err).toBeNull();
+  });
+
+  it('GROUP LEAD is denied an out-of-group task (centralised guard, 404)', async () => {
+    // The task's assignee + creator are users not in the lead's group, and the
+    // lead is neither party themselves. Used to pass when isManagerLike →
+    // unconditional access; the new shared guard scopes leads to in-group +
+    // self-touched.
+    mock.rows.tasks = [{ id: 't-1', assignee_id: 'u-other', created_by: 'u-other' }];
+    mock.rows.users = []; // no in-group users
+    mock.rows.task_subtasks = [];
+    const err = await call(tasks.listSubtasks as Handler, GROUP_LEAD, { params: { id: 't-1' } });
+    expect(err?.status).toBe(404);
+  });
+
+  it('GROUP LEAD CAN access a task whose participant is in their group', async () => {
+    mock.rows.tasks = [{ id: 't-1', assignee_id: 'u-in-group', created_by: 'u-other' }];
+    mock.rows.users = [{ id: 'u-in-group', group_id: 'g1' }];
+    mock.rows.task_subtasks = [];
+    const err = await call(tasks.listSubtasks as Handler, GROUP_LEAD, { params: { id: 't-1' } });
     expect(err).toBeNull();
   });
 });

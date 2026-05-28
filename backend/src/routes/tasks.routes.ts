@@ -5,7 +5,7 @@ import * as ta from '../controllers/taskAttachments.controller';
 import * as tf from '../controllers/taskFilters.controller';
 import { requireRole } from '../middleware/auth';
 import { MANAGER_TIER } from '../types';
-import { uploadAttachment } from '../middleware/upload';
+import { uploadAttachment, verifyUploadMagic } from '../middleware/upload';
 
 export const tasksRouter = Router();
 
@@ -53,5 +53,10 @@ tasksRouter.delete('/comments/:id', tc.remove);
 tasksRouter.get('/:taskId/attachments', ta.list);
 // Docs / images / spreadsheets / text only, max 15 MB. See uploadAttachment
 // in middleware/upload.ts for the exact mime+ext allowlist.
-tasksRouter.post('/:taskId/attachments', uploadAttachment.single('file'), ta.upload);
+tasksRouter.post(
+  '/:taskId/attachments',
+  uploadAttachment.single('file'),
+  verifyUploadMagic,
+  ta.upload,
+);
 tasksRouter.delete('/attachments/:id', ta.remove);

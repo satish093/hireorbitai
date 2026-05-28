@@ -14,9 +14,23 @@
 
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { randomBytes, randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID, createHash } from 'node:crypto';
 import { pool } from './db';
 import { env } from './env';
+
+/**
+ * Deterministic SHA-256 fingerprint of a raw refresh token. Stored in
+ * auth_sessions.refresh_lookup so /auth/refresh can find the candidate row in
+ * O(1) instead of bcrypt-comparing every live session (CPU-DoS surface).
+ *
+ * Safe to store: the token has ~256 bits of entropy from crypto.randomBytes,
+ * so even an attacker with full DB read can't reverse the hash. bcrypt
+ * remains the canonical secret-at-rest — the lookup column only narrows the
+ * candidate set to 1 before the bcrypt verification.
+ */
+function refreshLookup(rawToken: string): string {
+  return createHash('sha256').update(rawToken).digest('hex');
+}
 
 // ---------------------------------------------------------------------------
 // Response shape (legacy client shape, preserved for callsite compatibility)
@@ -96,12 +110,30 @@ function verifyAccessToken(token: string): JwtPayload {
 async function issueRefreshToken(userId: string): Promise<string> {
   const raw = randomBytes(48).toString('base64url');
   const hash = await bcrypt.hash(raw, 12);
+  const lookup = refreshLookup(raw);
   const expires = new Date(Date.now() + env.jwt.refreshTtlSeconds * 1000).toISOString();
-  await pool.query(
-    `INSERT INTO public.auth_sessions (id, user_id, refresh_hash, issued_at, expires_at)
-     VALUES ($1, $2, $3, now(), $4)`,
-    [randomUUID(), userId, hash, expires],
-  );
+  // Best-effort write of refresh_lookup — the column may not exist yet on a
+  // host that hasn't run migration 1752000000000_auth-sessions-refresh-lookup.
+  // Retry without the column on a schema-cache error so the deploy doesn't
+  // hard-fail before the migration is applied.
+  try {
+    await pool.query(
+      `INSERT INTO public.auth_sessions (id, user_id, refresh_hash, refresh_lookup, issued_at, expires_at)
+       VALUES ($1, $2, $3, $4, now(), $5)`,
+      [randomUUID(), userId, hash, lookup, expires],
+    );
+  } catch (e) {
+    const msg = (e as { message?: string })?.message ?? '';
+    if (/column .*refresh_lookup.* does not exist|schema cache/i.test(msg)) {
+      await pool.query(
+        `INSERT INTO public.auth_sessions (id, user_id, refresh_hash, issued_at, expires_at)
+         VALUES ($1, $2, $3, now(), $4)`,
+        [randomUUID(), userId, hash, expires],
+      );
+    } else {
+      throw e;
+    }
+  }
   return raw;
 }
 
@@ -226,18 +258,68 @@ async function issueSession(row: UserRow): Promise<{ user: AuthUser; session: Se
 export async function refreshSession(
   refreshToken: string,
 ): Promise<AuthResp<{ session: Session | null }>> {
-  // Pull all live sessions for any user; bcrypt-compare is the only way to
-  // find the matching row since the stored value is hashed. To keep this
-  // cheap, scope the search by expires_at — expired rows are skipped.
-  const r = await pool.query<{ id: string; user_id: string; refresh_hash: string }>(
-    `SELECT id, user_id, refresh_hash FROM public.auth_sessions
-       WHERE expires_at > now()
-       ORDER BY issued_at DESC
-       LIMIT 200`,
-  );
-  for (const sess of r.rows) {
+  const lookup = refreshLookup(refreshToken);
+
+  // Fast path: deterministic SHA-256 lookup → O(1) row resolution. Without
+  // this we'd bcrypt-compare every live session (up to 200 hashes per
+  // request), which lets an attacker burn CPU by spraying random refresh
+  // strings. bcrypt is STILL the canonical verification — the lookup only
+  // narrows the candidate set to one.
+  try {
+    const r = await pool.query<{ id: string; user_id: string; refresh_hash: string }>(
+      `SELECT id, user_id, refresh_hash FROM public.auth_sessions
+         WHERE refresh_lookup = $1 AND expires_at > now()
+         LIMIT 1`,
+      [lookup],
+    );
+    const sess = r.rows[0];
+    if (sess && (await bcrypt.compare(refreshToken, sess.refresh_hash))) {
+      await pool.query(`DELETE FROM public.auth_sessions WHERE id = $1`, [sess.id]);
+      const u = await pool.query<UserRow>(
+        `SELECT id, email, full_name, password_hash, session_version FROM public.users WHERE id = $1`,
+        [sess.user_id],
+      );
+      const row = u.rows[0];
+      if (!row)
+        return { data: { session: null }, error: { message: 'User not found', status: 401 } };
+      const { session } = await issueSession(row);
+      return { data: { session }, error: null };
+    }
+  } catch (e) {
+    // refresh_lookup column may not exist yet on a host that hasn't run
+    // migration 1752000000000. Fall through to the legacy scan below so the
+    // deploy doesn't break existing sessions.
+    const msg = (e as { message?: string })?.message ?? '';
+    if (!/column .*refresh_lookup.* does not exist|schema cache/i.test(msg)) throw e;
+  }
+
+  // Legacy fallback for pre-migration tokens (refresh_lookup IS NULL or the
+  // column doesn't exist). Bounded scan with a tight per-request cap —
+  // /auth/refresh has a dedicated 30/min/IP rate limiter (server.ts) on top
+  // of this. The first variant scopes to NULL-lookup rows so we never re-
+  // verify a row already handled by the fast path; if the column doesn't
+  // exist yet we degrade to the all-sessions scan.
+  let fallback: { rows: { id: string; user_id: string; refresh_hash: string }[] };
+  try {
+    fallback = await pool.query<{ id: string; user_id: string; refresh_hash: string }>(
+      `SELECT id, user_id, refresh_hash FROM public.auth_sessions
+         WHERE expires_at > now()
+           AND (refresh_lookup IS NULL OR refresh_lookup = '')
+         ORDER BY issued_at DESC
+         LIMIT 50`,
+    );
+  } catch (e) {
+    const msg = (e as { message?: string })?.message ?? '';
+    if (!/column .*refresh_lookup.* does not exist|schema cache/i.test(msg)) throw e;
+    fallback = await pool.query<{ id: string; user_id: string; refresh_hash: string }>(
+      `SELECT id, user_id, refresh_hash FROM public.auth_sessions
+         WHERE expires_at > now()
+         ORDER BY issued_at DESC
+         LIMIT 50`,
+    );
+  }
+  for (const sess of fallback.rows) {
     if (await bcrypt.compare(refreshToken, sess.refresh_hash)) {
-      // Delete the old session row, then issue a fresh access + refresh pair.
       await pool.query(`DELETE FROM public.auth_sessions WHERE id = $1`, [sess.id]);
       const u = await pool.query<UserRow>(
         `SELECT id, email, full_name, password_hash, session_version FROM public.users WHERE id = $1`,

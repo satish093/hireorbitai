@@ -17,6 +17,7 @@ import {
   leadCanAccessUser,
 } from '../services/groupScope';
 import type { Role } from '../types';
+import { assertCanAccessTask as assertCanAccessTaskShared } from '../services/taskAccess';
 
 const SELECT_WITH_JOINS = `
   *,
@@ -309,10 +310,14 @@ export const updateStatus: RequestHandler = async (req, res) => {
   res.json(await taskWithJoins(req.params.id));
 };
 
-/** Delete. Manager / Super admin only. */
+/** Delete. Manager / Super admin only — AND for group leads, only tasks
+ *  within their own group's scope (assertCanAccessTask). Previously this only
+ *  checked isManagerLike, so a lead could delete out-of-group tasks. */
 export const remove: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   if (!isManagerLike(req.user.role)) throw httpError(403, 'Forbidden');
+  // Throws 404 (not 403) on missing or out-of-scope — existence oracle safe.
+  await assertCanAccessTask(req.user, req.params.id);
   const { error } = await db.from('tasks').delete().eq('id', req.params.id);
   if (error) throw httpError(500, 'Database error');
   res.json({ ok: true });
@@ -525,22 +530,18 @@ interface AccessibleTask {
  * success; throws httpError(404, 'Task not found') if the row is missing OR the
  * caller is a non-manager who is neither the assignee nor the creator.
  */
+/**
+ * Thin wrapper around the centralised guard in services/taskAccess. The local
+ * version used to short-circuit on `isManagerLike` and let every MANAGER_TIER
+ * caller through, which let a group lead read/update/delete tasks belonging
+ * to other groups. The service-level guard scopes group leads to their own
+ * group + self-touched tasks.
+ */
 async function assertCanAccessTask(
-  user: { id: string; role: string },
+  user: { id: string; role: Role; group_id?: string | null },
   taskId: string,
 ): Promise<AccessibleTask> {
-  const { data, error } = await db
-    .from('tasks')
-    .select('id, assignee_id, created_by')
-    .eq('id', taskId)
-    .maybeSingle();
-  if (error) throw httpError(500, 'Database error');
-  const task = data as AccessibleTask | null;
-  if (!task) throw httpError(404, 'Task not found');
-  const allowed =
-    isManagerLike(user.role) || task.assignee_id === user.id || task.created_by === user.id;
-  if (!allowed) throw httpError(404, 'Task not found');
-  return task;
+  return assertCanAccessTaskShared(user, taskId);
 }
 
 const ACTIVITY_SELECT = `*, actor:users!actor_id ( id, full_name, email )`;

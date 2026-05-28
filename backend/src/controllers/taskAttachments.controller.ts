@@ -1,29 +1,27 @@
 import { RequestHandler } from 'express';
 import { db } from '../config/db';
-import { httpError, MANAGER_TIER } from '../types';
-
-function isManagerLike(role: string): boolean {
-  return (MANAGER_TIER as string[]).includes(role);
-}
+import { httpError, ADMIN_TIER, type Role } from '../types';
+import { assertCanAccessTask } from '../services/taskAccess';
 
 const BUCKET = 'task-attachments';
 
-async function canAccessTask(taskId: string, userId: string, role: string): Promise<boolean> {
-  if (isManagerLike(role)) return true;
-  const { data } = await db.from('tasks').select('assignee_id').eq('id', taskId).single();
-  return data?.assignee_id === userId;
+function isAdmin(role: Role): boolean {
+  return (ADMIN_TIER as Role[]).includes(role);
 }
 
 /** List attachments. Each entry includes a short-lived signed download URL. */
 export const list: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
-  const taskId = req.params.taskId;
-  if (!(await canAccessTask(taskId, req.user.id, req.user.role))) throw httpError(403, 'Forbidden');
+  // Centralised guard: admin-tier unscoped; group leads only their group's
+  // tasks; everyone else only their own assigned/created tasks. Previously
+  // this returned true for ANY MANAGER_TIER which let a lead list a peer
+  // group's attachments AND mint signed download URLs for them.
+  await assertCanAccessTask(req.user, req.params.taskId);
 
   const { data, error } = await db
     .from('task_attachments')
     .select(`*, uploader:users!uploaded_by ( id, email, full_name )`)
-    .eq('task_id', taskId)
+    .eq('task_id', req.params.taskId)
     .order('created_at', { ascending: false });
   if (error) throw httpError(500, 'Database error');
 
@@ -39,14 +37,13 @@ export const list: RequestHandler = async (req, res) => {
 /** Upload an attachment. multipart/form-data: { file }. */
 export const upload: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
-  const taskId = req.params.taskId;
-  if (!(await canAccessTask(taskId, req.user.id, req.user.role))) throw httpError(403, 'Forbidden');
+  await assertCanAccessTask(req.user, req.params.taskId);
 
   const file = (req as any).file as Express.Multer.File | undefined;
   if (!file) throw httpError(400, 'Missing file');
 
   const safeName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
-  const path = `${taskId}/${Date.now()}-${safeName}`;
+  const path = `${req.params.taskId}/${Date.now()}-${safeName}`;
   const { error: upErr } = await db.storage
     .from(BUCKET)
     .upload(path, file.buffer, { contentType: file.mimetype, upsert: false });
@@ -55,7 +52,7 @@ export const upload: RequestHandler = async (req, res) => {
   const { data, error } = await db
     .from('task_attachments')
     .insert({
-      task_id: taskId,
+      task_id: req.params.taskId,
       uploaded_by: req.user.id,
       file_name: file.originalname,
       storage_path: path,
@@ -68,7 +65,8 @@ export const upload: RequestHandler = async (req, res) => {
   res.status(201).json(data);
 };
 
-/** Delete an attachment (DB row + object). Uploader or manager. */
+/** Delete an attachment (DB row + object). Uploader, admin-tier, or a group
+ *  lead with access to the parent task. */
 export const remove: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   const { data: row } = await db
@@ -77,8 +75,15 @@ export const remove: RequestHandler = async (req, res) => {
     .eq('id', req.params.id)
     .single();
   if (!row) throw httpError(404, 'Attachment not found');
-  const canDelete = isManagerLike(req.user.role) || row.uploaded_by === req.user.id;
-  if (!canDelete) throw httpError(403, 'Forbidden');
+
+  // Uploader can always delete their own; otherwise require task-scoped
+  // access (admin unscoped, group lead in-group, plain user must be the
+  // task assignee/creator).
+  if (row.uploaded_by !== req.user.id) {
+    if (!isAdmin(req.user.role as Role)) {
+      await assertCanAccessTask(req.user, row.task_id);
+    }
+  }
 
   await db.storage.from(BUCKET).remove([row.storage_path]);
   const { error } = await db.from('task_attachments').delete().eq('id', row.id);

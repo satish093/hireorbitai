@@ -195,10 +195,9 @@ function rateLimitKey(req: import('express').Request): string {
 
 // Skip the global limiter on health/readiness/refresh:
 //   - /health, /ready  → uptime monitors mustn't burn budget.
-//   - /auth/refresh   → silent token refresh is a high-frequency interceptor
-//                       hook; if it gets 429'd we end up logging the user out
-//                       on a transient burst. The refresh endpoint has its own
-//                       narrow per-user cost (one DB hit) so it's safe.
+//   - /auth/refresh    → has its OWN dedicated limiter (refreshLimiter, below)
+//                        so a transient legitimate burst doesn't log users out,
+//                        but abusive token-guessing still gets blocked.
 function skipGlobal(req: import('express').Request): boolean {
   const p = req.path;
   return p === '/health' || p === '/ready' || p === '/auth/refresh' || p === '/api/auth/refresh';
@@ -237,6 +236,25 @@ app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/forgot-password', authLimiter);
 app.use('/api/auth/reset-password', authLimiter);
 app.use('/api/invitations/setup', authLimiter);
+
+// --- /auth/refresh dedicated limiter -----------------------------------------
+// /auth/refresh is excluded from the global limiter so a normal silent-refresh
+// burst can't log users out. But the endpoint itself does up to N bcrypt
+// compares per request (rotating refresh-token verification) — uncapped, this
+// is a cheap CPU-DoS vector for an attacker spraying random refresh strings.
+// 30 attempts per minute per IP is plenty for legitimate use (silent refresh
+// fires once per hour per active user) but blocks abuse decisively.
+const REFRESH_LIMITER_WINDOW_MS = 60 * 1000;
+const refreshLimiter = rateLimit({
+  windowMs: REFRESH_LIMITER_WINDOW_MS,
+  max: 30,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  handler: (req, res, next) =>
+    sendRateLimitResponse(req, res, next, { windowMs: REFRESH_LIMITER_WINDOW_MS }),
+});
+app.use('/auth/refresh', refreshLimiter);
+app.use('/api/auth/refresh', refreshLimiter);
 
 // --- AI-endpoint per-user limiter --------------------------------------------
 // Anthropic calls cost real money. The global 3000/15min ceiling is too high

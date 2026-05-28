@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { requireRole } from '../middleware/auth';
-import { MANAGER_TIER, ADMIN_TIER } from '../types';
+import { MANAGER_TIER, ADMIN_TIER, OWNER_TIER } from '../types';
 import * as c from '../controllers/training.controller';
 import * as w from '../controllers/trainingWorkspace.controller';
 import * as adminAI from '../controllers/adminAI.controller';
@@ -134,28 +134,31 @@ trainingRouter.get('/ai/provider', c.aiProviderInfo);
 // ---- AI generation status — live activity feed (manager-tier) ----
 trainingRouter.get('/ai/generation-status', requireRole(...MANAGER_TIER), c.aiGenerationStatus);
 
-// ---- Admin-only: validate an AI token before using it for generation ----
-trainingRouter.post('/ai/check-token', requireRole(...ADMIN_TIER), adminAI.checkAiToken);
-
-// ---- Claude CLI auth management (admin-tier only) ----
+// ---- AI credential management — OWNER_TIER only (SUPER_ADMIN + CEO) ---------
+// These routes are infrastructure-level: they rotate the Claude credential,
+// write backend/.env on the host, and trigger a PM2 reload. They were
+// previously ADMIN_TIER which let a DIRECTOR or CTO swap the workspace's AI
+// identity. OWNER_TIER matches the feature-flag write gate — operational
+// power on the actual deployment is reserved for ownership.
+trainingRouter.post('/ai/check-token', requireRole(...OWNER_TIER), adminAI.checkAiToken);
 // Refresh: runs `claude setup-token` — works when CLI is already logged in.
 trainingRouter.post(
   '/ai/claude-auth/refresh',
-  requireRole(...ADMIN_TIER),
+  requireRole(...OWNER_TIER),
   adminAI.refreshClaudeToken,
 );
 // Re-login: spawns `claude auth login`, returns the auth URL to show in the UI.
-trainingRouter.post('/ai/claude-auth/start', requireRole(...ADMIN_TIER), adminAI.startClaudeLogin);
+trainingRouter.post('/ai/claude-auth/start', requireRole(...OWNER_TIER), adminAI.startClaudeLogin);
 // Poll for completion of a pending login session.
 trainingRouter.get(
   '/ai/claude-auth/:sessionId/status',
-  requireRole(...ADMIN_TIER),
+  requireRole(...OWNER_TIER),
   adminAI.getLoginStatus,
 );
 // Submit the browser-issued authorization code to the waiting login process.
 trainingRouter.post(
   '/ai/claude-auth/:sessionId/code',
-  requireRole(...ADMIN_TIER),
+  requireRole(...OWNER_TIER),
   adminAI.submitClaudeCode,
 );
 

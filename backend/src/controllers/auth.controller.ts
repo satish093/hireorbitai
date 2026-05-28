@@ -3,13 +3,21 @@ import { z } from 'zod';
 import { db } from '../config/db';
 import { httpError } from '../types';
 import * as authSvc from '../services/auth.service';
+import { SAFE_USER_SELF_COLUMNS } from '../config/userColumns';
 
 // ---------------------------------------------------------------------------
 // /me — current user's profile, plus onboarding hints + must_change_password.
 // ---------------------------------------------------------------------------
 export const me: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
-  const { data: user, error } = await db.from('users').select('*').eq('id', req.user.id).single();
+  // Explicit safe column list — `select('*')` would leak password_hash,
+  // session_version, and any future auth-secret column added by a later
+  // migration. See backend/src/config/userColumns.ts.
+  const { data: user, error } = await db
+    .from('users')
+    .select(SAFE_USER_SELF_COLUMNS)
+    .eq('id', req.user.id)
+    .single();
   if (error) throw httpError(500, 'Database error');
 
   let consultant_id: string | null = null;
@@ -65,10 +73,12 @@ export const syncProfile: RequestHandler = async (req, res) => {
   if (parsed.data.full_name !== undefined) patch.full_name = parsed.data.full_name;
   if (parsed.data.phone !== undefined) patch.phone = parsed.data.phone;
   if (parsed.data.avatar_url !== undefined) patch.avatar_url = parsed.data.avatar_url;
+  // .select() with no args returns every column — same leak surface as
+  // select('*'). Pin to the safe self-profile list.
   const { data, error } = await db
     .from('users')
     .upsert(patch, { onConflict: 'id' })
-    .select()
+    .select(SAFE_USER_SELF_COLUMNS)
     .single();
   if (error) throw httpError(500, 'Database error');
   res.json(data);
