@@ -42,9 +42,12 @@
    * Light = the original Tailwind indigo-50; dark = translucent indigo-500
    * so the chip blends into the dark surface instead of glowing pure white.
    * `brand.50` / `brand.700` in tailwind.config.js point at these so every
-   * `bg-brand-50` / `text-brand-700` site auto-switches per theme. */
+   * `bg-brand-50` / `text-brand-700` site auto-switches per theme.
+   * --brand-soft-border is the matching brand-100 border that wraps the chip
+   * (RecruiterTargetingBar, ManagerDashboard hero card, TaskDetail pill). */
   --brand-soft: #eef2ff;
   --brand-on-soft: #4338ca;
+  --brand-soft-border: #e0e7ff;
   --success: #2e7a42; /* sRGB hex — 4.8:1 on success-soft #dcf7e1; axe-core cannot parse oklch */
   --success-soft: oklch(0.95 0.04 150);
   --warn: oklch(0.72 0.13 75);
@@ -121,9 +124,12 @@
   --brand-to: #8b5cf6;
   /* Dark-mode brand-soft chip: translucent indigo on the dark surface
    * (mirrors the existing `dark:bg-indigo-500/15` pattern used across the
-   * app). Paired text shifts to indigo-300 so the chip stays readable. */
+   * app). Paired text shifts to indigo-300 so the chip stays readable.
+   * --brand-soft-border is slightly more opaque so the chip edge stays
+   * visible on the dark surface without glowing like the light-mode #e0e7ff. */
   --brand-soft: rgb(99 102 241 / 0.15);
   --brand-on-soft: #a5b4fc;
+  --brand-soft-border: rgb(99 102 241 / 0.3);
   --success: #4aa865; /* brightened from #429c5a — 5.1:1 contrast on #012d10 (was 4.43:1) */
   --success-soft: #012d10;
   --warn: #d49838;

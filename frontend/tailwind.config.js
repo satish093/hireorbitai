@@ -61,12 +61,15 @@ export default {
           ring: 'var(--sidebar-ring)',
         },
         brand: {
-          // brand-50 + brand-700 are theme-aware: the chip background and its
-          // paired foreground swap on `[data-theme="dark"]` via tokens.css.
-          // The other shades (100/200/500/600/900) stay literal — they're
-          // used for borders/accents/dots that already read OK in dark mode.
+          // brand-50 / brand-100 / brand-700 are theme-aware via tokens.css
+          // (background / border / paired foreground). Without this, dark mode
+          // shows the literal pale-indigo `#eef2ff` / `#e0e7ff` glowing on a
+          // near-black surface — the RecruiterTargetingBar bug. The remaining
+          // shades (200/300/500/600/900) stay literal: brand-200 is used as
+          // `dark:text-brand-200` in Messages where the lightness is wanted,
+          // and the others are accent/dot/ring colors that already read OK.
           50: 'var(--brand-soft)',
-          100: '#e0e7ff',
+          100: 'var(--brand-soft-border)',
           200: '#c7d2fe',
           500: '#6366f1',
           600: '#4f46e5',
