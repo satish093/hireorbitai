@@ -24,6 +24,41 @@ interface ManagerRow {
   last_login_at?: string | null;
 }
 
+function StatusPill({ status }: { status?: string | null }) {
+  const active = (status ?? 'active') === 'active';
+  return (
+    <span
+      className={
+        active
+          ? 'inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-300'
+          : 'inline-flex items-center gap-1.5 rounded-full border border-border bg-hover px-2 py-0.5 text-xs font-medium text-muted'
+      }
+    >
+      <span
+        className={
+          active ? 'size-1.5 rounded-full bg-emerald-500' : 'size-1.5 rounded-full bg-slate-400'
+        }
+      />
+      {status ?? 'active'}
+    </span>
+  );
+}
+
+function RolePill({ role }: { role: Role }) {
+  const hr = role === 'HR_MANAGER';
+  return (
+    <span
+      className={
+        hr
+          ? 'inline-flex rounded-full border border-violet-500/20 bg-violet-500/10 px-2 py-0.5 text-xs font-medium text-violet-600 dark:text-violet-300'
+          : 'inline-flex rounded-full border border-sky-500/20 bg-sky-500/10 px-2 py-0.5 text-xs font-medium text-sky-700 dark:text-sky-300'
+      }
+    >
+      {ROLE_LABEL[role] ?? role}
+    </span>
+  );
+}
+
 export function Managers() {
   const { profile } = useAuth();
   const { groups } = useUserGroups();
@@ -80,12 +115,34 @@ export function Managers() {
     }
   }
 
+  const totalRecruiters = rows.reduce((sum, r) => sum + (r.recruiter_count ?? 0), 0);
+  const hrManagers = rows.filter((r) => r.role === 'HR_MANAGER').length;
+  const managers = rows.filter((r) => r.role === 'MANAGER').length;
+  const selectedGroupName =
+    groups.find((g) => g.id === selectedGroup)?.name ??
+    (selectedGroup ? 'selected group' : 'No group');
+
   return (
     <Layout title="Managers">
-      <PageHeader
-        title="Managers"
-        description="Users with role Manager or HR Manager. Admin tier can reassign their group."
-      />
+      <PageHeader title="Managers" description="Manage Manager and HR Manager group assignments." />
+      <div className="mb-4 grid grid-cols-2 gap-2 lg:grid-cols-4">
+        {[
+          { label: 'Total leads', value: rows.length },
+          { label: 'Managers', value: managers },
+          { label: 'HR Managers', value: hrManagers },
+          { label: 'Assigned recruiters', value: totalRecruiters },
+        ].map((item) => (
+          <div
+            key={item.label}
+            className="rounded-lg border border-border bg-surface px-3 py-2.5 shadow-btn-soft"
+          >
+            <div className="text-[10px] font-semibold uppercase tracking-widest text-muted">
+              {item.label}
+            </div>
+            <div className="mt-1 text-lg font-semibold text-ink">{item.value}</div>
+          </div>
+        ))}
+      </div>
       <DataTable
         rows={rows}
         loading={loading}
@@ -94,13 +151,14 @@ export function Managers() {
           {
             key: 'name',
             header: 'Name',
+            className: 'min-w-[260px]',
             render: (m: ManagerRow) => (
               <Link
                 to={`/users/${m.id}`}
-                className="inline-flex items-center gap-2 hover:bg-hover rounded-md -mx-1 px-1 py-0.5"
+                className="inline-flex max-w-full items-center gap-2.5 rounded-md -mx-1 px-1 py-0.5 hover:bg-hover"
               >
-                <Avatar name={m.full_name} email={m.email} size={26} />
-                <div className="leading-tight">
+                <Avatar name={m.full_name} email={m.email} size={30} />
+                <div className="min-w-0 leading-tight">
                   <div className="text-sm font-medium text-ink hover:underline">
                     {m.full_name ?? m.email}
                   </div>
@@ -112,9 +170,7 @@ export function Managers() {
           {
             key: 'role',
             header: 'Role',
-            render: (m: ManagerRow) => (
-              <span className="text-xs font-medium text-ink">{ROLE_LABEL[m.role] ?? m.role}</span>
-            ),
+            render: (m: ManagerRow) => <RolePill role={m.role} />,
           },
           {
             key: 'group',
@@ -124,34 +180,31 @@ export function Managers() {
           {
             key: 'recruiters',
             header: 'Recruiters',
-            align: 'right',
+            align: 'center',
             hideOnMobile: true,
             render: (m: ManagerRow) =>
               m.recruiter_count > 0 ? (
                 <Link
                   to={`/recruiters`}
-                  className="inline-flex items-center justify-center min-w-[1.75rem] rounded-full bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-700 hover:bg-brand-100"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-brand-500/20 bg-brand-50 px-2.5 py-1 text-xs font-semibold text-brand-700 hover:bg-brand-100"
                   title={`${m.recruiter_count} recruiter${m.recruiter_count === 1 ? '' : 's'}`}
                 >
-                  {m.recruiter_count}
+                  <span>{m.recruiter_count}</span>
+                  <span className="font-medium opacity-75">
+                    {m.recruiter_count === 1 ? 'recruiter' : 'recruiters'}
+                  </span>
                 </Link>
               ) : (
-                <span className="text-xs text-muted">0</span>
+                <span className="inline-flex items-center rounded-full border border-border bg-hover px-2.5 py-1 text-xs text-muted">
+                  none
+                </span>
               ),
           },
           {
             key: 'status',
             header: 'Status',
             hideOnMobile: true,
-            render: (m: ManagerRow) => (
-              <span
-                className={
-                  m.status === 'active' ? 'text-xs text-emerald-700' : 'text-xs text-muted italic'
-                }
-              >
-                {m.status ?? 'active'}
-              </span>
-            ),
+            render: (m: ManagerRow) => <StatusPill status={m.status} />,
           },
           ...(canEditGroup
             ? [
@@ -160,8 +213,8 @@ export function Managers() {
                   header: '',
                   align: 'right' as const,
                   render: (m: ManagerRow) => (
-                    <Button size="sm" variant="ghost" onClick={() => openGroupEdit(m)}>
-                      Group
+                    <Button size="sm" variant="outline" onClick={() => openGroupEdit(m)}>
+                      Move group
                     </Button>
                   ),
                 },
@@ -174,6 +227,7 @@ export function Managers() {
         open={!!picked}
         onClose={() => setPicked(null)}
         title={`Move ${picked?.full_name ?? picked?.email ?? 'manager'} to a group`}
+        description="Choose the group this manager belongs to."
         footer={
           <>
             <Button variant="secondary" onClick={() => setPicked(null)}>
@@ -214,13 +268,18 @@ export function Managers() {
           </>
         }
       >
-        <p className="text-sm text-ink">
-          Move{' '}
-          <span className="font-semibold">
-            {picked?.full_name ?? picked?.email ?? 'this manager'}
-          </span>
-          ? All Recruiters under this Manager will be unassigned.
-        </p>
+        <div className="space-y-3">
+          <p className="text-sm text-ink">
+            Move{' '}
+            <span className="font-semibold">
+              {picked?.full_name ?? picked?.email ?? 'this manager'}
+            </span>{' '}
+            to <span className="font-semibold">{selectedGroupName}</span>?
+          </p>
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-200">
+            All Recruiters under this Manager will be unassigned.
+          </div>
+        </div>
       </Modal>
     </Layout>
   );
