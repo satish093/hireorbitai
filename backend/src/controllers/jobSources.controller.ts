@@ -4,38 +4,13 @@ import { db } from '../config/db';
 import { runSync, runSyncForId, Source } from '../services/jobIngestion.service';
 import { httpError } from '../types';
 
-const VALID_SOURCES: Source[] = [
-  'remoteok',
-  'greenhouse',
-  'lever',
-  'adzuna',
-  'remotive',
-  'arbeitnow',
-  'jsearch',
-  'ashby',
-  'jooble',
-  'usajobs',
-  'serpapi',
-  'searchapi',
-  'linkedin',
-  'monster',
-  'manual',
-];
+const VALID_SOURCES: Source[] = ['dice', 'careerbuilder', 'linkedin', 'monster', 'manual'];
 
-function sourceNeedsSlug(s: Source): boolean {
-  return s === 'greenhouse' || s === 'lever' || s === 'ashby';
+function sourceNeedsSlug(_s: Source): boolean {
+  return false; // none of the four active drivers require a per-company slug
 }
 function sourceRequiresKey(s: Source): boolean {
-  return (
-    s === 'adzuna' ||
-    s === 'jsearch' ||
-    s === 'jooble' ||
-    s === 'usajobs' ||
-    s === 'serpapi' ||
-    s === 'searchapi' ||
-    s === 'linkedin' ||
-    s === 'monster'
-  );
+  return s === 'linkedin'; // only LinkedIn uses RAPIDAPI_KEY
 }
 
 export const listSources: RequestHandler = async (_req, res) => {
@@ -51,31 +26,12 @@ export const listSources: RequestHandler = async (_req, res) => {
 export const createSource: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   const schema = z.object({
-    source: z.enum([
-      'remoteok',
-      'greenhouse',
-      'lever',
-      'adzuna',
-      'remotive',
-      'arbeitnow',
-      'jsearch',
-      'ashby',
-      'jooble',
-      'usajobs',
-      'serpapi',
-      'searchapi',
-      'linkedin',
-      'monster',
-      'manual',
-    ]),
+    source: z.enum(['dice', 'careerbuilder', 'linkedin', 'monster', 'manual']),
     slug: z.string().optional().nullable(),
     display_name: z.string().optional(),
   });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
-  if (sourceNeedsSlug(parsed.data.source) && !parsed.data.slug) {
-    throw httpError(400, `${parsed.data.source} requires a company slug`);
-  }
   const { data, error } = await db
     .from('source_companies')
     .insert({
@@ -134,17 +90,12 @@ export const syncOne: RequestHandler = async (req, res) => {
   res.json(report);
 };
 
-/** Health dashboard — per-source rollup of:
- *   - is the API key configured?
- *   - how many rows in source_companies (active vs paused)
- *   - last sync count + last sync error (worst across rows)
- *  Used by the SourcesDrawer to explain why a source is dark / silent. */
+/** Health dashboard — per-source rollup of key config, row counts, last sync. */
 export const sourcesHealth: RequestHandler = async (_req, res) => {
   const { data: rows } = await db
     .from('source_companies')
     .select('source, is_active, last_synced_at, last_sync_jobs_count, last_sync_error');
 
-  // Per-source aggregates.
   const byId = new Map<
     Source,
     {
@@ -175,21 +126,11 @@ export const sourcesHealth: RequestHandler = async (_req, res) => {
   }
 
   const keyConfigured: Record<string, boolean> = {
-    remoteok: true,
-    greenhouse: true,
-    lever: true,
-    remotive: true,
-    arbeitnow: true,
-    ashby: true,
+    dice: true, // direct REST API — no key
+    careerbuilder: true, // HTTP scraper — no key
+    monster: true, // Playwright — no key
     manual: true,
-    adzuna: !!(process.env.ADZUNA_APP_ID && process.env.ADZUNA_APP_KEY),
-    jsearch: !!process.env.JSEARCH_API_KEY,
-    jooble: !!process.env.JOOBLE_API_KEY,
-    usajobs: !!(process.env.USAJOBS_API_KEY && process.env.USAJOBS_USER_AGENT),
-    serpapi: !!process.env.SERPAPI_API_KEY,
-    searchapi: !!process.env.SEARCHAPI_API_KEY,
-    linkedin: !!(process.env.RAPIDAPI_KEY || process.env.JSEARCH_API_KEY),
-    monster: !!(process.env.RAPIDAPI_KEY || process.env.JSEARCH_API_KEY),
+    linkedin: !!process.env.RAPIDAPI_KEY,
   };
 
   const out = VALID_SOURCES.map((s) => {
@@ -210,7 +151,6 @@ export const sourcesHealth: RequestHandler = async (_req, res) => {
       last_synced_at: agg.last_synced_at,
       last_sync_jobs_count: agg.last_sync_jobs_count,
       last_error: agg.last_error,
-      // status: green if it has active rows + key + recent sync; amber if missing key or 0 rows; red if last error.
       status: agg.last_error
         ? 'error'
         : sourceRequiresKey(s) && !keyConfigured[s]
