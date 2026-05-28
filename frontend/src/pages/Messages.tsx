@@ -90,6 +90,10 @@ export function Messages() {
   // attachment_ids and the server claims them. Empties on send / discard.
   const [pendingAttachments, setPendingAttachments] = useState<Attachment[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Auto-grow composer textarea: re-measures on every keystroke up to ~6
+  // lines, then scrolls internally. Kills the "tiny one-line box for a
+  // 3-paragraph message" feeling that single-row textareas have.
+  const composerRef = useRef<HTMLTextAreaElement>(null);
   // True when the backend returned 403 for the currently-targeted thread.
   // Triggers the "you no longer have access" panel + suppresses message-
   // polling for the denied peer until the user picks a different peer.
@@ -327,6 +331,17 @@ export function Messages() {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
     }
   }, [messages, activePeerId]);
+
+  // Auto-resize the composer textarea up to a max height. We reset to auto
+  // first so it can shrink back down when the user deletes text.
+  useEffect(() => {
+    const el = composerRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    // 144px ≈ 6 lines of body-1; matches the existing `max-h-32` Tailwind
+    // class (8rem = 128px) plus the padding so the visual cap is the same.
+    el.style.height = Math.min(el.scrollHeight, 144) + 'px';
+  }, [draft]);
 
   function onScrollMessages() {
     const el = scrollContainerRef.current;
@@ -753,12 +768,13 @@ export function Messages() {
                               {day}
                             </span>
                           </div>
-                          <div className="space-y-2">
-                            {items.map((m) => (
+                          <div>
+                            {annotateBursts(items).map(({ msg: m, isHeadOfBurst }) => (
                               <Bubble
                                 key={m.id}
                                 message={m}
                                 mine={m.sender_id === profile?.id}
+                                isHeadOfBurst={isHeadOfBurst}
                                 onEdit={async (newBody) => {
                                   // Optimistic local update; PATCH in
                                   // background. Roll back on failure.
@@ -858,6 +874,7 @@ export function Messages() {
                         <IconPaperclip size={18} />
                       </button>
                       <textarea
+                        ref={composerRef}
                         value={draft}
                         onChange={(e) => setDraft(e.target.value)}
                         onKeyDown={(e) => {
@@ -868,7 +885,7 @@ export function Messages() {
                         }}
                         rows={1}
                         placeholder="Write a message… (Shift+Enter for newline)"
-                        className="flex-1 resize-none bg-hover/60 rounded-2xl px-4 py-2.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-brand-500/40 max-h-32"
+                        className="flex-1 resize-none bg-hover/60 rounded-2xl px-4 py-2.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-brand-500/40 max-h-36 overflow-y-auto"
                       />
                       <Button
                         type="submit"
@@ -899,11 +916,17 @@ export function Messages() {
 function Bubble({
   message,
   mine,
+  isHeadOfBurst = true,
   onEdit,
   onDelete,
 }: {
   message: Message;
   mine: boolean;
+  /** True when this is the first message in a burst from this sender — gets
+   *  more top-margin so consecutive messages from one sender visually stack
+   *  tight (the "Discord/Slack" look). Defaults to true for callers that
+   *  haven't been updated to pass the flag. */
+  isHeadOfBurst?: boolean;
   onEdit?: (newBody: string) => void | Promise<void>;
   onDelete?: () => void | Promise<void>;
 }) {
@@ -938,6 +961,9 @@ function Bubble({
     <div
       className={clsx(
         'flex group relative',
+        // Tight stack: a continuation message sits ~2px below the previous
+        // one in the same burst; a new burst gets ~10px of breathing room.
+        isHeadOfBurst ? 'mt-2.5' : 'mt-0.5',
         mine ? 'justify-end animate-slide-in-right' : 'justify-start animate-slide-in-left',
       )}
       onMouseEnter={() => setHovered(true)}
@@ -1040,7 +1066,7 @@ function Bubble({
             {message.body && <span>{message.body}</span>}
             <div
               className={clsx(
-                'text-[10px] mt-1 flex items-center gap-1',
+                'text-[10px] mt-1 flex items-center gap-1 justify-end',
                 mine ? 'text-white/70' : 'text-muted',
               )}
             >
@@ -1051,11 +1077,61 @@ function Bubble({
               {message.edited_at && (
                 <span className={mine ? 'text-white/60' : 'text-muted'}>· edited</span>
               )}
+              {/* WhatsApp-style delivery ticks — outgoing messages only.
+                  Sent (single grey tick) when the row exists. Read (double
+                  blue tick) once the recipient's mark-read fires and
+                  read_at is set. Skipped for tmp-id optimistic rows that
+                  haven't reached the server yet — they'd otherwise show
+                  a "sent" indicator before the network even resolves. */}
+              {mine && !message.id.startsWith('tmp-') && <DeliveryTicks read={!!message.read_at} />}
             </div>
           </>
         )}
       </div>
     </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WhatsApp-style delivery ticks. The bubble already gates this to outgoing
+// messages with a real server id, so by definition the row has been
+// persisted — that earns the single "sent" tick. `read_at` flipping
+// non-null is what earns the second, blue tick. We deliberately skip the
+// middle "delivered to recipient device" state — the backend doesn't track
+// it and conflating delivered with read would be misleading. Two states is
+// enough to read at a glance.
+// ─────────────────────────────────────────────────────────────────────────────
+function DeliveryTicks({ read }: { read: boolean }) {
+  // Two overlapping ticks at 12px — the second one shifted right by 4px
+  // gives the classic WhatsApp double-check silhouette without needing a
+  // multi-path SVG.
+  const colour = read ? '#34b7f1' : 'currentColor';
+  const tick = (offset: number) => (
+    <svg
+      width={12}
+      height={12}
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke={colour}
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{ position: 'absolute', left: offset }}
+      aria-hidden
+    >
+      <path d="M3 8.5 6.5 12 14 4" />
+    </svg>
+  );
+  return (
+    <span
+      className="relative inline-block"
+      style={{ width: 16, height: 12 }}
+      title={read ? 'Read' : 'Sent'}
+      aria-label={read ? 'Read' : 'Sent'}
+    >
+      {tick(0)}
+      {read && tick(4)}
+    </span>
   );
 }
 
@@ -1174,6 +1250,28 @@ function groupByDay(messages: Message[]): { day: string; items: Message[] }[] {
       out.push({ day, items: [] });
     }
     out[out.length - 1]!.items.push(m);
+  }
+  return out;
+}
+
+/** Window within which two consecutive messages from the same sender count
+ *  as the same "burst" — gets the tight-stacked treatment (no avatar repeat,
+ *  minimal vertical gap). Five minutes matches Discord's default. */
+const GROUP_BURST_MS = 5 * 60_000;
+
+/** For each message decide whether it's the first in a new burst from a
+ *  given sender. The first message in a day is always a burst-head; the
+ *  rest depend on prev.sender vs current.sender and the time gap. */
+function annotateBursts(items: Message[]): Array<{ msg: Message; isHeadOfBurst: boolean }> {
+  const out: Array<{ msg: Message; isHeadOfBurst: boolean }> = [];
+  for (let i = 0; i < items.length; i++) {
+    const cur = items[i]!;
+    const prev = i > 0 ? items[i - 1] : null;
+    const isHead =
+      !prev ||
+      prev.sender_id !== cur.sender_id ||
+      new Date(cur.created_at).getTime() - new Date(prev.created_at).getTime() > GROUP_BURST_MS;
+    out.push({ msg: cur, isHeadOfBurst: isHead });
   }
   return out;
 }
