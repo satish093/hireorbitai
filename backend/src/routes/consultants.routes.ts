@@ -18,3 +18,4 @@ consultantsRouter.post(
   requireRole(...OPERATOR_TIER),
   c.setMarketingStatus,
 );
+consultantsRouter.post('/:id/move-group', requireRole(...MANAGER_TIER), c.moveGroup);

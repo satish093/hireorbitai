@@ -72,6 +72,7 @@ const Consultants = lazy(() =>
 const Recruiters = lazy(() =>
   import('./pages/Recruiters').then((m) => ({ default: m.Recruiters })),
 );
+const Managers = lazy(() => import('./pages/Managers').then((m) => ({ default: m.Managers })));
 const JobSearch = lazy(() => import('./pages/JobSearch').then((m) => ({ default: m.JobSearch })));
 const JobDetail = lazy(() => import('./pages/JobDetail').then((m) => ({ default: m.JobDetail })));
 const Applications = lazy(() =>
@@ -231,6 +232,7 @@ export default function App() {
     void import('./pages/ConsultantDashboard');
     void import('./pages/Consultants');
     void import('./pages/Recruiters');
+    void import('./pages/Managers');
     void import('./pages/JobSearch');
     void import('./pages/JobDetail');
     void import('./pages/Applications');
@@ -325,6 +327,14 @@ export default function App() {
             element={
               <ProtectedRoute allow={MANAGER_TIER}>
                 <Recruiters />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/managers"
+            element={
+              <ProtectedRoute allow={MANAGER_TIER}>
+                <Managers />
               </ProtectedRoute>
             }
           />

@@ -7,11 +7,11 @@ import { SelectInput } from '../components/SelectInput';
 import { Avatar } from '../components/TaskBits';
 import { PageHeader } from '../components/PageHeader';
 import { Button } from '../components/Button';
-import { GroupBadge } from '../components/GroupBadge';
+import { GroupBadge, useUserGroups, invalidateUserGroupsCache } from '../components/GroupBadge';
 import { Popover } from '../components/ui/Popover';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import { MANAGER_TIER } from '../types';
+import { ADMIN_TIER, MANAGER_TIER } from '../types';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
 
@@ -126,11 +126,16 @@ function StatusSelect({
 
 export function Consultants() {
   const { profile } = useAuth();
+  const { groups } = useUserGroups();
   // Only MANAGER_TIER may (re)assign recruiters — and only they may fetch the
   // /recruiters directory (the backend now gates it to MANAGER_TIER). A
   // RECRUITER sees the bench read-only, with no assign controls.
   const canAssignRecruiter =
     !!profile && (MANAGER_TIER as readonly string[]).includes(profile.role);
+  // Admin tier can move a consultant to any group; group leads can move within
+  // their own group only. Recruiters have no group-edit access.
+  const canEditGroup = !!profile && (MANAGER_TIER as readonly string[]).includes(profile.role);
+  const isAdminTierUser = !!profile && (ADMIN_TIER as readonly string[]).includes(profile.role);
   // Drill-down from the Recruiters page: ?recruiter=<recruiterId> filters the
   // bench to consultants assigned to that recruiter. The backend honours
   // ?recruiter_id= for manager-tier and re-applies group scoping.
@@ -142,6 +147,10 @@ export function Consultants() {
   const [selectedRecruiter, setSelectedRecruiter] = useState('');
   const [saving, setSaving] = useState(false);
   const [listLoading, setListLoading] = useState(true);
+  // Group edit state
+  const [groupPicked, setGroupPicked] = useState<ConsultantRow | null>(null);
+  const [selectedGroup, setSelectedGroup] = useState<string>('');
+  const [savingGroup, setSavingGroup] = useState(false);
 
   function load() {
     setListLoading(true);
@@ -208,6 +217,29 @@ export function Consultants() {
       toast.error(e?.response?.data?.error ?? 'Failed to assign');
     } finally {
       setSaving(false);
+    }
+  }
+
+  function openGroupEdit(c: ConsultantRow) {
+    setGroupPicked(c);
+    setSelectedGroup(c.user?.group_id ?? '');
+  }
+
+  async function saveGroup() {
+    if (!groupPicked) return;
+    setSavingGroup(true);
+    try {
+      await api.post(`/consultants/${groupPicked.id}/move-group`, {
+        group_id: selectedGroup || null,
+      });
+      toast.success('Group updated');
+      invalidateUserGroupsCache();
+      setGroupPicked(null);
+      load();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error ?? 'Failed to update group');
+    } finally {
+      setSavingGroup(false);
     }
   }
 
@@ -332,16 +364,25 @@ export function Consultants() {
             ),
           },
           // Assign/Reassign is manager-only; recruiters see the bench read-only.
-          ...(canAssignRecruiter
+          ...(canAssignRecruiter || canEditGroup
             ? [
                 {
                   key: 'actions',
                   header: '',
                   align: 'right' as const,
                   render: (c: ConsultantRow) => (
-                    <Button size="sm" variant="ghost" onClick={() => openAssign(c)}>
-                      {c.recruiter ? 'Reassign' : 'Assign'}
-                    </Button>
+                    <div className="flex items-center justify-end gap-1">
+                      {canAssignRecruiter && (
+                        <Button size="sm" variant="ghost" onClick={() => openAssign(c)}>
+                          {c.recruiter ? 'Reassign' : 'Assign'}
+                        </Button>
+                      )}
+                      {canEditGroup && (
+                        <Button size="sm" variant="ghost" onClick={() => openGroupEdit(c)}>
+                          Group
+                        </Button>
+                      )}
+                    </div>
                   ),
                 },
               ]
@@ -391,6 +432,51 @@ export function Consultants() {
               value: r.id,
               label: `${r.user?.full_name ?? r.user?.email ?? r.id}${r.team ? ' · ' + r.team : ''}`,
             }))}
+          />
+        </div>
+      </Modal>
+      {/* Group edit modal */}
+      <Modal
+        open={!!groupPicked}
+        onClose={() => setGroupPicked(null)}
+        title={`Move ${groupPicked?.user?.full_name ?? 'consultant'} to a group`}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setGroupPicked(null)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={saveGroup}
+              loading={savingGroup}
+              disabled={selectedGroup === (groupPicked?.user?.group_id ?? '')}
+            >
+              {savingGroup ? 'Saving' : 'Save'}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          {groupPicked?.recruiter && (
+            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+              This consultant is assigned to{' '}
+              <span className="font-medium">
+                {groupPicked.recruiter.user?.full_name ?? groupPicked.recruiter.user?.email}
+              </span>
+              . Their recruiter must belong to the same group — the backend will block the move if
+              there is a mismatch.
+            </p>
+          )}
+          <SelectInput
+            label="Group"
+            placeholder="No group (clear)"
+            value={selectedGroup}
+            onChange={(e) => setSelectedGroup(e.target.value)}
+            options={
+              // Group leads only see their own group; admin tier sees all.
+              (isAdminTierUser ? groups : groups.filter((g) => g.id === profile?.group_id)).map(
+                (g) => ({ value: g.id, label: g.name }),
+              )
+            }
           />
         </div>
       </Modal>

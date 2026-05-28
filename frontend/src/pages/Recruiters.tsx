@@ -7,11 +7,12 @@ import { Avatar } from '../components/TaskBits';
 import { PageHeader } from '../components/PageHeader';
 import { Button } from '../components/Button';
 import { SelectInput } from '../components/SelectInput';
-import { GroupBadge } from '../components/GroupBadge';
+import { GroupBadge, useUserGroups, invalidateUserGroupsCache } from '../components/GroupBadge';
 import { api } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
-import { Role, ROLE_LABEL, MANAGER_TIER } from '../types';
+import { Role, ROLE_LABEL, ADMIN_TIER, MANAGER_TIER } from '../types';
 
 interface ManagerLink {
   is_primary: boolean;
@@ -47,10 +48,17 @@ interface CandidateUser {
 const MANAGER_TIER_SET = new Set(MANAGER_TIER);
 
 export function Recruiters() {
+  const { profile } = useAuth();
+  const { groups } = useUserGroups();
+  const isAdminTierUser = !!profile && (ADMIN_TIER as readonly string[]).includes(profile.role);
   const [rows, setRows] = useState<RecruiterRow[]>([]);
   const [candidates, setCandidates] = useState<CandidateUser[]>([]);
   const [picked, setPicked] = useState<RecruiterRow | null>(null);
   const [loading, setLoading] = useState(true);
+  // Group edit state
+  const [groupPicked, setGroupPicked] = useState<RecruiterRow | null>(null);
+  const [selectedGroup, setSelectedGroup] = useState('');
+  const [savingGroup, setSavingGroup] = useState(false);
 
   function load() {
     setLoading(true);
@@ -76,6 +84,29 @@ export function Recruiters() {
       })
       .catch(() => setCandidates([]));
   }, []);
+
+  function openGroupEdit(r: RecruiterRow) {
+    setGroupPicked(r);
+    setSelectedGroup(r.user?.group_id ?? '');
+  }
+
+  async function saveGroup() {
+    if (!groupPicked) return;
+    setSavingGroup(true);
+    try {
+      await api.post(`/recruiters/${groupPicked.id}/move-group`, {
+        group_id: selectedGroup || null,
+      });
+      toast.success('Group updated');
+      invalidateUserGroupsCache();
+      setGroupPicked(null);
+      load();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error ?? 'Failed to update group');
+    } finally {
+      setSavingGroup(false);
+    }
+  }
 
   function effectiveManagers(r: RecruiterRow): ManagerLink[] {
     if (r.managers && r.managers.length > 0) {
@@ -198,13 +229,61 @@ export function Recruiters() {
             header: '',
             align: 'right',
             render: (r: RecruiterRow) => (
-              <Button size="sm" variant="ghost" onClick={() => setPicked(r)}>
-                Manage supervisors
-              </Button>
+              <div className="flex items-center justify-end gap-1">
+                <Button size="sm" variant="ghost" onClick={() => setPicked(r)}>
+                  Supervisors
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => openGroupEdit(r)}>
+                  Group
+                </Button>
+              </div>
             ),
           },
         ]}
       />
+
+      {/* Group edit modal */}
+      <Modal
+        open={!!groupPicked}
+        onClose={() => setGroupPicked(null)}
+        title={`Move ${groupPicked?.user?.full_name ?? 'recruiter'} to a group`}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setGroupPicked(null)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={saveGroup}
+              loading={savingGroup}
+              disabled={selectedGroup === (groupPicked?.user?.group_id ?? '')}
+            >
+              {savingGroup ? 'Saving' : 'Save'}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          {(groupPicked?.consultant_count ?? 0) > 0 && (
+            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+              This recruiter has{' '}
+              <span className="font-medium">{groupPicked!.consultant_count}</span> consultant
+              {groupPicked!.consultant_count === 1 ? '' : 's'} assigned. All their consultants must
+              already be in the target group — the backend will block the move if any are in a
+              different group.
+            </p>
+          )}
+          <SelectInput
+            label="Group"
+            placeholder="No group (clear)"
+            value={selectedGroup}
+            onChange={(e) => setSelectedGroup(e.target.value)}
+            options={(isAdminTierUser
+              ? groups
+              : groups.filter((g) => g.id === profile?.group_id)
+            ).map((g) => ({ value: g.id, label: g.name }))}
+          />
+        </div>
+      </Modal>
 
       {picked && (
         <ManageManagersModal

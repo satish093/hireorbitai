@@ -2,6 +2,7 @@ import { RequestHandler } from 'express';
 import { z } from 'zod';
 import { db } from '../config/db';
 import { httpError, MANAGER_TIER, type Role } from '../types';
+import { invalidatePermissionCache } from '../services/permission.service';
 import {
   managerGroupUserIds,
   isAdminTier,
@@ -370,4 +371,89 @@ export const setPrimaryManager: RequestHandler = async (req, res) => {
     .eq('manager_id', managerId);
   await db.from('recruiters').update({ manager_id: managerId }).eq('id', recruiterId);
   res.json({ ok: true });
+};
+
+/**
+ * POST /recruiters/:id/move-group
+ * Move a recruiter's user.group_id.
+ *
+ * Auth rules:
+ *  - Admin tier: move to any group.
+ *  - Group lead: only recruiters currently in their group, only to their own group.
+ *
+ * Safety: if the recruiter has assigned consultants whose user.group_id would
+ * no longer match after the move, the endpoint returns 409 with the count so
+ * the caller can reassign those consultants first.
+ */
+export const moveGroup: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const schema = z.object({ group_id: z.string().uuid().nullable() }).strict();
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
+
+  const recruiterId = req.params.id;
+  const { data: rec } = await db
+    .from('recruiters')
+    .select('id, user_id')
+    .eq('id', recruiterId)
+    .maybeSingle();
+  if (!rec) throw httpError(404, 'Recruiter not found');
+  const row = rec as { id: string; user_id: string | null };
+
+  if (isAdminTier(req.user.role)) {
+    // unscoped
+  } else if (isGroupLead(req.user.role)) {
+    // Group lead can only move a recruiter currently in their group, and only
+    // to their own group.
+    if (!row.user_id || !(await leadCanAccessUser(req.user, row.user_id))) {
+      throw httpError(403, 'Recruiter is not in your group.');
+    }
+    const target = parsed.data.group_id;
+    if (target && target !== (req.user.group_id ?? null)) {
+      throw httpError(403, 'You can only assign recruiters to your own group.');
+    }
+  } else {
+    throw httpError(403, 'Forbidden');
+  }
+
+  // Safety check: count consultants assigned to this recruiter whose group
+  // doesn't match the target group. Block the move if any exist.
+  if (parsed.data.group_id) {
+    const { data: assignedCons } = await db
+      .from('consultants')
+      .select('id, user_id')
+      .eq('recruiter_id', recruiterId);
+    const consUserIds = ((assignedCons ?? []) as Array<{ id: string; user_id: string | null }>)
+      .map((c) => c.user_id)
+      .filter(Boolean) as string[];
+
+    if (consUserIds.length > 0) {
+      const { data: consUsers } = await db
+        .from('users')
+        .select('id, group_id')
+        .in('id', consUserIds);
+      const mismatch = ((consUsers ?? []) as Array<{ id: string; group_id: string | null }>).filter(
+        (u) => u.group_id !== parsed.data.group_id,
+      );
+      if (mismatch.length > 0) {
+        throw httpError(
+          409,
+          `${mismatch.length} consultant${mismatch.length === 1 ? ' is' : 's are'} assigned to this recruiter but ` +
+            `belong to a different group. Reassign or move those consultants first.`,
+        );
+      }
+    }
+  }
+
+  if (!row.user_id) throw httpError(400, 'Recruiter has no linked user account.');
+
+  const { error } = await db
+    .from('users')
+    .update({ group_id: parsed.data.group_id })
+    .eq('id', row.user_id);
+  if (error) throw httpError(500, 'Database error');
+
+  if (row.user_id) invalidatePermissionCache(row.user_id);
+
+  res.json({ ok: true, group_id: parsed.data.group_id });
 };

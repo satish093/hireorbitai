@@ -74,6 +74,7 @@ export interface UserProfile {
   role: Role;
   avatar_url?: string;
   is_active: boolean;
+  group_id?: string | null;
   /** True when the user signed in with a temp password and must rotate it. */
   must_change_password?: boolean;
   /** Set when the user has completed the role-specific onboarding. */

@@ -108,6 +108,7 @@ const sections: Section[] = [
     items: [
       { to: '/consultants', label: 'Consultants', icon: IconUsers, roles: OPERATOR_TIER },
       { to: '/recruiters', label: 'Recruiters', icon: IconUser, roles: MANAGER_TIER },
+      { to: '/managers', label: 'Managers', icon: IconUsersCog, roles: MANAGER_TIER },
       // Jobs are a pipeline tool for operators (recruiters + managers/admins),
       // NOT for consultants — a consultant browses nothing here.
       { to: '/jobs', label: 'Jobs', icon: IconBriefcase, roles: OPERATOR_TIER },

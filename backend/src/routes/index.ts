@@ -9,6 +9,7 @@ import { invitationsRouter } from './invitations.routes';
 import * as invitationsCtl from '../controllers/invitations.controller';
 import { consultantsRouter } from './consultants.routes';
 import { recruitersRouter } from './recruiters.routes';
+import { managersRouter } from './managers.routes';
 import { resumesRouter } from './resumes.routes';
 import { jobsRouter } from './jobs.routes';
 import { vendorsRouter } from './vendors.routes';
@@ -84,6 +85,7 @@ router.use('/invitations', invitationsRouter);
 router.use('/consultants', consultantsRouter);
 router.use('/work-auth-docs', workAuthDocsRouter);
 router.use('/recruiters', recruitersRouter);
+router.use('/managers', managersRouter);
 router.use('/resumes', resumesRouter);
 // Jobs are an operator pipeline tool — OPERATOR_TIER (admins, group leads,
 // recruiters) only. CONSULTANT is excluded (consultants don't browse jobs) and

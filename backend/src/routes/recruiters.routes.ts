@@ -21,3 +21,4 @@ recruitersRouter.post(
   requireRole(...MANAGER_TIER),
   c.setPrimaryManager,
 );
+recruitersRouter.post('/:id/move-group', requireRole(...MANAGER_TIER), c.moveGroup);
