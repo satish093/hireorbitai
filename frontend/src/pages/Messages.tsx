@@ -5,7 +5,15 @@ import { Avatar } from '../components/TaskBits';
 import { PresenceDot, PresencePill } from '../components/PresenceDot';
 import { GroupBadge } from '../components/GroupBadge';
 import { Button } from '../components/Button';
-import { IconSearch, IconVideo, IconPhone, IconSend } from '../components/Icons';
+import {
+  IconSearch,
+  IconVideo,
+  IconPhone,
+  IconSend,
+  IconPaperclip,
+  IconX,
+  IconFile,
+} from '../components/Icons';
 import { NotificationToggle } from '../components/NotificationToggle';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -24,6 +32,19 @@ interface Party {
   group_id?: string | null;
 }
 
+interface Attachment {
+  id: string;
+  file_name: string;
+  mime_type: string | null;
+  size_bytes: number | null;
+  download_url: string | null;
+  is_image?: boolean;
+  /** Local-only flag set on optimistic attachments while their upload is in flight. */
+  uploading?: boolean;
+  /** Local-only object URL used to preview images before the upload returns. */
+  localPreview?: string;
+}
+
 interface Message {
   id: string;
   sender_id: string;
@@ -34,6 +55,7 @@ interface Message {
   edited_at?: string | null;
   sender?: Party;
   recipient?: Party;
+  attachments?: Attachment[];
 }
 
 interface Conversation {
@@ -62,6 +84,12 @@ export function Messages() {
   // you can start a brand-new chat without a separate compose popover.
   const [search, setSearch] = useState('');
   const [sending, setSending] = useState(false);
+  // Files the user has picked but not yet sent. Each starts uploading
+  // immediately (orphan row created on the server); we only block "Send"
+  // while uploads are in flight. On send we pass the server ids as
+  // attachment_ids and the server claims them. Empties on send / discard.
+  const [pendingAttachments, setPendingAttachments] = useState<Attachment[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   // True when the backend returned 403 for the currently-targeted thread.
   // Triggers the "you no longer have access" panel + suppresses message-
   // polling for the denied peer until the user picks a different peer.
@@ -315,11 +343,72 @@ export function Messages() {
     );
   }, [activePeerId, conversations, directory]);
 
+  // Pick file(s) → upload each as an orphan attachment and stage it locally.
+  // We start the upload immediately so by the time the user hits Send the
+  // attachment is already on disk (most cases). The Send button is disabled
+  // while any staged item is still uploading.
+  async function onFilesPicked(files: FileList | null) {
+    if (!activePeerId || !files || files.length === 0) return;
+    const list = Array.from(files);
+    for (const f of list) {
+      const tmp: Attachment = {
+        id: `tmp-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        file_name: f.name,
+        mime_type: f.type || null,
+        size_bytes: f.size,
+        download_url: null,
+        is_image: f.type.startsWith('image/'),
+        uploading: true,
+        localPreview: f.type.startsWith('image/') ? URL.createObjectURL(f) : undefined,
+      };
+      setPendingAttachments((arr) => [...arr, tmp]);
+      try {
+        const form = new FormData();
+        form.append('file', f);
+        form.append('recipient_id', activePeerId);
+        const res = await api.post<Attachment>('/messages/attachments', form, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        // Swap the tmp row for the real one returned by the server.
+        // Revoke the object-URL we used for the local image preview —
+        // the server gives us a signed URL to display instead, and
+        // leaving the blob URL around leaks memory.
+        if (tmp.localPreview) URL.revokeObjectURL(tmp.localPreview);
+        setPendingAttachments((arr) =>
+          arr.map((a) => (a.id === tmp.id ? { ...res.data, uploading: false } : a)),
+        );
+      } catch (e: any) {
+        if (tmp.localPreview) URL.revokeObjectURL(tmp.localPreview);
+        setPendingAttachments((arr) => arr.filter((a) => a.id !== tmp.id));
+        toast.error(e?.response?.data?.error ?? `Failed to upload ${f.name}`);
+      }
+    }
+  }
+
+  // Remove a staged attachment before sending. If it's already a real
+  // server row, also delete it on the server so we don't leave an orphan.
+  function unstageAttachment(att: Attachment) {
+    if (att.localPreview) URL.revokeObjectURL(att.localPreview);
+    setPendingAttachments((arr) => arr.filter((a) => a.id !== att.id));
+    if (!att.uploading && !att.id.startsWith('tmp-')) {
+      void api.delete(`/messages/attachments/${att.id}`).catch(() => {});
+    }
+  }
+
   async function send() {
-    if (!activePeerId || !draft.trim()) return;
+    if (!activePeerId) return;
+    const hasAttachments = pendingAttachments.length > 0;
+    const hasBody = draft.trim().length > 0;
+    if (!hasBody && !hasAttachments) return;
+    // Block while uploads are in flight — server would reject those ids
+    // because they're still attached to the local tmp- placeholders.
+    if (pendingAttachments.some((a) => a.uploading)) {
+      toast('Hold on — one of your files is still uploading.', { icon: '⏳' });
+      return;
+    }
     setSending(true);
     const body = draft;
-    // Optimistic append.
+    const stagedAttachments = pendingAttachments;
     tmpIdRef.current += 1;
     const optimistic: Message = {
       id: `tmp-${Date.now()}-${tmpIdRef.current}`,
@@ -328,9 +417,11 @@ export function Messages() {
       body,
       read_at: null,
       created_at: new Date().toISOString(),
+      attachments: stagedAttachments,
     };
     setMessages((m) => [...m, optimistic]);
     setDraft('');
+    setPendingAttachments([]);
     stickToBottomRef.current = true;
     try {
       // The server fans out a message:new SSE to both ends, so by the
@@ -339,7 +430,11 @@ export function Messages() {
       // "SSE beat the POST response" branch). Be idempotent: if a row
       // with the saved id is already present, drop the tmp- row and
       // leave the SSE-delivered one in place. Otherwise do the swap.
-      const res = await api.post('/messages', { recipient_id: activePeerId, body });
+      const res = await api.post('/messages', {
+        recipient_id: activePeerId,
+        body,
+        attachment_ids: stagedAttachments.filter((a) => !a.id.startsWith('tmp-')).map((a) => a.id),
+      });
       const saved = res.data as Message;
       setMessages((m) => {
         if (m.some((x) => x.id === saved.id)) {
@@ -347,21 +442,18 @@ export function Messages() {
         }
         return m.map((x) => (x.id === optimistic.id ? saved : x));
       });
-      // Refresh the conversation list (reorder, unread counts) but skip
-      // loadThread — the optimistic row is now the canonical row, and any
-      // peer message that arrived in the same window already came in via
-      // SSE.
       refresh();
     } catch (e: any) {
-      // Roll back optimistic message regardless of the failure reason.
+      // Roll back optimistic message + restore the staged attachments
+      // so the user can retry without re-uploading. The orphans are
+      // still on the server and re-claimable.
       setMessages((m) => m.filter((x) => x.id !== optimistic.id));
+      setPendingAttachments(stagedAttachments);
       if (e?.response?.status === 403) {
-        // Hierarchy says we can't message this peer (likely reassigned out
-        // from under us). Surface the access-denied panel and clear the
-        // composer — no point letting the user retry with the same payload.
         setAccessDenied(true);
         toast.error('You can no longer message this user.');
         setDraft('');
+        setPendingAttachments([]);
       } else {
         toast.error(e?.response?.data?.error ?? 'Send failed');
         setDraft(body);
@@ -727,31 +819,72 @@ export function Messages() {
                       e.preventDefault();
                       send();
                     }}
-                    className="border-t border-border px-3 py-3 flex items-end gap-2 bg-surface"
+                    className="border-t border-border bg-surface"
                   >
-                    <textarea
-                      value={draft}
-                      onChange={(e) => setDraft(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                          e.preventDefault();
-                          send();
+                    {/* Staged-attachments strip — shown above the composer
+                        while files are pending. Image attachments show a
+                        small thumb; everything else gets a filename chip.
+                        Click the X to remove before sending. */}
+                    {pendingAttachments.length > 0 && (
+                      <div className="px-3 pt-3 flex flex-wrap gap-2 border-b border-border">
+                        {pendingAttachments.map((a) => (
+                          <AttachmentChip
+                            key={a.id}
+                            attachment={a}
+                            onRemove={() => unstageAttachment(a)}
+                          />
+                        ))}
+                      </div>
+                    )}
+                    <div className="px-3 py-3 flex items-end gap-2">
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        multiple
+                        className="hidden"
+                        onChange={(e) => {
+                          void onFilesPicked(e.target.files);
+                          // Reset so picking the same file twice re-fires onChange.
+                          e.target.value = '';
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        title="Attach a file"
+                        aria-label="Attach a file"
+                        className="shrink-0 h-10 w-10 flex items-center justify-center rounded-full text-muted hover:text-ink hover:bg-hover transition-colors"
+                      >
+                        <IconPaperclip size={18} />
+                      </button>
+                      <textarea
+                        value={draft}
+                        onChange={(e) => setDraft(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            send();
+                          }
+                        }}
+                        rows={1}
+                        placeholder="Write a message… (Shift+Enter for newline)"
+                        className="flex-1 resize-none bg-hover/60 rounded-2xl px-4 py-2.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-brand-500/40 max-h-32"
+                      />
+                      <Button
+                        type="submit"
+                        variant="primary"
+                        iconOnly
+                        leftIcon={<IconSend size={18} />}
+                        disabled={
+                          sending ||
+                          (!draft.trim() && pendingAttachments.length === 0) ||
+                          pendingAttachments.some((a) => a.uploading)
                         }
-                      }}
-                      rows={1}
-                      placeholder="Write a message… (Shift+Enter for newline)"
-                      className="flex-1 resize-none bg-hover/60 rounded-2xl px-4 py-2.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-brand-500/40 max-h-32"
-                    />
-                    <Button
-                      type="submit"
-                      variant="primary"
-                      iconOnly
-                      leftIcon={<IconSend size={18} />}
-                      disabled={sending || !draft.trim()}
-                      loading={sending}
-                      title="Send message"
-                      className="shrink-0 !rounded-full !w-10 !h-10"
-                    />
+                        loading={sending}
+                        title="Send message"
+                        className="shrink-0 !rounded-full !w-10 !h-10"
+                      />
+                    </div>
                   </form>
                 </>
               )}
@@ -894,7 +1027,17 @@ function Bubble({
           </div>
         ) : (
           <>
-            {message.body}
+            {/* Attachments render ABOVE the text body so an image-only
+                message reads top-down (preview → caption). Empty body
+                means no separator div needed. */}
+            {message.attachments && message.attachments.length > 0 && (
+              <div className={clsx('flex flex-col gap-1.5', message.body ? 'mb-1.5' : '')}>
+                {message.attachments.map((a) => (
+                  <AttachmentView key={a.id} attachment={a} mine={mine} />
+                ))}
+              </div>
+            )}
+            {message.body && <span>{message.body}</span>}
             <div
               className={clsx(
                 'text-[10px] mt-1 flex items-center gap-1',
@@ -913,6 +1056,113 @@ function Bubble({
         )}
       </div>
     </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Attachment renderers (composer chip + bubble view).
+// ─────────────────────────────────────────────────────────────────────────────
+
+function formatBytes(n: number | null | undefined): string {
+  if (!n || n <= 0) return '';
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/** Composer-strip chip — image thumb or filename tag, with an X to remove. */
+function AttachmentChip({
+  attachment,
+  onRemove,
+}: {
+  attachment: Attachment;
+  onRemove: () => void;
+}) {
+  const previewSrc = attachment.localPreview ?? attachment.download_url ?? undefined;
+  return (
+    <div
+      className={clsx(
+        'relative shrink-0 inline-flex items-center gap-2 rounded-lg border border-border bg-hover/60 pl-2 pr-7 py-1.5 max-w-[240px]',
+        attachment.uploading && 'opacity-70',
+      )}
+    >
+      {attachment.is_image && previewSrc ? (
+        <img
+          src={previewSrc}
+          alt={attachment.file_name}
+          className="h-10 w-10 object-cover rounded"
+        />
+      ) : (
+        <IconFile size={20} className="text-muted shrink-0" />
+      )}
+      <div className="min-w-0">
+        <div className="text-xs text-ink truncate max-w-[160px]">{attachment.file_name}</div>
+        <div className="text-[10px] text-muted">
+          {attachment.uploading ? 'Uploading…' : formatBytes(attachment.size_bytes)}
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={onRemove}
+        title="Remove"
+        aria-label="Remove attachment"
+        className="absolute top-1 right-1 h-5 w-5 inline-flex items-center justify-center rounded-full text-muted hover:text-ink hover:bg-surface"
+      >
+        <IconX size={12} />
+      </button>
+    </div>
+  );
+}
+
+/** Bubble-side attachment view — inline image preview for image MIMEs,
+ *  otherwise a clickable file row with name + size. */
+function AttachmentView({ attachment, mine }: { attachment: Attachment; mine: boolean }) {
+  const previewSrc = attachment.localPreview ?? attachment.download_url ?? undefined;
+  if (attachment.is_image && previewSrc) {
+    return (
+      <a
+        href={attachment.download_url ?? previewSrc}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="block max-w-[280px]"
+        title={attachment.file_name}
+      >
+        <img
+          src={previewSrc}
+          alt={attachment.file_name}
+          className="rounded-lg max-h-64 max-w-full object-contain bg-black/5"
+        />
+      </a>
+    );
+  }
+  const content = (
+    <div
+      className={clsx(
+        'inline-flex items-center gap-2 rounded-lg px-2.5 py-1.5 max-w-[260px]',
+        mine ? 'bg-white/15' : 'bg-hover/80',
+      )}
+    >
+      <IconFile size={20} className={mine ? 'text-white/80' : 'text-muted'} />
+      <div className="min-w-0">
+        <div
+          className={clsx(
+            'text-xs truncate max-w-[180px] font-medium',
+            mine ? 'text-white' : 'text-ink',
+          )}
+        >
+          {attachment.file_name}
+        </div>
+        <div className={clsx('text-[10px]', mine ? 'text-white/70' : 'text-muted')}>
+          {attachment.uploading ? 'Uploading…' : formatBytes(attachment.size_bytes)}
+        </div>
+      </div>
+    </div>
+  );
+  if (!attachment.download_url) return content;
+  return (
+    <a href={attachment.download_url} target="_blank" rel="noopener noreferrer" download>
+      {content}
+    </a>
   );
 }
 

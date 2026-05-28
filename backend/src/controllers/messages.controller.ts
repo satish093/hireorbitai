@@ -9,6 +9,7 @@ import {
 } from '../services/permission.service';
 import { audit } from '../services/audit.service';
 import { publishToUser } from '../services/realtime.service';
+import { attachAttachments, claimAttachmentsForMessage } from './messageAttachments.controller';
 
 // Build the SELECT lazily so we can downgrade to a legacy column set the first
 // time we see "column doesn't exist" — that way the endpoints work both before
@@ -127,7 +128,15 @@ export const conversations: RequestHandler = async (req, res) => {
     const b = buckets.get(peer.id)!;
     if (!iAmSender && !m.read_at) b.unread_count++;
   }
-  res.json(Array.from(buckets.values()));
+  // Embed attachments on each conversation's last_message so the
+  // conversation list can render "📎 file.pdf" previews next to the body.
+  const rows = Array.from(buckets.values());
+  const lastMessages = rows.map((r) => r.last_message as { id: string });
+  const withAtt = await attachAttachments(lastMessages);
+  rows.forEach((r, i) => {
+    r.last_message = withAtt[i];
+  });
+  res.json(rows);
 };
 
 /** GET /messages/unread-count */
@@ -195,7 +204,8 @@ export const thread: RequestHandler = async (req, res) => {
       .order('created_at', { ascending: true }));
   }
   if (error) throw httpError(500, 'Database error');
-  res.json(data ?? []);
+  const withAttachments = await attachAttachments((data ?? []) as { id: string }[]);
+  res.json(withAttachments);
 };
 
 /** POST /messages/with/:userId/read — mark all messages FROM :userId as read */
@@ -237,13 +247,21 @@ export const markRead: RequestHandler = async (req, res) => {
 // Send a message
 // ---------------------------------------------------------------------------
 
-/** POST /messages — body: { recipient_id, body } */
+/** POST /messages — body: { recipient_id, body, attachment_ids? } */
 export const send: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
-  const schema = z.object({
-    recipient_id: z.string().uuid(),
-    body: z.string().min(1).max(8000),
-  });
+  // body may be empty when the message is purely an attachment, but we
+  // need AT LEAST one of body / attachment_ids to be non-empty so the
+  // composer can't submit a blank.
+  const schema = z
+    .object({
+      recipient_id: z.string().uuid(),
+      body: z.string().max(8000).optional().default(''),
+      attachment_ids: z.array(z.string().uuid()).max(10).optional().default([]),
+    })
+    .refine((d) => d.body.trim().length > 0 || d.attachment_ids.length > 0, {
+      message: 'Message body or at least one attachment is required',
+    });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
   if (parsed.data.recipient_id === req.user.id) {
@@ -292,6 +310,21 @@ export const send: RequestHandler = async (req, res) => {
     .single();
   if (insErr || !inserted) throw httpError(500, insErr?.message ?? 'Insert failed');
 
+  // Claim any pre-uploaded attachments by linking them to this new message.
+  // claimAttachmentsForMessage is permission-checked (uploaded_by + recipient
+  // + still-orphan), so a forged id can't smuggle someone else's file onto
+  // this thread. Failures here are silently swallowed inside the helper —
+  // we'd rather ship the message body than fail the whole send because
+  // one attachment id was bogus.
+  if (parsed.data.attachment_ids.length > 0) {
+    await claimAttachmentsForMessage({
+      attachmentIds: parsed.data.attachment_ids,
+      messageId: inserted.id,
+      senderId: req.user.id,
+      recipientId: parsed.data.recipient_id,
+    });
+  }
+
   let { data, error } = await db
     .from('messages')
     .select(msgSelect())
@@ -306,12 +339,18 @@ export const send: RequestHandler = async (req, res) => {
       .single());
   }
   if (error) throw httpError(500, 'Database error');
+
+  // Embed attachments + signed download URLs on the returned message so
+  // the SSE payload + the POST response both carry the renderable shape
+  // the frontend bubble expects.
+  const [withAtt] = await attachAttachments([data as { id: string }]);
+
   // Fan out to both ends. Recipient gets the message:new event for inbox /
   // active-thread updates; sender gets it too so a second tab on the
   // sender's side mirrors the new message without a poll cycle.
-  void publishToUser(parsed.data.recipient_id, 'message:new', data);
-  void publishToUser(req.user.id, 'message:new', data);
-  res.status(201).json(data);
+  void publishToUser(parsed.data.recipient_id, 'message:new', withAtt);
+  void publishToUser(req.user.id, 'message:new', withAtt);
+  res.status(201).json(withAtt);
 };
 
 // ---------------------------------------------------------------------------

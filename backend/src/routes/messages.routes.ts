@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import * as c from '../controllers/messages.controller';
+import * as att from '../controllers/messageAttachments.controller';
+import { uploadAttachment, verifyUploadMagic } from '../middleware/upload';
 
 export const messagesRouter = Router();
 
@@ -7,6 +9,14 @@ export const messagesRouter = Router();
 messagesRouter.get('/directory', c.directory);
 messagesRouter.get('/conversations', c.conversations);
 messagesRouter.get('/unread-count', c.unreadCount);
+
+// Attachment upload (multipart). Two-phase: file lands here as an "orphan"
+// (message_id = NULL), the subsequent POST /messages call claims it via
+// attachment_ids. uploadAttachment caps at 15 MB + MIME/ext allowlist;
+// verifyUploadMagic checks bytes match the declared MIME. Mounted BEFORE
+// /:id-style routes so the literal `/attachments` matches first.
+messagesRouter.post('/attachments', uploadAttachment.single('file'), verifyUploadMagic, att.upload);
+messagesRouter.delete('/attachments/:id', att.remove);
 
 messagesRouter.post('/', c.send);
 

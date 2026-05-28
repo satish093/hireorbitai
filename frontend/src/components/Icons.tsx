@@ -103,6 +103,17 @@ export const IconFile = ({ size, strokeWidth, ...p }: IconProps) => (
     <path d="M14 3v6h6" />
   </svg>
 );
+export const IconPaperclip = ({ size, strokeWidth, ...p }: IconProps) => (
+  <svg {...base(size, strokeWidth)} {...p}>
+    <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+  </svg>
+);
+export const IconX = ({ size, strokeWidth, ...p }: IconProps) => (
+  <svg {...base(size, strokeWidth)} {...p}>
+    <path d="M18 6 6 18" />
+    <path d="m6 6 12 12" />
+  </svg>
+);
 export const IconBuilding = ({ size, strokeWidth, ...p }: IconProps) => (
   <svg {...base(size, strokeWidth)} {...p}>
     <rect x="4" y="3" width="16" height="18" rx="1.5" />
