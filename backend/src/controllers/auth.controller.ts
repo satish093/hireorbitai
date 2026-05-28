@@ -5,6 +5,42 @@ import { httpError } from '../types';
 import * as authSvc from '../services/auth.service';
 import { SAFE_USER_SELF_COLUMNS } from '../config/userColumns';
 
+// Self-profile columns that landed in a late migration — if the deployed DB
+// hasn't picked them up yet (Render dev DB, fresh test instance, restored
+// snapshot), selecting them errors with "column ... does not exist". We strip
+// the missing one and retry instead of 500-ing the whole /auth/me bootstrap,
+// since a no-profile response cascades into every user hitting /unauthorized.
+// Convention matches users.controller / messages.controller / tasks.controller.
+const OPTIONAL_SELF_COLUMNS = ['tour_completed_at', 'job_alerts', 'last_seen_at', 'capabilities'];
+
+function stripMissingColumn(cols: string, msg: string): string | null {
+  for (const c of OPTIONAL_SELF_COLUMNS) {
+    if (msg.includes(c) && cols.includes(c)) {
+      return cols
+        .split(',')
+        .map((s) => s.trim())
+        .filter((s) => s !== c)
+        .join(', ');
+    }
+  }
+  return null;
+}
+
+async function selectSelfWithRetry(userId: string): Promise<Record<string, unknown>> {
+  let cols = SAFE_USER_SELF_COLUMNS;
+  // Up to OPTIONAL.length attempts: each schema-cache error peels one column.
+  for (let i = 0; i <= OPTIONAL_SELF_COLUMNS.length; i++) {
+    const { data, error } = await db.from('users').select(cols).eq('id', userId).single();
+    if (!error) return data as Record<string, unknown>;
+    const msg = error.message ?? '';
+    if (!/schema cache|column .* does not exist/i.test(msg)) break;
+    const stripped = stripMissingColumn(cols, msg);
+    if (!stripped) break;
+    cols = stripped;
+  }
+  throw httpError(500, 'Database error');
+}
+
 // ---------------------------------------------------------------------------
 // /me — current user's profile, plus onboarding hints + must_change_password.
 // ---------------------------------------------------------------------------
@@ -13,12 +49,11 @@ export const me: RequestHandler = async (req, res) => {
   // Explicit safe column list — `select('*')` would leak password_hash,
   // session_version, and any future auth-secret column added by a later
   // migration. See backend/src/config/userColumns.ts.
-  const { data: user, error } = await db
-    .from('users')
-    .select(SAFE_USER_SELF_COLUMNS)
-    .eq('id', req.user.id)
-    .single();
-  if (error) throw httpError(500, 'Database error');
+  const user = (await selectSelfWithRetry(req.user.id)) as {
+    id: string;
+    role: string;
+    [k: string]: unknown;
+  };
 
   let consultant_id: string | null = null;
   let recruiter_id: string | null = null;
@@ -28,14 +63,14 @@ export const me: RequestHandler = async (req, res) => {
       .select('id')
       .eq('user_id', user.id)
       .maybeSingle();
-    consultant_id = c?.id ?? null;
+    consultant_id = (c as { id?: string } | null)?.id ?? null;
   } else if (user.role === 'RECRUITER') {
     const { data: r } = await db
       .from('recruiters')
       .select('id')
       .eq('user_id', user.id)
       .maybeSingle();
-    recruiter_id = r?.id ?? null;
+    recruiter_id = (r as { id?: string } | null)?.id ?? null;
   }
   res.json({ ...user, consultant_id, recruiter_id });
 };
@@ -73,15 +108,15 @@ export const syncProfile: RequestHandler = async (req, res) => {
   if (parsed.data.full_name !== undefined) patch.full_name = parsed.data.full_name;
   if (parsed.data.phone !== undefined) patch.phone = parsed.data.phone;
   if (parsed.data.avatar_url !== undefined) patch.avatar_url = parsed.data.avatar_url;
-  // .select() with no args returns every column — same leak surface as
-  // select('*'). Pin to the safe self-profile list.
-  const { data, error } = await db
-    .from('users')
-    .upsert(patch, { onConflict: 'id' })
-    .select(SAFE_USER_SELF_COLUMNS)
-    .single();
+  // Upsert THEN reselect with strip-retry. Folding the returning select into
+  // the upsert means a single missing optional column (Render dev DB lagging
+  // a migration) would 500 the entire sign-in bootstrap. Splitting the round
+  // trips lets the upsert succeed unconditionally and the select tolerate
+  // schema lag, matching users.controller's pattern.
+  const { error } = await db.from('users').upsert(patch, { onConflict: 'id' });
   if (error) throw httpError(500, 'Database error');
-  res.json(data);
+  const fresh = await selectSelfWithRetry(req.user.id);
+  res.json(fresh);
 };
 
 // ---------------------------------------------------------------------------
