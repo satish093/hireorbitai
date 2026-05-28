@@ -166,17 +166,74 @@ try {
     console.log(`  ${r.full_name.padEnd(8)} ${r.team.padEnd(12)} manager=${r.reports_to_email}`);
   }
 
+  // ── 4. users.group_id ──────────────────────────────────────────────────────
+  // Phase 14: HR_MANAGER and MANAGER must belong to a group (else they're
+  // fail-closed by groupScope and see nothing). Recruiters live in the same
+  // group as their manager. SUPER_ADMIN / CEO / CTO / DIRECTOR stay group-less
+  // (admin-tier is intentionally unscoped).
+  //
+  // Pod assignments use the schema-seeded groups in database/init.sql:
+  //   Cloudfen  → HR_MANAGER Harini (lead) + MANAGER Neeraj + recruiters Sai, Bharth
+  //   Zangle IT → MANAGER Nikhil                      + recruiter  Ashok
+  //
+  // Idempotent — INSERT … ON CONFLICT DO NOTHING ensures both groups exist
+  // even if init.sql hasn't run, then UPDATE rewrites the group_id every run.
+  console.log('\n--- 4. group_id (Phase 14: HR/MANAGER are group leads) ---');
+  await pool.query(
+    `INSERT INTO public.user_groups (name, slug, description) VALUES
+       ('Cloudfen',  'cloudfen',  'Cloudfen consulting bench'),
+       ('Zangle IT', 'zangle-it', 'Zangle IT consulting bench')
+     ON CONFLICT (slug) DO NOTHING`,
+  );
+  const groupId = {};
+  for (const slug of ['cloudfen', 'zangle-it']) {
+    const r = await pool.query(`SELECT id FROM public.user_groups WHERE slug = $1`, [slug]);
+    if (!r.rows[0]) throw new Error(`Seed group missing: ${slug}`);
+    groupId[slug] = r.rows[0].id;
+  }
+  const groupAssignments = [
+    { email: 'harini@hireorbitai.test', group: 'cloudfen' }, // HR_MANAGER (lead)
+    { email: 'neeraj@hireorbitai.test', group: 'cloudfen' }, // MANAGER (lead)
+    { email: 'sai@hireorbitai.test', group: 'cloudfen' },
+    { email: 'bharth@hireorbitai.test', group: 'cloudfen' },
+    { email: 'nikhil@hireorbitai.test', group: 'zangle-it' }, // MANAGER (lead)
+    { email: 'ashok@hireorbitai.test', group: 'zangle-it' },
+  ];
+  for (const a of groupAssignments) {
+    await pool.query(`UPDATE public.users SET group_id = $1 WHERE id = $2`, [
+      groupId[a.group],
+      idByEmail.get(a.email),
+    ]);
+    console.log(`  ${a.email.padEnd(38)} -> ${a.group}`);
+  }
+  // Admin tier stays unscoped: explicitly NULL their group_id in case a prior
+  // run left a stale value.
+  await pool.query(
+    `UPDATE public.users SET group_id = NULL
+       WHERE email = ANY($1)`,
+    [
+      [
+        'admin@hireorbitai.test',
+        'satish@hireorbitai.test',
+        'rishi@hireorbitai.test',
+        'deepak@hireorbitai.test',
+      ],
+    ],
+  );
+
   console.log('\n--- Org chart ---');
-  console.log(`  SUPER_ADMIN  Dev Admin`);
-  console.log(`  CEO       Satish Kurelly`);
-  console.log(`   └─ CTO       Rishi`);
-  console.log(`        └─ DIRECTOR  Deepak`);
-  console.log(`             ├─ HR_MANAGER Harini  (group lead)`);
-  console.log(`             ├─ MANAGER   Neeraj`);
-  console.log(`             │   ├─ RECRUITER Sai     (Pod Gamma)`);
-  console.log(`             │   └─ RECRUITER Bharth  (Pod Gamma)`);
-  console.log(`             └─ MANAGER   Nikhil`);
-  console.log(`                 └─ RECRUITER Ashok   (Pod Delta)`);
+  console.log(
+    `  SUPER_ADMIN  Dev Admin                              (no group — admin-tier unscoped)`,
+  );
+  console.log(`  CEO       Satish Kurelly                            (no group)`);
+  console.log(`   └─ CTO       Rishi                                  (no group)`);
+  console.log(`        └─ DIRECTOR  Deepak                            (no group)`);
+  console.log(`             ├─ HR_MANAGER Harini  (lead, Cloudfen)`);
+  console.log(`             ├─ MANAGER   Neeraj   (lead, Cloudfen)`);
+  console.log(`             │   ├─ RECRUITER Sai     (Cloudfen)`);
+  console.log(`             │   └─ RECRUITER Bharth  (Cloudfen)`);
+  console.log(`             └─ MANAGER   Nikhil   (lead, Zangle IT)`);
+  console.log(`                 └─ RECRUITER Ashok   (Zangle IT)`);
   console.log(`\n  Password for all: ${PASSWORD}`);
 } catch (e) {
   console.error('\nSEED FAILED:', e.message);

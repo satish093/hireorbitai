@@ -38,9 +38,15 @@ const PASSWORD = process.env.SEED_PASSWORD ?? 'Passw0rd!2026';
 if (PASSWORD.length < 8) throw new Error('SEED_PASSWORD must be at least 8 characters.');
 const PASSWORD_HASH = await bcrypt.hash(PASSWORD, 10);
 
+// Phase 14 group model: every MANAGER / RECRUITER / CONSULTANT must belong to
+// a group, and consultant.user.group_id must match their recruiter.user.group_id
+// (the consultant↔recruiter same-group invariant). Pod Alpha → Xeronix group,
+// Pod Beta → Okta Solutions group (both pre-seeded by database/init.sql).
+const GROUP_SLUG = { alpha: 'xeronix', beta: 'okta-solutions' };
+
 const managers = [
-  { email: 'priya.anand@hireorbitai.test', full_name: 'Priya Anand' },
-  { email: 'david.chen@hireorbitai.test', full_name: 'David Chen' },
+  { email: 'priya.anand@hireorbitai.test', full_name: 'Priya Anand', group: 'alpha' },
+  { email: 'david.chen@hireorbitai.test', full_name: 'David Chen', group: 'beta' },
 ];
 
 const recruiters = [
@@ -49,6 +55,7 @@ const recruiters = [
     full_name: 'Marcus Bell',
     manager_email: 'priya.anand@hireorbitai.test',
     team: 'Pod Alpha',
+    group: 'alpha',
     target_submissions_per_week: 12,
     notes: 'Pacific time zone.',
   },
@@ -57,16 +64,21 @@ const recruiters = [
     full_name: 'Sara Okonkwo',
     manager_email: 'david.chen@hireorbitai.test',
     team: 'Pod Beta',
+    group: 'beta',
     target_submissions_per_week: 10,
     notes: 'EST. Strong on data roles.',
   },
 ];
 
+// Each consultant's `group` MUST match the group of their recruiter (Marcus →
+// alpha, Sara → beta) — enforced by the Phase 14 consultant↔recruiter same-
+// group invariant.
 const consultants = [
   {
     email: 'aniket.rao@hireorbitai.test',
     full_name: 'Aniket Rao',
     recruiter_email: 'marcus.bell@hireorbitai.test',
+    group: 'alpha',
     visa_status: 'H1B',
     current_location: 'New York, NY',
     preferred_locations: ['New York, NY', 'Jersey City, NJ', 'Remote'],
@@ -82,6 +94,7 @@ const consultants = [
     email: 'yuki.tanaka@hireorbitai.test',
     full_name: 'Yuki Tanaka',
     recruiter_email: 'marcus.bell@hireorbitai.test',
+    group: 'alpha',
     visa_status: 'GC',
     current_location: 'San Francisco, CA',
     preferred_locations: ['San Francisco, CA', 'Remote'],
@@ -97,6 +110,7 @@ const consultants = [
     email: 'rohan.mehta@hireorbitai.test',
     full_name: 'Rohan Mehta',
     recruiter_email: 'marcus.bell@hireorbitai.test',
+    group: 'alpha',
     visa_status: 'USC',
     current_location: 'Austin, TX',
     preferred_locations: ['Austin, TX', 'Dallas, TX', 'Remote'],
@@ -112,6 +126,7 @@ const consultants = [
     email: 'fatima.hassan@hireorbitai.test',
     full_name: 'Fatima Hassan',
     recruiter_email: 'sara.okonkwo@hireorbitai.test',
+    group: 'beta',
     visa_status: 'OPT',
     current_location: 'Remote',
     preferred_locations: ['Remote'],
@@ -127,6 +142,7 @@ const consultants = [
     email: 'linh.pham@hireorbitai.test',
     full_name: 'Linh Pham',
     recruiter_email: 'sara.okonkwo@hireorbitai.test',
+    group: 'beta',
     visa_status: 'USC',
     current_location: 'Boston, MA',
     preferred_locations: ['Boston, MA', 'Cambridge, MA', 'Remote'],
@@ -235,10 +251,42 @@ try {
     console.log(`  ok      ${c.email} -> recruiter ${c.recruiter_email}`);
   }
 
+  console.log('\n--- 5. group_id (Phase 14: every MGR/REC/CONS belongs to a pod) ---');
+  // Ensure the target groups exist (no-op if init.sql or seed-leadership.mjs
+  // already created them). Then resolve their ids.
+  await pool.query(
+    `INSERT INTO public.user_groups (name, slug, description) VALUES
+       ('Xeronix',        'xeronix',        'Pod Alpha bench'),
+       ('Okta Solutions', 'okta-solutions', 'Pod Beta bench')
+     ON CONFLICT (slug) DO NOTHING`,
+  );
+  const groupIdBySlug = {};
+  for (const slug of Object.values(GROUP_SLUG)) {
+    const r = await pool.query(`SELECT id FROM public.user_groups WHERE slug = $1`, [slug]);
+    if (!r.rows[0]) throw new Error(`Seed group missing: ${slug}`);
+    groupIdBySlug[slug] = r.rows[0].id;
+  }
+  // Assign group_id from each user's `group` field. Consultants inherit their
+  // recruiter's group by construction (see comment on `consultants` above) —
+  // preserves the consultant↔recruiter same-group invariant.
+  for (const u of [...managers, ...recruiters, ...consultants]) {
+    const slug = GROUP_SLUG[u.group];
+    if (!slug) throw new Error(`User ${u.email} has no group assignment`);
+    await pool.query(`UPDATE public.users SET group_id = $1 WHERE id = $2`, [
+      groupIdBySlug[slug],
+      emailToId.get(u.email),
+    ]);
+  }
+  console.log(
+    `  ${managers.length + recruiters.length + consultants.length} users -> {alpha:xeronix, beta:okta-solutions}`,
+  );
+
   console.log('\n--- summary ---');
   console.log(`  2 managers   : ${managers.map((m) => m.email).join(', ')}`);
   console.log(`  2 recruiters : ${recruiters.map((r) => r.email).join(', ')}`);
   console.log(`  5 consultants: ${consultants.map((c) => c.email).join(', ')}`);
+  console.log(`  groups       : Pod Alpha (Xeronix) — Priya + Marcus + 3 consultants`);
+  console.log(`                 Pod Beta  (Okta Solutions) — David + Sara + 2 consultants`);
   console.log(`  password (all): ${PASSWORD}`);
 } catch (e) {
   console.error('SEED FAILED:', e.message);
