@@ -120,8 +120,17 @@ export function JobDetail() {
                 author={note?.author ?? undefined}
                 updatedAt={note?.updated_at ?? undefined}
                 onSave={async (body) => {
-                  await saveRecruiterNote(job.id, body);
-                  setNote({ body, author: note?.author, updated_at: new Date().toISOString() });
+                  // Use the server's response so the author + updated_at are
+                  // the fresh values (previously the UI fell back to the
+                  // stale `note?.author` from before the save — which is
+                  // undefined for first-time notes — and the byline was
+                  // blank until a full page reload).
+                  const saved = await saveRecruiterNote(job.id, body);
+                  setNote({
+                    body: saved.body,
+                    author: saved.author ?? null,
+                    updated_at: saved.updated_at ?? new Date().toISOString(),
+                  });
                 }}
               />
             </div>

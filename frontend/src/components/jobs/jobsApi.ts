@@ -71,13 +71,25 @@ export async function fetchBenchMatches(jobId: string): Promise<BenchMatch[]> {
 /**
  * PATCH /jobs/:id/note
  * Persists a recruiter note on the job.
+ * Returns the saved note shape so the caller can sync state without
+ * waiting for a follow-up GET (the previous void return meant the UI
+ * couldn't show the author/timestamp until the user reloaded).
  * Fallback: writes to localStorage key `ho-jobnote:<id>`.
  */
-export async function saveRecruiterNote(jobId: string, body: string): Promise<void> {
+export async function saveRecruiterNote(
+  jobId: string,
+  body: string,
+): Promise<{ body: string; author?: string | null; updated_at?: string | null }> {
   try {
-    await api.patch(`/jobs/${jobId}/note`, { body });
+    const res = await api.patch<{
+      body: string;
+      author?: string | null;
+      updated_at?: string | null;
+    }>(`/jobs/${jobId}/note`, { body });
+    return res.data;
   } catch {
     localStorage.setItem(`ho-jobnote:${jobId}`, body);
+    return { body, author: null, updated_at: new Date().toISOString() };
   }
 }
 

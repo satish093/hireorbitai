@@ -328,7 +328,17 @@ export const setNote: RequestHandler = async (req, res) => {
     if (NOTE_MISSING.test(error.message)) throw httpError(503, 'Note storage not migrated yet');
     throw httpError(500, 'Database error');
   }
-  const author = (req.user as { full_name?: string }).full_name ?? null;
+  // `req.user` only carries id/email/role/group_id (see middleware/auth.ts) —
+  // there's no full_name on it, so casting to `{ full_name?: string }` always
+  // resolved to null and the UI never had an author to render. Resolve the
+  // author by hitting public.users, the same way `getNote` does.
+  let author: string | null = null;
+  const { data: u } = await db
+    .from('users')
+    .select('full_name')
+    .eq('id', req.user.id)
+    .maybeSingle();
+  author = (u as { full_name?: string } | null)?.full_name ?? null;
   res.json({ body: parsed.data.body, author, updated_at });
 };
 
