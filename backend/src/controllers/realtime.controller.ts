@@ -102,6 +102,9 @@ export const stream: RequestHandler = async (req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-transform');
   res.setHeader('Connection', 'keep-alive');
   res.setHeader('X-Accel-Buffering', 'no');
+  // Explicit identity — defence-in-depth so any intermediate (nginx, CDN)
+  // skips compression. Compressed SSE through HTTP/2 → ERR_HTTP2_PROTOCOL_ERROR.
+  res.setHeader('Content-Encoding', 'identity');
   res.flushHeaders?.();
 
   // First message — confirms the channel is alive to the client.

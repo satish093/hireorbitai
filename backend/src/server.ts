@@ -107,7 +107,18 @@ app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 // (e.g. ?role=admin&role=user) so handlers always see a single value.
 app.use(hpp());
 // gzip/brotli responses where it makes sense (most JSON bodies).
-app.use(compression());
+// SSE is skipped explicitly: gzip buffers output, breaks EventSource framing,
+// and triggers ERR_HTTP2_PROTOCOL_ERROR through nginx + HTTP/2. The matched
+// path is the request URL Express sees BEFORE the /api router strips its
+// prefix — i.e. /api/realtime/stream.
+app.use(
+  compression({
+    filter: (req, res) => {
+      if (req.path === '/api/realtime/stream') return false;
+      return compression.filter(req, res);
+    },
+  }),
+);
 
 // --- Request logging ----------------------------------------------------------
 // pino-http attaches a per-request logger to req.log with a unique requestId,
