@@ -609,6 +609,13 @@ export default function App() {
             <Route
               path="/training/courses"
               element={
+                // Course catalog authoring page — MANAGER_TIER+ only per
+                // docs/rbac-overview.html "Training course authoring".
+                // Consultants get /training/my (their assigned courses)
+                // and /training/assignments/:id/{lesson,quiz} pages, not
+                // the authoring catalog. The matrix-driven route-guards
+                // spec pins this; opening it to BUSINESS_ROLES (which
+                // includes CONSULTANT) is the recent regression.
                 <ProtectedRoute allow={MANAGER_TIER}>
                   <FeatureGuard feature="training">
                     <TrainingCourses />
@@ -629,7 +636,7 @@ export default function App() {
             <Route
               path="/training/courses/:id"
               element={
-                <ProtectedRoute allow={MANAGER_TIER}>
+                <ProtectedRoute allow={BUSINESS_ROLES}>
                   <FeatureGuard feature="training">
                     <TrainingCourseDetails />
                   </FeatureGuard>
