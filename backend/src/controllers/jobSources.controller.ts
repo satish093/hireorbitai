@@ -4,13 +4,10 @@ import { db } from '../config/db';
 import { runSync, runSyncForId, Source } from '../services/jobIngestion.service';
 import { httpError } from '../types';
 
-const VALID_SOURCES: Source[] = ['dice', 'careerbuilder', 'linkedin', 'monster', 'manual'];
+const VALID_SOURCES: Source[] = ['jooble', 'manual'];
 
-function sourceNeedsSlug(_s: Source): boolean {
-  return false; // none of the four active drivers require a per-company slug
-}
 function sourceRequiresKey(s: Source): boolean {
-  return s === 'linkedin'; // only LinkedIn uses RAPIDAPI_KEY
+  return s === 'jooble'; // free Jooble API key from jooble.org/api/index
 }
 
 export const listSources: RequestHandler = async (_req, res) => {
@@ -26,7 +23,7 @@ export const listSources: RequestHandler = async (_req, res) => {
 export const createSource: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   const schema = z.object({
-    source: z.enum(['dice', 'careerbuilder', 'linkedin', 'monster', 'manual']),
+    source: z.enum(['jooble', 'manual']),
     slug: z.string().optional().nullable(),
     display_name: z.string().optional(),
   });
@@ -69,10 +66,9 @@ export const deleteSource: RequestHandler = async (req, res) => {
   res.json({ ok: true });
 };
 
-/** Trigger a full sync across every active source. Manager-only. */
 export const sync: RequestHandler = async (_req, res) => {
   const { reports, auto_match } = await runSync();
-  const summary = {
+  res.json({
     sources_run: reports.length,
     jobs_pulled: reports.reduce((s, r) => s + r.jobs_pulled, 0),
     jobs_upserted: reports.reduce((s, r) => s + r.jobs_upserted, 0),
@@ -80,17 +76,14 @@ export const sync: RequestHandler = async (_req, res) => {
     errors: reports.filter((r) => r.error).length,
     auto_match,
     reports,
-  };
-  res.json(summary);
+  });
 };
 
-/** Sync a single source by source_companies.id */
 export const syncOne: RequestHandler = async (req, res) => {
   const report = await runSyncForId(req.params.id);
   res.json(report);
 };
 
-/** Health dashboard — per-source rollup of key config, row counts, last sync. */
 export const sourcesHealth: RequestHandler = async (_req, res) => {
   const { data: rows } = await db
     .from('source_companies')
@@ -119,18 +112,14 @@ export const sourcesHealth: RequestHandler = async (_req, res) => {
     if (r.is_active) cur.rows_active++;
     cur.last_sync_jobs_count += r.last_sync_jobs_count ?? 0;
     if (r.last_sync_error) cur.last_error = r.last_sync_error;
-    if (r.last_synced_at && (!cur.last_synced_at || r.last_synced_at > cur.last_synced_at)) {
+    if (r.last_synced_at && (!cur.last_synced_at || r.last_synced_at > cur.last_synced_at))
       cur.last_synced_at = r.last_synced_at;
-    }
     byId.set(k, cur);
   }
 
   const keyConfigured: Record<string, boolean> = {
-    dice: true, // direct REST API — no key
-    careerbuilder: true, // HTTP scraper — no key
-    monster: true, // Playwright — no key
+    jooble: !!process.env.JOOBLE_API_KEY,
     manual: true,
-    linkedin: !!process.env.RAPIDAPI_KEY,
   };
 
   const out = VALID_SOURCES.map((s) => {
@@ -145,7 +134,6 @@ export const sourcesHealth: RequestHandler = async (_req, res) => {
       source: s,
       key_configured: keyConfigured[s] ?? true,
       needs_key: sourceRequiresKey(s),
-      needs_slug: sourceNeedsSlug(s),
       rows_total: agg.rows_total,
       rows_active: agg.rows_active,
       last_synced_at: agg.last_synced_at,
@@ -153,7 +141,7 @@ export const sourcesHealth: RequestHandler = async (_req, res) => {
       last_error: agg.last_error,
       status: agg.last_error
         ? 'error'
-        : sourceRequiresKey(s) && !keyConfigured[s]
+        : !keyConfigured[s]
           ? 'missing_key'
           : agg.rows_active === 0
             ? 'no_rows'
@@ -163,13 +151,8 @@ export const sourcesHealth: RequestHandler = async (_req, res) => {
   res.json(out);
 };
 
-/** Driver list — useful for the frontend's "Add source" picker. */
 export const drivers: RequestHandler = (_req, res) => {
   res.json({
-    sources: VALID_SOURCES.map((s) => ({
-      id: s,
-      needs_slug: sourceNeedsSlug(s),
-      requires_key: sourceRequiresKey(s),
-    })),
+    sources: VALID_SOURCES.map((s) => ({ id: s, requires_key: sourceRequiresKey(s) })),
   });
 };
