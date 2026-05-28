@@ -1,9 +1,9 @@
 /**
  * Global call context.
  *
- * Wraps useCall() at the App level so the WebRTC state machine and
- * CallModal are alive regardless of which page the user is on. Incoming
- * calls ring and can be accepted/rejected from any route.
+ * Wraps useCall() at the App level so the WebRTC state machine + CallModal
+ * are alive regardless of which page the user is on. Incoming calls ring
+ * and can be accepted/rejected from any route.
  *
  * Messages.tsx uses useCallContext() to trigger outbound calls.
  */
@@ -22,18 +22,15 @@ export function CallProvider({ children }: { children: ReactNode }) {
       {children}
       <CallModal
         status={call.status}
-        callType={call.callType}
         peer={call.peer}
         incomingCall={call.incomingCall}
-        localStream={call.localStream}
         remoteStream={call.remoteStream}
         isMuted={call.isMuted}
-        isCameraOff={call.isCameraOff}
+        callDurationLabel={call.callDurationLabel}
         onAccept={call.acceptCall}
         onReject={call.rejectCall}
         onEnd={call.endCall}
         onToggleMute={call.toggleMute}
-        onToggleCamera={call.toggleCamera}
       />
     </CallContext.Provider>
   );

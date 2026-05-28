@@ -7,7 +7,6 @@ import { GroupBadge } from '../components/GroupBadge';
 import { Button } from '../components/Button';
 import {
   IconSearch,
-  IconVideo,
   IconPhone,
   IconSend,
   IconPaperclip,
@@ -744,27 +743,8 @@ export function Messages() {
                     {activePeer.role && ROLE_LABEL[activePeer.role]} · {activePeer.email}
                   </div>
                 </div>
-                {/* Call buttons — disabled while already in a call */}
+                {/* Voice call — disabled while already in a call */}
                 <div className="ml-auto flex items-center gap-1 text-muted">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    iconOnly
-                    leftIcon={<IconVideo size={18} />}
-                    title="Video call"
-                    disabled={call.status !== 'idle'}
-                    onClick={() =>
-                      call
-                        .startCall(
-                          activePeer.id,
-                          activePeer.full_name ?? null,
-                          activePeer.email,
-                          'video',
-                        )
-                        .catch((e: Error) => toast.error(e.message))
-                    }
-                  />
                   <Button
                     type="button"
                     variant="ghost"
@@ -775,12 +755,7 @@ export function Messages() {
                     disabled={call.status !== 'idle'}
                     onClick={() =>
                       call
-                        .startCall(
-                          activePeer.id,
-                          activePeer.full_name ?? null,
-                          activePeer.email,
-                          'audio',
-                        )
+                        .startCall(activePeer.id, activePeer.full_name ?? null, activePeer.email)
                         .catch((e: Error) => toast.error(e.message))
                     }
                   />

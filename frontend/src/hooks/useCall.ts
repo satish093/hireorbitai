@@ -1,14 +1,16 @@
 /**
- * WebRTC call state machine.
+ * Voice-call WebRTC state machine.
  *
  * Signaling flows through the existing SSE channel:
- *   caller  → POST /calls/offer      → SSE call:incoming  → callee
- *   callee  → POST /calls/answer     → SSE call:answered  → caller
+ *   caller  → POST /calls/offer         → SSE call:incoming    → callee
+ *   callee  → POST /calls/answer        → SSE call:answered    → caller
  *   either  → POST /calls/ice-candidate → SSE call:ice-candidate → peer
- *   either  → POST /calls/end        → SSE call:ended     → peer
- *   callee  → POST /calls/reject     → SSE call:rejected  → caller
+ *   either  → POST /calls/end           → SSE call:ended       → peer
+ *   callee  → POST /calls/reject        → SSE call:rejected    → caller
  *
  * Media goes peer-to-peer (WebRTC); only signaling touches the server.
+ * Voice-only by design — `call_type` is always `'audio'` and the codepaths
+ * for video have been stripped to keep the surface simple and reliable.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -24,6 +26,9 @@ const ICE_SERVERS: RTCIceServer[] = [
 // How long to wait for the callee to answer before auto-cancelling (45 s).
 const CALL_TIMEOUT_MS = 45_000;
 
+// Mobile vibration pattern for incoming calls. Re-armed every cycle while ringing.
+const VIBRATE_PATTERN = [600, 500, 600, 500, 600, 500];
+
 export type CallStatus =
   | 'idle'
   | 'calling' // outbound: waiting for callee to pick up
@@ -31,7 +36,8 @@ export type CallStatus =
   | 'connected' // media flowing both ways
   | 'ended'; // call finished (for any reason)
 
-export type CallType = 'audio' | 'video';
+/** Kept for SSE/DB compatibility — only `'audio'` is produced by the UI now. */
+export type CallType = 'audio';
 
 export interface IncomingCallInfo {
   call_id: string;
@@ -47,31 +53,53 @@ export interface IncomingCallInfo {
 
 export interface UseCallReturn {
   status: CallStatus;
-  callType: CallType | null;
   peer: { id: string; full_name?: string | null; email: string } | null;
   localStream: MediaStream | null;
   remoteStream: MediaStream | null;
   incomingCall: IncomingCallInfo | null;
   isMuted: boolean;
-  isCameraOff: boolean;
-  startCall: (
-    peerId: string,
-    peerName: string | null,
-    peerEmail: string,
-    type: CallType,
-  ) => Promise<void>;
+  /** Seconds since the call connected. 0 while ringing / calling. */
+  callDuration: number;
+  /** Formatted MM:SS (or H:MM:SS for long calls) string of callDuration. */
+  callDurationLabel: string;
+  startCall: (peerId: string, peerName: string | null, peerEmail: string) => Promise<void>;
   acceptCall: () => Promise<void>;
   rejectCall: () => Promise<void>;
   endCall: () => Promise<void>;
   toggleMute: () => void;
-  toggleCamera: () => void;
   /** Wire this into useRealtime in the parent component. */
   realtimeHandlers: Record<string, (payload: unknown) => void>;
 }
 
+function formatDuration(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
+}
+
+function mediaErrorMessage(err: unknown): string {
+  const e = err as { name?: string; message?: string };
+  switch (e?.name) {
+    case 'NotFoundError':
+    case 'DevicesNotFoundError':
+      return 'No microphone found. Connect a mic and try again.';
+    case 'NotAllowedError':
+    case 'PermissionDeniedError':
+      return 'Microphone access was blocked. Allow it in the browser address bar and try again.';
+    case 'NotReadableError':
+    case 'TrackStartError':
+      return 'Microphone is in use by another app or browser tab. Close it and try again.';
+    case 'SecurityError':
+      return 'Calls need a secure (HTTPS) connection.';
+    default:
+      return e?.message ?? 'Could not access microphone.';
+  }
+}
+
 export function useCall(): UseCallReturn {
   const [status, setStatus] = useState<CallStatus>('idle');
-  const [callType, setCallType] = useState<CallType | null>(null);
   const [peer, setPeer] = useState<{ id: string; full_name?: string | null; email: string } | null>(
     null,
   );
@@ -79,15 +107,57 @@ export function useCall(): UseCallReturn {
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
   const [incomingCall, setIncomingCall] = useState<IncomingCallInfo | null>(null);
   const [isMuted, setIsMuted] = useState(false);
-  const [isCameraOff, setIsCameraOff] = useState(false);
+  const [callDuration, setCallDuration] = useState(0);
 
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const callIdRef = useRef<string | null>(null);
   const pendingCandidates = useRef<RTCIceCandidateInit[]>([]);
   const callTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const connectedAtRef = useRef<number | null>(null);
+  const vibrateTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Tick the duration once a second while connected.
+  useEffect(() => {
+    if (status !== 'connected') return;
+    if (!connectedAtRef.current) connectedAtRef.current = Date.now();
+    const id = setInterval(() => {
+      const startedAt = connectedAtRef.current;
+      if (!startedAt) return;
+      setCallDuration(Math.floor((Date.now() - startedAt) / 1000));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [status]);
+
+  function stopVibration() {
+    if (vibrateTimerRef.current) {
+      clearInterval(vibrateTimerRef.current);
+      vibrateTimerRef.current = null;
+    }
+    try {
+      navigator.vibrate?.(0);
+    } catch {
+      /* not supported */
+    }
+  }
+
+  function startVibration() {
+    if (typeof navigator === 'undefined' || !navigator.vibrate) return;
+    try {
+      navigator.vibrate(VIBRATE_PATTERN);
+    } catch {
+      return;
+    }
+    vibrateTimerRef.current = setInterval(() => {
+      try {
+        navigator.vibrate(VIBRATE_PATTERN);
+      } catch {
+        stopVibration();
+      }
+    }, 3_600);
+  }
 
   // -------------------------------------------------------------------------
-  // Cleanup — closes PC, releases media, stops sounds
+  // Cleanup — closes PC, releases media, stops sounds + vibration
   // -------------------------------------------------------------------------
 
   const cleanup = useCallback(() => {
@@ -96,6 +166,7 @@ export function useCall(): UseCallReturn {
       callTimeoutRef.current = null;
     }
     stopRing();
+    stopVibration();
 
     if (pcRef.current) {
       pcRef.current.onicecandidate = null;
@@ -110,6 +181,8 @@ export function useCall(): UseCallReturn {
     setRemoteStream(null);
     pendingCandidates.current = [];
     callIdRef.current = null;
+    connectedAtRef.current = null;
+    setCallDuration(0);
   }, []);
 
   const finalise = useCallback(
@@ -117,17 +190,15 @@ export function useCall(): UseCallReturn {
       cleanup();
       if (playSound && next === 'ended') playDisconnect();
       setStatus(next);
-      setCallType(null);
       setPeer(null);
       setIncomingCall(null);
       setIsMuted(false);
-      setIsCameraOff(false);
     },
     [cleanup],
   );
 
   // -------------------------------------------------------------------------
-  // Build RTCPeerConnection
+  // Build RTCPeerConnection + remote-stream wiring
   // -------------------------------------------------------------------------
 
   function buildPC(peerId: string): RTCPeerConnection {
@@ -148,18 +219,23 @@ export function useCall(): UseCallReturn {
         .catch(() => {});
     };
 
+    // Create the MediaStream up front and expose it via state. The CallModal
+    // attaches it to an <audio autoplay> element. Tracks are added as they
+    // arrive — modern browsers play newly-added audio tracks without re-binding.
     const stream = new MediaStream();
     setRemoteStream(stream);
-    pc.ontrack = ({ track }) => {
-      stream.addTrack(track);
+    pc.ontrack = ({ track, streams }) => {
+      // Prefer the stream the browser hands us (some Safari versions don't
+      // hand-build incremental MediaStreams correctly).
+      if (streams && streams[0]) {
+        setRemoteStream(streams[0]);
+      } else {
+        stream.addTrack(track);
+      }
     };
 
     return pc;
   }
-
-  // -------------------------------------------------------------------------
-  // Drain queued ICE candidates once remote description is set
-  // -------------------------------------------------------------------------
 
   async function drainPending(pc: RTCPeerConnection) {
     for (const c of pendingCandidates.current) {
@@ -172,72 +248,21 @@ export function useCall(): UseCallReturn {
     pendingCandidates.current = [];
   }
 
-  // -------------------------------------------------------------------------
-  // Acquire local media
-  //
-  // Returns { stream, effectiveType } — if the caller asked for video but the
-  // browser has no camera (or it's locked by another tab), we fall back to
-  // audio-only rather than failing the whole call. The caller can show a toast
-  // when effectiveType !== requested type so the user knows what happened.
-  // -------------------------------------------------------------------------
-
-  function mediaErrorMessage(err: unknown): string {
-    const e = err as { name?: string; message?: string };
-    switch (e?.name) {
-      case 'NotFoundError':
-      case 'DevicesNotFoundError':
-        return 'No camera or microphone found. Connect a device and try again.';
-      case 'NotAllowedError':
-      case 'PermissionDeniedError':
-        return 'Microphone / camera access was blocked. Allow it in the browser address bar and try again.';
-      case 'NotReadableError':
-      case 'TrackStartError':
-        return 'Camera or microphone is in use by another app or browser tab. Close it and try again.';
-      case 'OverconstrainedError':
-        return 'No device matches the requested call quality. Try a voice call instead.';
-      case 'SecurityError':
-        return 'Calls need a secure (HTTPS) connection.';
-      default:
-        return e?.message ?? 'Could not access camera / microphone.';
-    }
-  }
-
-  async function getMedia(
-    type: CallType,
-  ): Promise<{ stream: MediaStream; effectiveType: CallType }> {
-    // Voice call — only mic. NotFoundError here means no mic at all.
-    if (type === 'audio') {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-      return { stream, effectiveType: 'audio' };
-    }
-    // Video call — try video+audio. If video fails (no camera, camera locked,
-    // etc.) but audio works, gracefully degrade to audio-only so the call
-    // still connects. Both failing means no input at all → re-throw.
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
-      return { stream, effectiveType: 'video' };
-    } catch (videoErr) {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-        return { stream, effectiveType: 'audio' };
-      } catch {
-        throw videoErr; // surface the original (more specific) error
-      }
-    }
+  async function getMicStream(): Promise<MediaStream> {
+    return navigator.mediaDevices.getUserMedia({ audio: true, video: false });
   }
 
   // -------------------------------------------------------------------------
-  // startCall — outbound
+  // startCall — outbound (voice only)
   // -------------------------------------------------------------------------
 
   const startCall = useCallback(
-    async (peerId: string, peerName: string | null, peerEmail: string, type: CallType) => {
+    async (peerId: string, peerName: string | null, peerEmail: string) => {
       if (status !== 'idle') return;
       setStatus('calling');
-      setCallType(type);
       setPeer({ id: peerId, full_name: peerName, email: peerEmail });
 
-      // Ring tone starts for the caller too — stops once the callee answers.
+      // Ringback tone for the caller — stops once the callee answers.
       ring();
 
       // Auto-cancel if no answer within 45 s.
@@ -246,11 +271,8 @@ export function useCall(): UseCallReturn {
       }, CALL_TIMEOUT_MS);
 
       try {
-        const { stream, effectiveType } = await getMedia(type);
+        const stream = await getMicStream();
         setLocalStream(stream);
-        // If a video call was downgraded to audio (no camera available)
-        // surface that to the in-call UI so it renders the audio layout.
-        if (effectiveType !== type) setCallType(effectiveType);
 
         const pc = buildPC(peerId);
         pcRef.current = pc;
@@ -261,18 +283,13 @@ export function useCall(): UseCallReturn {
 
         const res = await api.post('/calls/offer', {
           callee_id: peerId,
-          call_type: effectiveType,
+          call_type: 'audio',
           sdp: offer.sdp,
         });
         callIdRef.current = res.data.call_id as string;
       } catch (err: unknown) {
         finalise('ended', false);
-        // Media errors get a friendly message; backend errors keep theirs.
-        const e = err as {
-          response?: { data?: { error?: string } };
-          name?: string;
-          message?: string;
-        };
+        const e = err as { response?: { data?: { error?: string } } };
         const serverMsg = e?.response?.data?.error;
         throw new Error(serverMsg ?? mediaErrorMessage(err));
       }
@@ -285,23 +302,18 @@ export function useCall(): UseCallReturn {
   // -------------------------------------------------------------------------
 
   const acceptCall = useCallback(async () => {
-    // Atomically read and clear incomingCall to avoid race.
     const incoming = incomingCall;
     if (!incoming) return;
     setIncomingCall(null);
     stopRing();
+    stopVibration();
 
-    const { call_id, call_type, sdp, caller } = incoming;
-    setStatus('connected');
-    setCallType(call_type);
+    const { call_id, sdp, caller } = incoming;
     setPeer({ id: caller.id, full_name: caller.full_name ?? null, email: caller.email });
 
     try {
-      const { stream, effectiveType } = await getMedia(call_type);
+      const stream = await getMicStream();
       setLocalStream(stream);
-      // If the callee can't supply video (no camera), downgrade the UI but
-      // continue the call — the caller still gets our audio + their own video.
-      if (effectiveType !== call_type) setCallType(effectiveType);
 
       const pc = buildPC(caller.id);
       pcRef.current = pc;
@@ -322,30 +334,24 @@ export function useCall(): UseCallReturn {
       });
 
       playConnect();
+      setStatus('connected');
     } catch {
       finalise('ended');
     }
   }, [incomingCall, finalise]);
-
-  // -------------------------------------------------------------------------
-  // rejectCall — inbound, callee declines
-  // -------------------------------------------------------------------------
 
   const rejectCall = useCallback(async () => {
     const incoming = incomingCall;
     if (!incoming) return;
     setIncomingCall(null);
     stopRing();
+    stopVibration();
     setStatus('idle');
 
     await api
       .post('/calls/reject', { call_id: incoming.call_id, caller_id: incoming.caller.id })
       .catch(() => {});
   }, [incomingCall]);
-
-  // -------------------------------------------------------------------------
-  // endCall — either side hangs up
-  // -------------------------------------------------------------------------
 
   const endCall = useCallback(async () => {
     const peerId = peer?.id;
@@ -356,24 +362,12 @@ export function useCall(): UseCallReturn {
     }
   }, [peer, finalise]);
 
-  // -------------------------------------------------------------------------
-  // Mute / camera toggle
-  // -------------------------------------------------------------------------
-
   const toggleMute = useCallback(() => {
     if (!localStream) return;
     localStream.getAudioTracks().forEach((t) => {
       t.enabled = !t.enabled;
     });
     setIsMuted((m) => !m);
-  }, [localStream]);
-
-  const toggleCamera = useCallback(() => {
-    if (!localStream) return;
-    localStream.getVideoTracks().forEach((t) => {
-      t.enabled = !t.enabled;
-    });
-    setIsCameraOff((off) => !off);
   }, [localStream]);
 
   // -------------------------------------------------------------------------
@@ -394,12 +388,12 @@ export function useCall(): UseCallReturn {
       }
       setIncomingCall(data);
       setStatus('ringing');
-      ring(); // ring for callee
+      ring();
+      startVibration();
     },
 
     'call:answered': async (raw) => {
       const { call_id, sdp } = raw as { call_id: string; sdp: string };
-      // Only apply if this matches the active outbound call.
       if (call_id !== callIdRef.current) return;
       const pc = pcRef.current;
       if (!pc) return;
@@ -448,19 +442,18 @@ export function useCall(): UseCallReturn {
 
   return {
     status,
-    callType,
     peer,
     localStream,
     remoteStream,
     incomingCall,
     isMuted,
-    isCameraOff,
+    callDuration,
+    callDurationLabel: formatDuration(callDuration),
     startCall,
     acceptCall,
     rejectCall,
     endCall,
     toggleMute,
-    toggleCamera,
     realtimeHandlers,
   };
 }
