@@ -77,7 +77,10 @@ export const create: RequestHandler = async (req, res) => {
 
     // Non-admins must be able to see the target user via the permission service.
     if (!isAdminCaller) {
-      const canSee = await canViewUser({ id: req.user.id, role: req.user.role }, pId);
+      const canSee = await canViewUser(
+        { id: req.user.id, role: req.user.role, group_id: req.user.group_id ?? null },
+        pId,
+      );
       if (!canSee) throw httpError(403, 'You do not have permission to assign this parent.');
     }
 

@@ -54,7 +54,11 @@ export const directory: RequestHandler = async (req, res) => {
   // reports-to fallback and no "we already have a thread so it's allowed" carve-
   // out. The directory and the per-endpoint canMessageUser() checks read the
   // same engine, so they can't drift.
-  const peerIds = await getAccessibleUserIds({ id: me.id, role: me.role });
+  const peerIds = await getAccessibleUserIds({
+    id: me.id,
+    role: me.role,
+    group_id: me.group_id ?? null,
+  });
   if (peerIds.size === 0) {
     res.json([]);
     return;
@@ -157,7 +161,10 @@ export const thread: RequestHandler = async (req, res) => {
   // alias for canMessageUser — the SAME strict current-assignment rule as the
   // directory. There is no prior-thread carve-out: if a reassignment removes the
   // relationship, the in-flight thread is no longer readable (fail-closed).
-  const allowed = await canViewConversation({ id: me, role: req.user.role }, other);
+  const allowed = await canViewConversation(
+    { id: me, role: req.user.role, group_id: req.user.group_id ?? null },
+    other,
+  );
   if (!allowed) {
     audit({
       action: 'messages_permission_denied',
@@ -201,7 +208,10 @@ export const markRead: RequestHandler = async (req, res) => {
   // and silently mark the victim's outgoing messages as "read" on the
   // caller's inbox — a social-engineering vector even though the data
   // returned is empty.
-  const allowed = await canViewConversation({ id: me, role: req.user.role }, other);
+  const allowed = await canViewConversation(
+    { id: me, role: req.user.role, group_id: req.user.group_id ?? null },
+    other,
+  );
   if (!allowed) {
     audit({
       action: 'messages_permission_denied',
@@ -254,7 +264,7 @@ export const send: RequestHandler = async (req, res) => {
   // is server-side only — frontend filtering of the directory does NOT
   // protect against direct API calls.
   const allowed = await canMessageUser(
-    { id: req.user.id, role: req.user.role },
+    { id: req.user.id, role: req.user.role, group_id: req.user.group_id ?? null },
     parsed.data.recipient_id,
   );
   if (!allowed) {

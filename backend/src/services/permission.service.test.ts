@@ -1,31 +1,29 @@
 /**
- * Unit tests for the permission engine. The DB layer is mocked end-to-end so
- * the suite runs in milliseconds without a Postgres dependency.
+ * Permission engine — final policy.
  *
- * What this covers:
- *   - role-tier branches (admin / manager / recruiter / consultant)
- *   - assignment-based isolation (recruiter ↔ consultant, manager ↔ recruiter)
- *   - reports_to chain is NOT used for messaging permissions
- *   - prior-thread legitimacy is NOT used (strict assignment only)
- *   - self-message refusal
- *   - cache hit, cache miss, cache invalidation
+ * Verifies every case from the product spec:
+ *   - SUPER_ADMIN can chat with everyone.
+ *   - CEO / CTO / DIRECTOR can chat with everyone.
+ *   - HR_MANAGER / MANAGER can chat with all managers + HR managers (org-wide).
+ *   - HR_MANAGER / MANAGER can chat with admin leadership.
+ *   - HR_MANAGER / MANAGER can chat with recruiters in their own group.
+ *   - HR_MANAGER / MANAGER can chat with consultants in their own group.
+ *   - HR_MANAGER / MANAGER cannot chat with unrelated consultants.
+ *   - RECRUITER can chat with all other recruiters.
+ *   - RECRUITER can chat with own manager / HR chain.
+ *   - RECRUITER can chat with own assigned consultants.
+ *   - RECRUITER cannot chat with other recruiters' consultants.
+ *   - CONSULTANT can chat with assigned recruiter.
+ *   - CONSULTANT can chat with that recruiter's manager chain.
+ *   - CONSULTANT cannot chat with other consultants / unrelated recruiters.
+ *   - DEVELOPER has no chat.
+ *   - No reports_to chain. No prior-thread carry-over.
  *
- * What this does NOT cover (intentional — needs a real Postgres in CI):
- *   - SQL correctness of the underlying queries
- *   - controller integration (use supertest + a seeded test DB)
- *   - cross-worker cache behavior (single-process pmodel here)
- *
- * The mock strategy: vi.mock the `config/db` module with a stub that returns
- * canned responses for each table/method combination. Every test resets the
- * mock so cases don't leak into each other.
+ * DB mocked at module load — no Postgres / env needed.
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-// ---------------------------------------------------------------------------
-// Mock the db module BEFORE importing permission.service.
-// vi.hoisted lets the mock factory reach into closures defined here.
-// ---------------------------------------------------------------------------
 const mock = vi.hoisted(() => {
   const handlers: Map<string, (filters: Record<string, unknown>) => unknown[]> = new Map();
   return { handlers };
@@ -33,12 +31,10 @@ const mock = vi.hoisted(() => {
 
 vi.mock('../config/db', () => {
   type R = { data: unknown; error: null; count?: number };
-
   function makeBuilder(table: string) {
     const filters: Record<string, unknown> = {};
     const builder = {
       select(_cols?: string, opts?: { count?: string; head?: boolean }) {
-        filters.__cols = _cols;
         filters.__head = !!opts?.head;
         return builder;
       },
@@ -58,10 +54,6 @@ vi.mock('../config/db', () => {
         filters[`in:${col}`] = value;
         return builder;
       },
-      or(expr: string) {
-        filters['or'] = expr;
-        return builder;
-      },
       maybeSingle() {
         const rows = mock.handlers.get(table)?.(filters) ?? [];
         return Promise.resolve({ data: rows[0] ?? null, error: null } as R);
@@ -70,7 +62,6 @@ vi.mock('../config/db', () => {
         const rows = mock.handlers.get(table)?.(filters) ?? [];
         return Promise.resolve({ data: rows[0] ?? null, error: null } as R);
       },
-      // Supports head:true selects (count queries).
       then<T>(resolve: (value: R) => T) {
         const rows = mock.handlers.get(table)?.(filters) ?? [];
         return Promise.resolve({
@@ -82,28 +73,16 @@ vi.mock('../config/db', () => {
     };
     return builder;
   }
-
   return {
-    db: {
-      from(table: string) {
-        return makeBuilder(table);
-      },
-    },
+    db: { from: (table: string) => makeBuilder(table) },
     pool: {},
   };
 });
 
-// Mock the shared logger so we don't write to stdout during tests.
 vi.mock('../config/logger', () => ({
-  logger: {
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-    debug: vi.fn(),
-  },
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
-// AFTER the mocks are registered.
 import {
   canMessageUser,
   canViewConversation,
@@ -112,15 +91,10 @@ import {
   clearPermissionCache,
 } from './permission.service';
 
-// ---------------------------------------------------------------------------
-// Test-only helpers — set up the mocked DB state.
-// ---------------------------------------------------------------------------
 function setupDb(rows: Record<string, unknown[]>) {
   mock.handlers.clear();
   for (const [table, list] of Object.entries(rows)) {
     mock.handlers.set(table, (filters) => {
-      // Generic filter application — supports the small set of operators
-      // the permission service actually uses.
       return list.filter((row) => {
         const r = row as Record<string, unknown>;
         for (const [k, v] of Object.entries(filters)) {
@@ -137,8 +111,6 @@ function setupDb(rows: Record<string, unknown[]>) {
             const col = k.slice(3);
             if (r[col] !== v) return false;
           }
-          // `or` is left unmatched — the permission service no longer
-          // queries the messages table at all.
         }
         return true;
       });
@@ -151,288 +123,388 @@ beforeEach(() => {
   mock.handlers.clear();
 });
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-describe('permission.service — admin override', () => {
+// ─── Admin override ────────────────────────────────────────────────────────
+describe('admin tier — chat with everyone', () => {
   it('SUPER_ADMIN can message any active user', async () => {
-    setupDb({
-      users: [{ id: 'u-target', is_active: true }],
-    });
-    const ok = await canMessageUser({ id: 'u-admin', role: 'SUPER_ADMIN' }, 'u-target');
-    expect(ok).toBe(true);
+    setupDb({ users: [{ id: 'u-target', is_active: true }] });
+    expect(await canMessageUser({ id: 'u-sa', role: 'SUPER_ADMIN' }, 'u-target')).toBe(true);
   });
 
-  it('SUPER_ADMIN cannot message themselves', async () => {
-    const ok = await canMessageUser({ id: 'u-admin', role: 'SUPER_ADMIN' }, 'u-admin');
-    expect(ok).toBe(false);
+  it('CEO / CTO / DIRECTOR can message any active user', async () => {
+    setupDb({ users: [{ id: 'u-target', is_active: true }] });
+    expect(await canMessageUser({ id: 'u-ceo', role: 'CEO' }, 'u-target')).toBe(true);
+    expect(await canMessageUser({ id: 'u-cto', role: 'CTO' }, 'u-target')).toBe(true);
+    expect(await canMessageUser({ id: 'u-dir', role: 'DIRECTOR' }, 'u-target')).toBe(true);
   });
 
-  it('SUPER_ADMIN cannot message an inactive user', async () => {
-    setupDb({
-      users: [{ id: 'u-target', is_active: false }],
-    });
-    const ok = await canMessageUser({ id: 'u-admin', role: 'SUPER_ADMIN' }, 'u-target');
-    expect(ok).toBe(false);
+  it('admins cannot message themselves', async () => {
+    expect(await canMessageUser({ id: 'u-sa', role: 'SUPER_ADMIN' }, 'u-sa')).toBe(false);
   });
 
-  it('MANAGER sees their own recruiter/consultant subtree, not unrelated users', async () => {
-    setupDb({
-      users: [
-        { id: 'u-admin', role: 'SUPER_ADMIN', is_active: true },
-        { id: 'u-manager', role: 'MANAGER', is_active: true, reports_to: null },
-        { id: 'u-recruiter', is_active: true },
-        { id: 'u-consultant', is_active: true },
-        { id: 'u-unrelated', is_active: true },
-        { id: 'u-other-recruiter', is_active: true },
-      ],
-      recruiters: [
-        { id: 'r-mine', user_id: 'u-recruiter', manager_id: 'u-manager' },
-        { id: 'r-other', user_id: 'u-other-recruiter', manager_id: null },
-      ],
-      recruiter_managers: [],
-      consultants: [{ recruiter_id: 'r-mine', user_id: 'u-consultant' }],
-    });
-    const ids = await getAccessibleUserIds({ id: 'u-manager', role: 'MANAGER' });
-    // Admin users always reachable
-    expect(ids.has('u-admin')).toBe(true);
-    // Their own recruiter is reachable
-    expect(ids.has('u-recruiter')).toBe(true);
-    // That recruiter's consultant is reachable
-    expect(ids.has('u-consultant')).toBe(true);
-    // Unrelated user is NOT reachable
-    expect(ids.has('u-unrelated')).toBe(false);
-    // Another manager's recruiter is NOT reachable
-    expect(ids.has('u-other-recruiter')).toBe(false);
-    // Self never appears
-    expect(ids.has('u-manager')).toBe(false);
+  it('admins cannot message inactive users', async () => {
+    setupDb({ users: [{ id: 'u-target', is_active: false }] });
+    expect(await canMessageUser({ id: 'u-sa', role: 'SUPER_ADMIN' }, 'u-target')).toBe(false);
   });
 });
 
-describe('permission.service — recruiter scope (org-wide staff chat)', () => {
-  it('recruiter can message their own assigned consultants', async () => {
+// ─── HR_MANAGER / MANAGER scope ────────────────────────────────────────────
+describe('group lead (HR_MANAGER / MANAGER) scope', () => {
+  // Fixture: two groups (A, B). Lead M in group A. Various peer + group rows.
+  function fixtureManagerScope() {
     setupDb({
-      users: [],
-      recruiters: [{ id: 'r-1', user_id: 'u-recruiter', manager_id: null }],
+      users: [
+        // Manager-tier peers (org-wide reachable from any lead).
+        { id: 'u-mgr-a', role: 'MANAGER', is_active: true, group_id: 'g-a' },
+        { id: 'u-mgr-b', role: 'MANAGER', is_active: true, group_id: 'g-b' },
+        { id: 'u-hr-a', role: 'HR_MANAGER', is_active: true, group_id: 'g-a' },
+        { id: 'u-hr-b', role: 'HR_MANAGER', is_active: true, group_id: 'g-b' },
+        // Admin tier (upward leadership).
+        { id: 'u-dir', role: 'DIRECTOR', is_active: true, group_id: null },
+        { id: 'u-ceo', role: 'CEO', is_active: true, group_id: null },
+        // Recruiters + consultants in each group.
+        { id: 'u-rec-a', role: 'RECRUITER', is_active: true, group_id: 'g-a' },
+        { id: 'u-rec-b', role: 'RECRUITER', is_active: true, group_id: 'g-b' },
+        { id: 'u-cons-a', role: 'CONSULTANT', is_active: true, group_id: 'g-a' },
+        { id: 'u-cons-b', role: 'CONSULTANT', is_active: true, group_id: 'g-b' },
+      ],
+      recruiters: [
+        { id: 'r-a', user_id: 'u-rec-a', manager_id: null },
+        { id: 'r-b', user_id: 'u-rec-b', manager_id: null },
+      ],
+      recruiter_managers: [],
       consultants: [
-        { recruiter_id: 'r-1', user_id: 'u-consultant-1' },
-        { recruiter_id: 'r-1', user_id: 'u-consultant-2' },
+        { recruiter_id: 'r-a', user_id: 'u-cons-a' },
+        { recruiter_id: 'r-b', user_id: 'u-cons-b' },
       ],
     });
-    const ids = await getAccessibleUserIds({ id: 'u-recruiter', role: 'RECRUITER' });
-    expect(ids.has('u-consultant-1')).toBe(true);
-    expect(ids.has('u-consultant-2')).toBe(true);
-  });
+  }
 
-  it("recruiter CANNOT message another recruiter's consultant (consultants stay assignment-bound)", async () => {
-    setupDb({
-      users: [],
-      recruiters: [
-        { id: 'r-mine', user_id: 'u-recruiter', manager_id: null },
-        { id: 'r-other', user_id: 'u-other-recruiter', manager_id: null },
-      ],
-      consultants: [{ recruiter_id: 'r-other', user_id: 'u-other-consultant' }],
-    });
-    const ids = await getAccessibleUserIds({ id: 'u-recruiter', role: 'RECRUITER' });
-    expect(ids.has('u-other-consultant')).toBe(false);
-  });
-
-  it('recruiter can message ANY active staff user (managers, other recruiters, admins) org-wide', async () => {
-    setupDb({
-      users: [
-        { id: 'u-recruiter', role: 'RECRUITER', is_active: true },
-        { id: 'u-manager', role: 'MANAGER', is_active: true },
-        { id: 'u-hr', role: 'HR_MANAGER', is_active: true },
-        { id: 'u-other-recruiter', role: 'RECRUITER', is_active: true },
-        { id: 'u-director', role: 'DIRECTOR', is_active: true },
-        { id: 'u-inactive-mgr', role: 'MANAGER', is_active: false },
-        { id: 'u-some-consultant', role: 'CONSULTANT', is_active: true },
-      ],
-      recruiters: [{ id: 'r-1', user_id: 'u-recruiter', manager_id: null }],
-      consultants: [],
-    });
-    const ids = await getAccessibleUserIds({ id: 'u-recruiter', role: 'RECRUITER' });
-    // Any active staff (not just their manager) is reachable.
-    expect(ids.has('u-manager')).toBe(true);
-    expect(ids.has('u-hr')).toBe(true);
-    expect(ids.has('u-other-recruiter')).toBe(true);
-    expect(ids.has('u-director')).toBe(true);
-    // Inactive staff excluded; a consultant who isn't theirs is excluded.
-    expect(ids.has('u-inactive-mgr')).toBe(false);
-    expect(ids.has('u-some-consultant')).toBe(false);
-    // Self never appears.
-    expect(ids.has('u-recruiter')).toBe(false);
-  });
-
-  it('reverse: a non-managing MANAGER can view/reply to a recruiter-initiated thread', async () => {
-    // The recruiter reaches all staff (incl. this manager), so the manager must
-    // be able to read/reply even though the recruiter is not in their subtree.
-    setupDb({
-      users: [
-        { id: 'u-recruiter', role: 'RECRUITER', is_active: true },
-        { id: 'u-manager', role: 'MANAGER', is_active: true },
-      ],
-      recruiters: [{ id: 'r-1', user_id: 'u-recruiter', manager_id: null }],
-      recruiter_managers: [],
-      consultants: [],
-    });
-    const ok = await canMessageUser({ id: 'u-manager', role: 'MANAGER' }, 'u-recruiter');
+  it('MANAGER can chat with another MANAGER (any group)', async () => {
+    fixtureManagerScope();
+    const ok = await canMessageUser({ id: 'u-mgr-a', role: 'MANAGER', group_id: 'g-a' }, 'u-mgr-b');
     expect(ok).toBe(true);
   });
 
-  it('reverse does NOT let a consultant reach an arbitrary recruiter', async () => {
-    setupDb({
-      users: [
-        { id: 'u-recruiter', role: 'RECRUITER', is_active: true },
-        { id: 'u-consultant', role: 'CONSULTANT', is_active: true },
-      ],
-      consultants: [{ user_id: 'u-consultant', recruiter_id: 'r-other' }],
-      recruiters: [
-        { id: 'r-1', user_id: 'u-recruiter', manager_id: null },
-        { id: 'r-other', user_id: 'u-their-recruiter', manager_id: null },
-      ],
-      recruiter_managers: [],
-    });
-    // u-recruiter is not this consultant's recruiter; the recruiter's staff set
-    // excludes consultants, so neither direction grants access.
-    const ok = await canMessageUser({ id: 'u-consultant', role: 'CONSULTANT' }, 'u-recruiter');
-    expect(ok).toBe(false);
+  it('MANAGER can chat with an HR_MANAGER (any group)', async () => {
+    fixtureManagerScope();
+    expect(
+      await canMessageUser({ id: 'u-mgr-a', role: 'MANAGER', group_id: 'g-a' }, 'u-hr-b'),
+    ).toBe(true);
   });
 
-  it('reverse never makes an admin universally reachable', async () => {
-    // A consultant must NOT be able to message an admin just because the admin
-    // reaches everyone. The reverse check skips admin-tier targets.
+  it('MANAGER can chat with a DIRECTOR (admin leadership)', async () => {
+    fixtureManagerScope();
+    expect(await canMessageUser({ id: 'u-mgr-a', role: 'MANAGER', group_id: 'g-a' }, 'u-dir')).toBe(
+      true,
+    );
+  });
+
+  it('MANAGER can chat with a RECRUITER in their own group', async () => {
+    fixtureManagerScope();
+    expect(
+      await canMessageUser({ id: 'u-mgr-a', role: 'MANAGER', group_id: 'g-a' }, 'u-rec-a'),
+    ).toBe(true);
+  });
+
+  it('MANAGER can chat with a CONSULTANT in their own group', async () => {
+    fixtureManagerScope();
+    expect(
+      await canMessageUser({ id: 'u-mgr-a', role: 'MANAGER', group_id: 'g-a' }, 'u-cons-a'),
+    ).toBe(true);
+  });
+
+  it('MANAGER CANNOT chat with a CONSULTANT outside their group', async () => {
+    fixtureManagerScope();
+    expect(
+      await canMessageUser({ id: 'u-mgr-a', role: 'MANAGER', group_id: 'g-a' }, 'u-cons-b'),
+    ).toBe(false);
+  });
+
+  it('MANAGER CANNOT chat with a RECRUITER outside their group (unless via junction)', async () => {
+    fixtureManagerScope();
+    expect(
+      await canMessageUser({ id: 'u-mgr-a', role: 'MANAGER', group_id: 'g-a' }, 'u-rec-b'),
+    ).toBe(false);
+  });
+
+  it('cross-group exception: a manager assigned via recruiter_managers reaches that recruiter + their consultants', async () => {
     setupDb({
       users: [
-        { id: 'u-admin', role: 'SUPER_ADMIN', is_active: true },
-        { id: 'u-consultant', role: 'CONSULTANT', is_active: true },
+        { id: 'u-mgr-a', role: 'MANAGER', is_active: true, group_id: 'g-a' },
+        { id: 'u-rec-b', role: 'RECRUITER', is_active: true, group_id: 'g-b' },
+        { id: 'u-cons-b', role: 'CONSULTANT', is_active: true, group_id: 'g-b' },
       ],
-      consultants: [{ user_id: 'u-consultant', recruiter_id: 'r-1' }],
-      recruiters: [{ id: 'r-1', user_id: 'u-recruiter', manager_id: null }],
-      recruiter_managers: [],
+      recruiters: [{ id: 'r-b', user_id: 'u-rec-b', manager_id: null }],
+      recruiter_managers: [{ recruiter_id: 'r-b', manager_id: 'u-mgr-a' }],
+      consultants: [{ recruiter_id: 'r-b', user_id: 'u-cons-b' }],
     });
-    const ok = await canMessageUser({ id: 'u-consultant', role: 'CONSULTANT' }, 'u-admin');
-    expect(ok).toBe(false);
+    const ok = await canMessageUser({ id: 'u-mgr-a', role: 'MANAGER', group_id: 'g-a' }, 'u-rec-b');
+    const ok2 = await canMessageUser(
+      { id: 'u-mgr-a', role: 'MANAGER', group_id: 'g-a' },
+      'u-cons-b',
+    );
+    expect(ok).toBe(true);
+    expect(ok2).toBe(true);
+  });
+
+  it('group lead with NO group_id sees managers + admins but no recruiters/consultants (fail-closed group branch)', async () => {
+    fixtureManagerScope();
+    const ids = await getAccessibleUserIds({ id: 'u-mgr-a', role: 'MANAGER', group_id: null });
+    expect(ids.has('u-mgr-b')).toBe(true); // org-wide manager peer
+    expect(ids.has('u-dir')).toBe(true); // admin
+    expect(ids.has('u-rec-a')).toBe(false); // no group → no recruiters
+    expect(ids.has('u-cons-a')).toBe(false); // no group → no consultants
   });
 });
 
-describe('permission.service — consultant scope', () => {
-  it('consultant can message their assigned recruiter', async () => {
+// ─── RECRUITER scope ───────────────────────────────────────────────────────
+describe('recruiter scope', () => {
+  function fixtureRecruiterScope() {
     setupDb({
-      consultants: [{ user_id: 'u-consultant', recruiter_id: 'r-1' }],
-      recruiters: [{ id: 'r-1', user_id: 'u-recruiter', manager_id: null }],
-      recruiter_managers: [],
-    });
-    const ids = await getAccessibleUserIds({ id: 'u-consultant', role: 'CONSULTANT' });
-    expect(ids.has('u-recruiter')).toBe(true);
-  });
-
-  it("consultant cannot message another recruiter's users", async () => {
-    setupDb({
-      consultants: [{ user_id: 'u-consultant', recruiter_id: 'r-mine' }],
+      users: [
+        // Recruiters (org-wide reachable from any recruiter).
+        { id: 'u-rec-mine', role: 'RECRUITER', is_active: true, group_id: 'g-a' },
+        { id: 'u-rec-other', role: 'RECRUITER', is_active: true, group_id: 'g-b' },
+        // Admin tier.
+        { id: 'u-dir', role: 'DIRECTOR', is_active: true, group_id: null },
+        // Managers in own + other group.
+        { id: 'u-mgr-a', role: 'MANAGER', is_active: true, group_id: 'g-a' },
+        { id: 'u-hr-a', role: 'HR_MANAGER', is_active: true, group_id: 'g-a' },
+        { id: 'u-mgr-b', role: 'MANAGER', is_active: true, group_id: 'g-b' },
+      ],
       recruiters: [
-        { id: 'r-mine', user_id: 'u-my-recruiter', manager_id: null },
-        { id: 'r-other', user_id: 'u-other-recruiter', manager_id: null },
+        { id: 'r-mine', user_id: 'u-rec-mine', manager_id: null },
+        { id: 'r-other', user_id: 'u-rec-other', manager_id: null },
       ],
       recruiter_managers: [],
+      consultants: [
+        { recruiter_id: 'r-mine', user_id: 'u-cons-mine' },
+        { recruiter_id: 'r-other', user_id: 'u-cons-other' },
+      ],
     });
-    const ids = await getAccessibleUserIds({ id: 'u-consultant', role: 'CONSULTANT' });
-    expect(ids.has('u-my-recruiter')).toBe(true);
-    expect(ids.has('u-other-recruiter')).toBe(false);
+  }
+
+  it('RECRUITER can chat with another RECRUITER (any group)', async () => {
+    fixtureRecruiterScope();
+    expect(
+      await canMessageUser({ id: 'u-rec-mine', role: 'RECRUITER', group_id: 'g-a' }, 'u-rec-other'),
+    ).toBe(true);
+  });
+
+  it('RECRUITER can chat with their own manager / HR chain (managers in own group)', async () => {
+    fixtureRecruiterScope();
+    expect(
+      await canMessageUser({ id: 'u-rec-mine', role: 'RECRUITER', group_id: 'g-a' }, 'u-mgr-a'),
+    ).toBe(true);
+    expect(
+      await canMessageUser({ id: 'u-rec-mine', role: 'RECRUITER', group_id: 'g-a' }, 'u-hr-a'),
+    ).toBe(true);
+  });
+
+  it('RECRUITER can chat with admin leadership (upward)', async () => {
+    fixtureRecruiterScope();
+    expect(
+      await canMessageUser({ id: 'u-rec-mine', role: 'RECRUITER', group_id: 'g-a' }, 'u-dir'),
+    ).toBe(true);
+  });
+
+  it('RECRUITER can chat with their own assigned consultant', async () => {
+    fixtureRecruiterScope();
+    expect(
+      await canMessageUser({ id: 'u-rec-mine', role: 'RECRUITER', group_id: 'g-a' }, 'u-cons-mine'),
+    ).toBe(true);
+  });
+
+  it("RECRUITER CANNOT chat with another recruiter's consultant", async () => {
+    fixtureRecruiterScope();
+    expect(
+      await canMessageUser(
+        { id: 'u-rec-mine', role: 'RECRUITER', group_id: 'g-a' },
+        'u-cons-other',
+      ),
+    ).toBe(false);
+  });
+
+  it('RECRUITER CANNOT chat with an out-of-group manager (not assigned, not in own group)', async () => {
+    fixtureRecruiterScope();
+    expect(
+      await canMessageUser({ id: 'u-rec-mine', role: 'RECRUITER', group_id: 'g-a' }, 'u-mgr-b'),
+    ).toBe(false);
+  });
+
+  it('RECRUITER reaches their assigned manager via recruiter_managers junction even when out-of-group', async () => {
+    setupDb({
+      users: [
+        { id: 'u-rec-mine', role: 'RECRUITER', is_active: true, group_id: 'g-a' },
+        { id: 'u-mgr-b', role: 'MANAGER', is_active: true, group_id: 'g-b' },
+      ],
+      recruiters: [{ id: 'r-mine', user_id: 'u-rec-mine', manager_id: null }],
+      recruiter_managers: [{ recruiter_id: 'r-mine', manager_id: 'u-mgr-b' }],
+      consultants: [],
+    });
+    const ok = await canMessageUser(
+      { id: 'u-rec-mine', role: 'RECRUITER', group_id: 'g-a' },
+      'u-mgr-b',
+    );
+    expect(ok).toBe(true);
   });
 });
 
-describe('permission.service — strict assignment only (no reports_to, no prior-thread)', () => {
+// ─── CONSULTANT scope ──────────────────────────────────────────────────────
+describe('consultant scope', () => {
+  function fixtureConsultantScope() {
+    setupDb({
+      users: [
+        { id: 'u-cons', role: 'CONSULTANT', is_active: true, group_id: 'g-a' },
+        { id: 'u-my-rec', role: 'RECRUITER', is_active: true, group_id: 'g-a' },
+        { id: 'u-mgr-a', role: 'MANAGER', is_active: true, group_id: 'g-a' },
+        { id: 'u-hr-a', role: 'HR_MANAGER', is_active: true, group_id: 'g-a' },
+        { id: 'u-other-rec', role: 'RECRUITER', is_active: true, group_id: 'g-b' },
+        { id: 'u-other-cons', role: 'CONSULTANT', is_active: true, group_id: 'g-b' },
+      ],
+      consultants: [{ user_id: 'u-cons', recruiter_id: 'r-mine' }],
+      recruiters: [
+        { id: 'r-mine', user_id: 'u-my-rec', manager_id: 'u-mgr-a' },
+        { id: 'r-other', user_id: 'u-other-rec', manager_id: null },
+      ],
+      recruiter_managers: [],
+    });
+  }
+
+  it('CONSULTANT can chat with their assigned recruiter', async () => {
+    fixtureConsultantScope();
+    expect(
+      await canMessageUser({ id: 'u-cons', role: 'CONSULTANT', group_id: 'g-a' }, 'u-my-rec'),
+    ).toBe(true);
+  });
+
+  it("CONSULTANT can chat with their recruiter's manager chain", async () => {
+    fixtureConsultantScope();
+    expect(
+      await canMessageUser({ id: 'u-cons', role: 'CONSULTANT', group_id: 'g-a' }, 'u-mgr-a'),
+    ).toBe(true);
+  });
+
+  it('CONSULTANT can chat with the HR_MANAGER in their group (in-group manager-tier)', async () => {
+    fixtureConsultantScope();
+    expect(
+      await canMessageUser({ id: 'u-cons', role: 'CONSULTANT', group_id: 'g-a' }, 'u-hr-a'),
+    ).toBe(true);
+  });
+
+  it('CONSULTANT CANNOT chat with an unrelated recruiter', async () => {
+    fixtureConsultantScope();
+    expect(
+      await canMessageUser({ id: 'u-cons', role: 'CONSULTANT', group_id: 'g-a' }, 'u-other-rec'),
+    ).toBe(false);
+  });
+
+  it('CONSULTANT CANNOT chat with another consultant', async () => {
+    fixtureConsultantScope();
+    expect(
+      await canMessageUser({ id: 'u-cons', role: 'CONSULTANT', group_id: 'g-a' }, 'u-other-cons'),
+    ).toBe(false);
+  });
+});
+
+// ─── DEVELOPER ─────────────────────────────────────────────────────────────
+describe('developer — no chat by default', () => {
+  it('DEVELOPER has an empty accessible set', async () => {
+    setupDb({
+      users: [
+        { id: 'u-dir', role: 'DIRECTOR', is_active: true },
+        { id: 'u-rec', role: 'RECRUITER', is_active: true },
+      ],
+    });
+    const ids = await getAccessibleUserIds({ id: 'u-dev', role: 'DEVELOPER', group_id: null });
+    expect(ids.size).toBe(0);
+  });
+
+  it('DEVELOPER cannot message anyone (capability grants are for admin surfaces, not chat)', async () => {
+    expect(await canMessageUser({ id: 'u-dev', role: 'DEVELOPER', group_id: null }, 'u-rec')).toBe(
+      false,
+    );
+  });
+});
+
+// ─── Strict assignment-only (no reports_to, no prior-thread) ───────────────
+describe('strict assignment + group only', () => {
   it('reports_to chain is ignored — consultant with no assignment sees nobody', async () => {
-    // Even though u-me has a reports_to boss and direct reports, those are
-    // NOT messaging permissions. Only the recruiter assignment matters.
     setupDb({
       recruiters: [],
       recruiter_managers: [],
       consultants: [{ user_id: 'u-me', recruiter_id: null }],
       users: [
-        { id: 'u-me', reports_to: 'u-boss' },
-        { id: 'u-boss', reports_to: null },
-        { id: 'u-report-1', reports_to: 'u-me' },
+        { id: 'u-me', reports_to: 'u-boss', group_id: null },
+        { id: 'u-boss', reports_to: null, role: 'MANAGER', is_active: true, group_id: null },
+        { id: 'u-report', reports_to: 'u-me', role: 'CONSULTANT', is_active: true, group_id: null },
       ],
     });
-    const ids = await getAccessibleUserIds({ id: 'u-me', role: 'CONSULTANT' });
-    // reports_to boss is NOT reachable — not an assignment relationship
+    const ids = await getAccessibleUserIds({ id: 'u-me', role: 'CONSULTANT', group_id: null });
     expect(ids.has('u-boss')).toBe(false);
-    // Direct reports are NOT reachable — not an assignment relationship
-    expect(ids.has('u-report-1')).toBe(false);
-    expect(ids.has('u-me')).toBe(false);
+    expect(ids.has('u-report')).toBe(false);
   });
 
   it('prior messages do NOT grant ongoing access — assignment is the only gate', async () => {
-    // Consultant is assigned to r-mine. They previously messaged u-stranger.
-    // u-stranger must still be unreachable because the assignment changed.
     setupDb({
-      consultants: [{ user_id: 'u-consultant', recruiter_id: 'r-mine' }],
-      recruiters: [{ id: 'r-mine', user_id: 'u-recruiter', manager_id: null }],
+      consultants: [{ user_id: 'u-cons', recruiter_id: 'r-mine' }],
+      recruiters: [{ id: 'r-mine', user_id: 'u-my-rec', manager_id: null }],
       recruiter_managers: [],
-      // Even if messages table had rows between consultant and stranger,
-      // we no longer query it — so it doesn't matter.
+      users: [],
     });
-    const ids = await getAccessibleUserIds({ id: 'u-consultant', role: 'CONSULTANT' });
-    expect(ids.has('u-recruiter')).toBe(true);
+    const ids = await getAccessibleUserIds({ id: 'u-cons', role: 'CONSULTANT', group_id: 'g-a' });
+    expect(ids.has('u-my-rec')).toBe(true);
     expect(ids.has('u-stranger')).toBe(false);
   });
 });
 
-describe('permission.service — cache behavior', () => {
+// ─── Cache behaviour ───────────────────────────────────────────────────────
+describe('permission cache', () => {
   it('second call uses cached result without re-querying', async () => {
-    setupDb({
-      users: [{ id: 'u-x', is_active: true }],
-    });
+    setupDb({ users: [{ id: 'u-x', is_active: true }] });
     const ids1 = await getAccessibleUserIds({ id: 'u-admin', role: 'SUPER_ADMIN' });
-    expect(ids1.has('u-x')).toBe(true);
-
-    // Clear handler — if cache works, the result is still correct.
     mock.handlers.clear();
     const ids2 = await getAccessibleUserIds({ id: 'u-admin', role: 'SUPER_ADMIN' });
+    expect(ids2).toBe(ids1); // identity-equal → cache hit
     expect(ids2.has('u-x')).toBe(true);
-    // Same reference confirms cache hit, not just same content.
-    expect(ids2).toBe(ids1);
   });
 
   it('invalidatePermissionCache clears entries for that user', async () => {
-    setupDb({
-      users: [{ id: 'u-x', is_active: true }],
-    });
+    setupDb({ users: [{ id: 'u-x', is_active: true }] });
     await getAccessibleUserIds({ id: 'u-admin', role: 'SUPER_ADMIN' });
-
     invalidatePermissionCache('u-admin');
-
-    // Now change the underlying data and re-query — must re-fetch because
-    // we just invalidated.
-    setupDb({
-      users: [{ id: 'u-y', is_active: true }],
-    });
+    setupDb({ users: [{ id: 'u-y', is_active: true }] });
     const ids = await getAccessibleUserIds({ id: 'u-admin', role: 'SUPER_ADMIN' });
     expect(ids.has('u-y')).toBe(true);
     expect(ids.has('u-x')).toBe(false);
   });
 
-  it('clearPermissionCache wipes everything', async () => {
-    setupDb({ users: [{ id: 'u-x', is_active: true }] });
-    await getAccessibleUserIds({ id: 'u-a', role: 'SUPER_ADMIN' });
-    await getAccessibleUserIds({ id: 'u-b', role: 'CEO' });
-
-    clearPermissionCache();
-    setupDb({ users: [{ id: 'u-y', is_active: true }] });
-    const ids = await getAccessibleUserIds({ id: 'u-a', role: 'SUPER_ADMIN' });
-    expect(ids.has('u-y')).toBe(true);
+  it('cache key includes group_id so a re-grouped user gets a fresh resolution', async () => {
+    setupDb({
+      users: [
+        { id: 'u-rec-a', role: 'RECRUITER', is_active: true, group_id: 'g-a' },
+        { id: 'u-mgr-a', role: 'MANAGER', is_active: true, group_id: 'g-a' },
+        { id: 'u-mgr-b', role: 'MANAGER', is_active: true, group_id: 'g-b' },
+      ],
+      recruiters: [{ id: 'r-mine', user_id: 'u-me', manager_id: null }],
+      recruiter_managers: [],
+      consultants: [],
+    });
+    const inA = await getAccessibleUserIds({ id: 'u-me', role: 'RECRUITER', group_id: 'g-a' });
+    const inB = await getAccessibleUserIds({ id: 'u-me', role: 'RECRUITER', group_id: 'g-b' });
+    expect(inA.has('u-mgr-a')).toBe(true);
+    expect(inA.has('u-mgr-b')).toBe(false);
+    expect(inB.has('u-mgr-b')).toBe(true);
+    expect(inB.has('u-mgr-a')).toBe(false);
   });
 });
 
-describe('permission.service — canViewConversation alias', () => {
+// ─── canViewConversation alias ─────────────────────────────────────────────
+describe('canViewConversation alias', () => {
   it('behaves identically to canMessageUser', async () => {
-    setupDb({
-      users: [{ id: 'u-target', is_active: true }],
-    });
-    const a = await canMessageUser({ id: 'u-admin', role: 'SUPER_ADMIN' }, 'u-target');
-    const b = await canViewConversation({ id: 'u-admin', role: 'SUPER_ADMIN' }, 'u-target');
+    setupDb({ users: [{ id: 'u-target', is_active: true }] });
+    const a = await canMessageUser({ id: 'u-sa', role: 'SUPER_ADMIN' }, 'u-target');
+    const b = await canViewConversation({ id: 'u-sa', role: 'SUPER_ADMIN' }, 'u-target');
     expect(a).toBe(b);
   });
 });

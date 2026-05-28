@@ -1,58 +1,74 @@
 /**
  * Centralized permission engine for hierarchy-aware messaging.
  *
- * Single source of truth for "can user A reach user B?" — every controller
- * that needs the answer calls into this module. Keeping the rules here means
- * directory, send, thread, and read endpoints stay in lockstep automatically.
+ * Single source of truth for "can user A reach user B?" — every controller that
+ * needs the answer calls into this module. Directory, send, thread fetch, and
+ * read-receipt endpoints all go through the same engine so they cannot drift.
  *
- * Permission model (strict role + assignment only):
+ * Final policy (mirrors the product spec verbatim):
  *
- *   ADMIN_TIER (SUPER_ADMIN, CEO, CTO, DIRECTOR)
- *     → every active user in the workspace
+ *   SUPER_ADMIN / CEO / CTO / DIRECTOR (ADMIN_TIER)
+ *     → every active user in the workspace.
  *
- *   SUB_MANAGER (MANAGER, HR_MANAGER) — the group leads
- *     → admin-tier users (upward escalation)
- *     → recruiters they directly manage (recruiter_managers + legacy manager_id)
- *     → consultants of those recruiters
+ *   HR_MANAGER / MANAGER (functionally one "group lead" tier)
+ *     → every other MANAGER and HR_MANAGER (org-wide peer chat).
+ *     → admin tier (upward leadership).
+ *     → recruiters in their OWN GROUP (users.group_id).
+ *     → consultants in their OWN GROUP (consultant.user.group_id, which by
+ *       the Phase 14 consultant↔recruiter invariant matches the recruiter's
+ *       group).
+ *     → recruiters they manage via recruiter_managers + the legacy single-
+ *       manager_id column, plus those recruiters' consultants — preserves
+ *       cross-group supervisor relationships.
+ *     A group lead with NO group_id sees no recruiters/consultants from the
+ *     group branch (fail-closed); the org-wide peer + admin branches still
+ *     apply.
  *
- *   DEVELOPER holds NO default messaging visibility — it is a scoped super-admin
- *   whose access comes only from explicit capability grants, none of which is a
- *   messaging/visibility grant. So a DEVELOPER sees nobody here by default.
- *
- *   RECRUITER (org-wide staff chat — product decision)
- *     → every active STAFF user (OPERATOR_TIER: recruiters, group leads, admins)
- *     → their own assigned consultants (consultants.recruiter_id)
- *     Consultants who are not theirs are NOT reachable — consultants stay
- *     assignment-bound. The recipient side is handled by the reverse check in
- *     canMessageUser so staff can read/reply to a recruiter-initiated thread.
+ *   RECRUITER
+ *     → every other RECRUITER (org-wide peer chat).
+ *     → admin tier (upward).
+ *     → own manager / HR-manager / reporting chain: their assigned managers
+ *       (recruiter_managers + legacy) AND manager-tier users in their OWN
+ *       GROUP (the in-group reporting chain).
+ *     → their own assigned consultants.
+ *     NEVER consultants assigned to other recruiters.
  *
  *   CONSULTANT
- *     → their assigned recruiter
- *     → that recruiter's managers
+ *     → their assigned recruiter.
+ *     → that recruiter's manager / HR chain (assigned managers via junction +
+ *       manager-tier users in the consultant's own group).
+ *     NEVER other consultants, NEVER unrelated recruiters.
  *
- * No reports_to chain — that is an HR org-chart field, not an assignment.
- * No prior-thread legitimacy — permissions are always current-assignment only.
- * If a consultant is reassigned to a different recruiter, their old recruiter
- * immediately loses access and the new one gains it.
+ *   DEVELOPER
+ *     → no chat by default. Capability grants are for admin surfaces, not
+ *       messaging.
+ *
+ * Strict assignment + group only — no reports_to chain, no prior-thread
+ * carry-over. If a reassignment removes a relationship, the in-flight thread
+ * immediately becomes unreachable (fail-closed).
+ *
+ * The per-role rules above are designed to be EXPLICITLY BIDIRECTIONAL — a
+ * manager sees their in-group recruiter and that recruiter sees the manager
+ * via their in-group chain. canMessageUser therefore does a forward check
+ * only; a reverse fallback would over-broaden (e.g. let any consultant
+ * message any admin because the admin's set is everyone).
  */
 
 import { db } from '../config/db';
 import { logger } from '../config/logger';
-import { ADMIN_TIER, OPERATOR_TIER, type Role } from '../types';
+import { ADMIN_TIER, type Role } from '../types';
 
 const ADMIN_ROLES = ADMIN_TIER as readonly Role[];
-// Staff roles (operators) — every business role EXCEPT CONSULTANT and DEVELOPER.
-// A recruiter may chat with all active staff org-wide; consultants are NOT in
-// this set, so they stay assignment-bound on both sides.
-const STAFF_ROLES = OPERATOR_TIER as readonly Role[];
-// Group leads only. DEVELOPER is intentionally excluded — it has no default
-// business visibility (capability-gated elsewhere), so it falls through to the
-// empty peer set below.
-const SUB_MGR_ROLES: Role[] = ['MANAGER', 'HR_MANAGER'];
+// Group-lead tier — HR_MANAGER and MANAGER are functionally one role for
+// messaging purposes (both lead groups; both reach each other org-wide).
+const MANAGER_LIKE: Role[] = ['MANAGER', 'HR_MANAGER'];
 
 export interface PermissionCaller {
   id: string;
   role: Role;
+  /** Required for group-scoped branches (HR_MANAGER/MANAGER, RECRUITER, CONSULTANT).
+   *  Admin-tier ignores this field — they reach every active user regardless. */
+  group_id?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -66,7 +82,9 @@ const TTL_MS = 30_000;
 const cache = new Map<string, CacheEntry>();
 
 function cacheKey(caller: PermissionCaller): string {
-  return `${caller.role}:${caller.id}`;
+  // group_id is part of the key so a re-grouped user gets a fresh resolution
+  // on the next call without waiting for the TTL.
+  return `${caller.role}:${caller.id}:${caller.group_id ?? ''}`;
 }
 
 function cacheGet(caller: PermissionCaller): Set<string> | null {
@@ -89,14 +107,12 @@ function cacheSet(caller: PermissionCaller, ids: Set<string>): void {
   }
 }
 
-/**
- * Drop the cached accessible-user set for a single user. Call from any code
- * path that mutates the user's hierarchy: recruiter assignment, manager
- * assignment, role change, deactivation, etc.
- */
+/** Drop the cached accessible-user set for a single user. Call from any mutation
+ *  that changes the user's hierarchy: recruiter assignment, manager assignment,
+ *  role change, group change, deactivation. */
 export function invalidatePermissionCache(userId: string): void {
   for (const key of cache.keys()) {
-    if (key.endsWith(`:${userId}`)) cache.delete(key);
+    if (key.split(':')[1] === userId) cache.delete(key);
   }
 }
 
@@ -106,9 +122,8 @@ export function clearPermissionCache(): void {
 }
 
 /**
- * Returns the set of user IDs the caller is permitted to message.
- * Permissions are based solely on role and current assignment — no org-chart
- * (reports_to) chain and no prior-thread carry-over.
+ * Returns the set of user ids the caller is permitted to message. Pure forward
+ * lookup; canMessageUser does NOT do a reverse check.
  */
 export async function getAccessibleUserIds(caller: PermissionCaller): Promise<Set<string>> {
   const cached = cacheGet(caller);
@@ -128,11 +143,9 @@ export async function getAccessibleUserIds(caller: PermissionCaller): Promise<Se
 
   const peerIds = new Set<string>();
 
-  // ── SUB_MANAGER (MANAGER, HR_MANAGER, DEVELOPER) ─────────────────────────
-  // Sees: admins above them + their assigned recruiters + those recruiters'
-  // consultants. Two managers' subtrees are fully isolated from each other.
-  if (SUB_MGR_ROLES.includes(caller.role)) {
-    // Admin-tier users are always reachable (upward escalation path).
+  // ── MANAGER / HR_MANAGER (group leads) ────────────────────────────────────
+  if (MANAGER_LIKE.includes(caller.role)) {
+    // 1. Admin tier (upward leadership).
     const { data: admins } = await db
       .from('users')
       .select('id')
@@ -140,7 +153,31 @@ export async function getAccessibleUserIds(caller: PermissionCaller): Promise<Se
       .neq('is_active', false);
     for (const a of (admins ?? []) as Array<{ id: string }>) peerIds.add(a.id);
 
-    // Recruiters this manager directly manages — legacy single manager_id column.
+    // 2. Org-wide peer chat — every other MANAGER and HR_MANAGER.
+    const { data: peers } = await db
+      .from('users')
+      .select('id')
+      .in('role', MANAGER_LIKE as unknown as string[])
+      .neq('is_active', false);
+    for (const p of (peers ?? []) as Array<{ id: string }>) peerIds.add(p.id);
+
+    // 3. Group-scoped: recruiters + consultants in OWN GROUP.
+    //    A lead with no group_id is fail-closed here (peers + admins still
+    //    reachable above, but no group surface — matches groupScope semantics).
+    if (caller.group_id) {
+      const { data: groupMembers } = await db
+        .from('users')
+        .select('id')
+        .eq('group_id', caller.group_id)
+        .in('role', ['RECRUITER', 'CONSULTANT'])
+        .neq('is_active', false);
+      for (const u of (groupMembers ?? []) as Array<{ id: string }>) peerIds.add(u.id);
+    }
+
+    // 4. Cross-group exception: recruiters this manager supervises via the
+    //    recruiter_managers junction or the legacy recruiters.manager_id
+    //    column, PLUS those recruiters' consultants. Lets a manager who is
+    //    assigned as a supervisor across groups still reach those people.
     const { data: legacyRecs } = await db
       .from('recruiters')
       .select('id, user_id')
@@ -150,8 +187,6 @@ export async function getAccessibleUserIds(caller: PermissionCaller): Promise<Se
       recruiterRowIds.add(r.id);
       if (r.user_id) peerIds.add(r.user_id);
     }
-
-    // Many-to-many junction (canonical for newer rows).
     const { data: junctionRecs } = await db
       .from('recruiter_managers')
       .select('recruiter_id')
@@ -172,8 +207,6 @@ export async function getAccessibleUserIds(caller: PermissionCaller): Promise<Se
         }
       }
     }
-
-    // Consultants of all those recruiters.
     if (recruiterRowIds.size > 0) {
       const { data: cons } = await db
         .from('consultants')
@@ -186,26 +219,41 @@ export async function getAccessibleUserIds(caller: PermissionCaller): Promise<Se
   }
 
   // ── RECRUITER ─────────────────────────────────────────────────────────────
-  // Org-wide STAFF chat (product decision): a recruiter may message every active
-  // staff user (OPERATOR_TIER — recruiters, group leads, admins), PLUS their own
-  // assigned consultants. Consultants who are NOT theirs are intentionally
-  // excluded so consultants stay assignment-bound on both sides.
   if (caller.role === 'RECRUITER') {
-    const { data: staff } = await db
+    // 1. Admin tier (upward).
+    const { data: admins } = await db
       .from('users')
       .select('id')
-      .in('role', STAFF_ROLES as unknown as string[])
+      .in('role', ADMIN_ROLES as unknown as string[])
       .neq('is_active', false);
-    for (const u of (staff ?? []) as Array<{ id: string }>) peerIds.add(u.id);
+    for (const a of (admins ?? []) as Array<{ id: string }>) peerIds.add(a.id);
 
-    // Plus this recruiter's own assigned consultants.
+    // 2. Org-wide peer chat — every other RECRUITER.
+    const { data: recs } = await db
+      .from('users')
+      .select('id')
+      .eq('role', 'RECRUITER')
+      .neq('is_active', false);
+    for (const r of (recs ?? []) as Array<{ id: string }>) peerIds.add(r.id);
+
+    // 3. Own reporting chain: assigned manager(s) via recruiter_managers
+    //    junction + the legacy single-manager column.
     const { data: myRec } = await db
       .from('recruiters')
-      .select('id')
+      .select('id, manager_id')
       .eq('user_id', caller.id)
       .maybeSingle();
-    const recRow = myRec as { id?: string } | null;
+    const recRow = myRec as { id?: string; manager_id?: string | null } | null;
     if (recRow?.id) {
+      if (recRow.manager_id) peerIds.add(recRow.manager_id);
+      const { data: mgrs } = await db
+        .from('recruiter_managers')
+        .select('manager_id')
+        .eq('recruiter_id', recRow.id);
+      for (const m of (mgrs ?? []) as Array<{ manager_id: string }>) {
+        if (m.manager_id) peerIds.add(m.manager_id);
+      }
+      // Own consultants.
       const { data: cons } = await db
         .from('consultants')
         .select('user_id')
@@ -214,10 +262,22 @@ export async function getAccessibleUserIds(caller: PermissionCaller): Promise<Se
         if (c.user_id) peerIds.add(c.user_id);
       }
     }
+
+    // 4. In-group manager-tier — covers managers/HR who lead the recruiter's
+    //    group but aren't named via recruiter_managers (the bidirectional
+    //    counterpart to "manager sees in-group recruiters").
+    if (caller.group_id) {
+      const { data: groupMgrs } = await db
+        .from('users')
+        .select('id')
+        .eq('group_id', caller.group_id)
+        .in('role', MANAGER_LIKE as unknown as string[])
+        .neq('is_active', false);
+      for (const m of (groupMgrs ?? []) as Array<{ id: string }>) peerIds.add(m.id);
+    }
   }
 
   // ── CONSULTANT ────────────────────────────────────────────────────────────
-  // Sees: their assigned recruiter + that recruiter's managers only.
   if (caller.role === 'CONSULTANT') {
     const { data: me } = await db
       .from('consultants')
@@ -231,24 +291,38 @@ export async function getAccessibleUserIds(caller: PermissionCaller): Promise<Se
         .select('id, user_id, manager_id')
         .eq('id', cRow.recruiter_id)
         .maybeSingle();
-      const recRow = rec as {
+      const recRow2 = rec as {
         id?: string;
         user_id?: string | null;
         manager_id?: string | null;
       } | null;
-      if (recRow?.user_id) peerIds.add(recRow.user_id);
-      if (recRow?.manager_id) peerIds.add(recRow.manager_id);
-      if (recRow?.id) {
+      if (recRow2?.user_id) peerIds.add(recRow2.user_id);
+      if (recRow2?.manager_id) peerIds.add(recRow2.manager_id);
+      if (recRow2?.id) {
         const { data: mgrs } = await db
           .from('recruiter_managers')
           .select('manager_id')
-          .eq('recruiter_id', recRow.id);
+          .eq('recruiter_id', recRow2.id);
         for (const m of (mgrs ?? []) as Array<{ manager_id: string }>) {
           if (m.manager_id) peerIds.add(m.manager_id);
         }
       }
     }
+    // Plus manager-tier users in the consultant's own group — covers the HR/
+    // manager who leads the group even when not named via recruiter_managers.
+    // By the Phase 14 invariant the consultant's group equals their recruiter's.
+    if (caller.group_id) {
+      const { data: groupMgrs } = await db
+        .from('users')
+        .select('id')
+        .eq('group_id', caller.group_id)
+        .in('role', MANAGER_LIKE as unknown as string[])
+        .neq('is_active', false);
+      for (const m of (groupMgrs ?? []) as Array<{ id: string }>) peerIds.add(m.id);
+    }
   }
+
+  // DEVELOPER: no chat by default — the role falls through to the empty set.
 
   peerIds.delete(caller.id);
   cacheSet(caller, peerIds);
@@ -256,8 +330,10 @@ export async function getAccessibleUserIds(caller: PermissionCaller): Promise<Se
 }
 
 /**
- * Cheaper variant when the caller only needs to check ONE target id.
- * Falls back to `getAccessibleUserIds` — no prior-thread fast-path.
+ * One-target convenience check. Pure forward lookup — the per-role rules in
+ * getAccessibleUserIds are explicitly bidirectional, so a reverse fallback
+ * would only over-broaden (e.g. let any consultant message any admin because
+ * the admin's accessible set is "everyone").
  */
 export async function canMessageUser(caller: PermissionCaller, targetId: string): Promise<boolean> {
   if (!targetId || caller.id === targetId) return false;
@@ -271,39 +347,15 @@ export async function canMessageUser(caller: PermissionCaller, targetId: string)
     return !!t?.id && t.is_active !== false;
   }
   const allowed = await getAccessibleUserIds(caller);
-  if (allowed.has(targetId)) return true;
-
-  // Reverse direction. A conversation needs BOTH participants to be able to view
-  // it, so if the target is permitted to open a thread with the caller, the
-  // caller may view/reply too (e.g. a recruiter with org-wide staff reach
-  // messaged this user — the recipient must be able to read and reply).
-  //
-  // We deliberately do NOT grant reverse access when the target is admin-tier:
-  // an admin's accessible set is "everyone", so a symmetric admin rule would let
-  // any user message any admin. Admins still initiate to anyone (above); they
-  // are reached only by users who already have them in their forward set.
-  const { data } = await db
-    .from('users')
-    .select('role, is_active')
-    .eq('id', targetId)
-    .maybeSingle();
-  const t = data as { role?: Role; is_active?: boolean | null } | null;
-  if (!t?.role || t.is_active === false) return false;
-  if (ADMIN_ROLES.includes(t.role)) return false;
-  const reverse = await getAccessibleUserIds({ id: targetId, role: t.role });
-  return reverse.has(caller.id);
+  return allowed.has(targetId);
 }
 
-/**
- * Alias — viewing a user requires the same permission as messaging them.
- */
+/** Alias — viewing a user requires the same permission as messaging them. */
 export async function canViewUser(caller: PermissionCaller, targetId: string): Promise<boolean> {
   return canMessageUser(caller, targetId);
 }
 
-/**
- * Alias — starting a conversation IS messaging them; same check.
- */
+/** Alias — starting a conversation IS messaging them; same check. */
 export async function canStartConversation(
   caller: PermissionCaller,
   targetId: string,
@@ -311,9 +363,7 @@ export async function canStartConversation(
   return canMessageUser(caller, targetId);
 }
 
-/**
- * Alias for thread-fetch callsites — same permission as messaging.
- */
+/** Alias for thread-fetch callsites — same permission as messaging. */
 export async function canViewConversation(
   caller: PermissionCaller,
   peerId: string,

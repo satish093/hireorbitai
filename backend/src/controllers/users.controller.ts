@@ -46,12 +46,15 @@ function isManagerTier(role: Role | undefined): boolean {
  *   - Everyone else: only users reachable via their permission group
  *     (same isolation rules as messaging — own recruiter/consultants chain). */
 async function canViewProfile(
-  caller: { id: string; role: Role },
+  caller: { id: string; role: Role; group_id?: string | null },
   targetUserId: string,
 ): Promise<boolean> {
   if (caller.id === targetUserId) return true;
   if ((ADMIN_TIER as Role[]).includes(caller.role)) return true;
-  return canViewUser({ id: caller.id, role: caller.role }, targetUserId);
+  return canViewUser(
+    { id: caller.id, role: caller.role, group_id: caller.group_id ?? null },
+    targetUserId,
+  );
 }
 
 /** Can the calling user edit the target user's profile (role-level gate)?
