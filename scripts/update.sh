@@ -35,6 +35,26 @@ if ! git diff --quiet || ! git diff --cached --quiet; then
   git checkout -- .
 fi
 
+# Untracked migration / SQL files would also block `git pull --ff-only` if
+# the same path lands in the next commit (which is exactly what happens
+# when a migration file is created on the VPS during a previous failed
+# deploy attempt — node-pg-migrate's create-migration step writes the
+# file before the SQL inside is finalised). These directories should
+# only ever contain repo-tracked content, so it's safe to nuke any
+# untracked stragglers. `.env` and other secrets live outside these
+# paths and are NOT touched.
+for protected in backend/migrations database; do
+  if [[ -d "$protected" ]]; then
+    untracked=$(git ls-files --others --exclude-standard -- "$protected" || true)
+    if [[ -n "$untracked" ]]; then
+      echo "→ removing untracked files under $protected/ (would block git pull):"
+      echo "$untracked" | sed 's/^/    /'
+      # -x in case .gitignore would have kept them; -d only removes empty dirs.
+      git clean -fxd -- "$protected"
+    fi
+  fi
+done
+
 echo "→ git fetch && pull (ff-only)"
 git fetch --tags --prune
 git pull --ff-only
