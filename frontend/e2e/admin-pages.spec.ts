@@ -320,7 +320,7 @@ test.describe('Recruiters page', () => {
     expect(errors).toHaveLength(0);
   });
 
-  test('Manage supervisors button opens modal', async ({ page }) => {
+  test('Supervisors button opens modal', async ({ page }) => {
     const errors = trackPageErrors(page);
 
     await managerSetup(page, {
@@ -329,7 +329,7 @@ test.describe('Recruiters page', () => {
     await page.goto('/recruiters');
     await page.waitForLoadState('networkidle');
 
-    const manageBtn = page.getByRole('button', { name: /manage supervisors/i }).first();
+    const manageBtn = page.getByRole('button', { name: /^supervisors$/i }).first();
     await manageBtn.waitFor({ timeout: 8000 });
     await manageBtn.click();
 
