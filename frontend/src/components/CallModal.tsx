@@ -7,17 +7,13 @@
  *   connected — full-screen with avatar, live timer, mute + end controls
  *   ended     — brief "Call ended" banner before fading
  *
- * Critical reliability fix from the previous build:
- *   The remote audio is bound to a real <audio autoPlay> element. The earlier
- *   version reused the <video> element with `className="hidden"` for audio
- *   calls — `display:none` blocks autoplay in Safari and several Chrome
- *   versions, producing the "no voice" bug after answer/connect.
+ * The remote-audio sink lives in CallProvider (not here) so it survives
+ * every modal mount cycle. The modal only renders presentation + controls.
  *
  * Portaled to document.body so the fullscreen overlay is viewport-relative,
  * not relative to the transformed <main> (see frontend-responsive rules).
  */
 
-import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import clsx from 'clsx';
 import { Avatar } from './TaskBits';
@@ -28,96 +24,37 @@ interface CallModalProps {
   status: CallStatus;
   peer: { id: string; full_name?: string | null; email: string } | null;
   incomingCall: UseCallReturn['incomingCall'];
-  remoteStream: MediaStream | null;
   isMuted: boolean;
   callDurationLabel: string;
+  /** True when browser autoplay blocked the remote stream; show "Tap to hear". */
+  needsAudioTap: boolean;
   onAccept: () => void;
   onReject: () => void;
   onEnd: () => void;
   onToggleMute: () => void;
+  onRetryPlay: () => void;
 }
 
 export function CallModal({
   status,
   peer,
   incomingCall,
-  remoteStream,
   isMuted,
   callDurationLabel,
+  needsAudioTap,
   onAccept,
   onReject,
   onEnd,
   onToggleMute,
+  onRetryPlay,
 }: CallModalProps) {
-  // ---- Remote audio playback --------------------------------------------
-  // Use an <audio> element (not a hidden <video>) so display: none doesn't
-  // suppress audio. The element is permanently mounted at the modal root.
-  //
-  // Mobile autoplay reality: on iOS Safari (and some Android Chromes) the
-  // browser only honours .play() when called from a LIVE user gesture. The
-  // accept-call flow is async (getUserMedia → buildPC → setRemoteDescription
-  // → createAnswer → POST /answer → state update → useEffect), and by the
-  // time this effect runs the gesture from the Accept tap has already
-  // expired. If play() rejects, we flip `needsAudioTap` so the in-call UI
-  // surfaces a "Tap to hear" button that retries play() inside a fresh
-  // gesture.
-  const remoteAudioRef = useRef<HTMLAudioElement>(null);
-  const [needsAudioTap, setNeedsAudioTap] = useState(false);
-
-  useEffect(() => {
-    const el = remoteAudioRef.current;
-    if (!el) {
-      setNeedsAudioTap(false);
-      return;
-    }
-    if (!remoteStream) {
-      el.srcObject = null;
-      setNeedsAudioTap(false);
-      return;
-    }
-    if (el.srcObject !== remoteStream) {
-      el.srcObject = remoteStream;
-    }
-    el.muted = false;
-    el.volume = 1;
-    el.play()
-      .then(() => setNeedsAudioTap(false))
-      .catch(() => setNeedsAudioTap(true));
-  }, [remoteStream]);
-
-  function manualPlay() {
-    const el = remoteAudioRef.current;
-    if (!el) return;
-    el.muted = false;
-    el.volume = 1;
-    el.play()
-      .then(() => setNeedsAudioTap(false))
-      .catch(() => {
-        /* still blocked — leave the button visible */
-      });
-  }
-
   if (status === 'idle') return null;
 
   const callerInfo = incomingCall?.caller ?? peer;
   const displayName = callerInfo?.full_name ?? callerInfo?.email ?? 'Unknown';
 
-  // ---- State labels ------------------------------------------------------
-  const stateLabel =
-    status === 'ringing'
-      ? 'Incoming voice call'
-      : status === 'calling'
-        ? 'Calling…'
-        : status === 'connected'
-          ? callDurationLabel
-          : 'Call ended';
-
   return createPortal(
     <>
-      {/* Always-mounted remote-audio sink — keeps audio playing across state
-          transitions and is the actual fix for the no-voice bug. */}
-      <audio ref={remoteAudioRef} autoPlay playsInline className="sr-only" />
-
       {status === 'ended' ? (
         <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 flex items-center gap-2 bg-surface border border-border rounded-full px-4 py-2 shadow-xl animate-in fade-in duration-200">
           <span className="text-base">📵</span>
@@ -149,9 +86,8 @@ export function CallModal({
                 {callDurationLabel}
               </p>
             )}
-            {status !== 'connected' && stateLabel && (
-              <p className="text-sm text-white/50">{stateLabel}</p>
-            )}
+            {status === 'ringing' && <p className="text-sm text-white/50">Incoming voice call</p>}
+            {status === 'calling' && <p className="text-sm text-white/50">Calling…</p>}
           </div>
 
           {/* Middle: big avatar + name */}
@@ -214,14 +150,10 @@ export function CallModal({
               </div>
             ) : (
               <div className="flex flex-col items-center gap-5">
-                {/* Mobile browsers (esp. iOS Safari) block autoplay when the
-                    user gesture has expired by the time srcObject is attached.
-                    If play() rejected, surface a button that retries inside a
-                    fresh, live gesture. Vanishes silently once audio is alive. */}
                 {needsAudioTap && (
                   <button
                     type="button"
-                    onClick={manualPlay}
+                    onClick={onRetryPlay}
                     className="px-4 py-2 rounded-full bg-amber-400 text-slate-900 text-sm font-semibold shadow-lg animate-pulse focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-200"
                   >
                     🔈 Tap to hear the other person

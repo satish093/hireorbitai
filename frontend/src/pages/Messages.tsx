@@ -753,11 +753,17 @@ export function Messages() {
                     leftIcon={<IconPhone size={18} />}
                     title="Voice call"
                     disabled={call.status !== 'idle'}
-                    onClick={() =>
+                    onClick={() => {
+                      // Capture user gesture for autoplay BEFORE the async
+                      // startCall chain expires it. Critical for iOS Safari
+                      // and some Android Chromes — without this, the callee
+                      // answers but no audio plays until the user taps
+                      // "Tap to hear" inside the call screen.
+                      call.primeAudio();
                       call
                         .startCall(activePeer.id, activePeer.full_name ?? null, activePeer.email)
-                        .catch((e: Error) => toast.error(e.message))
-                    }
+                        .catch((e: Error) => toast.error(e.message));
+                    }}
                   />
                 </div>
               </header>
