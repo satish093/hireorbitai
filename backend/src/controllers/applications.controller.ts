@@ -30,7 +30,22 @@ function isManagerTier(role?: string): boolean {
 
 async function getCallerRecruiterRowId(userId: string): Promise<string | null> {
   const { data } = await db.from('recruiters').select('id').eq('user_id', userId).maybeSingle();
-  return (data as { id?: string } | null)?.id ?? null;
+  if ((data as { id?: string } | null)?.id) return (data as { id: string }).id;
+  // Self-heal for legacy RECRUITER accounts created via /admin/users (or
+  // invitations with null parent) that never got their `recruiters` row.
+  // Without this the applications + submissions endpoints always return []
+  // for these users until an admin intervenes. Mirrors the same self-heal
+  // in consultants.controller.
+  try {
+    const { data: created } = await db
+      .from('recruiters')
+      .upsert({ user_id: userId, manager_id: null }, { onConflict: 'user_id' })
+      .select('id')
+      .single();
+    return (created as { id?: string } | null)?.id ?? null;
+  } catch {
+    return null;
+  }
 }
 
 async function getCallerConsultantRowId(userId: string): Promise<string | null> {

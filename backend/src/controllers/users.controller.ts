@@ -15,6 +15,7 @@ import * as authSvc from '../services/auth.service';
 import { assertOutranks } from './adminUsers.controller';
 import { canViewUser } from '../services/permission.service';
 import { managerGroupUserIds } from '../services/groupScope';
+import { wireHierarchy } from '../services/invitationHierarchy.service';
 
 /** Refuse to mutate an equal- or higher-ranked user. Loads the target's role
  *  and defers to the canonical rank ladder in adminUsers.controller. Without
@@ -296,6 +297,14 @@ export const adminCreate: RequestHandler = async (req, res) => {
     createdBy: { id: req.user.id, email: req.user.email },
     req,
   });
+
+  // Wire the role-specific profile row (recruiters / consultants).
+  // adminCreateUser only creates the auth + users rows; without this call a
+  // brand-new RECRUITER would have no row in `recruiters` (so the
+  // /recruiters list misses them and /consultants returns [] for them as
+  // caller), and a brand-new CONSULTANT would have no row in `consultants`.
+  // Best-effort — wireHierarchy is contract-bound to never throw.
+  await wireHierarchy(user_id, parsed.data.role as Role, null).catch(() => {});
 
   res.status(201).json({ ok: true, user_id });
 };

@@ -17,11 +17,31 @@ function isManagerTier(role?: string): boolean {
 
 /**
  * Resolve the recruiter row id for the calling user (if they are a recruiter).
- * Returns null when the caller isn't a recruiter or has no row yet.
+ *
+ * Self-heals: if the user IS a RECRUITER (per req.user.role check at the call
+ * site) but has NO row in the recruiters table — which happens to accounts
+ * created by admins via /admin/users before wireHierarchy was wired into that
+ * path, or to legacy invitations whose parent resolution returned null — we
+ * upsert a row with manager_id = null. Without this self-heal the caller would
+ * always see an empty consultants list (and an empty submissions list) until
+ * an admin manually intervened.
  */
 async function getCallerRecruiterRowId(userId: string): Promise<string | null> {
   const { data } = await db.from('recruiters').select('id').eq('user_id', userId).maybeSingle();
-  return data?.id ?? null;
+  if (data?.id) return data.id;
+  // No row — create one. Best-effort: if the upsert errors (e.g. schema lag
+  // requires manager_id NOT NULL on an older DB), we surface null and the
+  // caller falls back to the empty-list response.
+  try {
+    const { data: created } = await db
+      .from('recruiters')
+      .upsert({ user_id: userId, manager_id: null }, { onConflict: 'user_id' })
+      .select('id')
+      .single();
+    return (created as { id?: string } | null)?.id ?? null;
+  } catch {
+    return null;
+  }
 }
 
 const onboardingSchema = z

@@ -253,35 +253,40 @@ export async function wireHierarchy(
   invitedRole: Role,
   parentUserId: string | null,
 ): Promise<void> {
-  if (!parentUserId) return;
-
+  // RECRUITER / CONSULTANT MUST get their profile row regardless of whether a
+  // parent was resolved. Previously this function early-returned on
+  // `!parentUserId`, leaving brand-new recruiters with NO row in the
+  // recruiters table — which then made the /consultants list (RECRUITER
+  // self-scope) return [] AND made the /recruiters list (HR_MANAGER group
+  // scope) miss them entirely. The "parent" is the manager-relationship
+  // wiring; the profile row itself is identity-shaped and must always exist.
   if (invitedRole === 'CONSULTANT') {
-    // Attempt to wire consultant → recruiter row if parent is a recruiter
-    const { data: rec } = await db
-      .from('recruiters')
-      .select('id')
-      .eq('user_id', parentUserId)
-      .maybeSingle();
-    const recRow = rec as { id: string } | null;
-    if (recRow) {
-      try {
-        await db
-          .from('consultants')
-          .upsert({ user_id: newUserId, recruiter_id: recRow.id }, { onConflict: 'user_id' });
-      } catch {
-        // parent may not be a recruiter (e.g. manager as parent) — graceful skip
-      }
+    const recId: string | null = await recruiterRowFor(parentUserId);
+    try {
+      await db
+        .from('consultants')
+        .upsert({ user_id: newUserId, recruiter_id: recId }, { onConflict: 'user_id' });
+    } catch {
+      // recruiter_id may be NOT NULL on older schemas; in that case the row
+      // gets created during a later admin assignment. Don't block account
+      // creation — wireHierarchy is best-effort by contract.
     }
-    await db.from('users').update({ reports_to: parentUserId }).eq('id', newUserId);
-  } else if (invitedRole === 'RECRUITER') {
-    // Create / update the recruiter's profile row
+    if (parentUserId) {
+      await db.from('users').update({ reports_to: parentUserId }).eq('id', newUserId);
+    }
+    return;
+  }
+
+  if (invitedRole === 'RECRUITER') {
+    // Always create the recruiter profile row. `manager_id` may be null when
+    // there's no parent yet — that's fine; an admin will assign it later.
     const { data: rec } = await db
       .from('recruiters')
-      .upsert({ user_id: newUserId, manager_id: parentUserId }, { onConflict: 'user_id' })
+      .upsert({ user_id: newUserId, manager_id: parentUserId ?? null }, { onConflict: 'user_id' })
       .select('id')
       .single();
     const recRow = rec as { id: string } | null;
-    if (recRow) {
+    if (recRow && parentUserId) {
       try {
         await db
           .from('recruiter_managers')
@@ -293,9 +298,27 @@ export async function wireHierarchy(
         // recruiter_managers migration may not be applied yet — graceful degradation
       }
     }
-    await db.from('users').update({ reports_to: parentUserId }).eq('id', newUserId);
-  } else {
-    // MANAGER, HR_MANAGER, DEVELOPER — set reports_to only
+    if (parentUserId) {
+      await db.from('users').update({ reports_to: parentUserId }).eq('id', newUserId);
+    }
+    return;
+  }
+
+  // MANAGER, HR_MANAGER, DEVELOPER — set reports_to only when a parent exists
+  if (parentUserId) {
     await db.from('users').update({ reports_to: parentUserId }).eq('id', newUserId);
   }
+}
+
+/** Resolve the recruiter row id whose user_id == parentUserId (so a new
+ *  CONSULTANT can be tied to their recruiter). Returns null when the parent
+ *  isn't a recruiter (e.g. a manager parent) or no row exists. */
+async function recruiterRowFor(parentUserId: string | null): Promise<string | null> {
+  if (!parentUserId) return null;
+  const { data } = await db
+    .from('recruiters')
+    .select('id')
+    .eq('user_id', parentUserId)
+    .maybeSingle();
+  return (data as { id?: string } | null)?.id ?? null;
 }
