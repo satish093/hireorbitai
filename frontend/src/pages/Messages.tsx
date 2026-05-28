@@ -45,6 +45,12 @@ interface Attachment {
   localPreview?: string;
 }
 
+interface ReplyParent {
+  id: string;
+  body: string;
+  sender_id: string;
+}
+
 interface Message {
   id: string;
   sender_id: string;
@@ -56,6 +62,8 @@ interface Message {
   sender?: Party;
   recipient?: Party;
   attachments?: Attachment[];
+  reply_to_message_id?: string | null;
+  reply_to?: ReplyParent | null;
 }
 
 interface Conversation {
@@ -105,6 +113,10 @@ export function Messages() {
   // after ~3.5s of no follow-up event. We also clear immediately when a
   // real message:new arrives from them, so the indicator doesn't flash
   // for a beat after the message lands.
+  // Active reply target. Click "Reply" on a bubble to set this; the chip
+  // above the composer renders the parent preview + an X to clear.
+  // Cleared on send + on peer change.
+  const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [peerTyping, setPeerTyping] = useState(false);
   const peerTypingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Local throttle so we don't POST /typing on every keystroke — once
@@ -204,6 +216,7 @@ export function Messages() {
     refresh();
   }, [refresh]);
   useEffect(() => {
+    setReplyingTo(null); // any pending reply target belongs to the previous peer
     if (!activePeerId) {
       setMessages([]);
       setAccessDenied(false);
@@ -471,6 +484,7 @@ export function Messages() {
     setSending(true);
     const body = draft;
     const stagedAttachments = pendingAttachments;
+    const stagedReply = replyingTo;
     tmpIdRef.current += 1;
     const optimistic: Message = {
       id: `tmp-${Date.now()}-${tmpIdRef.current}`,
@@ -480,10 +494,15 @@ export function Messages() {
       read_at: null,
       created_at: new Date().toISOString(),
       attachments: stagedAttachments,
+      reply_to_message_id: stagedReply?.id ?? null,
+      reply_to: stagedReply
+        ? { id: stagedReply.id, body: stagedReply.body, sender_id: stagedReply.sender_id }
+        : null,
     };
     setMessages((m) => [...m, optimistic]);
     setDraft('');
     setPendingAttachments([]);
+    setReplyingTo(null);
     stickToBottomRef.current = true;
     try {
       // The server fans out a message:new SSE to both ends, so by the
@@ -496,6 +515,7 @@ export function Messages() {
         recipient_id: activePeerId,
         body,
         attachment_ids: stagedAttachments.filter((a) => !a.id.startsWith('tmp-')).map((a) => a.id),
+        reply_to_message_id: stagedReply?.id ?? null,
       });
       const saved = res.data as Message;
       setMessages((m) => {
@@ -822,6 +842,11 @@ export function Messages() {
                                 message={m}
                                 mine={m.sender_id === profile?.id}
                                 isHeadOfBurst={isHeadOfBurst}
+                                peerName={activePeer?.full_name?.trim() || activePeer?.email}
+                                onReply={() => {
+                                  setReplyingTo(m);
+                                  composerRef.current?.focus();
+                                }}
                                 onEdit={async (newBody) => {
                                   // Optimistic local update; PATCH in
                                   // background. Roll back on failure.
@@ -877,6 +902,43 @@ export function Messages() {
                     <div ref={messagesEndRef} />
                   </div>
 
+                  {/* Reply-target preview chip — shown while the user is
+                      composing a reply. The chip identifies the parent
+                      message author + a short preview of the body, with
+                      an X to clear. Submitting the message clears
+                      replyingTo automatically. */}
+                  {replyingTo && (
+                    <div className="border-t border-border px-5 py-2 bg-surface flex items-start gap-2">
+                      <div className="flex-1 min-w-0 border-l-2 border-brand-500 pl-2">
+                        <div className="text-[10px] uppercase tracking-widest text-muted">
+                          Replying to{' '}
+                          <span className="text-ink font-semibold">
+                            {replyingTo.sender_id === profile?.id
+                              ? 'yourself'
+                              : (activePeer?.full_name?.trim() ?? activePeer?.email ?? 'them')}
+                          </span>
+                        </div>
+                        <div className="text-xs text-ink-2 truncate">
+                          {replyingTo.body || (
+                            <em className="text-muted">
+                              {replyingTo.attachments?.length
+                                ? `📎 ${replyingTo.attachments[0]!.file_name}`
+                                : 'message'}
+                            </em>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setReplyingTo(null)}
+                        aria-label="Cancel reply"
+                        title="Cancel reply"
+                        className="shrink-0 h-6 w-6 inline-flex items-center justify-center rounded text-muted hover:text-ink hover:bg-hover"
+                      >
+                        <IconX size={14} />
+                      </button>
+                    </div>
+                  )}
                   {/* Typing indicator — only visible to the recipient of
                       a freshly-typed character. Auto-clears after
                       TYPING_CLEAR_MS or as soon as a real message:new
@@ -989,6 +1051,8 @@ function Bubble({
   message,
   mine,
   isHeadOfBurst = true,
+  peerName,
+  onReply,
   onEdit,
   onDelete,
 }: {
@@ -999,6 +1063,10 @@ function Bubble({
    *  tight (the "Discord/Slack" look). Defaults to true for callers that
    *  haven't been updated to pass the flag. */
   isHeadOfBurst?: boolean;
+  /** Display name for the peer — used to label the quoted reply preview
+   *  ("Replying to Sarah") when the parent's sender isn't me. */
+  peerName?: string | null;
+  onReply?: () => void;
   onEdit?: (newBody: string) => void | Promise<void>;
   onDelete?: () => void | Promise<void>;
 }) {
@@ -1041,11 +1109,28 @@ function Bubble({
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      {/* Sender-side action menu — only renders for own messages, only when
-          hovered. Edit/Delete callbacks come from the parent. */}
-      {mine && (onEdit || onDelete) && hovered && !editing && (
-        <div className="absolute -top-3 right-1 inline-flex gap-1 bg-surface border border-border rounded-full shadow-sm px-1 py-0.5 text-[11px] z-10">
-          {onEdit && (
+      {/* Hover menu. Reply is available on every message; edit/delete only
+          for own messages. Positioned above the bubble so it doesn't
+          overlap the message text. */}
+      {hovered && !editing && (onReply || (mine && (onEdit || onDelete))) && (
+        <div
+          className={clsx(
+            'absolute -top-3 inline-flex gap-1 bg-surface border border-border rounded-full shadow-sm px-1 py-0.5 text-[11px] z-10',
+            mine ? 'right-1' : 'left-1',
+          )}
+        >
+          {onReply && (
+            <button
+              type="button"
+              onClick={onReply}
+              className="px-1.5 text-muted hover:text-ink"
+              title="Reply"
+              aria-label="Reply"
+            >
+              ↩
+            </button>
+          )}
+          {mine && onEdit && (
             <button
               type="button"
               onClick={() => setEditing(true)}
@@ -1055,7 +1140,7 @@ function Bubble({
               ✎
             </button>
           )}
-          {onDelete && (
+          {mine && onDelete && (
             <button
               type="button"
               onClick={() => void onDelete()}
@@ -1125,6 +1210,32 @@ function Bubble({
           </div>
         ) : (
           <>
+            {/* Reply quote — sits at the very top so the reader sees what
+                this message is responding to before the body itself. The
+                parent author is "you" when the parent's sender_id matches
+                the viewer, otherwise it's the peer's name (passed in via
+                peerName, since we don't have a full users map here). */}
+            {message.reply_to && (
+              <div
+                className={clsx(
+                  'mb-1.5 rounded-md border-l-2 pl-2 pr-2 py-1 text-[11px] max-w-full overflow-hidden',
+                  mine
+                    ? 'bg-white/10 border-white/40 text-white/85'
+                    : 'bg-hover/60 border-brand-500 text-ink-2',
+                )}
+              >
+                <div className={clsx('font-semibold', mine ? 'text-white/90' : 'text-brand-700')}>
+                  {message.reply_to.sender_id === message.sender_id
+                    ? mine
+                      ? 'You'
+                      : (peerName ?? 'Them')
+                    : mine
+                      ? (peerName ?? 'Them')
+                      : 'You'}
+                </div>
+                <div className="truncate">{message.reply_to.body}</div>
+              </div>
+            )}
             {/* Attachments render ABOVE the text body so an image-only
                 message reads top-down (preview → caption). Empty body
                 means no separator div needed. */}

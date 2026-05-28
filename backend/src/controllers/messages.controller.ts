@@ -9,7 +9,11 @@ import {
 } from '../services/permission.service';
 import { audit } from '../services/audit.service';
 import { publishToUser } from '../services/realtime.service';
-import { attachAttachments, claimAttachmentsForMessage } from './messageAttachments.controller';
+import {
+  attachAttachments,
+  claimAttachmentsForMessage,
+  resolveReplyParents,
+} from './messageAttachments.controller';
 
 // Build the SELECT lazily so we can downgrade to a legacy column set the first
 // time we see "column doesn't exist" — that way the endpoints work both before
@@ -205,7 +209,10 @@ export const thread: RequestHandler = async (req, res) => {
   }
   if (error) throw httpError(500, 'Database error');
   const withAttachments = await attachAttachments((data ?? []) as { id: string }[]);
-  res.json(withAttachments);
+  const withReplies = await resolveReplyParents(
+    withAttachments as Array<{ id: string; reply_to_message_id?: string | null }>,
+  );
+  res.json(withReplies);
 };
 
 /**
@@ -286,6 +293,10 @@ export const send: RequestHandler = async (req, res) => {
       recipient_id: z.string().uuid(),
       body: z.string().max(8000).optional().default(''),
       attachment_ids: z.array(z.string().uuid()).max(10).optional().default([]),
+      // Optional parent for reply quoting. Must reference a message that
+      // belongs to THIS pair (sender ↔ recipient) — enforced server-side
+      // below, so a forged id from another conversation can't be quoted.
+      reply_to_message_id: z.string().uuid().optional().nullable(),
     })
     .refine((d) => d.body.trim().length > 0 || d.attachment_ids.length > 0, {
       message: 'Message body or at least one attachment is required',
@@ -324,18 +335,50 @@ export const send: RequestHandler = async (req, res) => {
     throw httpError(403, 'You cannot message this user.');
   }
 
+  // Validate reply parent — it must exist in THIS conversation, otherwise
+  // a forged id from another thread could be quoted (information leak via
+  // the embedded sender/body in the reply preview). null/undefined means
+  // "no reply" which is the common case.
+  let replyToId: string | null = null;
+  if (parsed.data.reply_to_message_id) {
+    const filter =
+      `and(sender_id.eq.${req.user.id},recipient_id.eq.${parsed.data.recipient_id}),` +
+      `and(sender_id.eq.${parsed.data.recipient_id},recipient_id.eq.${req.user.id})`;
+    const { data: parent } = await db
+      .from('messages')
+      .select('id')
+      .eq('id', parsed.data.reply_to_message_id)
+      .or(filter)
+      .maybeSingle();
+    if (!parent) throw httpError(400, 'reply_to_message_id is not in this conversation');
+    replyToId = parsed.data.reply_to_message_id;
+  }
+
   // Insert first (no embed) so we get the row id, then fetch with the embed.
   // Two-step avoids the failure mode where the embed errors and we lose the
   // insert's returning id.
-  const { data: inserted, error: insErr } = await db
+  const insertRow: Record<string, unknown> = {
+    sender_id: req.user.id,
+    recipient_id: parsed.data.recipient_id,
+    body: parsed.data.body.trim(),
+  };
+  if (replyToId) insertRow.reply_to_message_id = replyToId;
+  let { data: inserted, error: insErr } = await db
     .from('messages')
-    .insert({
-      sender_id: req.user.id,
-      recipient_id: parsed.data.recipient_id,
-      body: parsed.data.body.trim(),
-    })
+    .insert(insertRow)
     .select('id')
     .single();
+  // Schema lag: the column may not exist on a DB that hasn't run the
+  // 1754000000000 migration yet. Retry without the field so a body-only
+  // send still works before the migration lands.
+  if (insErr && /reply_to_message_id|schema cache/i.test(insErr.message ?? '')) {
+    delete insertRow.reply_to_message_id;
+    ({ data: inserted, error: insErr } = await db
+      .from('messages')
+      .insert(insertRow)
+      .select('id')
+      .single());
+  }
   if (insErr || !inserted) throw httpError(500, insErr?.message ?? 'Insert failed');
 
   // Claim any pre-uploaded attachments by linking them to this new message.
@@ -368,17 +411,20 @@ export const send: RequestHandler = async (req, res) => {
   }
   if (error) throw httpError(500, 'Database error');
 
-  // Embed attachments + signed download URLs on the returned message so
-  // the SSE payload + the POST response both carry the renderable shape
-  // the frontend bubble expects.
+  // Embed attachments + reply-parent preview on the returned message
+  // so the SSE payload + the POST response both carry the renderable
+  // shape the frontend bubble expects.
   const [withAtt] = await attachAttachments([data as { id: string }]);
+  const [withReply] = await resolveReplyParents([
+    withAtt as { id: string; reply_to_message_id?: string | null },
+  ]);
 
   // Fan out to both ends. Recipient gets the message:new event for inbox /
   // active-thread updates; sender gets it too so a second tab on the
   // sender's side mirrors the new message without a poll cycle.
-  void publishToUser(parsed.data.recipient_id, 'message:new', withAtt);
-  void publishToUser(req.user.id, 'message:new', withAtt);
-  res.status(201).json(withAtt);
+  void publishToUser(parsed.data.recipient_id, 'message:new', withReply);
+  void publishToUser(req.user.id, 'message:new', withReply);
+  res.status(201).json(withReply);
 };
 
 // ---------------------------------------------------------------------------

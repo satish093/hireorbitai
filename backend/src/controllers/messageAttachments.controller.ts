@@ -195,6 +195,58 @@ export async function attachAttachments<T extends { id: string; attachments?: un
   }));
 }
 
+/**
+ * Resolve the parent message preview for each row that has a
+ * reply_to_message_id, in one batch query. Mutates each message with a
+ * `reply_to` field shaped { id, body, sender: { id, full_name, email } }
+ * or null when the parent has been deleted (we still keep the field for
+ * shape consistency).
+ *
+ * Authorization isn't repeated here — `messages.thread` has already
+ * scoped the array to messages the caller can see, and the parent must
+ * by definition belong to the SAME conversation (enforced server-side
+ * in messages.send) so it's already in-scope. We strip body content
+ * down to the first ~280 chars to keep the preview compact.
+ */
+export async function resolveReplyParents<
+  T extends { id: string; reply_to_message_id?: string | null },
+>(
+  messages: T[],
+): Promise<(T & { reply_to: { id: string; body: string; sender_id: string } | null })[]> {
+  const parentIds = messages.map((m) => m.reply_to_message_id).filter((id): id is string => !!id);
+  if (parentIds.length === 0) {
+    return messages.map((m) => ({ ...m, reply_to: null }));
+  }
+  // .in() with a deduped set keeps the query minimal even if many
+  // messages reply to the same parent (common in busy threads).
+  const unique = Array.from(new Set(parentIds));
+  const { data } = await db
+    .from('messages')
+    .select('id, body, sender_id, deleted_at')
+    .in('id', unique);
+  const rows = (data ?? []) as Array<{
+    id: string;
+    body: string;
+    sender_id: string;
+    deleted_at: string | null;
+  }>;
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  return messages.map((m) => {
+    if (!m.reply_to_message_id) return { ...m, reply_to: null };
+    const p = byId.get(m.reply_to_message_id);
+    // Soft-deleted parents render as "Original message was deleted".
+    if (!p || p.deleted_at) return { ...m, reply_to: null };
+    return {
+      ...m,
+      reply_to: {
+        id: p.id,
+        body: p.body.length > 280 ? p.body.slice(0, 280) + '…' : p.body,
+        sender_id: p.sender_id,
+      },
+    };
+  });
+}
+
 /** DELETE /messages/attachments/:id — uploader-only. */
 export const remove: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
