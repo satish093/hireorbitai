@@ -52,9 +52,18 @@ export const create: RequestHandler = async (req, res) => {
     throw httpError(403, `You are not permitted to invite the role ${requestedRole}.`);
   }
 
-  // Group ceiling: admin tier may pre-assign any group; everyone else (group
-  // leads + recruiters) may only assign their OWN group or no group at all.
-  assertCanAssignGroup(req.user, parsed.data.group_id ?? null);
+  // Group resolution. Admin-tier may pre-assign any group (or omit for "no
+  // group"). For everyone else (group leads + recruiters), the invitee MUST land
+  // in the caller's own group — so we DEFAULT a missing group_id to the
+  // caller's own group_id rather than letting it fall through to NULL. This
+  // satisfies the recruiter-invites-consultant invariant: a recruiter's invited
+  // consultant always ends up in the recruiter's group. assertCanAssignGroup
+  // then still rejects any explicit out-of-scope group_id.
+  const isAdminCallerForGroup = (ADMIN_TIER as Role[]).includes(req.user.role);
+  const groupId = isAdminCallerForGroup
+    ? (parsed.data.group_id ?? null)
+    : (parsed.data.group_id ?? req.user.group_id ?? null);
+  assertCanAssignGroup(req.user, groupId);
 
   // ── Parent assignment ───────────────────────────────────────────────────
   let parentUserId: string | null = null;
@@ -106,7 +115,7 @@ export const create: RequestHandler = async (req, res) => {
     email: parsed.data.email,
     role: parsed.data.role,
     invitedBy: req.user.id,
-    groupId: parsed.data.group_id ?? null,
+    groupId,
     parentUserId,
     assignedMode,
     assignedBy,

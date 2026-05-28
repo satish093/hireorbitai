@@ -311,6 +311,29 @@ export const assignRecruiter: RequestHandler = async (req, res) => {
     .single();
   if (error) throw httpError(500, 'Database error');
 
+  // Preserve the consultant↔recruiter same-group invariant: a consultant must
+  // live in the same group as the recruiter they're assigned to. For group-lead
+  // callers this is already true by construction (both sides validated above).
+  // For admin-tier reassigns across groups, sync the consultant's user.group_id
+  // to match the new recruiter's group so group-scoped surfaces stay coherent.
+  if (oldCons.user_id && newRec.user_id) {
+    const { data: newRecUser } = await db
+      .from('users')
+      .select('group_id')
+      .eq('id', newRec.user_id)
+      .maybeSingle();
+    const targetGroup = (newRecUser as { group_id?: string | null } | null)?.group_id ?? null;
+    const { data: consUser } = await db
+      .from('users')
+      .select('group_id')
+      .eq('id', oldCons.user_id)
+      .maybeSingle();
+    const currentGroup = (consUser as { group_id?: string | null } | null)?.group_id ?? null;
+    if (currentGroup !== targetGroup) {
+      await db.from('users').update({ group_id: targetGroup }).eq('id', oldCons.user_id);
+    }
+  }
+
   // Invalidate permission caches for old recruiter, new recruiter, and the consultant.
   if (oldCons.recruiter_id) {
     const { data: oldRec } = await db

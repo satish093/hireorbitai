@@ -192,4 +192,39 @@ describe('consultants.assignRecruiter — validation + audit', () => {
     );
     expect(err?.status).toBe(403);
   });
+
+  // ── Invariant: consultant.user.group_id stays in sync with the recruiter's
+  // group on (re-)assignment. Group-lead callers never trigger this branch
+  // meaningfully (both sides are already in the same group by construction);
+  // admin-tier cross-group reassigns DO update the consultant's user row.
+  it("syncs consultant.user.group_id to the new recruiter's group on admin reassign", async () => {
+    mock.rows.consultants = [CONSULTANT_ROW, OLD_REC_ROW];
+    mock.rows.recruiters = [OLD_REC_ROW, NEW_REC_ROW];
+    mock.rows.users = [
+      { id: 'u-cons', group_id: 'g-old' },
+      { id: 'u-new-recruiter', group_id: 'g-new' },
+    ];
+    const { err } = await call(consultants.assignRecruiter as Handler, ADMIN_USER, {
+      body: { recruiter_id: 'rec-new' },
+      params: { id: 'cons-1' },
+    });
+    expect(err).toBeNull();
+    const userUpdate = mock.updates.find((u) => u.table === 'users');
+    expect(userUpdate).toBeTruthy();
+    expect(userUpdate?.payload).toEqual({ group_id: 'g-new' });
+  });
+
+  it("skips the user-group sync when the consultant is already in the new recruiter's group", async () => {
+    mock.rows.consultants = [CONSULTANT_ROW, OLD_REC_ROW];
+    mock.rows.recruiters = [OLD_REC_ROW, NEW_REC_ROW];
+    mock.rows.users = [
+      { id: 'u-cons', group_id: 'g-same' },
+      { id: 'u-new-recruiter', group_id: 'g-same' },
+    ];
+    await call(consultants.assignRecruiter as Handler, ADMIN_USER, {
+      body: { recruiter_id: 'rec-new' },
+      params: { id: 'cons-1' },
+    });
+    expect(mock.updates.find((u) => u.table === 'users')).toBeUndefined();
+  });
 });

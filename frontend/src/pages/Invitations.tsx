@@ -357,18 +357,26 @@ export function Invitations() {
             options={ROLE_OPTIONS}
           />
           {renderParentField()}
-          <SelectInput
-            label="Group"
-            value={form.group_id}
-            onChange={(e) => setForm({ ...form, group_id: e.target.value })}
-            options={[
-              { value: '', label: 'No Group' },
-              ...groups.map((g) => ({
-                value: g.id,
-                label: g.unique_group_id ? `${g.name} (${g.unique_group_id})` : g.name,
-              })),
-            ]}
-          />
+          {isAdmin ? (
+            <SelectInput
+              label="Group"
+              value={form.group_id}
+              onChange={(e) => setForm({ ...form, group_id: e.target.value })}
+              options={[
+                { value: '', label: 'No Group' },
+                ...groups.map((g) => ({
+                  value: g.id,
+                  label: g.unique_group_id ? `${g.name} (${g.unique_group_id})` : g.name,
+                })),
+              ]}
+            />
+          ) : (
+            // Non-admin (group lead / recruiter): the invitee always lands in
+            // YOUR group — the backend defaults missing group_id to the
+            // caller's own and rejects any other group_id (assertCanAssignGroup).
+            // Don't expose an arbitrary picker that the backend will reject.
+            <p className="text-xs text-muted">Invitee will be added to your group.</p>
+          )}
         </div>
       </Modal>
     </Layout>
