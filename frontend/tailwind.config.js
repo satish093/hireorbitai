@@ -61,12 +61,16 @@ export default {
           ring: 'var(--sidebar-ring)',
         },
         brand: {
-          50: '#eef2ff',
+          // brand-50 + brand-700 are theme-aware: the chip background and its
+          // paired foreground swap on `[data-theme="dark"]` via tokens.css.
+          // The other shades (100/200/500/600/900) stay literal — they're
+          // used for borders/accents/dots that already read OK in dark mode.
+          50: 'var(--brand-soft)',
           100: '#e0e7ff',
           200: '#c7d2fe',
           500: '#6366f1',
           600: '#4f46e5',
-          700: '#4338ca',
+          700: 'var(--brand-on-soft)',
           900: '#312e81',
           from: 'var(--brand-from)',
           to: 'var(--brand-to)',
