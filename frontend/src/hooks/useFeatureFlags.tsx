@@ -3,6 +3,7 @@ import { Link, Navigate } from 'react-router-dom';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useInvalidationListener } from './useInvalidate';
+import { LoadingScreen } from '../components/LoadingScreen';
 import { OWNER_TIER } from '../types';
 
 interface FeatureFlagsContextValue {
@@ -132,9 +133,7 @@ export function FeatureGuard({
   // While loading we render a thin spinner rather than the children —
   // keeps the page from flashing partial UI before the flag check resolves.
   if (!ctx || ctx.loading) {
-    return (
-      <div className="min-h-dvh flex items-center justify-center text-muted text-sm">Loading…</div>
-    );
+    return <LoadingScreen />;
   }
   if (ctx.flags[feature] === false) {
     if (redirectTo) return <Navigate to={redirectTo} replace />;

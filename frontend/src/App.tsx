@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect } from 'react';
 import { Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { LoadingScreen } from './components/LoadingScreen';
 import { AppChrome } from './components/AppChrome';
 import { FeatureGuard } from './hooks/useFeatureFlags';
 import { RealtimeNotifications } from './components/RealtimeNotifications';
@@ -168,9 +169,7 @@ const TrainingPlanView = lazy(() =>
 /** Suspense fallback used while a route chunk is being fetched. Intentionally
  *  minimal so it doesn't flash a heavy spinner on fast loads. */
 function RouteFallback() {
-  return (
-    <div className="min-h-dvh flex items-center justify-center text-muted text-sm">Loading…</div>
-  );
+  return <LoadingScreen />;
 }
 
 /** Minimal landing for a DEVELOPER with no obvious capability home. The manager
