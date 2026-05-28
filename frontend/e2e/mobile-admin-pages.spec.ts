@@ -459,13 +459,23 @@ test.describe('Mobile — Feature Flags page', () => {
 // ─── /admin/groups ────────────────────────────────────────────────────────────
 
 test.describe('Mobile — User Groups page', () => {
+  // /admin/groups is ADMIN_TIER (CTO+); a MANAGER session would be
+  // redirected to /unauthorized. Mirrors the desktop admin-pages fix.
+  const CTO = { ...MANAGER, role: 'CTO' as const };
+
   test('renders groups list with no horizontal overflow', async ({ page }) => {
     const errors = trackPageErrors(page);
 
-    await managerSetup(page, {
-      '/user-groups': { json: MOCK_USER_GROUPS },
-      '/consultants': { json: MOCK_CONSULTANTS },
-      '/recruiters': { json: MOCK_RECRUITERS },
+    await seedSession(page, CTO);
+    await mockApi(page, {
+      profile: CTO,
+      flags: ALL_FLAGS,
+      handlers: {
+        ...BASE_HANDLERS,
+        '/user-groups': { json: MOCK_USER_GROUPS },
+        '/consultants': { json: MOCK_CONSULTANTS },
+        '/recruiters': { json: MOCK_RECRUITERS },
+      },
     });
     await page.goto('/admin/groups');
     await page.waitForLoadState('networkidle');

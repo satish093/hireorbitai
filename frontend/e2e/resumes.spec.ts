@@ -174,11 +174,20 @@ test.describe('Résumés page — loading and RBAC', () => {
       timeout: 8000,
     });
 
-    // Description mentions "Invite a consultant".
-    await expect(page.getByText(/Invite a consultant/)).toBeVisible({ timeout: 8000 });
+    // Description mentions "Invite a consultant". Narrow to the paragraph
+    // (the same text also appears as the button label, which would trip
+    // strict-mode on a bare getByText regex).
+    await expect(
+      page.getByText(/No consultant profiles exist yet\. Invite a consultant/),
+    ).toBeVisible({ timeout: 8000 });
 
-    // "Go to Users" CTA is present.
-    await expect(page.getByRole('button', { name: 'Go to Users' })).toBeVisible({ timeout: 8000 });
+    // CTA — for a MANAGER (the seeded profile) the empty-state CTA is
+    // "Invite a consultant" (goes to /invitations). The "Go to Users"
+    // variant is only shown for ADMIN_TIER (canManageUsers === true) per
+    // pages/Resumes.tsx, and a MANAGER doesn't qualify.
+    await expect(page.getByRole('button', { name: 'Invite a consultant' })).toBeVisible({
+      timeout: 8000,
+    });
 
     // No upload control when there is no consultant — the upload zone only
     // appears after a consultant is selected and has no resumes yet.

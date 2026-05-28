@@ -531,10 +531,22 @@ test.describe('User Groups page', () => {
   test('renders groups list with member counts', async ({ page }) => {
     const errors = trackPageErrors(page);
 
-    await managerSetup(page, {
-      '/user-groups': { json: MOCK_USER_GROUPS },
-      '/consultants': { json: MOCK_CONSULTANTS },
-      '/recruiters': { json: MOCK_RECRUITERS },
+    // /admin/groups is ADMIN_TIER (CTO+). A MANAGER session would be
+    // redirected to /unauthorized by ProtectedRoute and the heading
+    // wouldn't render — use a CTO session here, matching the pattern
+    // already used by the AI Settings / Audit Log / Deactivated tests
+    // further down this file.
+    const CTO = { ...MANAGER, role: 'CTO' as const };
+    await seedSession(page, CTO);
+    await mockApi(page, {
+      profile: CTO,
+      flags: ALL_FLAGS,
+      handlers: {
+        ...BASE_HANDLERS,
+        '/user-groups': { json: MOCK_USER_GROUPS },
+        '/consultants': { json: MOCK_CONSULTANTS },
+        '/recruiters': { json: MOCK_RECRUITERS },
+      },
     });
     await page.goto('/admin/groups');
     await page.waitForLoadState('networkidle');
