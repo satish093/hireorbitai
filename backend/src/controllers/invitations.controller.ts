@@ -52,29 +52,25 @@ export const create: RequestHandler = async (req, res) => {
     throw httpError(403, `You are not permitted to invite the role ${requestedRole}.`);
   }
 
-  // Group resolution. Admin-tier may pre-assign any group (or omit for "no
-  // group"). For everyone else (group leads + recruiters), the invitee MUST
-  // land in the caller's own group — so we FORCE the invitee's group_id to
-  // the caller's group_id and require the caller to actually be in a group.
-  // A recruiter without a group_id cannot invite at all (otherwise the new
-  // consultant would land with users.group_id = NULL, escaping every
-  // group-scope check and leaking across pods). assertCanAssignGroup is
-  // belt-and-braces for the admin branch and to reject any client-side
-  // override that doesn't match the caller's group.
-  const isAdminCallerForGroup = (ADMIN_TIER as Role[]).includes(req.user.role);
+  // Group resolution.
+  //   RECRUITER → FORCE invitee into caller's group (ignore any body.group_id)
+  //   and refuse the invite if the recruiter has no group. Without this, a
+  //   recruiter could create a Consultant with users.group_id = NULL, escaping
+  //   every downstream group-scope check.
+  //   Admin-tier + manager-tier (HR_MANAGER, MANAGER, DEVELOPER) → free choice
+  //   of group, including "no group" (null). assertCanAssignGroup still rejects
+  //   any non-admin attempt to land in a group other than the caller's own.
   let groupId: string | null;
-  if (isAdminCallerForGroup) {
-    groupId = parsed.data.group_id ?? null;
-  } else {
+  if (req.user.role === 'RECRUITER') {
     if (!req.user.group_id) {
       throw httpError(
         403,
         'You must be assigned to a group before inviting other users. Ask an admin to place you in a group first.',
       );
     }
-    // Force to caller's group — ignore any explicit body group_id so a
-    // recruiter / lead can't sneak the invitee into a peer group via curl.
     groupId = req.user.group_id;
+  } else {
+    groupId = parsed.data.group_id ?? null;
   }
   assertCanAssignGroup(req.user, groupId);
 
