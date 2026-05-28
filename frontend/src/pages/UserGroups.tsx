@@ -4,6 +4,8 @@ import { Layout } from '../components/Layout';
 import { SkeletonCard } from '../components/Skeleton';
 import { Button } from '../components/Button';
 import { api } from '../services/api';
+import { useAuth } from '../context/AuthContext';
+import { canAssignRole, Role } from '../types';
 
 interface UserGroup {
   id: string;
@@ -23,6 +25,9 @@ interface UserLite {
 }
 
 export function UserGroups() {
+  const { profile } = useAuth();
+  const callerRole = profile?.role as Role | undefined;
+  const callerId = profile?.id;
   const [groups, setGroups] = useState<UserGroup[]>([]);
   const [users, setUsers] = useState<UserLite[]>([]);
   const [loading, setLoading] = useState(true);
@@ -195,8 +200,17 @@ export function UserGroups() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {groups.map((g) => {
-            const members = users.filter((u) => u.group_id === g.id);
-            const candidates = users.filter((u) => u.group_id !== g.id);
+            // Rank-based visibility: a caller can only see/manage users whose
+            // role they can actually assign (`canAssignRole`). A DIRECTOR should
+            // not see a SUPER_ADMIN in either the members list or the "+ Add
+            // member" dropdown because they couldn't move them anyway — the
+            // backend would reject it (canAssignRole + assertOutranks). The
+            // caller always sees their own row regardless of rank.
+            const visibleUsers = callerRole
+              ? users.filter((u) => u.id === callerId || canAssignRole(callerRole, u.role as Role))
+              : users;
+            const members = visibleUsers.filter((u) => u.group_id === g.id);
+            const candidates = visibleUsers.filter((u) => u.group_id !== g.id);
             return (
               <div
                 key={g.id}
@@ -216,7 +230,15 @@ export function UserGroups() {
                       )}
                     </div>
                     <p className="text-xs text-muted">
-                      {g.member_count} member{g.member_count === 1 ? '' : 's'}
+                      {members.length} member{members.length === 1 ? '' : 's'}
+                      {g.member_count > members.length && (
+                        <span
+                          className="ml-1 text-muted/70"
+                          title={`${g.member_count - members.length} member(s) hidden — outside your rank`}
+                        >
+                          (of {g.member_count})
+                        </span>
+                      )}
                     </p>
                   </div>
                   <Button variant="ghost" size="sm" onClick={() => toggle(g)}>
