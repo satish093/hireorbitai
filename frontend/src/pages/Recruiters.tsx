@@ -17,7 +17,13 @@ import { Role, ROLE_LABEL, ADMIN_TIER, MANAGER_TIER } from '../types';
 interface ManagerLink {
   is_primary: boolean;
   assigned_at: string;
-  manager: { id: string; email: string; full_name?: string | null; role?: Role } | null;
+  manager: {
+    id: string;
+    email: string;
+    full_name?: string | null;
+    role?: Role;
+    group_id?: string | null;
+  } | null;
 }
 
 interface RecruiterRow {
@@ -45,6 +51,14 @@ interface CandidateUser {
   role: Role;
 }
 
+interface ManagerCandidate {
+  id: string;
+  email: string;
+  full_name?: string | null;
+  role: Role;
+  group_id?: string | null;
+}
+
 const MANAGER_TIER_SET = new Set(MANAGER_TIER);
 
 export function Recruiters() {
@@ -53,11 +67,13 @@ export function Recruiters() {
   const isAdminTierUser = !!profile && (ADMIN_TIER as readonly string[]).includes(profile.role);
   const [rows, setRows] = useState<RecruiterRow[]>([]);
   const [candidates, setCandidates] = useState<CandidateUser[]>([]);
+  const [groupManagers, setGroupManagers] = useState<ManagerCandidate[]>([]);
   const [picked, setPicked] = useState<RecruiterRow | null>(null);
   const [loading, setLoading] = useState(true);
   // Group edit state
   const [groupPicked, setGroupPicked] = useState<RecruiterRow | null>(null);
   const [selectedGroup, setSelectedGroup] = useState('');
+  const [selectedGroupManager, setSelectedGroupManager] = useState('');
   const [confirmGroupMoveOpen, setConfirmGroupMoveOpen] = useState(false);
   const [savingGroup, setSavingGroup] = useState(false);
 
@@ -84,16 +100,30 @@ export function Recruiters() {
         setCandidates(users);
       })
       .catch(() => setCandidates([]));
+    api
+      .get('/managers')
+      .then((r) => setGroupManagers(r.data ?? []))
+      .catch(() => setGroupManagers([]));
   }, []);
 
   function openGroupEdit(r: RecruiterRow) {
+    const currentGroup = r.user?.group_id ?? '';
+    const managers = effectiveManagers(r);
+    const currentManager =
+      managers.find((m) => m.is_primary && m.manager?.group_id === currentGroup)?.manager ??
+      managers.find((m) => m.manager?.group_id === currentGroup)?.manager;
     setGroupPicked(r);
-    setSelectedGroup(r.user?.group_id ?? '');
+    setSelectedGroup(currentGroup);
+    setSelectedGroupManager(currentManager?.id ?? '');
     setConfirmGroupMoveOpen(false);
   }
 
   async function saveGroup() {
     if (!groupPicked) return;
+    if (selectedGroup && !selectedGroupManager) {
+      toast.error('Pick a manager in the selected group');
+      return;
+    }
     setConfirmGroupMoveOpen(true);
   }
 
@@ -103,12 +133,14 @@ export function Recruiters() {
     try {
       await api.post(`/recruiters/${groupPicked.id}/move-group`, {
         group_id: selectedGroup || null,
+        manager_id: selectedGroup ? selectedGroupManager : null,
         confirm_unassign_consultants: true,
       });
       toast.success('Group updated');
       invalidateUserGroupsCache();
       setConfirmGroupMoveOpen(false);
       setGroupPicked(null);
+      setSelectedGroupManager('');
       load();
     } catch (e: any) {
       toast.error(e?.response?.data?.error ?? 'Failed to update group');
@@ -137,6 +169,14 @@ export function Recruiters() {
     }
     return [];
   }
+
+  const managersForSelectedGroup = selectedGroup
+    ? groupManagers.filter((m) => m.group_id === selectedGroup)
+    : [];
+  const selectedGroupManagerName =
+    groupManagers.find((m) => m.id === selectedGroupManager)?.full_name ??
+    groupManagers.find((m) => m.id === selectedGroupManager)?.email ??
+    'the selected manager';
 
   return (
     <Layout title="Recruiters">
@@ -264,7 +304,10 @@ export function Recruiters() {
             <Button
               onClick={saveGroup}
               loading={savingGroup}
-              disabled={selectedGroup === (groupPicked?.user?.group_id ?? '')}
+              disabled={
+                selectedGroup === (groupPicked?.user?.group_id ?? '') ||
+                (!!selectedGroup && !selectedGroupManager)
+              }
             >
               {savingGroup ? 'Saving' : 'Save'}
             </Button>
@@ -276,21 +319,41 @@ export function Recruiters() {
             <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
               This recruiter has{' '}
               <span className="font-medium">{groupPicked!.consultant_count}</span> consultant
-              {groupPicked!.consultant_count === 1 ? '' : 's'} assigned. All their consultants must
-              already be in the target group — the backend will block the move if any are in a
-              different group.
+              {groupPicked!.consultant_count === 1 ? '' : 's'} assigned. They will be unassigned
+              when this recruiter moves.
             </p>
           )}
           <SelectInput
             label="Group"
             placeholder="No group (clear)"
             value={selectedGroup}
-            onChange={(e) => setSelectedGroup(e.target.value)}
+            onChange={(e) => {
+              const nextGroup = e.target.value;
+              setSelectedGroup(nextGroup);
+              setSelectedGroupManager(
+                groupManagers.find((m) => m.group_id === nextGroup)?.id ?? '',
+              );
+            }}
             options={(isAdminTierUser
               ? groups
               : groups.filter((g) => g.id === profile?.group_id)
             ).map((g) => ({ value: g.id, label: g.name }))}
           />
+          {selectedGroup && (
+            <SelectInput
+              label="Manager in selected group"
+              placeholder="Select a manager..."
+              value={selectedGroupManager}
+              onChange={(e) => setSelectedGroupManager(e.target.value)}
+              options={managersForSelectedGroup.map((m) => ({
+                value: m.id,
+                label: `${m.full_name ?? m.email}${m.role ? ` (${ROLE_LABEL[m.role]})` : ''}`,
+              }))}
+            />
+          )}
+          {selectedGroup && managersForSelectedGroup.length === 0 && (
+            <p className="text-xs text-danger">No managers are in the selected group.</p>
+          )}
         </div>
       </Modal>
 
@@ -315,7 +378,8 @@ export function Recruiters() {
           <span className="font-semibold">
             {groupPicked?.user?.full_name ?? groupPicked?.user?.email ?? 'this recruiter'}
           </span>
-          ? All Consultants under this Recruiter will be unassigned.
+          ? All Consultants under this Recruiter will be unassigned, and this Recruiter will report
+          to <span className="font-semibold">{selectedGroupManagerName}</span>.
         </p>
       </Modal>
 

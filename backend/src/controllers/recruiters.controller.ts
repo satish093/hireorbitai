@@ -10,6 +10,8 @@ import {
   leadCanAccessUser,
 } from '../services/groupScope';
 
+const RECRUITER_MANAGER_ROLES = ['MANAGER', 'HR_MANAGER'] as const;
+
 interface Caller {
   id: string;
   role: Role;
@@ -390,6 +392,7 @@ export const moveGroup: RequestHandler = async (req, res) => {
   const schema = z
     .object({
       group_id: z.string().uuid().nullable(),
+      manager_id: z.string().uuid().nullable().optional(),
       confirm_unassign_consultants: z.boolean().optional(),
     })
     .strict();
@@ -435,6 +438,31 @@ export const moveGroup: RequestHandler = async (req, res) => {
     .eq('recruiter_id', recruiterId);
   const assignedRows = (assignedCons ?? []) as Array<{ id: string; user_id: string | null }>;
   const changingGroup = parsed.data.group_id !== currentGroup;
+  const targetGroup = parsed.data.group_id;
+  const targetManagerId = parsed.data.manager_id ?? null;
+
+  if (changingGroup && targetGroup && !targetManagerId) {
+    throw httpError(400, 'Pick a manager in the selected group before moving this recruiter.');
+  }
+
+  if (targetManagerId) {
+    const { data: manager } = await db
+      .from('users')
+      .select('id, role, group_id')
+      .eq('id', targetManagerId)
+      .maybeSingle();
+    const managerRow = manager as { id: string; role: string; group_id: string | null } | null;
+    if (!managerRow || !RECRUITER_MANAGER_ROLES.includes(managerRow.role as any)) {
+      throw httpError(400, 'Selected user is not a manager.');
+    }
+    if (managerRow.group_id !== targetGroup) {
+      throw httpError(400, 'Selected manager is not in the target group.');
+    }
+    if (isGroupLead(req.user.role) && !(await leadCanAccessUser(req.user, targetManagerId))) {
+      throw httpError(403, 'Selected manager is not in your group.');
+    }
+  }
+
   if (changingGroup && assignedRows.length > 0 && !parsed.data.confirm_unassign_consultants) {
     throw httpError(
       409,
@@ -453,17 +481,42 @@ export const moveGroup: RequestHandler = async (req, res) => {
     }
   }
 
-  const { error } = await db
-    .from('users')
-    .update({ group_id: parsed.data.group_id })
-    .eq('id', row.user_id);
+  const { error } = await db.from('users').update({ group_id: targetGroup }).eq('id', row.user_id);
   if (error) throw httpError(500, 'Database error');
+
+  if (targetManagerId) {
+    const { error: legacyErr } = await db
+      .from('recruiters')
+      .update({ manager_id: targetManagerId })
+      .eq('id', recruiterId);
+    if (legacyErr) throw httpError(500, 'Database error');
+
+    const { error: clearErr } = await db
+      .from('recruiter_managers')
+      .delete()
+      .eq('recruiter_id', recruiterId);
+    if (clearErr && !/recruiter_managers/i.test(clearErr.message ?? '')) {
+      throw httpError(500, 'Database error');
+    }
+
+    if (!clearErr) {
+      const { error: linkErr } = await db.from('recruiter_managers').insert({
+        recruiter_id: recruiterId,
+        manager_id: targetManagerId,
+        is_primary: true,
+        assigned_by: req.user.id,
+      });
+      if (linkErr) throw httpError(500, 'Database error');
+    }
+    invalidatePermissionCache(targetManagerId);
+  }
 
   if (row.user_id) invalidatePermissionCache(row.user_id);
 
   res.json({
     ok: true,
-    group_id: parsed.data.group_id,
+    group_id: targetGroup,
+    manager_id: targetManagerId,
     unassigned_consultants: assignedRows.length,
   });
 };

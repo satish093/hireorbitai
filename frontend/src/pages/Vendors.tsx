@@ -17,9 +17,19 @@ const EMPTY = {
   tier: '',
 };
 
+function valueOrDash(value?: string | null) {
+  return value?.trim() ? value : '—';
+}
+
+function formatDate(value?: string | null) {
+  if (!value) return '—';
+  return new Date(value).toLocaleDateString();
+}
+
 export function Vendors() {
   const [rows, setRows] = useState<any[]>([]);
   const [open, setOpen] = useState(false);
+  const [selected, setSelected] = useState<any | null>(null);
   const [form, setForm] = useState<any>(EMPTY);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -67,12 +77,45 @@ export function Vendors() {
         loading={loading}
         empty="No vendors yet. Add your first vendor to start tracking submissions."
         columns={[
-          { key: 'company_name', header: 'Company' },
+          {
+            key: 'company_name',
+            header: 'Company',
+            render: (row: any) => (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelected(row);
+                }}
+                className="text-sm font-medium text-brand-700 hover:underline"
+              >
+                {row.company_name}
+              </button>
+            ),
+          },
           { key: 'contact_name', header: 'Contact' },
           { key: 'contact_email', header: 'Email' },
           { key: 'tier', header: 'Tier' },
+          {
+            key: 'actions',
+            header: '',
+            align: 'right',
+            render: (row: any) => (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelected(row);
+                }}
+              >
+                View
+              </Button>
+            ),
+          },
         ]}
         rows={rows}
+        onRowClick={setSelected}
       />
       <Modal
         open={open}
@@ -139,6 +182,60 @@ export function Vendors() {
           />
         </div>
       </Modal>
+      <Modal
+        open={!!selected}
+        onClose={() => setSelected(null)}
+        title={selected?.company_name ?? 'Vendor details'}
+        footer={
+          <Button variant="secondary" onClick={() => setSelected(null)}>
+            Close
+          </Button>
+        }
+      >
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+          <Detail label="Contact name" value={valueOrDash(selected?.contact_name)} />
+          <Detail label="Contact email" value={valueOrDash(selected?.contact_email)} />
+          <Detail label="Contact phone" value={valueOrDash(selected?.contact_phone)} />
+          <Detail label="Tier" value={valueOrDash(selected?.tier)} />
+          <Detail label="Website" value={valueOrDash(selected?.website)} href={selected?.website} />
+          <Detail label="Created" value={formatDate(selected?.created_at)} />
+          <div className="sm:col-span-2">
+            <Detail
+              label="Tags"
+              value={
+                Array.isArray(selected?.tags) && selected.tags.length > 0
+                  ? selected.tags.join(', ')
+                  : '—'
+              }
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <Detail label="Notes" value={valueOrDash(selected?.notes)} />
+          </div>
+        </div>
+      </Modal>
     </Layout>
+  );
+}
+
+function Detail({ label, value, href }: { label: string; value: string; href?: string | null }) {
+  const content =
+    href && value !== '—' ? (
+      <a
+        href={href}
+        target="_blank"
+        rel="noreferrer"
+        className="text-brand-700 hover:underline break-all"
+      >
+        {value}
+      </a>
+    ) : (
+      value
+    );
+  return (
+    <div className="rounded-lg border border-border bg-hover/50 px-3 py-2">
+      <div className="text-[10px] font-semibold uppercase tracking-widest text-muted">{label}</div>
+      <div className="mt-1 text-ink break-words">{content}</div>
+    </div>
   );
 }
