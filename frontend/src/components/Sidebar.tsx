@@ -95,6 +95,9 @@ const sections: Section[] = [
         badgeKey: 'reminders',
         flagKey: 'reminders',
       },
+      // Consultant self-service. Operator-tier uses /resumes ("Resumes") for
+      // the multi-consultant management view.
+      { to: '/my-resume', label: 'My Resume', icon: IconFile, roles: ['CONSULTANT'] },
     ],
   },
   {

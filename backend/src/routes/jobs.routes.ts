@@ -35,7 +35,10 @@ jobsRouter.post('/import-url', ingest, requireRole(...OPERATOR_TIER), c.importBy
 
 jobsRouter.get('/', c.list);
 jobsRouter.post('/', requireRole(...OPERATOR_TIER), c.create);
-jobsRouter.post('/score', requireRole('CONSULTANT'), c.scoreJobs);
+// /jobs/score was a CONSULTANT-only natural-language re-rank, but this router
+// is mounted under requireRole(...OPERATOR_TIER) (consultants are excluded
+// from /jobs/*), so the route was unreachable. Removed — consistent with the
+// "consultants do not browse jobs" policy.
 
 jobsRouter.get('/:id', c.get);
 jobsRouter.patch('/:id', requireRole(...OPERATOR_TIER), c.update);

@@ -91,7 +91,12 @@ export function TrainingCourses() {
       ]}
     >
       <div className="flex items-start justify-between mb-5 flex-wrap gap-3">
-        <h1 className="text-2xl font-semibold tracking-tight">Courses</h1>
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Courses</h1>
+          <p className="text-xs text-muted mt-1">
+            Workspace-wide — every manager-tier user sees the same course catalog.
+          </p>
+        </div>
         <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <select
             aria-label="Filter by status"

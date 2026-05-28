@@ -82,6 +82,7 @@ const Interviews = lazy(() =>
 );
 const Calendar = lazy(() => import('./pages/Calendar').then((m) => ({ default: m.Calendar })));
 const Resumes = lazy(() => import('./pages/Resumes').then((m) => ({ default: m.Resumes })));
+const MyResume = lazy(() => import('./pages/MyResume').then((m) => ({ default: m.MyResume })));
 const Vendors = lazy(() => import('./pages/Vendors').then((m) => ({ default: m.Vendors })));
 const Clients = lazy(() => import('./pages/Clients').then((m) => ({ default: m.Clients })));
 const Reminders = lazy(() => import('./pages/Reminders').then((m) => ({ default: m.Reminders })));
@@ -236,6 +237,7 @@ export default function App() {
     void import('./pages/Interviews');
     void import('./pages/Calendar');
     void import('./pages/Resumes');
+    void import('./pages/MyResume');
     void import('./pages/Vendors');
     void import('./pages/Clients');
     void import('./pages/Reminders');
@@ -288,7 +290,7 @@ export default function App() {
           <Route
             path="/onboarding/consultant"
             element={
-              <ProtectedRoute bypassOnboarding>
+              <ProtectedRoute allow={['CONSULTANT']} bypassOnboarding>
                 <ConsultantOnboarding />
               </ProtectedRoute>
             }
@@ -296,7 +298,7 @@ export default function App() {
           <Route
             path="/onboarding/recruiter"
             element={
-              <ProtectedRoute bypassOnboarding>
+              <ProtectedRoute allow={['RECRUITER']} bypassOnboarding>
                 <RecruiterOnboarding />
               </ProtectedRoute>
             }
@@ -373,6 +375,16 @@ export default function App() {
             element={
               <ProtectedRoute allow={OPERATOR_TIER}>
                 <Resumes />
+              </ProtectedRoute>
+            }
+          />
+          {/* Consultant self-service: a dedicated page so the resume upload is
+              one click from the sidebar, not buried on the dashboard. */}
+          <Route
+            path="/my-resume"
+            element={
+              <ProtectedRoute allow={['CONSULTANT']}>
+                <MyResume />
               </ProtectedRoute>
             }
           />
@@ -498,7 +510,9 @@ export default function App() {
             path="/training/ai-activity"
             element={
               <ProtectedRoute allow={MANAGER_TIER}>
-                <TrainingAIActivity />
+                <FeatureGuard feature="training">
+                  <TrainingAIActivity />
+                </FeatureGuard>
               </ProtectedRoute>
             }
           />

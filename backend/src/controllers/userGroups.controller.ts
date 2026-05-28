@@ -1,9 +1,31 @@
 import { RequestHandler } from 'express';
 import { z } from 'zod';
 import { db } from '../config/db';
-import { httpError } from '../types';
+import { httpError, ADMIN_TIER, canAssignRole, type Role } from '../types';
 import { logger } from '../config/logger';
 import { audit } from '../services/audit.service';
+
+/**
+ * Can the caller move/alter the target user's group?
+ *
+ *   SUPER_ADMIN              → anyone (absolute).
+ *   Anyone → SUPER_ADMIN     → never (no one else may touch a SUPER_ADMIN).
+ *   DEVELOPER + user_groups  → any user NOT in ADMIN_TIER and NOT DEVELOPER
+ *                              (so HR_MANAGER, MANAGER, RECRUITER, CONSULTANT).
+ *   CEO / CTO / DIRECTOR     → users they STRICTLY outrank and never a
+ *                              SA-only role — exactly what canAssignRole encodes.
+ *
+ * The route gate already ensures the caller is ADMIN_TIER OR DEVELOPER+cap;
+ * this is the per-target rank check the spec required.
+ */
+function canMoveUser(caller: { role: Role }, target: { role: Role }): boolean {
+  if (caller.role === 'SUPER_ADMIN') return true;
+  if (target.role === 'SUPER_ADMIN') return false;
+  if (caller.role === 'DEVELOPER') {
+    return !(ADMIN_TIER as Role[]).includes(target.role) && target.role !== 'DEVELOPER';
+  }
+  return canAssignRole(caller.role, target.role);
+}
 
 // 7-char hex color (e.g. "#6366F1"). Empty/missing is accepted and falls
 // back to the column's server-side default at insert time.
@@ -207,12 +229,37 @@ export const assignOne: RequestHandler = async (req, res) => {
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
 
-  // Pre-read so the audit row can record the transition direction.
+  // Pre-read so the audit row can record the transition direction AND so we
+  // can rank-check the target. Rank check is critical: the route gate only
+  // verifies the CALLER's tier — it doesn't stop a DIRECTOR from moving a
+  // SUPER_ADMIN out of their group (which would be a privilege-escalation
+  // surface via group-scoped overrides on flags, etc.).
   const { data: before } = await db
     .from('users')
-    .select('id, email, group_id')
+    .select('id, email, role, group_id')
     .eq('id', parsed.data.user_id)
     .maybeSingle();
+  if (!before) throw httpError(404, 'User not found');
+  const target = before as {
+    id: string;
+    email: string | null;
+    role: Role;
+    group_id: string | null;
+  };
+  if (!canMoveUser(req.user, { role: target.role })) {
+    throw httpError(403, `You cannot move a user with role ${target.role}.`);
+  }
+
+  // Validate the target group exists when one is supplied. Clearing a user's
+  // group (group_id = null) skips this check by design.
+  if (parsed.data.group_id) {
+    const { data: grp } = await db
+      .from('user_groups')
+      .select('id')
+      .eq('id', parsed.data.group_id)
+      .maybeSingle();
+    if (!grp) throw httpError(404, 'Target group not found');
+  }
 
   const { error, data } = await db
     .from('users')
@@ -260,6 +307,33 @@ export const setMembers: RequestHandler = async (req, res) => {
     res.json({ updated: 0 });
     return;
   }
+
+  // Validate the target group exists. ("members" is a UI concept; the column
+  // is users.group_id, so we need a real group id to write.)
+  const { data: grp } = await db
+    .from('user_groups')
+    .select('id')
+    .eq('id', req.params.id)
+    .maybeSingle();
+  if (!grp) throw httpError(404, 'Target group not found');
+
+  // Per-user rank check. Load every target's role once and reject the whole
+  // batch on the first violation — partial application would silently drop
+  // SUPER_ADMIN protection from the others. Same canMoveUser used by assignOne.
+  const { data: targets } = await db
+    .from('users')
+    .select('id, role')
+    .in('id', parsed.data.user_ids);
+  const rows = (targets ?? []) as { id: string; role: Role }[];
+  if (rows.length !== parsed.data.user_ids.length) {
+    throw httpError(404, 'One or more user_ids do not exist');
+  }
+  for (const t of rows) {
+    if (!canMoveUser(req.user, { role: t.role })) {
+      throw httpError(403, `You cannot move a user with role ${t.role}.`);
+    }
+  }
+
   const { error, count } = await db
     .from('users')
     .update({ group_id: req.params.id }, { count: 'exact' })

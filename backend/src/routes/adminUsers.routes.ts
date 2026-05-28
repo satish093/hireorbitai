@@ -1,18 +1,20 @@
 import { Router } from 'express';
 import { requireRoleOrCapability } from '../middleware/auth';
-import { MANAGER_TIER, ADMIN_TIER } from '../types';
+import { ADMIN_TIER } from '../types';
 import * as c from '../controllers/adminUsers.controller';
 
 export const adminUsersRouter = Router();
 
-// Role change: MANAGER_TIER+ (or a DEVELOPER granted `users`). Rank guards in
-// the handler (assertOutranks + assertNotLastSuperAdmin) still bound exactly
-// which users/roles the caller may touch — a DEVELOPER can't escalate anyone
-// to/above its own rank, and impersonation stays SUPER_ADMIN-only.
-adminUsersRouter.patch('/:id/role', requireRoleOrCapability(MANAGER_TIER, 'users'), c.setRole);
-
-// Everything else: admin tier (or a DEVELOPER granted `users`).
+// Every /admin/users/* surface is ADMIN_TIER (or a DEVELOPER granted `users`).
+// Role change used to be MANAGER_TIER, but the matching /admin/users PAGE was
+// already ADMIN_TIER-only — leaving the backend opener created hidden API
+// access without UI clarity (a MANAGER could PATCH a role via curl with no
+// /admin/users page to find users on). Rank guards inside setRole
+// (assertOutranks + canAssignRole + assertNotLastSuperAdmin + self-protection)
+// still bound exactly which users/roles the caller may touch.
 adminUsersRouter.use(requireRoleOrCapability(ADMIN_TIER, 'users'));
+
+adminUsersRouter.patch('/:id/role', c.setRole);
 
 adminUsersRouter.get('/', c.list);
 adminUsersRouter.get('/kpi', c.kpi);

@@ -103,6 +103,16 @@ export const RBAC_MATRIX: RoutePolicy[] = [
     scope: 'owner-scoped',
     primaryActions: ['create/snooze own reminders'],
   },
+  {
+    path: '/my-resume',
+    sidebarLabel: 'My Resume',
+    section: 'Workspace',
+    allow: ['CONSULTANT'],
+    backendGate:
+      'CONSULTANT-only route; backend resume endpoints scope to caller via authorizeConsultantAccess',
+    scope: 'owner-scoped',
+    primaryActions: ['upload / list / download / set-current / delete own resume'],
+  },
 
   // ── Talent ─────────────────────────────────────────────────────────────
   {

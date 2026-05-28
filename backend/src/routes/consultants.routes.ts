@@ -7,7 +7,10 @@ export const consultantsRouter = Router();
 
 consultantsRouter.get('/', c.list);
 consultantsRouter.get('/:id', c.get);
-consultantsRouter.post('/onboard', c.onboard);
+// Consultants onboard themselves; gate to the CONSULTANT role only. Without
+// this any authenticated user could call /consultants/onboard and create a
+// stray consultants row pointing at their user_id.
+consultantsRouter.post('/onboard', requireRole('CONSULTANT'), c.onboard);
 consultantsRouter.patch('/:id', requireRole(...ALL_ROLES), c.update);
 consultantsRouter.post('/:id/assign-recruiter', requireRole(...MANAGER_TIER), c.assignRecruiter);
 consultantsRouter.post(

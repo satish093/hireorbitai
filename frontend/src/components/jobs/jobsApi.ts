@@ -2,8 +2,10 @@
 // (GET/PATCH /jobs/:id/note) are now backed by real endpoints; the client-side
 // fallbacks below stay as a safety net for the window before the note migration
 // (1700000000010_job_recruiter_note.sql) is applied.
-// TODO: POST /jobs/score (natural-language re-rank) is still a stub — returns
-// null so the caller falls back to the server-side `q` filter on /jobs/recommended.
+//
+// /jobs/score was a CONSULTANT-only natural-language re-rank stub. /jobs itself
+// is OPERATOR_TIER-gated (consultants can't reach /jobs/*), so the route was
+// unreachable and the scoreQuery() client never had a caller. Removed.
 
 import { api } from '../../services/api';
 
@@ -12,22 +14,6 @@ export interface BenchMatch {
   name: string;
   title?: string | null;
   matchScore: number;
-}
-
-/**
- * POST /jobs/score?q=...
- * Re-ranks job ids by relevance to the query string.
- * Returns null if the endpoint is unavailable (caller should do client-side filtering instead).
- */
-export async function scoreQuery(q: string): Promise<{ id: string; score: number }[] | null> {
-  try {
-    const res = await api.post<{ id: string; score: number }[]>(
-      `/jobs/score?q=${encodeURIComponent(q)}`,
-    );
-    return res.data;
-  } catch {
-    return null;
-  }
 }
 
 /** Deterministic pseudo-score so the fallback is stable across renders. */
