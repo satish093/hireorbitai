@@ -190,6 +190,12 @@ export function useCall(): UseCallReturn {
   const callTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const connectedAtRef = useRef<number | null>(null);
   const vibrateTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Screen Wake Lock — held while the call is connected so the device
+  // doesn't sleep mid-conversation (would suspend WebRTC + drop audio on
+  // Android and Mac Safari). Released on call end OR when the tab loses
+  // visibility, then re-acquired when visible again (per Wake Lock spec).
+  const wakeLockRef = useRef<WakeLockSentinel | null>(null);
+  const iceRestartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Tick the duration once a second while connected.
   useEffect(() => {
@@ -202,6 +208,57 @@ export function useCall(): UseCallReturn {
     }, 1000);
     return () => clearInterval(id);
   }, [status]);
+
+  // Acquire / release the screen Wake Lock based on call status. The browser
+  // automatically drops the lock when the tab is hidden, so wire
+  // visibilitychange to re-acquire whenever the user comes back during an
+  // active call.
+  useEffect(() => {
+    if (status !== 'connected') {
+      releaseWakeLock();
+      return;
+    }
+    void acquireWakeLock();
+    function onVisible() {
+      if (document.visibilityState === 'visible' && status === 'connected') {
+        void acquireWakeLock();
+      }
+    }
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      releaseWakeLock();
+    };
+  }, [status]);
+
+  // ----- Screen Wake Lock helpers -----------------------------------------
+  // Wake Lock keeps the screen / device awake while the call is connected.
+  // Without this, Android Chrome and iOS Safari will suspend the page after
+  // ~30 s of inactivity, which kills the WebRTC connection and drops audio.
+  // The browser auto-releases the lock when the tab loses visibility, so we
+  // also wire visibilitychange to re-acquire it when the user comes back.
+  async function acquireWakeLock(): Promise<void> {
+    try {
+      const wl = (
+        navigator as { wakeLock?: { request: (t: 'screen') => Promise<WakeLockSentinel> } }
+      ).wakeLock;
+      if (!wl) return; // Unsupported (older Safari, embedded webviews)
+      wakeLockRef.current = await wl.request('screen');
+    } catch {
+      /* user denied / browser blocked — not fatal, call still works */
+    }
+  }
+
+  function releaseWakeLock(): void {
+    const sentinel = wakeLockRef.current;
+    wakeLockRef.current = null;
+    if (!sentinel) return;
+    try {
+      void sentinel.release();
+    } catch {
+      /* ignore */
+    }
+  }
 
   function stopVibration() {
     // Only call navigator.vibrate(0) if we actually STARTED a vibration via
@@ -247,6 +304,11 @@ export function useCall(): UseCallReturn {
       clearTimeout(callTimeoutRef.current);
       callTimeoutRef.current = null;
     }
+    if (iceRestartTimerRef.current) {
+      clearTimeout(iceRestartTimerRef.current);
+      iceRestartTimerRef.current = null;
+    }
+    releaseWakeLock();
     stopRing();
     stopVibration();
 
@@ -297,6 +359,36 @@ export function useCall(): UseCallReturn {
     // instead of staring at a connected screen with no audio.
     pc.oniceconnectionstatechange = () => {
       console.info('[useCall] iceConnectionState:', pc.iceConnectionState);
+      if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+        // Stable connection — cancel any pending ICE-restart that was
+        // queued during a transient 'disconnected' state.
+        if (iceRestartTimerRef.current) {
+          clearTimeout(iceRestartTimerRef.current);
+          iceRestartTimerRef.current = null;
+        }
+        return;
+      }
+      if (pc.iceConnectionState === 'disconnected') {
+        // Transient — usually the user switched WiFi ↔ cellular or hit a
+        // brief network blip. Give it 4 s to recover on its own, then
+        // force an ICE restart so the connection can re-negotiate
+        // candidates against the new network. Without this, the call
+        // stays "disconnected" forever after a network switch.
+        if (iceRestartTimerRef.current) return;
+        iceRestartTimerRef.current = setTimeout(() => {
+          iceRestartTimerRef.current = null;
+          if (pcRef.current !== pc) return; // call was already ended
+          if (pc.iceConnectionState === 'disconnected') {
+            console.info('[useCall] restarting ICE after disconnect');
+            try {
+              pc.restartIce();
+            } catch {
+              /* older browsers / Safari pre-13 don't support restartIce */
+            }
+          }
+        }, 4_000);
+        return;
+      }
       if (pc.iceConnectionState === 'failed') {
         setLastError(
           "Couldn't connect through your network. Try switching to WiFi, or ask your network admin to allow WebRTC traffic.",
@@ -372,7 +464,18 @@ export function useCall(): UseCallReturn {
       err.name = 'SecurityError';
       throw err;
     }
-    return navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    // Explicit audio constraints — request the three quality filters every
+    // platform supports. Most browsers default these to true, but iOS
+    // Safari and some Android Chromes need them explicit or they fall back
+    // to raw mic input, which produces ear-piercing echo over speakerphone.
+    return navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      },
+      video: false,
+    });
   }
 
   // -------------------------------------------------------------------------
