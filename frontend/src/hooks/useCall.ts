@@ -308,7 +308,20 @@ export function useCall(): UseCallReturn {
 
         const pc = buildPC(peerId);
         pcRef.current = pc;
-        stream.getTracks().forEach((t) => pc.addTrack(t, stream));
+        // Use addTransceiver('audio', {direction:'sendrecv'}) and attach the
+        // track to its sender — instead of bare addTrack(). Two reasons:
+        //   1. Explicit sendrecv direction. On iOS Safari, bare addTrack
+        //      occasionally yields a transceiver with direction "sendonly"
+        //      or even "inactive" until the answer renegotiates. Pinning
+        //      sendrecv up-front guarantees the offer has the right
+        //      direction for the audio m-section.
+        //   2. The callee can match this transceiver kind-for-kind during
+        //      its own setRemoteDescription, avoiding the duplicate
+        //      transceiver bug that caused the caller→callee audio drop.
+        for (const track of stream.getAudioTracks()) {
+          const tx = pc.addTransceiver('audio', { direction: 'sendrecv' });
+          await tx.sender.replaceTrack(track);
+        }
 
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
@@ -316,7 +329,11 @@ export function useCall(): UseCallReturn {
         const res = await api.post('/calls/offer', {
           callee_id: peerId,
           call_type: 'audio',
-          sdp: offer.sdp,
+          // Use pc.localDescription.sdp (browser-finalised) rather than
+          // offer.sdp — some browsers tweak the SDP during
+          // setLocalDescription (e.g. inline ICE candidates), and the
+          // tweaked version is what the peer must see.
+          sdp: pc.localDescription?.sdp ?? offer.sdp,
         });
         const callId = res.data.call_id as string;
         callIdRef.current = callId;
@@ -353,9 +370,36 @@ export function useCall(): UseCallReturn {
       pcRef.current = pc;
       callIdRef.current = call_id;
 
-      stream.getTracks().forEach((t) => pc.addTrack(t, stream));
-
+      // 1. setRemoteDescription FIRST so the offer's audio m-section
+      //    instantiates an audio transceiver in the receiver direction.
+      //    Doing addTrack BEFORE this was the root cause of the
+      //    caller→callee silence: the callee ended up with TWO audio
+      //    transceivers (one from addTrack, one from the offer), and on
+      //    some browsers the answer's audio direction ended up as
+      //    "recvonly" which dropped the caller's outbound audio packets.
       await pc.setRemoteDescription({ type: 'offer', sdp });
+
+      // 2. Reuse the existing transceiver (from setRemoteDescription) for
+      //    our send direction by replaceTrack on its sender. Pin the
+      //    direction to sendrecv so the answer SDP keeps both directions
+      //    open regardless of what the offer asked for.
+      for (const track of stream.getAudioTracks()) {
+        const audioTx =
+          pc
+            .getTransceivers()
+            .find((tr) => tr.receiver.track.kind === 'audio' && !tr.sender.track) ?? null;
+        if (audioTx) {
+          await audioTx.sender.replaceTrack(track);
+          audioTx.direction = 'sendrecv';
+        } else {
+          // No matching transceiver (unexpected — offer didn't have audio?).
+          // Fall back to addTransceiver so we at least try to send our audio.
+          const tx = pc.addTransceiver('audio', { direction: 'sendrecv' });
+          await tx.sender.replaceTrack(track);
+        }
+      }
+
+      // 3. Drain any ICE candidates that arrived before setRemoteDescription.
       await drainPending(pc);
 
       const answer = await pc.createAnswer();
@@ -364,7 +408,9 @@ export function useCall(): UseCallReturn {
       await api.post('/calls/answer', {
         call_id,
         caller_id: caller.id,
-        sdp: answer.sdp,
+        // Use pc.localDescription.sdp (browser-finalised) rather than
+        // answer.sdp — same defence as on the caller side.
+        sdp: pc.localDescription?.sdp ?? answer.sdp,
       });
 
       playConnect();
