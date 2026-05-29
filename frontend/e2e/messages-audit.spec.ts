@@ -225,18 +225,21 @@ test.describe('Messages page — deep audit', () => {
     expect(errors).toHaveLength(0);
   });
 
-  test('call buttons present and disabled state toggles', async ({ page }) => {
+  test('voice call button present + enabled in chat header', async ({ page }) => {
+    // The chat header used to expose a video-call button alongside the
+    // voice-call one. Voice-only became the policy after the iOS audio
+    // bring-up — the video button is gone, the voice button stays.
     const errors = trackPageErrors(page);
     await setup(page);
     await page.goto(`/messages?with=${PEER_ID}`);
     await page.waitForLoadState('networkidle');
 
-    const videoBtn = page.getByRole('button', { name: /video call/i });
     const phoneBtn = page.getByRole('button', { name: /voice call/i });
-    await expect(videoBtn).toBeVisible();
     await expect(phoneBtn).toBeVisible();
-    await expect(videoBtn).toBeEnabled();
     await expect(phoneBtn).toBeEnabled();
+
+    // Video button must NOT be present.
+    await expect(page.getByRole('button', { name: /video call/i })).toHaveCount(0);
 
     expect(errors).toHaveLength(0);
   });

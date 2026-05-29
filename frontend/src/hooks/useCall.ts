@@ -130,10 +130,17 @@ export function useCall(): UseCallReturn {
   }, [status]);
 
   function stopVibration() {
-    if (vibrateTimerRef.current) {
-      clearInterval(vibrateTimerRef.current);
-      vibrateTimerRef.current = null;
-    }
+    // Only call navigator.vibrate(0) if we actually STARTED a vibration via
+    // the timer. Calling it unconditionally on every cleanup (including the
+    // unmount safety net) made Chrome log a console warning
+    //   "Blocked call to navigator.vibrate because user hasn't tapped on
+    //    the frame yet"
+    // on every page load (CallProvider mounts → cleanup deps run → vibrate
+    // fires without a gesture). Gated by the timer ref so the call only
+    // happens during an actual in-progress ring.
+    if (!vibrateTimerRef.current) return;
+    clearInterval(vibrateTimerRef.current);
+    vibrateTimerRef.current = null;
     try {
       navigator.vibrate?.(0);
     } catch {

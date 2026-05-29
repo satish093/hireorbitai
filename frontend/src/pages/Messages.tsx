@@ -1363,9 +1363,12 @@ function Bubble({
             )}
             {message.body && <span>{message.body}</span>}
             <div
+              // text-white/90 over bg-brand-600 = ~5.0:1, meeting WCAG AA's
+              // 4.5:1 minimum for normal text. Previously text-white/70
+              // landed at 3.92:1 and tripped axe-core color-contrast.
               className={clsx(
                 'text-[10px] mt-1 flex items-center gap-1 justify-end',
-                mine ? 'text-white/70' : 'text-muted',
+                mine ? 'text-white/90' : 'text-muted',
               )}
             >
               {new Date(message.created_at).toLocaleTimeString([], {
@@ -1373,7 +1376,7 @@ function Bubble({
                 minute: '2-digit',
               })}
               {message.edited_at && (
-                <span className={mine ? 'text-white/60' : 'text-muted'}>· edited</span>
+                <span className={mine ? 'text-white/80' : 'text-muted'}>· edited</span>
               )}
               {/* WhatsApp-style delivery ticks — outgoing messages only.
                   Sent (single grey tick) when the row exists. Read (double
@@ -1456,6 +1459,10 @@ function DeliveryTicks({ read }: { read: boolean }) {
   );
   return (
     <span
+      // role="img" makes the bare <span> a valid host for aria-label per
+      // the axe-core `aria-prohibited-attr` rule. The ticks are decorative-
+      // with-meaning (a status icon), so the image role is the right fit.
+      role="img"
       className="relative inline-block"
       style={{ width: 16, height: 12 }}
       title={read ? 'Read' : 'Sent'}

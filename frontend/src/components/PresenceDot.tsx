@@ -49,6 +49,11 @@ export function PresenceDot({
   const status = presenceStatusFromLastSeen(lastSeenAt);
   return (
     <span
+      // role="img" lets the bare <span> legally carry aria-label without
+      // tripping the axe-core `aria-prohibited-attr` rule. The element is
+      // purely decorative-with-meaning (a colored pip), so an image role is
+      // the closest accurate match per WAI-ARIA practices.
+      role="img"
       className={clsx(
         'relative inline-block rounded-full ring-2 ring-surface',
         COLOR[status],
