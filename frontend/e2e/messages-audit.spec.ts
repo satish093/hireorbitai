@@ -184,17 +184,25 @@ test.describe('Messages page — deep audit', () => {
   });
 
   test('attachment file chip renders with filename + clickable wrapper', async ({ page }) => {
+    // File chips used to be raw <a download> links. Now they're <button>
+    // wrappers that open the WhatsApp-style centered MediaViewerModal
+    // (image lightbox / in-app PDF viewer / file card) instead of dumping
+    // the user into a new tab. The test verifies:
+    //   1. The filename is visible inside the bubble.
+    //   2. The chip is wrapped in a focusable, clickable button (not a
+    //      bare div), so the user can open the viewer with keyboard or
+    //      tap.
+    //   3. The "open <filename>" title is set so axe / screen readers
+    //      announce the action target.
     const errors = trackPageErrors(page);
     await setup(page);
     await page.goto(`/messages?with=${PEER_ID}`);
     await page.waitForLoadState('networkidle');
 
-    // The PDF attachment renders a file row with the filename.
     await expect(page.getByText('spec.pdf').first()).toBeVisible();
-    // The wrapper is an <a> with the download URL.
-    const link = page.locator('a[href*="messages/att-1"]').first();
-    await expect(link).toBeVisible();
-    await expect(link).toHaveAttribute('target', '_blank');
+    const openBtn = page.getByRole('button', { name: /Open spec\.pdf/ }).first();
+    await expect(openBtn).toBeVisible();
+    await expect(openBtn).toBeEnabled();
 
     expect(errors).toHaveLength(0);
   });
