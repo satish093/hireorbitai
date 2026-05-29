@@ -104,6 +104,13 @@ export function Messages() {
   // you can start a brand-new chat without a separate compose popover.
   const [search, setSearch] = useState('');
   const [sending, setSending] = useState(false);
+  // Synchronous re-entry guard for send(). setSending(true) is async — a
+  // fast Enter-Enter (or Enter-then-click) fires send() twice before React
+  // has flipped the `sending` state + disabled the submit button, so the
+  // second call would also pass the `if (sending) return` check and POST
+  // a duplicate row. A ref flips synchronously so the second send() bails
+  // immediately even mid-stack-frame. Cleared in the finally block of send().
+  const sendInFlightRef = useRef(false);
   // Files the user has picked but not yet sent. Each starts uploading
   // immediately (orphan row created on the server); we only block "Send"
   // while uploads are in flight. On send we pass the server ids as
@@ -566,13 +573,26 @@ export function Messages() {
 
   async function send() {
     if (!activePeerId) return;
+    // Synchronous re-entry guard. Fixes the duplicate-message bug where a
+    // fast Enter-Enter (or Enter-then-Send-button) fired send() twice
+    // before React had time to flip `sending` to true + disable the
+    // button — both calls passed every check and both POSTed, producing
+    // two real server messages with the same body. The ref flips
+    // synchronously so the second call bails immediately even if it
+    // entered the function on the same microtask as the first.
+    if (sendInFlightRef.current) return;
+    sendInFlightRef.current = true;
     const hasAttachments = pendingAttachments.length > 0;
     const hasBody = draft.trim().length > 0;
-    if (!hasBody && !hasAttachments) return;
+    if (!hasBody && !hasAttachments) {
+      sendInFlightRef.current = false;
+      return;
+    }
     // Block while uploads are in flight — server would reject those ids
     // because they're still attached to the local tmp- placeholders.
     if (pendingAttachments.some((a) => a.uploading)) {
       toast('Hold on — one of your files is still uploading.', { icon: '⏳' });
+      sendInFlightRef.current = false;
       return;
     }
     setSending(true);
@@ -636,6 +656,7 @@ export function Messages() {
       }
     } finally {
       setSending(false);
+      sendInFlightRef.current = false;
     }
   }
 
