@@ -1564,6 +1564,7 @@ function AttachmentView({
           onClick={onOpen}
           className="block max-w-[280px] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/60 rounded-lg"
           title={`Open ${attachment.file_name}`}
+          aria-label={`Open ${attachment.file_name}`}
         >
           <img
             src={previewSrc}
@@ -1617,6 +1618,7 @@ function AttachmentView({
         onClick={onOpen}
         className="text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/60 rounded-lg"
         title={`Open ${attachment.file_name}`}
+        aria-label={`Open ${attachment.file_name}`}
       >
         {card}
       </button>
