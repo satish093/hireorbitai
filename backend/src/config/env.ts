@@ -201,6 +201,18 @@ const envSchema = z.object({
   // radius is small. The frontend refetches on every call start anyway.
   TURN_CREDENTIAL_TTL_SECONDS: z.coerce.number().int().min(60).max(86400).default(3600),
 
+  // Strict org-wide monthly cap on accepted call duration. Protects the
+  // Cloudflare Realtime TURN free tier (1,000 GB egress / calendar month).
+  // 980 hrs at Opus ~80 kbps ≈ 280 GB — well inside the free ceiling
+  // with headroom for both legs of every call. Reset window is the
+  // calendar month (UTC). Once the cap is reached, POST /calls/offer
+  // returns 503 ("Monthly call capacity reached — service paused until
+  // next month") and the frontend surfaces the message as a toast. Set
+  // to 0 to disable the cap entirely (useful for dev/test). Integer-only
+  // so a misconfig like `0.5` is rejected at boot instead of letting one
+  // call through then blocking forever.
+  CALLS_MONTHLY_HOUR_CAP: z.coerce.number().int().min(0).default(980),
+
   // --- Development tooling ---
   // Master switch for the development-only surface: the role/user switch
   // endpoints (/auth/dev/*) and the Super-Admin test panel API (/dev/*).
@@ -381,5 +393,8 @@ export const env = {
         : [],
     },
     credentialTtlSeconds: e.TURN_CREDENTIAL_TTL_SECONDS,
+  },
+  calls: {
+    monthlyHourCap: e.CALLS_MONTHLY_HOUR_CAP,
   },
 } as const;

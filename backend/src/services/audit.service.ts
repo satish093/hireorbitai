@@ -37,6 +37,7 @@ export type AuditAction =
   | 'daily_digest_skipped'
   | 'messages_permission_denied'
   | 'calls_permission_denied'
+  | 'calls_monthly_cap_reached'
   | 'work_auth_doc_uploaded'
   | 'work_auth_doc_deleted'
   | 'resume_uploaded'

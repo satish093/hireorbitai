@@ -7,6 +7,11 @@ import { publishToUser } from '../services/realtime.service';
 import { audit } from '../services/audit.service';
 import { logger } from '../config/logger';
 import { env } from '../config/env';
+import {
+  assertUnderMonthlyCap,
+  getMonthlyHoursUsed,
+  invalidateMonthlyHoursUsed,
+} from '../services/callsBudget.service';
 
 // ---------------------------------------------------------------------------
 // Schema helpers
@@ -78,6 +83,35 @@ export const offer: RequestHandler = async (req, res) => {
       metadata: { callee_id, call_type },
     });
     throw httpError(403, 'Not permitted to call this user');
+  }
+
+  // Org-wide monthly cap. Refuses NEW offers once accepted-call duration
+  // for the calendar month hits CALLS_MONTHLY_HOUR_CAP (default 980 hrs)
+  // — protects the Cloudflare Realtime TURN free tier. Calls already in
+  // progress are not affected; only new offers get a 503. The check is
+  // cached for ~60 s so it's effectively free on the hot path.
+  try {
+    await assertUnderMonthlyCap();
+  } catch (err) {
+    if (err instanceof Error && (err as { status?: number }).status === 503) {
+      // Greppable audit row carrying the actual numbers (cap + used) so
+      // post-incident analysis can correlate the spike with when the
+      // service started refusing. Same `audit({...})` pattern as the
+      // permission-denied event above.
+      const used = await getMonthlyHoursUsed().catch(() => -1);
+      audit({
+        action: 'calls_monthly_cap_reached',
+        user_id: me.id,
+        email: me.email,
+        req,
+        metadata: {
+          callee_id,
+          used_hours: used,
+          cap_hours: env.calls.monthlyHourCap,
+        },
+      });
+    }
+    throw err;
   }
 
   // Fetch caller display info first so it's ready before we notify the callee.
@@ -191,9 +225,21 @@ export const end: RequestHandler = async (req, res) => {
 
   const { call_id, peer_id } = parsed.data;
 
+  // Atomic close-out. Computes duration_seconds in the same statement so
+  // we never have a window where the row is `status='ended'` but missing
+  // the duration. GREATEST(0, …) defends against pathological cases
+  // where ended_at could land before started_at (e.g. clock drift during
+  // an immediate end). Calls that were never accepted (started_at IS
+  // NULL — typical for caller-cancel before pickup) get NULL duration,
+  // which the monthly-cap aggregation already excludes.
   const { rows } = await pool.query<{ caller_id: string; callee_id: string }>(
     `UPDATE public.calls
-     SET status = 'ended', ended_at = now()
+     SET status = 'ended',
+         ended_at = now(),
+         duration_seconds = CASE
+           WHEN started_at IS NULL THEN NULL
+           ELSE GREATEST(0, EXTRACT(EPOCH FROM (now() - started_at))::int)
+         END
      WHERE id = $1
        AND status NOT IN ('ended', 'rejected')
        AND (caller_id = $2 OR callee_id = $2)
@@ -201,6 +247,12 @@ export const end: RequestHandler = async (req, res) => {
     [call_id, me.id],
   );
   if (!rows[0]) throw httpError(404, 'Call not found or already ended');
+
+  // Wipe the budget cache so the next /calls/offer sees this call's
+  // duration immediately. Without this, the cap check could lag by up
+  // to the 60 s cache TTL — usually fine, but means a back-to-back
+  // burst right at the cap boundary could over-shoot.
+  invalidateMonthlyHoursUsed();
 
   const { caller_id, callee_id } = rows[0];
   if (peer_id !== caller_id && peer_id !== callee_id) throw httpError(403, 'Invalid peer');
