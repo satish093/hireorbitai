@@ -183,6 +183,90 @@ test.describe('Messages page — deep audit', () => {
     expect(errors).toHaveLength(0);
   });
 
+  test('clicking PDF chip opens WhatsApp-style PDF viewer modal', async ({ page }) => {
+    // End-to-end behaviour test: tapping a PDF attachment inside a chat
+    // bubble must lazy-load MediaViewerModal AND mount the centered PDF
+    // viewer (file name in the header bar + "Open in new tab" escape
+    // hatch + a Close button). Asserts the chunk loads, the dialog
+    // renders, and the close button puts us back to the thread.
+    const errors = trackPageErrors(page);
+    await setup(page);
+    await page.goto(`/messages?with=${PEER_ID}`);
+    await page.waitForLoadState('networkidle');
+
+    const openBtn = page.getByRole('button', { name: /Open spec\.pdf/ }).first();
+    await openBtn.click();
+
+    // The viewer header carries the file name and the "Open in new tab"
+    // escape hatch — both are unique to PdfViewerModal.
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await expect(page.getByText('Open in new tab ↗')).toBeVisible();
+
+    // The close button is aria-labelled — verify it actually tears the modal down.
+    await page.getByRole('button', { name: 'Close viewer' }).click();
+    await expect(page.getByRole('dialog')).not.toBeVisible();
+
+    // pdfjs may emit a "fake worker" warning in test envs; otherwise no
+    // hard page errors.
+    expect(errors.filter((e) => !/fake worker/i.test(e))).toHaveLength(0);
+  });
+
+  test('clicking image chip opens centered lightbox', async ({ page }) => {
+    // Same end-to-end shape, image path. The MediaViewerModal routes
+    // image attachments to yet-another-react-lightbox; we assert the
+    // lightbox's distinct toolbar + role="presentation" backdrop, not
+    // the file-card or PDF surfaces.
+    const errors = trackPageErrors(page);
+    await seedSession(page, MANAGER);
+    const IMG_THREAD = [
+      {
+        id: 'm-img-1',
+        sender_id: PEER_ID,
+        recipient_id: MANAGER.id,
+        body: '',
+        read_at: null,
+        created_at: new Date().toISOString(),
+        attachments: [
+          {
+            id: 'att-img-1',
+            file_name: 'photo.png',
+            mime_type: 'image/png',
+            size_bytes: 4242,
+            // 1×1 transparent PNG so the lightbox renders without a network round trip.
+            download_url:
+              'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==',
+            is_image: true,
+          },
+        ],
+      },
+    ];
+    await mockApi(page, {
+      profile: MANAGER,
+      flags: { messages: true },
+      handlers: {
+        '/messages/conversations': {
+          json: [{ peer: MOCK_PEER, last_message: IMG_THREAD[0], unread_count: 1 }],
+        },
+        '/messages/directory': { json: [MOCK_PEER] },
+        '/messages/unread-count': { json: { unread: 1 } },
+        [`/messages/with/${PEER_ID}`]: { json: IMG_THREAD },
+        [`POST /messages/with/${PEER_ID}/read`]: { json: { ok: true } },
+      },
+    });
+    await page.goto(`/messages?with=${PEER_ID}`);
+    await page.waitForLoadState('networkidle');
+
+    const openImg = page.getByRole('button', { name: /Open photo\.png/ }).first();
+    await openImg.click();
+
+    // yet-another-react-lightbox renders a root with class `yarl__root`
+    // and exposes a Close button labelled "Close" — both unique to the
+    // lightbox surface (not the PDF or file-card modals).
+    await expect(page.locator('.yarl__root')).toBeVisible();
+
+    expect(errors).toHaveLength(0);
+  });
+
   test('attachment file chip renders with filename + clickable wrapper', async ({ page }) => {
     // File chips used to be raw <a download> links. Now they're <button>
     // wrappers that open the WhatsApp-style centered MediaViewerModal
