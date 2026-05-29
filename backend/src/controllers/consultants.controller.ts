@@ -262,21 +262,23 @@ export const update: RequestHandler = async (req, res) => {
 
   // Admin tier unscoped; group leads confined to their group; recruiter to
   // their assigned consultants; consultant to their own row.
+  // Out-of-scope responses use 404 (not 403) so the endpoint isn't an
+  // existence oracle — drifted from `get` which already returns 404.
   if (isAdminTier(req.user.role)) {
     // unscoped
   } else if (isGroupLead(req.user.role)) {
     if (!(await leadCanAccessUser(req.user, (row as { user_id: string }).user_id))) {
-      throw httpError(403, 'Forbidden');
+      throw httpError(404, 'Not found');
     }
   } else if (req.user.role === 'RECRUITER') {
     const myRecId = await getCallerRecruiterRowId(req.user.id);
     if (!myRecId || (row as { recruiter_id: string | null }).recruiter_id !== myRecId) {
-      throw httpError(403, 'Forbidden');
+      throw httpError(404, 'Not found');
     }
   } else if (req.user.role === 'CONSULTANT') {
-    if ((row as { user_id: string }).user_id !== req.user.id) throw httpError(403, 'Forbidden');
+    if ((row as { user_id: string }).user_id !== req.user.id) throw httpError(404, 'Not found');
   } else {
-    throw httpError(403, 'Forbidden');
+    throw httpError(404, 'Not found');
   }
 
   const { data, error } = await db

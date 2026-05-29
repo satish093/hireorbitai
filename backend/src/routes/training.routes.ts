@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import rateLimit from 'express-rate-limit';
 import { requireRole } from '../middleware/auth';
 import { MANAGER_TIER, ADMIN_TIER, OWNER_TIER } from '../types';
 import * as c from '../controllers/training.controller';
@@ -6,6 +7,21 @@ import * as w from '../controllers/trainingWorkspace.controller';
 import * as adminAI from '../controllers/adminAI.controller';
 
 export const trainingRouter = Router();
+
+// Per-route hard cap on lesson-content AI generation. The global aiLimiter
+// applies to /training/generate + /training/coach but does NOT match
+// /training/lessons/:id/generate-content (different path shape). Without
+// this, an admin-tier insider could loop the endpoint and either burn the
+// OWNER's Claude Max quota (if owner-tier) or simply rack up
+// ANTHROPIC_API_KEY spend (if admin-tier). Five requests / minute is well
+// above any legitimate authoring rhythm.
+const trainingLessonAiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 5,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  keyGenerator: (req) => req.user?.id ?? req.ip ?? 'anon',
+});
 
 // ---- Learning workspace (any authed user; reads degrade gracefully) ----
 trainingRouter.get('/catalog', w.getCatalog);
@@ -47,8 +63,12 @@ trainingRouter.post('/courses/:id/lessons', requireRole(...MANAGER_TIER), c.crea
 trainingRouter.put('/lessons/:id', requireRole(...MANAGER_TIER), c.updateLesson);
 trainingRouter.delete('/lessons/:id', requireRole(...MANAGER_TIER), c.deleteLesson);
 // AI lesson-content generation is ADMIN-tier only.
+// Credential isolation (only OWNER_TIER may pass aiToken / use OAUTH fallback)
+// is enforced inside the handler. The per-route limiter sits BEFORE the role
+// gate so abuse from any authenticated caller still bounces off the cap.
 trainingRouter.post(
   '/lessons/:id/generate-content',
+  trainingLessonAiLimiter,
   requireRole(...ADMIN_TIER),
   c.generateLessonContent,
 );

@@ -4,6 +4,7 @@ import { db, pool } from '../config/db';
 import { httpError } from '../types';
 import { canMessageUser } from '../services/permission.service';
 import { publishToUser } from '../services/realtime.service';
+import { audit } from '../services/audit.service';
 import { logger } from '../config/logger';
 
 // ---------------------------------------------------------------------------
@@ -64,7 +65,19 @@ export const offer: RequestHandler = async (req, res) => {
     { id: me.id, role: me.role, group_id: me.group_id ?? null },
     callee_id,
   );
-  if (!allowed) throw httpError(403, 'Not permitted to call this user');
+  if (!allowed) {
+    // Surface denied call attempts in the audit trail so abuse / probing of
+    // the messaging-permission boundary is visible alongside the existing
+    // `messages_permission_denied` events.
+    audit({
+      action: 'calls_permission_denied',
+      user_id: me.id,
+      email: me.email,
+      req,
+      metadata: { callee_id, call_type },
+    });
+    throw httpError(403, 'Not permitted to call this user');
+  }
 
   // Fetch caller display info first so it's ready before we notify the callee.
   const { data: callerRow } = await db
@@ -123,6 +136,11 @@ export const answer: RequestHandler = async (req, res) => {
   if (rows[0].caller_id !== caller_id) throw httpError(409, 'Caller ID mismatch');
 
   await publishToUser(caller_id, 'call:answered', { call_id, sdp });
+  // Fan out a 'taken-on-another-tab' notice to the callee's OTHER live SSE
+  // streams (laptop + phone + stale tabs). Without this, every other tab
+  // keeps ringing + vibrating forever — the phone-in-meeting bug. The
+  // active tab guards on call_id and ignores its own notice.
+  await publishToUser(me.id, 'call:accepted-elsewhere', { call_id });
 
   logger.info({ call_id, caller_id, callee_id: me.id }, 'call:answered');
 
@@ -219,6 +237,9 @@ export const reject: RequestHandler = async (req, res) => {
   if (rows[0].caller_id !== caller_id) throw httpError(409, 'Caller ID mismatch');
 
   await publishToUser(caller_id, 'call:rejected', { call_id });
+  // Same multi-tab clearance as answer() — every other live SSE stream of
+  // the rejecting user gets a notice so the ringtone/vibration stops.
+  await publishToUser(me.id, 'call:rejected-elsewhere', { call_id });
 
   logger.info({ call_id, callee_id: me.id }, 'call:rejected');
 

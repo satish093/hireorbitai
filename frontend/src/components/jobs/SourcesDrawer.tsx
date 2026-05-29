@@ -18,22 +18,15 @@ export function SourcesDrawer({
   const [rows, setRows] = useState<SourceCompany[]>([]);
   const [health, setHealth] = useState<SourceHealth[]>([]);
   const [loading, setLoading] = useState(true);
-  const [newSource, setNewSource] = useState<
-    | 'greenhouse'
-    | 'lever'
-    | 'remoteok'
-    | 'adzuna'
-    | 'remotive'
-    | 'arbeitnow'
-    | 'jsearch'
-    | 'ashby'
-    | 'jooble'
-    | 'usajobs'
-    | 'serpapi'
-    | 'searchapi'
-    | 'linkedin'
-    | 'monster'
-  >('greenhouse');
+  // Backend currently accepts only the two source IDs in the Zod enum at
+  // backend/src/controllers/jobSources.controller.ts ('jooble' | 'manual').
+  // Every other option that used to appear here (greenhouse/lever/jsearch/…)
+  // was rejected with 400 by the backend AND violates the strict-source
+  // policy in CLAUDE.md — keeping them in the UI invited operator confusion
+  // and accidental re-introduction. Aligning the backend ingestion enum to
+  // CLAUDE.md's strict-4 (linkedin/jsearch/monster) is tracked as a separate
+  // follow-up (requires driver inspection).
+  const [newSource, setNewSource] = useState<'jooble' | 'manual'>('jooble');
   const [newSlug, setNewSlug] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -57,14 +50,10 @@ export function SourcesDrawer({
   }, []);
 
   async function add() {
-    if ((newSource === 'greenhouse' || newSource === 'lever') && !newSlug.trim()) {
-      toast.error(`${newSource} needs a company slug (e.g. "stripe")`);
-      return;
-    }
     try {
       await api.post('/jobs/sources', {
         source: newSource,
-        slug: newSource === 'remoteok' || newSource === 'adzuna' ? null : newSlug.trim(),
+        slug: newSlug.trim() || null,
         display_name: newSlug.trim() || newSource,
       });
       setNewSlug('');
@@ -147,58 +136,25 @@ export function SourcesDrawer({
           <div className="grid grid-cols-3 gap-2">
             <select
               value={newSource}
-              onChange={(e) => setNewSource(e.target.value as any)}
+              onChange={(e) => setNewSource(e.target.value as 'jooble' | 'manual')}
               className="border border-border rounded-lg px-2 py-1.5 text-sm bg-surface"
             >
-              <option value="greenhouse">Greenhouse</option>
-              <option value="lever">Lever</option>
-              <option value="ashby">Ashby</option>
-              <option value="remoteok">RemoteOK</option>
-              <option value="remotive">Remotive</option>
-              <option value="arbeitnow">Arbeitnow</option>
-              <option value="adzuna">Adzuna</option>
-              <option value="jsearch">JSearch (Indeed / LinkedIn)</option>
               <option value="jooble">Jooble</option>
-              <option value="usajobs">USAJobs</option>
-              <option value="serpapi">SerpAPI Google Jobs</option>
-              <option value="searchapi">SearchApi.io Google Jobs</option>
-              <option value="linkedin">LinkedIn (Fantastic Jobs)</option>
-              <option value="monster">Monster (RapidAPI)</option>
+              <option value="manual">Manual</option>
             </select>
             <input
               value={newSlug}
               onChange={(e) => setNewSlug(e.target.value)}
-              placeholder={
-                newSource === 'greenhouse' || newSource === 'lever' || newSource === 'ashby'
-                  ? 'e.g. stripe'
-                  : newSource === 'linkedin'
-                    ? 'e.g. Data Engineer (title filter)'
-                    : newSource === 'monster'
-                      ? 'e.g. python|New York|en_us'
-                      : newSource === 'jsearch' ||
-                          newSource === 'jooble' ||
-                          newSource === 'serpapi' ||
-                          newSource === 'searchapi' ||
-                          newSource === 'usajobs'
-                        ? 'optional: search query'
-                        : '—'
-              }
-              disabled={
-                newSource === 'remoteok' ||
-                newSource === 'adzuna' ||
-                newSource === 'remotive' ||
-                newSource === 'arbeitnow'
-              }
-              className="border border-border rounded-lg px-2 py-1.5 text-sm col-span-1 disabled:bg-hover"
+              placeholder={newSource === 'jooble' ? 'optional: search query' : 'label or note'}
+              className="border border-border rounded-lg px-2 py-1.5 text-sm col-span-1"
             />
             <Button variant="primary" size="sm" onClick={add}>
               + Add
             </Button>
           </div>
           <p className="text-[11px] text-muted mt-2">
-            Greenhouse / Lever slugs come from the careers URL — e.g.{' '}
-            <span className="font-mono">boards.greenhouse.io/stripe</span> → slug{' '}
-            <span className="font-mono">stripe</span>.
+            Jooble pulls aggregated postings via the free Jooble API (JOOBLE_API_KEY). Use "Manual"
+            for one-off rows you maintain by hand.
           </p>
         </div>
 

@@ -36,8 +36,10 @@ async function assertOwner(reminderId: string, userId: string): Promise<void> {
     .eq('id', reminderId)
     .maybeSingle();
   if (error) throw httpError(500, 'Database error');
-  if (!data) throw httpError(404, 'Reminder not found');
-  if (data.owner_id !== userId) throw httpError(403, 'Forbidden');
+  // Ownership-mismatch returns 404 (not 403) so the endpoint isn't an existence
+  // oracle — a non-owner probing UUIDs gets the same response whether the row
+  // exists or not. Mirrors the canonical applications.loadAndAuthorize pattern.
+  if (!data || data.owner_id !== userId) throw httpError(404, 'Reminder not found');
 }
 
 export const list: RequestHandler = async (req, res) => {

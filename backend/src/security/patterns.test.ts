@@ -149,4 +149,28 @@ describe('security pattern guard (controllers)', () => {
     assertAgainstBaseline('raw-sql-concat', findings, RAW_SQL_CONCAT_BASELINE);
     expect(countByFile(findings)).toEqual(RAW_SQL_CONCAT_BASELINE);
   });
+
+  // Audit regression: recruiters.onboard previously had a non-strict Zod
+  // schema that accepted `manager_id` and spread it into the upsert,
+  // forging the v_user_relationships permission graph in one request. Pin
+  // that the schema is .strict() and does NOT include any of the
+  // authority-conferring columns.
+  it('recruiters.onboard onboardingSchema is .strict() and excludes authority columns', () => {
+    const src = readFileSync(join(CONTROLLERS_DIR, 'recruiters.controller.ts'), 'utf8');
+    // Locate the schema block (object literal followed by .strict()).
+    expect(src, 'recruiters.controller.ts: onboardingSchema must call .strict()').toMatch(
+      /onboardingSchema\s*=\s*z[\s\S]*?\.strict\(\)/,
+    );
+    // Extract the lines between `const onboardingSchema = z.object({` and the
+    // closing `}).strict();` so the assertion only sees the schema body.
+    const match = src.match(/const\s+onboardingSchema\s*=\s*z[\s\S]*?\}\)\s*\.strict\(\)/);
+    expect(match, 'onboardingSchema block not found').toBeTruthy();
+    const block = match![0];
+    for (const forbidden of ['manager_id', 'recruiter_id', 'consultant_id', 'user_id', 'role']) {
+      expect(
+        block,
+        `onboardingSchema must NOT include ${forbidden} (authority column — gated by addManager / moveGroup).`,
+      ).not.toMatch(new RegExp(`\\b${forbidden}\\b`));
+    }
+  });
 });

@@ -59,8 +59,13 @@ function evictExpiredSseTokens(): void {
 export const issueToken: RequestHandler = (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   evictExpiredSseTokens();
-  if (sseTokens.size > 10_000) {
-    logger.warn({ size: sseTokens.size }, 'realtime/token: SSE token store too large');
+  // Hard refuse once the in-process token store is saturated. The previous
+  // shape only logged a warning, which let an attacker keep minting tokens
+  // until the process ran out of memory. The store is a Map<token,entry>
+  // with a 60s TTL — even at the cap we churn fast under normal load.
+  if (sseTokens.size >= 10_000) {
+    logger.warn({ size: sseTokens.size }, 'realtime/token: SSE token store saturated');
+    throw httpError(503, 'Realtime temporarily unavailable — try again shortly.');
   }
   const token = crypto.randomBytes(32).toString('hex');
   sseTokens.set(token, { userId: req.user.id, expiresAt: Date.now() + 60_000 });

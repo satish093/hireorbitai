@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { db } from '../config/db';
+import { db, pool } from '../config/db';
 import { sendInvitationLink } from './brevo.service';
 import { env } from '../config/env';
 import { logger } from '../config/logger';
@@ -145,16 +145,27 @@ export async function acceptInvitation(token: string, userId: string) {
     );
   }
 
+  // Atomically claim the invitation BEFORE mutating the user row. Without
+  // this CAS, two concurrent accept clicks both read status=PENDING above
+  // and both proceed to role-promote + wireHierarchy. Only the winner of
+  // the UPDATE…WHERE status='PENDING' continues.
+  const claim = await pool.query<{ id: string }>(
+    `UPDATE public.invitations
+        SET status = 'ACCEPTED', accepted_at = $2
+      WHERE id = $1 AND status = 'PENDING'
+      RETURNING id`,
+    [invite.id, new Date().toISOString()],
+  );
+  if (claim.rows.length === 0) {
+    throw httpError(400, 'Invitation already accepted');
+  }
+
   // Promote the user's role and, if the invitation pre-assigned a group,
   // move the user into it. Null group_id on the invitation leaves the user's
   // existing group untouched (no "demotion to No Group" surprises).
   const userPatch: Record<string, unknown> = { role: invite.role };
   if (invite.group_id) userPatch.group_id = invite.group_id;
   await db.from('users').update(userPatch).eq('id', userId);
-  await db
-    .from('invitations')
-    .update({ status: 'ACCEPTED', accepted_at: new Date().toISOString() })
-    .eq('id', invite.id);
 
   // Wire the org-hierarchy relationships now that the user exists with their role
   await wireHierarchy(userId, invite.role as Role, invite.parent_user_id ?? null).catch(

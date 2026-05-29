@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { Layout } from '../components/Layout';
 import { SkeletonCard } from '../components/Skeleton';
 import { Button } from '../components/Button';
+import { Modal } from '../components/Modal';
 import { Avatar } from '../components/TaskBits';
 import { PresencePill } from '../components/PresenceDot';
 import { useAuth } from '../context/AuthContext';
@@ -478,97 +479,91 @@ export function UserProfile() {
         </div>
       </div>
 
-      {showDeactivate && (
-        <div
-          className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-[2px] flex items-center justify-center p-6 animate-fade-in"
-          onClick={() => !actBusy && setShowDeactivate(false)}
-          role="dialog"
-          aria-modal="true"
-        >
-          <div
-            className="bg-surface rounded-2xl border border-border shadow-xl w-full max-w-md p-6 animate-scale-in"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="text-lg font-semibold text-ink">Deactivate account?</h2>
-            <p className="text-sm text-muted mt-2">
-              <span className="font-medium text-ink">{user.email}</span> will be signed out of every
-              session and unable to log in until you reactivate them. Their data is preserved.
-            </p>
-            <div className="flex items-center justify-end gap-2 mt-5">
-              <Button variant="outline" onClick={() => setShowDeactivate(false)} disabled={actBusy}>
-                Cancel
-              </Button>
-              <Button variant="danger" onClick={deactivate} disabled={actBusy} loading={actBusy}>
-                {actBusy ? 'Deactivating…' : 'Deactivate'}
-              </Button>
-            </div>
+      {/* Replaced inline `fixed inset-0` divs with the shared <Modal> — the
+          inline version rendered as a child of <main>, which carries the
+          `animate-page-enter` transform. A transformed ancestor re-anchors
+          `position:fixed` to itself, so the dialog visually centered against
+          the content area instead of the viewport on every page that scrolled.
+          <Modal> portals to document.body + handles focus trap + Escape +
+          scroll lock. */}
+      <Modal
+        open={showDeactivate}
+        onClose={() => !actBusy && setShowDeactivate(false)}
+        title="Deactivate account?"
+        size="md"
+        footer={
+          <div className="flex items-center justify-end gap-2">
+            <Button variant="outline" onClick={() => setShowDeactivate(false)} disabled={actBusy}>
+              Cancel
+            </Button>
+            <Button variant="danger" onClick={deactivate} disabled={actBusy} loading={actBusy}>
+              {actBusy ? 'Deactivating…' : 'Deactivate'}
+            </Button>
           </div>
-        </div>
-      )}
+        }
+      >
+        <p className="text-sm text-muted">
+          <span className="font-medium text-ink">{user.email}</span> will be signed out of every
+          session and unable to log in until you reactivate them. Their data is preserved.
+        </p>
+      </Modal>
 
-      {showDelete && (
-        <div
-          className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-[2px] flex items-center justify-center p-6 animate-fade-in"
-          onClick={() => !actBusy && setShowDelete(false)}
-          role="dialog"
-          aria-modal="true"
-        >
-          <div
-            className="bg-surface rounded-2xl border border-border shadow-xl w-full max-w-md p-6 animate-scale-in"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="text-lg font-semibold text-ink">Delete account permanently?</h2>
-            <p className="text-sm text-muted mt-2">
-              This will permanently remove{' '}
-              <span className="font-medium text-ink">{user.email}</span>'s auth user, profile row,
-              and active sessions. This action cannot be undone.
-            </p>
-            <p className="text-xs text-muted mt-3">
-              Prefer{' '}
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setShowDelete(false);
-                  setShowDeactivate(true);
-                }}
-                className="text-amber-700 dark:text-amber-300 hover:underline"
-              >
-                deactivate
-              </Button>{' '}
-              if you want to keep the audit trail.
-            </p>
-            <label className="block mt-4">
-              <span className="text-[10px] font-semibold uppercase tracking-widest text-muted">
-                Type <span className="text-ink">{user.email}</span> to confirm
-              </span>
-              <input
-                type="text"
-                value={deleteConfirmText}
-                onChange={(e) => setDeleteConfirmText(e.target.value)}
-                autoComplete="off"
-                className="mt-1 w-full text-sm bg-surface border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-red-500/40"
-              />
-            </label>
-            <div className="flex items-center justify-end gap-2 mt-5">
-              <Button variant="outline" onClick={() => setShowDelete(false)} disabled={actBusy}>
-                Cancel
-              </Button>
-              <Button
-                variant="danger"
-                onClick={remove}
-                disabled={
-                  actBusy || deleteConfirmText.trim().toLowerCase() !== user.email.toLowerCase()
-                }
-                loading={actBusy}
-              >
-                {actBusy ? 'Deleting…' : 'Delete permanently'}
-              </Button>
-            </div>
+      <Modal
+        open={showDelete}
+        onClose={() => !actBusy && setShowDelete(false)}
+        title="Delete account permanently?"
+        size="md"
+        footer={
+          <div className="flex items-center justify-end gap-2">
+            <Button variant="outline" onClick={() => setShowDelete(false)} disabled={actBusy}>
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              onClick={remove}
+              disabled={
+                actBusy || deleteConfirmText.trim().toLowerCase() !== user.email.toLowerCase()
+              }
+              loading={actBusy}
+            >
+              {actBusy ? 'Deleting…' : 'Delete permanently'}
+            </Button>
           </div>
-        </div>
-      )}
+        }
+      >
+        <p className="text-sm text-muted">
+          This will permanently remove <span className="font-medium text-ink">{user.email}</span>'s
+          auth user, profile row, and active sessions. This action cannot be undone.
+        </p>
+        <p className="text-xs text-muted mt-3">
+          Prefer{' '}
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setShowDelete(false);
+              setShowDeactivate(true);
+            }}
+            className="text-amber-700 dark:text-amber-300 hover:underline"
+          >
+            deactivate
+          </Button>{' '}
+          if you want to keep the audit trail.
+        </p>
+        <label className="block mt-4">
+          <span className="text-[10px] font-semibold uppercase tracking-widest text-muted">
+            Type <span className="text-ink">{user.email}</span> to confirm
+          </span>
+          <input
+            type="text"
+            value={deleteConfirmText}
+            onChange={(e) => setDeleteConfirmText(e.target.value)}
+            autoComplete="off"
+            className="mt-1 w-full text-sm bg-surface border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-red-500/40"
+          />
+        </label>
+      </Modal>
     </Layout>
   );
 }

@@ -2,6 +2,28 @@ import { RequestHandler } from 'express';
 import { z } from 'zod';
 import { db } from '../config/db';
 import { httpError } from '../types';
+import { isAdminTier } from '../services/groupScope';
+import type { Role } from '../types';
+
+// Row-load + ownership check for mutation paths — mirrors vendors/applications.
+// Non-admin callers may only mutate clients THEY created. 404 on miss avoids
+// turning the endpoint into an existence oracle.
+async function loadAndAuthorizeClient(
+  caller: { id: string; role: Role },
+  clientId: string,
+): Promise<{ id: string; created_by: string | null }> {
+  const { data } = await db
+    .from('clients')
+    .select('id, created_by')
+    .eq('id', clientId)
+    .maybeSingle();
+  const row = data as { id: string; created_by: string | null } | null;
+  if (!row) throw httpError(404, 'Client not found');
+  if (!isAdminTier(caller.role) && row.created_by !== caller.id) {
+    throw httpError(404, 'Client not found');
+  }
+  return row;
+}
 
 // Mass-assignment guard. Only these columns are client-writable; server-owned
 // fields (id, created_by, created_at, updated_at) are set server-side and must
@@ -51,6 +73,7 @@ export const update: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   const parsed = updateSchema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
+  await loadAndAuthorizeClient(req.user, req.params.id);
   const { data, error } = await db
     .from('clients')
     .update(parsed.data)
@@ -62,6 +85,8 @@ export const update: RequestHandler = async (req, res) => {
 };
 
 export const remove: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  await loadAndAuthorizeClient(req.user, req.params.id);
   const { error } = await db.from('clients').delete().eq('id', req.params.id);
   if (error) throw httpError(500, 'Database error');
   res.json({ ok: true });

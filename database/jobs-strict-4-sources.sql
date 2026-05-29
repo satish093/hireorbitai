@@ -34,7 +34,10 @@ WHERE source = 'jsearch'
 --    The fetchMonster driver already exists in jobIngestion.service.ts —
 --    it just needed active source_companies rows to run.
 -- ────────────────────────────────────────────────────────────────────────────
-INSERT INTO source_companies (name, source, slug, is_active)
+-- NOTE: the column is `display_name`, not `name`. Earlier revision used `name`
+-- which doesn't exist in the source_companies schema (see
+-- database/all-sources-seed.sql) — fresh applies would error out.
+INSERT INTO source_companies (display_name, source, slug, is_active)
 VALUES
   ('Monster — Software Engineer', 'monster', 'software engineer', true),
   ('Monster — Data Engineer',     'monster', 'data engineer',     true),
@@ -63,7 +66,7 @@ WHERE  source = 'jsearch'
 --    The publisher filter added in jobIngestion.service.ts ensures only
 --    Dice/CareerBuilder results are saved even if JSearch returns others.
 -- ────────────────────────────────────────────────────────────────────────────
-INSERT INTO source_companies (name, source, slug, is_active)
+INSERT INTO source_companies (display_name, source, slug, is_active)
 VALUES
   ('JSearch · Dice · Software Engineer',    'jsearch', 'software engineer site:dice.com',        true),
   ('JSearch · Dice · Data Engineer',        'jsearch', 'data engineer site:dice.com',             true),
@@ -87,9 +90,9 @@ ON CONFLICT (source, slug) DO UPDATE
 -- ────────────────────────────────────────────────────────────────────────────
 -- Verification queries (run manually to confirm):
 --
---   SELECT source, name, is_active, slug
+--   SELECT source, display_name, is_active, slug
 --   FROM source_companies
---   ORDER BY source, name;
+--   ORDER BY source, display_name;
 --   -- Expected: only linkedin, jsearch, monster rows
 --
 --   SELECT source, COUNT(*) FROM source_companies GROUP BY source;

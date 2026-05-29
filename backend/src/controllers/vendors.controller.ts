@@ -2,6 +2,30 @@ import { RequestHandler } from 'express';
 import { z } from 'zod';
 import { db } from '../config/db';
 import { httpError } from '../types';
+import { isAdminTier } from '../services/groupScope';
+import type { Role } from '../types';
+
+// Row-load + ownership check for mutation paths. Non-admin callers may only
+// touch vendors THEY created (`created_by = caller.id`). 404 on miss so the
+// endpoint can't be used as an existence oracle — mirrors the canonical
+// applications.controller.ts loadAndAuthorize pattern. Without this guard, a
+// group-A operator could mutate/delete a group-B vendor by guessing the id.
+async function loadAndAuthorizeVendor(
+  caller: { id: string; role: Role },
+  vendorId: string,
+): Promise<{ id: string; created_by: string | null }> {
+  const { data } = await db
+    .from('vendors')
+    .select('id, created_by')
+    .eq('id', vendorId)
+    .maybeSingle();
+  const row = data as { id: string; created_by: string | null } | null;
+  if (!row) throw httpError(404, 'Vendor not found');
+  if (!isAdminTier(caller.role) && row.created_by !== caller.id) {
+    throw httpError(404, 'Vendor not found');
+  }
+  return row;
+}
 
 // Mass-assignment guard. Only these columns are client-writable; server-owned
 // fields (id, created_by, created_at, updated_at) are set server-side and must
@@ -53,6 +77,7 @@ export const update: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   const parsed = updateSchema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
+  await loadAndAuthorizeVendor(req.user, req.params.id);
   const { data, error } = await db
     .from('vendors')
     .update(parsed.data)
@@ -64,6 +89,8 @@ export const update: RequestHandler = async (req, res) => {
 };
 
 export const remove: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  await loadAndAuthorizeVendor(req.user, req.params.id);
   const { error } = await db.from('vendors').delete().eq('id', req.params.id);
   if (error) throw httpError(500, 'Database error');
   res.json({ ok: true });

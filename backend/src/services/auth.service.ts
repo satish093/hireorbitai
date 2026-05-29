@@ -707,6 +707,26 @@ export async function setUserStatus(args: {
     await db.auth.admin.signOut(targetId, 'global').catch((err) => {
       logger.warn({ err, targetId }, 'lifecycle: signOut failed');
     });
+    // Also invalidate every outstanding password-reset token for this user.
+    // Without this, a reset link issued before deactivation can be replayed
+    // after a later reactivation to take over the account during the
+    // attacker's chosen window. used_at = now() marks them spent so the
+    // /auth/complete-password-reset path's "already used" check fires.
+    // Column name MUST match database/auth-hardening.sql (`used_at`); the
+    // shim returns {error} envelopes rather than throwing, so we destructure
+    // and log explicitly instead of relying on try/catch — otherwise schema
+    // drift would silently no-op this guard.
+    const { error: resetErr } = await db
+      .from('password_reset_tokens')
+      .update({ used_at: new Date().toISOString() })
+      .eq('user_id', targetId)
+      .is('used_at', null);
+    if (resetErr) {
+      logger.warn(
+        { err: resetErr, targetId },
+        'lifecycle: failed to invalidate outstanding password reset tokens',
+      );
+    }
   }
 
   audit({

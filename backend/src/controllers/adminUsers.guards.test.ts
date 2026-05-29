@@ -52,7 +52,32 @@ vi.mock('../config/db', () => {
     };
     return builder;
   }
-  return { db: { from: (table: string) => makeBuilder(table) }, pool: {} };
+  return {
+    db: { from: (table: string) => makeBuilder(table) },
+    // assertNotLastSuperAdmin now uses pool.query + FOR UPDATE to lock the
+    // candidate row (atomic CAS — see security regression). Route by SQL
+    // keyword so the mock answers both shapes against the seeded users.
+    pool: {
+      query: vi.fn(async (sql: string, params: unknown[]) => {
+        const rows = mock.handlers.get('users')?.({}) ?? [];
+        if (/FOR UPDATE/i.test(sql)) {
+          const id = params[0];
+          const row = rows.find((r: any) => r.id === id);
+          return {
+            rows: row ? [{ role: (row as any).role, is_active: (row as any).is_active }] : [],
+          };
+        }
+        if (/count\(\*\)/i.test(sql)) {
+          const id = params[0];
+          const n = rows.filter(
+            (r: any) => r.role === 'SUPER_ADMIN' && r.is_active === true && r.id !== id,
+          ).length;
+          return { rows: [{ n }] };
+        }
+        return { rows: [] };
+      }),
+    },
+  };
 });
 
 // The controller imports these at module load; stub them so nothing tries to

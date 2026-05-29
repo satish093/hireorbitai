@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { Button } from '../components/Button';
 import { SkeletonCard } from '../components/Skeleton';
+import { EmptyState } from '../components/EmptyState';
 import {
   PriorityBadge,
   TaskStatusBadge,
@@ -58,10 +59,47 @@ export function TaskDetail() {
     setAttachments(a.data ?? []);
   }
 
+  const [loadError, setLoadError] = useState<{ status?: number; message?: string } | null>(null);
   useEffect(() => {
-    loadAll().catch((e) => toast.error(e?.response?.data?.error ?? 'Failed to load'));
+    setLoadError(null);
+    loadAll().catch((e) => {
+      // Track the error so the page can render an EmptyState instead of an
+      // infinite SkeletonCard. The toast still fires for transient errors
+      // (network blip, timeout), but a 404/403 lands the user on a clear
+      // "not found" panel with a way back to the task list.
+      const status = e?.response?.status as number | undefined;
+      const message = (e?.response?.data?.error as string | undefined) ?? 'Failed to load';
+      setLoadError({ status, message });
+      toast.error(message);
+    });
     // eslint-disable-next-line
   }, [id]);
+
+  if (loadError && !task) {
+    const isNotFound = loadError.status === 404 || loadError.status === 403;
+    return (
+      <Layout title="Task">
+        <div className="max-w-3xl">
+          <EmptyState
+            title={isNotFound ? 'Task not found' : 'Could not load task'}
+            description={
+              isNotFound
+                ? 'This task may have been deleted or moved out of your scope.'
+                : (loadError.message ?? 'Please try again in a moment.')
+            }
+            action={
+              <Link
+                to="/tasks"
+                className="text-sm px-4 py-2 rounded-lg bg-ink text-bg hover:opacity-90"
+              >
+                Back to tasks
+              </Link>
+            }
+          />
+        </div>
+      </Layout>
+    );
+  }
 
   if (!task) {
     return (

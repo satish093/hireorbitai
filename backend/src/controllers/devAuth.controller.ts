@@ -68,12 +68,17 @@ export const login: RequestHandler = async (req, res) => {
 
   const { data: target } = await db
     .from('users')
-    .select('id, email, full_name, role, status')
+    .select('id, email, full_name, role, status, is_active')
     .eq('id', parsed.data.userId)
     .maybeSingle();
   if (!target) throw httpError(404, 'User not found');
-  const t = target as SeedUserRow;
-  if (t.status && t.status !== 'active') throw httpError(403, 'User is not active');
+  const t = target as SeedUserRow & { is_active?: boolean | null };
+  // Fail-closed status check: if `status` is NULL on a legacy row, fall
+  // back to is_active so a deactivated user can't slip through the dev-login
+  // door just because the new column was never backfilled. The legacy
+  // boolean is_active is still authoritative in that fallback case.
+  const effectiveStatus = t.status ?? (t.is_active === false ? 'inactive' : 'active');
+  if (effectiveStatus !== 'active') throw httpError(403, 'User is not active');
 
   const { data, error } = await db.auth.admin.createSessionForUser(t.id);
   if (error || !data?.session) throw httpError(500, 'Failed to start dev session');

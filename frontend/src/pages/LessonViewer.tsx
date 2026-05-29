@@ -12,6 +12,7 @@ import {
   FeedbackModal,
 } from '../components/Training';
 import { SkeletonCard } from '../components/Skeleton';
+import { EmptyState } from '../components/EmptyState';
 import {
   AcknowledgementCard,
   ComplianceReportButton,
@@ -187,8 +188,10 @@ export function LessonViewer() {
       .catch(() => {});
   }
 
+  const [loadError, setLoadError] = useState<{ status?: number; message?: string } | null>(null);
   async function load() {
     if (!id) return;
+    setLoadError(null);
     try {
       const r = await api.get(`/training/assignments/${id}`);
       setAssignment(r.data);
@@ -219,7 +222,13 @@ export function LessonViewer() {
         setActiveLessonId((lastViewed ?? firstIncomplete ?? ordered[0]).id);
       }
     } catch (e: any) {
-      toast.error(e?.response?.data?.error ?? 'Failed to load');
+      // Track the error so the loading guard below renders an EmptyState
+      // instead of an infinite skeleton. 404/403 → "Assignment not
+      // available"; everything else surfaces the server message.
+      const status = e?.response?.status as number | undefined;
+      const message = (e?.response?.data?.error as string | undefined) ?? 'Failed to load';
+      setLoadError({ status, message });
+      toast.error(message);
     }
   }
   useEffect(() => {
@@ -312,6 +321,30 @@ export function LessonViewer() {
     } catch {
       /* swallow — toast already fired in child */
     }
+  }
+
+  if (loadError && (!assignment || !course)) {
+    const isNotFound = loadError.status === 404 || loadError.status === 403;
+    return (
+      <Layout title="Training plan">
+        <EmptyState
+          title={isNotFound ? 'Assignment not available' : 'Could not load assignment'}
+          description={
+            isNotFound
+              ? 'This training assignment may have been removed or is outside your scope.'
+              : (loadError.message ?? 'Please try again in a moment.')
+          }
+          action={
+            <Link
+              to="/training"
+              className="text-sm px-4 py-2 rounded-lg bg-ink text-bg hover:opacity-90"
+            >
+              Back to my training
+            </Link>
+          }
+        />
+      </Layout>
+    );
   }
 
   if (!assignment || !course)

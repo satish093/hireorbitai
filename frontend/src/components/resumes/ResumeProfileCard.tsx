@@ -75,8 +75,13 @@ export function ResumeProfileCard({ profile: initialProfile, resumeId, onParsed 
   const visibleSkills = showAllSkills ? skills : skills.slice(0, SKILL_LIMIT);
   const hiddenCount = skills.length - SKILL_LIMIT;
 
+  // dvh (dynamic viewport height) tracks the iOS Safari URL-bar collapse;
+  // 100vh includes the bar so content under it gets clipped when the bar
+  // retracts during scroll. Matches the project rule
+  // (.claude/rules/frontend-responsive.md) — every other surface already
+  // uses dvh, this one was the last hold-out.
   return (
-    <div className="overflow-y-auto max-h-[calc(100vh-260px)] pr-1">
+    <div className="overflow-y-auto max-h-[calc(100dvh-260px)] pr-1">
       {parseOverlay}
       {/* ── Header: name + contact ── */}
       <div className="pb-4 border-b border-border">

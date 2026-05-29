@@ -24,25 +24,46 @@ const MOCKS = {
 export function useReportData<T extends ReportTab>(
   tab: T,
   enabled = true,
-): { data: ReportPayloadMap[T] | null; loading: boolean } {
+): { data: ReportPayloadMap[T] | null; loading: boolean; isMock: boolean; error: string | null } {
   const { resolved, compareToPrior } = useReportContext();
   // Tag the loaded payload with the tab it belongs to so a stale payload from
   // the previous tab is never handed to the new tab's component (which would
   // read a field of the wrong shape). Use an `alive` flag rather than an
   // AbortController so a fast unmount/remount (React StrictMode) doesn't cancel
   // the only in-flight request — stale results are simply ignored.
-  const [loaded, setLoaded] = useState<{ tab: ReportTab; payload: unknown } | null>(null);
+  const [loaded, setLoaded] = useState<{
+    tab: ReportTab;
+    payload: unknown;
+    isMock: boolean;
+  } | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!enabled) return;
     let alive = true;
+    setError(null);
     api
       .get(`/reports/${tab}`, { params: { range: resolved.param, compareToPrior } })
       .then((r) => {
-        if (alive) setLoaded({ tab, payload: r.data });
+        if (alive) setLoaded({ tab, payload: r.data, isMock: false });
       })
-      .catch(() => {
-        if (alive) setLoaded({ tab, payload: MOCKS[tab] }); // endpoint not built → mock
+      .catch((e) => {
+        if (!alive) return;
+        const status = (e?.response?.status as number | undefined) ?? 0;
+        // 404 is the only case where the bundled mock is a reasonable
+        // dev-time fallback ("backend endpoint not built yet"). Any other
+        // failure (5xx, 403, network) MUST surface as an error — execs were
+        // previously shown fabricated numbers when the API was down because
+        // every catch path silently replaced the payload with MOCKS[tab].
+        if (status === 404) {
+          setLoaded({ tab, payload: MOCKS[tab], isMock: true });
+        } else {
+          setLoaded(null);
+          setError(
+            (e?.response?.data?.error as string | undefined) ??
+              `Couldn't load ${tab} report. Please try again.`,
+          );
+        }
       });
     return () => {
       alive = false;
@@ -51,5 +72,6 @@ export function useReportData<T extends ReportTab>(
   }, [tab, enabled, resolved.param, resolved.from, resolved.to, compareToPrior]);
 
   const data = loaded && loaded.tab === tab ? (loaded.payload as ReportPayloadMap[T]) : null;
-  return { data, loading: data === null };
+  const isMock = loaded?.tab === tab ? loaded.isMock : false;
+  return { data, loading: data === null && error === null, isMock, error };
 }

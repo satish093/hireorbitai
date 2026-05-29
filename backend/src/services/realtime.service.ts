@@ -30,6 +30,14 @@
 import { Client } from 'pg';
 import { env } from '../config/env';
 import { logger } from '../config/logger';
+import { httpError } from '../types';
+
+// Per-user concurrent SSE connection cap. Each subscription holds a TCP
+// socket + 25s heartbeat + a PG LISTEN entry. Without a cap, a single
+// authenticated user could exhaust FDs and saturate the PG LISTEN/NOTIFY
+// channel for everyone else. 16 covers laptop + phone + a couple of stale
+// tabs comfortably while still bounding the blast radius.
+export const MAX_SSE_PER_USER = 16;
 
 export interface RealtimeEvent {
   /** Stable event type — receivers route on this. */
@@ -160,6 +168,17 @@ export async function stopRealtime(): Promise<void> {
  */
 export async function subscribe(userId: string, handler: Handler): Promise<() => void> {
   let set = subscribers.get(userId);
+  // Bound the per-user subscriber set BEFORE we register or LISTEN. A single
+  // user holding MAX_SSE_PER_USER live connections is already at the cap;
+  // additional attempts must bounce with 429 instead of silently queuing.
+  // Defense-in-depth against an authed DoS (FD exhaustion + LISTEN/NOTIFY
+  // saturation) by a single account.
+  if (set && set.size >= MAX_SSE_PER_USER) {
+    throw httpError(
+      429,
+      'Too many open realtime connections — close some browser tabs and try again.',
+    );
+  }
   if (!set) {
     set = new Set();
     subscribers.set(userId, set);

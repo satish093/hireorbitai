@@ -61,16 +61,26 @@ const SELECT_WITH_JOINS =
   'manager:users!manager_id(id, email, full_name, group_id), ' +
   'managers:recruiter_managers(is_primary, assigned_at, manager:users!manager_id(id, email, full_name, role, group_id))';
 
-const onboardingSchema = z.object({
-  // Personal details — write through to public.users on the same row.
-  full_name: z.string().min(1).optional(),
-  phone: z.string().optional(),
-  // Recruiter-row fields.
-  team: z.string().optional(),
-  target_submissions_per_week: z.number().int().min(0).optional(),
-  manager_id: z.string().uuid().optional(),
-  notes: z.string().optional(),
-});
+// .strict() rejects unknown keys at parse time — mass-assignment guard, per
+// .claude/rules/security.md. `manager_id` is INTENTIONALLY OMITTED here:
+// recruiter→manager edges are an authority relation (they feed
+// v_user_relationships, the source of truth for canMessageUser /
+// canViewConversation / canViewProfile) and must only be mutated via the
+// gated addManager / setPrimaryManager / removeManager / moveGroup paths
+// — those validate role + group + outranking and invalidate the perm
+// cache under guard. A self-onboard form letting RECRUITER pick their own
+// manager would forge the permission graph in one request.
+const onboardingSchema = z
+  .object({
+    // Personal details — write through to public.users on the same row.
+    full_name: z.string().min(1).optional(),
+    phone: z.string().optional(),
+    // Recruiter-row fields.
+    team: z.string().optional(),
+    target_submissions_per_week: z.number().int().min(0).optional(),
+    notes: z.string().optional(),
+  })
+  .strict();
 
 export const list: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');

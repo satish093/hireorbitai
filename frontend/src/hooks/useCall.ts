@@ -744,6 +744,29 @@ export function useCall(): UseCallReturn {
     'call:rejected': () => {
       finalise('ended');
     },
+
+    // Multi-tab clearance: when the callee answers (or rejects) on ANOTHER
+    // tab/device, the backend publishes one of these to every SSE stream of
+    // the callee. The active tab guards on call_id and ignores its own copy.
+    // Without this, laptop + phone + stale tabs all keep ringing + vibrating
+    // long after the call was answered elsewhere — the phone-in-meeting bug.
+    'call:accepted-elsewhere': (raw) => {
+      const { call_id } = raw as { call_id: string };
+      if (status !== 'ringing' || incomingCall?.call_id !== call_id) return;
+      setIncomingCall(null);
+      stopRing();
+      stopVibration();
+      setStatus('idle');
+    },
+
+    'call:rejected-elsewhere': (raw) => {
+      const { call_id } = raw as { call_id: string };
+      if (status !== 'ringing' || incomingCall?.call_id !== call_id) return;
+      setIncomingCall(null);
+      stopRing();
+      stopVibration();
+      setStatus('idle');
+    },
   };
 
   // Reset status to idle after "ended" display delay.

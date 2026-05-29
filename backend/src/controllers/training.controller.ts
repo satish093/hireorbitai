@@ -5,7 +5,8 @@ import * as svc from '../services/training.service';
 import * as ai from '../services/trainingAI.service';
 import { lessonCoach as runLessonCoach } from '../services/ai.service';
 import { ANTHROPIC_ENABLED } from '../config/anthropic';
-import { httpError, MANAGER_TIER, ADMIN_TIER, type Role } from '../types';
+import { httpError, MANAGER_TIER, ADMIN_TIER, OWNER_TIER, type Role } from '../types';
+import { audit } from '../services/audit.service';
 import { logger } from '../config/logger';
 import { evaluateAchievements, logStudyMinutes } from '../services/trainingAchievements.service';
 import { publishToUser } from '../services/realtime.service';
@@ -1078,36 +1079,94 @@ export const generateOutline: RequestHandler = async (req, res) => {
   });
 };
 
+// Credential-isolation: only OWNER_TIER (SUPER_ADMIN, CEO) may supply a custom
+// aiToken or trigger the server-side ANTHROPIC_OAUTH_TOKEN (Claude Max) path.
+// Lower admin tiers (CTO, DIRECTOR) fall through to the global ANTHROPIC_API_KEY
+// client like every other AI route. This prevents:
+//   1. DIRECTOR/CTO insider draining the SUPER_ADMIN's Claude Max quota in a loop.
+//   2. The endpoint being used as a token-validity oracle (success vs SDK error
+//      reveals key validity to anyone in ADMIN_TIER).
+const generateLessonContentBodySchema = z
+  .object({
+    aiToken: z.string().min(10).max(500).optional(),
+  })
+  .strict();
+
 export const generateLessonContent: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
+  const me = req.user;
+  const isOwnerTier = (OWNER_TIER as Role[]).includes(me.role);
+
+  const parsedBody = generateLessonContentBodySchema.safeParse(req.body ?? {});
+  if (!parsedBody.success) {
+    throw httpError(400, 'Invalid input', parsedBody.error.flatten());
+  }
+  const { aiToken } = parsedBody.data;
+
+  // Body-supplied aiToken is OWNER_TIER only. ADMIN_TIER callers attempting
+  // to pass one are rejected — silently dropping it would be confusing
+  // (they'd think their key was used) and would mask the policy violation
+  // from audit.
+  if (aiToken && !isOwnerTier) {
+    audit({
+      action: 'training_ai_generate',
+      user_id: me.id,
+      email: me.email,
+      req,
+      metadata: {
+        lesson_id: req.params.id,
+        outcome: 'denied_token_supplied',
+        credential_mode: 'body_token_rejected',
+      },
+    });
+    throw httpError(
+      403,
+      'Only owner-tier accounts may supply a custom AI token here. Contact the workspace owner.',
+    );
+  }
+
   const { data: lesson, error } = await repo.lessons.get(req.params.id);
   if (error || !lesson) throw httpError(404, 'Lesson not found');
   const l: any = lesson;
   const { data: course } = await repo.courses.get(l.course_id);
   const c: any = course ?? {};
 
-  // Build the Anthropic client for this request with the following priority:
-  //   1. aiToken from body (admin pasted their own key in the modal — explicit override)
-  //   2. ANTHROPIC_OAUTH_TOKEN (admin's Claude Max subscription) — admin-tier only
-  //   3. Fall through to the global client (ANTHROPIC_API_KEY or configured provider)
-  const { aiToken } = req.body as { aiToken?: unknown };
+  // Build the Anthropic client for this request. Resolution order:
+  //   1. (OWNER_TIER only) aiToken from body — explicit per-call override.
+  //   2. (OWNER_TIER only) ANTHROPIC_OAUTH_TOKEN env (Claude Max subscription).
+  //   3. Fall through to the global client (ANTHROPIC_API_KEY).
   const AnthropicSDK = (await import('@anthropic-ai/sdk')).default;
   let customClient: InstanceType<typeof AnthropicSDK> | undefined;
+  let credentialMode: 'body_token' | 'server_oauth' | 'global' = 'global';
 
-  if (typeof aiToken === 'string' && aiToken.length > 10) {
-    // Explicit key from the modal
+  if (isOwnerTier && aiToken) {
     const isOAuth = !aiToken.startsWith('sk-');
     customClient = new AnthropicSDK(
       isOAuth ? { authToken: aiToken, maxRetries: 0 } : { apiKey: aiToken, maxRetries: 0 },
     );
-  } else {
-    // Auto-select: subscription token for admins if configured on the server
+    credentialMode = 'body_token';
+  } else if (isOwnerTier) {
     const oauthToken = process.env.ANTHROPIC_OAUTH_TOKEN ?? '';
     if (oauthToken.length > 10) {
       customClient = new AnthropicSDK({ authToken: oauthToken, maxRetries: 0 });
+      credentialMode = 'server_oauth';
     }
-    // else: fall through to global client (API key path)
   }
+  // Audit every successful entry (before the AI call) so the credential mode
+  // used per invocation is recoverable from auth_audit_logs. The action is
+  // listed in the closed AuditAction union as `training_ai_generate`.
+  audit({
+    action: 'training_ai_generate',
+    user_id: me.id,
+    email: me.email,
+    req,
+    metadata: {
+      lesson_id: req.params.id,
+      course_id: l.course_id,
+      credential_mode: credentialMode,
+      role: me.role,
+    },
+  });
 
   await repo.lessons.update(l.id, { content_status: 'GENERATING' });
   await publishToUser(req.user!.id, 'training:lesson-start', {

@@ -280,20 +280,90 @@ const aiLimiter = rateLimit({
   keyGenerator: rateLimitKey,
   handler: (req, res, next) => sendRateLimitResponse(req, res, next, { windowMs: 5 * 60 * 1000 }),
 });
-app.use('/ai', aiLimiter);
-app.use('/api/ai', aiLimiter);
-// Also cap the AI-heavy endpoints under /jobs (resume tailoring, ATS match,
-// per-job match-for-me, enrich-pending). These all hit Anthropic.
-app.use('/jobs/:id/skill-match', aiLimiter);
-app.use('/jobs/:id/skill-match-for-me', aiLimiter);
-app.use('/jobs/:id/ats-match', aiLimiter);
-app.use('/jobs/:id/enrich', aiLimiter);
-app.use('/jobs/:id/customize-resume', aiLimiter);
-app.use('/api/jobs/:id/skill-match', aiLimiter);
-app.use('/api/jobs/:id/skill-match-for-me', aiLimiter);
-app.use('/api/jobs/:id/ats-match', aiLimiter);
-app.use('/api/jobs/:id/enrich', aiLimiter);
-app.use('/api/jobs/:id/customize-resume', aiLimiter);
+// Every path that spends Anthropic / Groq / Gemini tokens. Listed once and
+// applied with + without /api prefix so single-domain Nginx vhosts (no /api
+// rewrite) and the dev-server proxied paths both hit the limiter. Audit
+// caught that ~12 AI-spending routes (copilot, match-for-me, skill-gap,
+// requirements, apply-options, ats-score, resume tailor + sessions +
+// parse-profile, training generate + coach) were previously only bounded
+// by the global 3000/15min ceiling — well above the $-burn threshold of
+// a single user looping resume-tailor for a minute.
+const AI_PATHS: string[] = [
+  // /ai/* canonical surface — already covered, kept here for the loop.
+  '/ai',
+  // /jobs AI-spending sub-paths
+  '/jobs/:id/skill-match',
+  '/jobs/:id/skill-match-for-me',
+  '/jobs/:id/match-for-me',
+  '/jobs/:id/ats-match',
+  '/jobs/:id/enrich',
+  '/jobs/:id/customize-resume',
+  '/jobs/:id/copilot',
+  '/jobs/:id/skill-gap',
+  '/jobs/:id/requirements',
+  '/jobs/:id/apply-options',
+  // /applications + /resumes AI
+  '/applications/:id/ats-score',
+  '/resumes/:id/score',
+  '/resumes/tailor',
+  '/resumes/:id/tailor-sessions',
+  '/resumes/:id/parse-profile',
+  // /training AI (course generation + lesson coach — Anthropic Sonnet)
+  '/training/generate',
+  '/training/coach',
+];
+for (const path of AI_PATHS) {
+  app.use(path, aiLimiter);
+  app.use(`/api${path}`, aiLimiter);
+}
+
+// --- Per-route limiters for spammable, expensive paths ----------------------
+// Each peer connection emits dozens of ICE candidates per second during
+// negotiation; without a cap a malicious or buggy client could spam at
+// 5000/min, each call triggering a DB lookup + pg_notify fanout. 200/min
+// per user is generous (covers a worst-case full ICE trickle on a slow
+// network) while bounding the abuse surface.
+const callIceLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 200,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  keyGenerator: rateLimitKey,
+  handler: (req, res, next) => sendRateLimitResponse(req, res, next, { windowMs: 60 * 1000 }),
+});
+app.use('/calls/ice-candidate', callIceLimiter);
+app.use('/api/calls/ice-candidate', callIceLimiter);
+
+// The other /calls verbs are user-driven (one offer per outbound call,
+// one answer/reject per inbound). 30/min is plenty for any legitimate
+// human; abusive callers get bounced.
+const callControlLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  keyGenerator: rateLimitKey,
+  handler: (req, res, next) => sendRateLimitResponse(req, res, next, { windowMs: 60 * 1000 }),
+});
+for (const path of ['/calls/offer', '/calls/answer', '/calls/reject', '/calls/end']) {
+  app.use(path, callControlLimiter);
+  app.use(`/api${path}`, callControlLimiter);
+}
+
+// Attachment uploads are 15 MB each. Without a per-user cap, a single
+// abusive caller could push 15 MB × 3000 req / 15 min ≈ 45 GB / 15 min
+// (the global limiter's ceiling). 10 uploads / min × 15 MB = 150 MB/min
+// per user, still ample for a power user pasting several files at once.
+const attachmentUploadLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  keyGenerator: rateLimitKey,
+  handler: (req, res, next) => sendRateLimitResponse(req, res, next, { windowMs: 60 * 1000 }),
+});
+app.use('/messages/attachments', attachmentUploadLimiter);
+app.use('/api/messages/attachments', attachmentUploadLimiter);
 
 // --- Health + readiness -------------------------------------------------------
 // /health = liveness (the process is up and responsive)

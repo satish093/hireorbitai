@@ -212,14 +212,15 @@ describe('consultants.update — write ownership', () => {
     expect(patch).toMatchObject({ primary_skill: 'TypeScript' });
   });
 
-  it("returns 403 when a CONSULTANT updates another user's row", async () => {
+  it("returns 404 when a CONSULTANT updates another user's row (oracle hygiene)", async () => {
     mock.rows.consultants = [CONSULTANT_ROW];
     const { err } = await call(consultants.update as Handler, CONSULTANT_OTHER, {
       params: { id: 'c-1' },
       body: { primary_skill: 'Attacker' },
     });
-    expect(err?.status).toBe(403);
-    // No DB write should have happened
+    // 404 (not 403) so the endpoint can't be used as an existence oracle —
+    // matches the canonical pattern from applications.loadAndAuthorize.
+    expect(err?.status).toBe(404);
     expect(mock.updates.find((u) => u.table === 'consultants')).toBeUndefined();
   });
 
@@ -247,14 +248,14 @@ describe('consultants.update — write ownership', () => {
     });
   });
 
-  it('returns 403 when a group lead updates a consultant outside their group', async () => {
+  it('returns 404 when a group lead updates a consultant outside their group (oracle hygiene)', async () => {
     mock.rows.consultants = [CONSULTANT_ROW];
     mock.rows.users = []; // not in the lead's group
     const { err } = await call(consultants.update as Handler, GROUP_LEAD, {
       params: { id: 'c-1' },
       body: { primary_skill: 'Java' },
     });
-    expect(err?.status).toBe(403);
+    expect(err?.status).toBe(404);
     expect(mock.updates.find((u) => u.table === 'consultants')).toBeUndefined();
   });
 

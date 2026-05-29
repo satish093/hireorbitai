@@ -144,9 +144,11 @@ export const get: RequestHandler = async (req, res) => {
       !(await leadInScopeForAssignee(req.user, data.assignee_id)) &&
       data.assignee_id !== req.user.id
     )
-      throw httpError(403, 'Forbidden');
+      // 404 (not 403) on out-of-scope so the endpoint isn't an existence
+      // oracle — drifted from tasks.remove which already uses 404.
+      throw httpError(404, 'Task not found');
   } else if (data.assignee_id !== req.user.id) {
-    throw httpError(403, 'Forbidden');
+    throw httpError(404, 'Task not found');
   }
   res.json(data);
 };
@@ -207,11 +209,13 @@ export const update: RequestHandler = async (req, res) => {
 
   const isMgr = isManagerLike(req.user.role);
   const isAssignee = existing.assignee_id === req.user.id;
-  if (!isMgr && !isAssignee) throw httpError(403, 'Forbidden');
+  // Out-of-scope ownership returns 404 (not 403) so the endpoint can't be
+  // used as an existence oracle by walking UUIDs.
+  if (!isMgr && !isAssignee) throw httpError(404, 'Task not found');
   // Group leads may only edit tasks within their group (unless it's their own).
   if (isGroupLead(req.user.role) && !isAssignee) {
     if (!(await leadInScopeForAssignee(req.user, existing.assignee_id)))
-      throw httpError(403, 'Forbidden');
+      throw httpError(404, 'Task not found');
   }
 
   const allowed: Record<string, unknown> = {};
@@ -293,9 +297,10 @@ export const updateStatus: RequestHandler = async (req, res) => {
       !(await leadInScopeForAssignee(req.user, existing.assignee_id)) &&
       existing.assignee_id !== req.user.id
     )
-      throw httpError(403, 'Forbidden');
+      // 404 (not 403) — same oracle-hygiene fix as get / update above.
+      throw httpError(404, 'Task not found');
   } else if (existing.assignee_id !== req.user.id) {
-    throw httpError(403, 'Forbidden');
+    throw httpError(404, 'Task not found');
   }
 
   const patch: Record<string, unknown> = { status };

@@ -6,6 +6,7 @@ import { FormInput } from '../components/FormInput';
 import { PageHeader } from '../components/PageHeader';
 import { Button } from '../components/Button';
 import { api } from '../services/api';
+import { isSafeHttpsUrl } from '../utils/safeUrl';
 import toast from 'react-hot-toast';
 
 const EMPTY = {
@@ -219,19 +220,24 @@ export function Vendors() {
 }
 
 function Detail({ label, value, href }: { label: string; value: string; href?: string | null }) {
-  const content =
-    href && value !== '—' ? (
-      <a
-        href={href}
-        target="_blank"
-        rel="noreferrer"
-        className="text-brand-700 hover:underline break-all"
-      >
-        {value}
-      </a>
-    ) : (
-      value
-    );
+  // Only render an <a> if the user-supplied href is a real https URL.
+  // Without this guard a vendor row containing `website = 'javascript:…'`
+  // turns the workspace into an ATO target on click. rel uses
+  // `noopener noreferrer` instead of bare `noreferrer` so the opened tab
+  // can't reach window.opener and can't leak the referrer either.
+  const isLinkable = href && value !== '—' && isSafeHttpsUrl(href);
+  const content = isLinkable ? (
+    <a
+      href={href as string}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-brand-700 hover:underline break-all"
+    >
+      {value}
+    </a>
+  ) : (
+    value
+  );
   return (
     <div className="rounded-lg border border-border bg-hover/50 px-3 py-2">
       <div className="text-[10px] font-semibold uppercase tracking-widest text-muted">{label}</div>

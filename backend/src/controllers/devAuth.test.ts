@@ -133,4 +133,39 @@ describe('devAuth.login', () => {
     const { err } = await call(login, { body: {} });
     expect(err?.status).toBe(400);
   });
+
+  // Regression: when `status` is NULL on a legacy row but `is_active` is
+  // false, dev-login must NOT log the user in. Pre-fix, the guard
+  // `if (t.status && t.status !== 'active')` short-circuited on NULL and
+  // let deactivated users through.
+  it('fails closed when status is NULL but is_active is false', async () => {
+    mock.target = {
+      id: '44444444-4444-4444-4444-444444444444',
+      email: 'd@x.local',
+      full_name: 'Dee Deactivated',
+      role: 'CONSULTANT',
+      status: null,
+      is_active: false,
+    };
+    const { err } = await call(login, {
+      body: { userId: '44444444-4444-4444-4444-444444444444' },
+    });
+    expect(err?.status).toBe(403);
+  });
+
+  it('allows login when status is NULL but is_active is true (legacy active row)', async () => {
+    mock.target = {
+      id: '55555555-5555-5555-5555-555555555555',
+      email: 'e@x.local',
+      full_name: 'Ed Existing',
+      role: 'CONSULTANT',
+      status: null,
+      is_active: true,
+    };
+    const { err, res } = await call(login, {
+      body: { userId: '55555555-5555-5555-5555-555555555555' },
+    });
+    expect(err).toBeNull();
+    expect(res.body.access_token).toBe('acc');
+  });
 });

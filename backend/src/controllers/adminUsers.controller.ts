@@ -55,22 +55,42 @@ export function assertOutranks(actor: { role: Role }, targetRole: Role | null | 
 /** Throws 409 if removing this user (or making them inactive) would leave
  *  zero active SUPER_ADMINs in the org. Same guard the legacy
  *  `users.controller.deactivate` route uses — without it, the admin surface
- *  can lock the org out of its only super-admin. */
+ *  can lock the org out of its only super-admin.
+ *
+ *  Race-condition note: the previous shape (separate SELECT then SELECT-COUNT)
+ *  could let two concurrent deactivation requests both pass the guard when
+ *  the org had exactly one active SUPER_ADMIN — both would read count=1 and
+ *  proceed. We now lock the candidate row up-front via `SELECT … FOR UPDATE`
+ *  so concurrent attempts on the same target serialize, and we count
+ *  *peers* (id <> target) instead of total — if zero other active SUPER_ADMINs
+ *  exist, this mutation is the dangerous one regardless of which request
+ *  arrived first.
+ */
 export async function assertNotLastSuperAdmin(targetId: string): Promise<void> {
-  const { data: target } = await db
-    .from('users')
-    .select('role, is_active')
-    .eq('id', targetId)
-    .maybeSingle();
-  if (!target) return; // 404 surfaces elsewhere
-  const row = target as { role: Role; is_active: boolean };
+  // One SQL round-trip via pool.query so we can use FOR UPDATE — the shim
+  // doesn't expose row locking. Same parameterisation as everywhere else
+  // in the controller; targetId comes from the validated route :id.
+  const target = await pool
+    .query<{
+      role: Role;
+      is_active: boolean;
+    }>('SELECT role, is_active FROM public.users WHERE id = $1 FOR UPDATE', [targetId])
+    .catch(() => ({ rows: [] as Array<{ role: Role; is_active: boolean }> }));
+  const row = target.rows[0];
+  if (!row) return; // 404 surfaces elsewhere
   if (row.role !== 'SUPER_ADMIN' || row.is_active === false) return;
-  const { count } = await db
-    .from('users')
-    .select('id', { count: 'exact', head: true })
-    .eq('role', 'SUPER_ADMIN')
-    .eq('is_active', true);
-  if ((count ?? 0) <= 1) {
+  // Count OTHER active super-admins. If zero, this mutation removes the
+  // last one — refuse, regardless of how many concurrent attempts arrive.
+  const peers = await pool.query<{ n: string }>(
+    `SELECT count(*)::int AS n
+       FROM public.users
+      WHERE role = 'SUPER_ADMIN'
+        AND is_active = true
+        AND id <> $1`,
+    [targetId],
+  );
+  const others = Number(peers.rows[0]?.n ?? 0);
+  if (others < 1) {
     throw httpError(
       409,
       'Refusing to remove the last active SUPER_ADMIN. Promote another admin first.',
@@ -189,11 +209,16 @@ export const list: RequestHandler = async (req, res) => {
     query = query.gte('last_seen_at', new Date(Date.now() - ms).toISOString());
   }
   if (q) {
-    // `or()` with ilike on email + full_name covers the common search cases.
-    // We escape `%` and `_` so a literal "%" in the search string doesn't
-    // turn into a wildcard.
-    const safe = q.replace(/[%_]/g, (m) => `\\${m}`);
-    query = query.or(`email.ilike.%${safe}%,full_name.ilike.%${safe}%`);
+    // Escape both LIKE wildcards (%, _) AND PostgREST OR-filter control chars
+    // (, . ( ) * — comma terminates filter clauses, dot starts an operator,
+    // parens group, * is the wildcard). Without the PostgREST escapes a
+    // scoped DEVELOPER with `users` capability could submit
+    //   q=",role.eq.SUPER_ADMIN"
+    // and inject an extra filter clause that widens the result set past
+    // intended scope. The two escape passes cover both layers.
+    const likeSafe = q.replace(/[%_]/g, (m) => `\\${m}`);
+    const orSafe = likeSafe.replace(/[,.()*]/g, '\\$&');
+    query = query.or(`email.ilike.%${orSafe}%,full_name.ilike.%${orSafe}%`);
   }
 
   const { data, error, count } = await query;

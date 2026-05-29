@@ -190,13 +190,15 @@ describe('tasks.controller — update field restriction for non-manager assignee
     expect(patch).not.toHaveProperty('assignee_id');
   });
 
-  it('a non-manager who is neither assignee nor creator gets 403 on update', async () => {
+  it('a non-manager who is neither assignee nor creator gets 404 on update (oracle hygiene)', async () => {
     mock.rows.tasks = [{ id: 't-1', assignee_id: 'u-owner' }];
     const err = await call(tasks.update as Handler, STRANGER, {
       params: { id: 't-1' },
       body: { status: 'IN_PROGRESS' },
     });
-    expect(err?.status).toBe(403);
+    // 404 (not 403) so the endpoint can't be used as an existence oracle —
+    // matches tasks.remove's existing pattern.
+    expect(err?.status).toBe(404);
     expect(mock.updates.find((u) => u.table === 'tasks')).toBeUndefined();
   });
 
@@ -224,14 +226,14 @@ describe('tasks.controller — update field restriction for non-manager assignee
     });
   });
 
-  it('a group lead gets 403 patching a task outside their group', async () => {
+  it('a group lead gets 404 patching a task outside their group (oracle hygiene)', async () => {
     mock.rows.tasks = [{ id: 't-1', assignee_id: 'u-owner' }];
     mock.rows.users = []; // assignee not in the lead's group
     const err = await call(tasks.update as Handler, GROUP_LEAD, {
       params: { id: 't-1' },
       body: { title: 'Renamed' },
     });
-    expect(err?.status).toBe(403);
+    expect(err?.status).toBe(404);
     expect(mock.updates.find((u) => u.table === 'tasks')).toBeUndefined();
   });
 });

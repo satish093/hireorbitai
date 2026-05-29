@@ -36,6 +36,7 @@ export type AuditAction =
   | 'daily_digest_sent'
   | 'daily_digest_skipped'
   | 'messages_permission_denied'
+  | 'calls_permission_denied'
   | 'work_auth_doc_uploaded'
   | 'work_auth_doc_deleted'
   | 'resume_uploaded'
@@ -44,6 +45,7 @@ export type AuditAction =
   | 'resume_access_denied'
   | 'training_course_accessed'
   | 'training_lesson_accessed'
+  | 'training_ai_generate'
   | 'data_access_denied'
   | 'consultant_recruiter_assigned'
   | 'ai_resume_scored'
@@ -52,7 +54,9 @@ export type AuditAction =
   | 'ai_resume_profile_parsed'
   | 'ai_feature_error'
   | 'dev_login'
-  | 'developer_capabilities_set';
+  | 'developer_capabilities_set'
+  | 'feature_flag_changed'
+  | 'feature_flag_group_override_changed';
 
 interface AuditInput {
   action: AuditAction;

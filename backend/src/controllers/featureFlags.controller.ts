@@ -2,6 +2,7 @@ import { RequestHandler } from 'express';
 import { z } from 'zod';
 import { db } from '../config/db';
 import { httpError } from '../types';
+import { audit } from '../services/audit.service';
 
 // In-memory cache so we don't hammer the DB on every request. Invalidated
 // synchronously on PATCH and on group-override change. 5-second hard TTL
@@ -73,9 +74,18 @@ export const list: RequestHandler = async (_req, res) => {
 /** PATCH /:key  body: { enabled: boolean } */
 export const setFlag: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
-  const schema = z.object({ enabled: z.boolean() });
+  const schema = z.object({ enabled: z.boolean() }).strict();
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'enabled (boolean) required');
+
+  // Snapshot previous value BEFORE the update so the audit row carries
+  // from→to and post-incident review can reconstruct flips.
+  const { data: prev } = await db
+    .from('feature_flags')
+    .select('enabled')
+    .eq('key', req.params.key)
+    .maybeSingle();
+  const fromValue = (prev as { enabled?: boolean } | null)?.enabled ?? null;
 
   const { data, error } = await db
     .from('feature_flags')
@@ -89,6 +99,18 @@ export const setFlag: RequestHandler = async (req, res) => {
     .single();
   if (error || !data) throw httpError(404, error?.message ?? 'Flag not found');
   invalidateCache();
+
+  // Flags gate /tasks /training /messages /calls /interviews /reminders
+  // /reports /ai /jobs /applications — silently flipping them == silently
+  // turning whole modules on/off for the org. Audit the actor + from→to.
+  audit({
+    action: 'feature_flag_changed',
+    user_id: req.user.id,
+    email: req.user.email,
+    req,
+    metadata: { key: req.params.key, from: fromValue, to: parsed.data.enabled },
+  });
+
   res.json(data);
 };
 
@@ -121,11 +143,23 @@ export const listOverrides: RequestHandler = async (_req, res) => {
  *  Setting enabled to null clears the override (inherit global). */
 export const setGroupOverride: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
-  const schema = z.object({ enabled: z.boolean().nullable() });
+  const schema = z.object({ enabled: z.boolean().nullable() }).strict();
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'enabled (boolean | null) required');
 
   const { groupId, key } = req.params;
+
+  // Snapshot the override row (if any) so the audit metadata captures the
+  // transition. `from=null` here means "inherit global"; reading the
+  // global is left to incident review.
+  const { data: prevRow } = await db
+    .from('group_feature_flags')
+    .select('enabled')
+    .eq('group_id', groupId)
+    .eq('key', key)
+    .maybeSingle();
+  const fromValue = (prevRow as { enabled?: boolean } | null)?.enabled ?? null;
+
   if (parsed.data.enabled === null) {
     const { error } = await db
       .from('group_feature_flags')
@@ -147,5 +181,14 @@ export const setGroupOverride: RequestHandler = async (req, res) => {
     if (error) throw httpError(500, 'Database error');
   }
   invalidateCache();
+
+  audit({
+    action: 'feature_flag_group_override_changed',
+    user_id: req.user.id,
+    email: req.user.email,
+    req,
+    metadata: { key, group_id: groupId, from: fromValue, to: parsed.data.enabled },
+  });
+
   res.json({ ok: true });
 };

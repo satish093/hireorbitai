@@ -1,6 +1,6 @@
 import { RequestHandler } from 'express';
 import { z } from 'zod';
-import { db } from '../config/db';
+import { db, pool } from '../config/db';
 import { env } from '../config/env';
 import { createInvitation, acceptInvitation } from '../services/invitation.service';
 import {
@@ -308,6 +308,36 @@ export const setup: RequestHandler = async (req, res) => {
     throw httpError(400, 'Invitation expired');
   }
 
+  // Atomically claim the invitation BEFORE creating the user. Without this
+  // CAS, two concurrent requests with the same token both read status=PENDING
+  // above and both proceed to createUser/upsert. The auth createUser would
+  // reject the second on email-uniqueness, but only after wireHierarchy
+  // could already have fired twice in racing requests (different timing
+  // windows). Move the status transition up-front so only the winner
+  // continues — losers see "already accepted" and bail before any side effect.
+  //
+  // invitation_status is an enum ('PENDING','ACCEPTED','EXPIRED','REVOKED')
+  // so we transition straight to ACCEPTED. On createUser failure below we
+  // revert to PENDING so the link remains usable.
+  const claim = await pool.query<{ id: string }>(
+    `UPDATE public.invitations
+        SET status = 'ACCEPTED', accepted_at = $2
+      WHERE id = $1 AND status = 'PENDING'
+      RETURNING id`,
+    [invite.id, new Date().toISOString()],
+  );
+  if (claim.rows.length === 0) {
+    throw httpError(400, 'Invitation already accepted');
+  }
+  // Helper: revert the claim if a downstream step fails so the user can retry.
+  const revertClaim = async (): Promise<void> => {
+    await pool
+      .query(`UPDATE public.invitations SET status = 'PENDING', accepted_at = NULL WHERE id = $1`, [
+        invite.id,
+      ])
+      .catch(() => {});
+  };
+
   // 2. Strong-password check matching the rest of the auth flows.
   const strength = validatePasswordStrength(password, { email: invite.email });
   if (!strength.ok) throw httpError(400, strength.problems.join(' '));
@@ -322,6 +352,7 @@ export const setup: RequestHandler = async (req, res) => {
   });
   if (createErr || !created.user) {
     // Most common reason: a user already exists for this email.
+    await revertClaim();
     const msg = createErr?.message ?? 'Could not create user';
     throw httpError(400, msg);
   }
@@ -349,8 +380,10 @@ export const setup: RequestHandler = async (req, res) => {
   );
   if (upsertErr) {
     // Roll back the auth user — otherwise the email is "taken" but the user
-    // can never finish provisioning.
+    // can never finish provisioning. Also revert the invitation claim so the
+    // link is usable again.
     await db.auth.admin.deleteUser(created.user.id).catch(() => {});
+    await revertClaim();
     throw httpError(500, upsertErr.message);
   }
 
@@ -362,8 +395,8 @@ export const setup: RequestHandler = async (req, res) => {
     },
   );
 
-  // 6. Mark the invitation as accepted.
-  await db.from('invitations').update({ status: 'ACCEPTED', accepted_at: now }).eq('id', invite.id);
+  // 6. The atomic claim above already set status=ACCEPTED + accepted_at —
+  //    no further write needed here.
 
   // 7. Issue a session right now — avoids a round-trip second login on the
   //    client and the brief window where the just-created user hasn't been

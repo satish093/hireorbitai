@@ -12,7 +12,7 @@ import { tailorForJob as resumeTailorForJob } from './resumes.controller';
 import { fromJob as applicationsFromJob } from './applications.controller';
 import { httpError, ADMIN_TIER, GROUP_LEAD_ROLES } from '../types';
 import { ANTHROPIC_ENABLED } from '../config/anthropic';
-import { leadCanAccessUser } from '../services/groupScope';
+import { leadCanAccessUser, isAdminTier } from '../services/groupScope';
 
 // Light user join helper — explicit FK hint so the embed never collides.
 const JOB_SELECT = '*, client:clients(id, company_name), vendor:vendors(id, company_name)';
@@ -352,6 +352,26 @@ export const setNote: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   const parsed = noteSchema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid note', parsed.error.flatten());
+
+  // Anti-impersonation: only the existing note author OR an admin-tier
+  // caller may overwrite a note. New (null) notes are open — first OPERATOR
+  // to add one claims authorship. Without this, group-A operators could
+  // silently overwrite group-B's recruiter notes and the displayed author
+  // name would point to the new editor, with no audit trail. Mirrors the
+  // ownership pattern used by vendors/clients.
+  const { data: existing } = await db
+    .from('jobs')
+    .select('id, recruiter_note_by')
+    .eq('id', req.params.id)
+    .maybeSingle();
+  const row = existing as { id: string; recruiter_note_by: string | null } | null;
+  if (!row) throw httpError(404, 'Job not found');
+  const isAdmin = isAdminTier(req.user.role);
+  const isOriginalAuthor = row.recruiter_note_by === null || row.recruiter_note_by === req.user.id;
+  if (!isAdmin && !isOriginalAuthor) {
+    throw httpError(404, 'Job not found');
+  }
+
   const updated_at = new Date().toISOString();
   const { error } = await db
     .from('jobs')
