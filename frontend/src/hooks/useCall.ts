@@ -17,10 +17,45 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../services/api';
 import { ring, stopRing, playConnect, playDisconnect } from '../utils/callSounds';
 
-// Free public STUN servers — no account needed, no cost.
+// Public ICE servers.
+//
+// STUN-only works when at least one peer is on an open network (typical
+// desktop-on-WiFi case). It FAILS when both peers are behind symmetric NAT
+// — which is exactly what happens between two cellular phones, and was
+// the reason calls "connected" on the UI but had zero audio when both
+// sides were on mobile data. Adding TURN gives us a relay fallback for
+// that case.
+//
+// OpenRelay (metered.ca) publishes free public TURN credentials —
+// intentionally shared, ~100 GB/month per project. Three URLs so the
+// client can fall back through transports:
+//   - turn:…:80           — UDP on port 80 (works through most NATs)
+//   - turn:…:443          — UDP on the TLS port (works through filters
+//                           that only allow 80/443)
+//   - turn:…:443?transport=tcp — TCP relay for symmetric NAT + UDP-blocking
+//                                firewalls (corporate WiFi / hotel networks)
+//
+// If our usage outgrows the free tier or we need self-hosted relay, swap
+// in a coturn instance on the VPS — the URLs/credentials are the only
+// thing that changes here.
 const ICE_SERVERS: RTCIceServer[] = [
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
+  {
+    urls: 'turn:openrelay.metered.ca:80',
+    username: 'openrelayproject',
+    credential: 'openrelayproject',
+  },
+  {
+    urls: 'turn:openrelay.metered.ca:443',
+    username: 'openrelayproject',
+    credential: 'openrelayproject',
+  },
+  {
+    urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+    username: 'openrelayproject',
+    credential: 'openrelayproject',
+  },
 ];
 
 // How long to wait for the callee to answer before auto-cancelling (45 s).
@@ -252,6 +287,27 @@ export function useCall(): UseCallReturn {
   function buildPC(peerId: string): RTCPeerConnection {
     const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
 
+    // ICE / connection state diagnostics. Without these, a call that fails
+    // NAT traversal (the most common silent-call symptom on mobile
+    // networks) looks identical to a working call in the UI — both sides
+    // see "Connected" because we set that on SDP exchange, not on actual
+    // RTP flow. Logging the state changes makes the failure mode
+    // diagnosable from DevTools in the field. If the state lands in
+    // 'failed', mark the call ended so the user gets clear feedback
+    // instead of staring at a connected screen with no audio.
+    pc.oniceconnectionstatechange = () => {
+      console.info('[useCall] iceConnectionState:', pc.iceConnectionState);
+      if (pc.iceConnectionState === 'failed') {
+        setLastError(
+          "Couldn't connect through your network. Try switching to WiFi, or ask your network admin to allow WebRTC traffic.",
+        );
+        finalise('ended');
+      }
+    };
+    pc.onconnectionstatechange = () => {
+      console.info('[useCall] connectionState:', pc.connectionState);
+    };
+
     pc.onicecandidate = ({ candidate }) => {
       if (!candidate) return;
       const payload = {
@@ -396,6 +452,12 @@ export function useCall(): UseCallReturn {
         throw new Error(serverMsg ?? mediaErrorMessage(err));
       }
     },
+    // buildPC is a plain function declared in the component body and
+    // re-created every render — listing it in deps would regenerate
+    // startCall on every render for no real benefit. The closures it
+    // captures (setLastError, finalise, setRemoteStream) all have stable
+    // identity from useState/useCallback, so the per-render churn is safe.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [status, finalise, cleanup],
   );
 
@@ -483,6 +545,9 @@ export function useCall(): UseCallReturn {
       }
       finalise('ended');
     }
+    // Same reason as startCall: buildPC is a plain per-render function with
+    // stable closures — listing it in deps just churns acceptCall identity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [incomingCall, finalise, cleanup]);
 
   const rejectCall = useCallback(async () => {
