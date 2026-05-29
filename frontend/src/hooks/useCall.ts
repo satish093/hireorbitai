@@ -62,6 +62,13 @@ export interface UseCallReturn {
   callDuration: number;
   /** Formatted MM:SS (or H:MM:SS for long calls) string of callDuration. */
   callDurationLabel: string;
+  /** Most recent media / permission error, or null. Read by CallContext to
+   *  show a toast — set on permission denial / device-not-found etc., cleared
+   *  the moment the next call attempt starts or succeeds. */
+  lastError: string | null;
+  /** Manual clear — call after surfacing the toast so a stale error doesn't
+   *  re-show on the next render. */
+  clearError: () => void;
   startCall: (peerId: string, peerName: string | null, peerEmail: string) => Promise<void>;
   acceptCall: () => Promise<void>;
   rejectCall: () => Promise<void>;
@@ -79,7 +86,15 @@ function formatDuration(seconds: number): string {
   return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
 }
 
-function mediaErrorMessage(err: unknown): string {
+/** True when the error is a mic permission / dismissed-prompt failure
+ *  that the user can resolve by simply tapping Call again (the browser
+ *  will re-prompt). False for hard failures like NotFoundError. */
+function isPermissionRetryable(err: unknown): boolean {
+  const e = err as { name?: string };
+  return e?.name === 'NotAllowedError' || e?.name === 'PermissionDeniedError';
+}
+
+function mediaErrorMessage(err: unknown, permanentlyBlocked = false): string {
   const e = err as { name?: string; message?: string };
   switch (e?.name) {
     case 'NotFoundError':
@@ -87,7 +102,12 @@ function mediaErrorMessage(err: unknown): string {
       return 'No microphone found. Connect a mic and try again.';
     case 'NotAllowedError':
     case 'PermissionDeniedError':
-      return 'Microphone access was blocked. Allow it in the browser address bar and try again.';
+      return permanentlyBlocked
+        ? // Browser remembers a previous "Block" choice — tapping Call won't re-prompt
+          // until the user changes the site setting manually.
+          'Microphone is blocked for this site. Tap the lock icon next to the URL → Site settings → Microphone → Allow, then tap Call again.'
+        : // First-time or dismissed prompt — tapping Call again will re-prompt.
+          'Microphone access is needed. Tap Call again and choose Allow when prompted.';
     case 'NotReadableError':
     case 'TrackStartError':
       return 'Microphone is in use by another app or browser tab. Close it and try again.';
@@ -95,6 +115,22 @@ function mediaErrorMessage(err: unknown): string {
       return 'Calls need a secure (HTTPS) connection.';
     default:
       return e?.message ?? 'Could not access microphone.';
+  }
+}
+
+/** Ask the Permissions API whether the mic has been *permanently* blocked.
+ *  Returns false on browsers that don't expose Permissions for microphone
+ *  (older Safari) — we fall back to a non-permanent message in that case. */
+async function micPermanentlyBlocked(): Promise<boolean> {
+  try {
+    const perms = navigator.permissions as
+      | { query?: (d: { name: string }) => Promise<{ state: string }> }
+      | undefined;
+    if (!perms?.query) return false;
+    const result = await perms.query({ name: 'microphone' });
+    return result.state === 'denied';
+  } catch {
+    return false;
   }
 }
 
@@ -108,6 +144,9 @@ export function useCall(): UseCallReturn {
   const [incomingCall, setIncomingCall] = useState<IncomingCallInfo | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [callDuration, setCallDuration] = useState(0);
+  const [lastError, setLastError] = useState<string | null>(null);
+
+  const clearError = useCallback(() => setLastError(null), []);
 
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const callIdRef = useRef<string | null>(null);
@@ -287,6 +326,7 @@ export function useCall(): UseCallReturn {
   const startCall = useCallback(
     async (peerId: string, peerName: string | null, peerEmail: string) => {
       if (status !== 'idle') return;
+      setLastError(null); // any stale "mic blocked" from a previous attempt
       setStatus('calling');
       setPeer({ id: peerId, full_name: peerName, email: peerEmail });
 
@@ -339,13 +379,24 @@ export function useCall(): UseCallReturn {
         callIdRef.current = callId;
         flushOutgoingCandidates(peerId, callId);
       } catch (err: unknown) {
-        finalise('ended', false);
         const e = err as { response?: { data?: { error?: string } } };
         const serverMsg = e?.response?.data?.error;
+        // Permission-denied: skip the "Call ended" banner + the 2.5 s idle
+        // wait, so tapping Call again works immediately. Also detect the
+        // permanently-blocked state so the toast can guide the user to
+        // unblock at the browser settings level.
+        if (isPermissionRetryable(err) && !serverMsg) {
+          cleanup();
+          setStatus('idle');
+          setPeer(null);
+          const blocked = await micPermanentlyBlocked();
+          throw new Error(mediaErrorMessage(err, blocked));
+        }
+        finalise('ended', false);
         throw new Error(serverMsg ?? mediaErrorMessage(err));
       }
     },
-    [status, finalise],
+    [status, finalise, cleanup],
   );
 
   // -------------------------------------------------------------------------
@@ -415,10 +466,24 @@ export function useCall(): UseCallReturn {
 
       playConnect();
       setStatus('connected');
-    } catch {
+    } catch (err: unknown) {
+      // Same UX as the outbound side: if the callee denied / dismissed
+      // the mic prompt, snap straight back to "ringing" so they can tap
+      // Accept again. Other failures (PC errors, etc.) fall through to
+      // the standard "ended" banner.
+      if (isPermissionRetryable(err)) {
+        cleanup();
+        setStatus('ringing');
+        // Restore the incoming-call card so Accept is tappable again.
+        setIncomingCall(incoming);
+        ring();
+        const blocked = await micPermanentlyBlocked();
+        setLastError(mediaErrorMessage(err, blocked));
+        return;
+      }
       finalise('ended');
     }
-  }, [incomingCall, finalise]);
+  }, [incomingCall, finalise, cleanup]);
 
   const rejectCall = useCallback(async () => {
     const incoming = incomingCall;
@@ -541,6 +606,8 @@ export function useCall(): UseCallReturn {
     isMuted,
     callDuration,
     callDurationLabel: formatDuration(callDuration),
+    lastError,
+    clearError,
     startCall,
     acceptCall,
     rejectCall,

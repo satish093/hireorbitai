@@ -18,6 +18,7 @@
  */
 
 import { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
+import toast from 'react-hot-toast';
 import { useCall, UseCallReturn } from '../hooks/useCall';
 import { CallModal } from '../components/CallModal';
 
@@ -61,6 +62,18 @@ export function CallProvider({ children }: { children: ReactNode }) {
         /* still blocked — leave the button visible */
       });
   }
+
+  // Surface mic / permission errors via the global toast as soon as useCall
+  // sets them. Critical for the callee-side retry flow: when the callee
+  // denies / dismisses the mic prompt, useCall puts them back in 'ringing'
+  // state silently — without this toast they'd have no idea why their
+  // Accept tap "didn't do anything". The toast disappears after a few
+  // seconds; clearError() prevents re-firing on the next render.
+  useEffect(() => {
+    if (!call.lastError) return;
+    toast.error(call.lastError, { duration: 6000 });
+    call.clearError();
+  }, [call.lastError, call]);
 
   // Bind the remote stream + attempt play whenever it changes.
   useEffect(() => {
