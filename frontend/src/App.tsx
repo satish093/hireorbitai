@@ -14,6 +14,7 @@ import {
   ADMIN_TIER,
   MANAGER_TIER,
   OPERATOR_TIER,
+  OWNER_TIER,
   BUSINESS_ROLES,
   MESSAGING_ROLES,
   hasCapability,
@@ -90,6 +91,7 @@ const Clients = lazy(() => import('./pages/Clients').then((m) => ({ default: m.C
 const Reminders = lazy(() => import('./pages/Reminders').then((m) => ({ default: m.Reminders })));
 const AIEmail = lazy(() => import('./pages/AIEmail').then((m) => ({ default: m.AIEmail })));
 const AIUsage = lazy(() => import('./pages/AIUsage').then((m) => ({ default: m.AIUsage })));
+const AdminCallsUsage = lazy(() => import('./pages/AdminCallsUsage'));
 const Reports = lazy(() => import('./pages/Reports').then((m) => ({ default: m.Reports })));
 const Invitations = lazy(() =>
   import('./pages/Invitations').then((m) => ({ default: m.Invitations })),
@@ -441,6 +443,18 @@ export default function App() {
               element={
                 <ProtectedRoute allow={MANAGER_TIER} capability="ai_usage">
                   <AIUsage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/calls-usage"
+              element={
+                // OWNER_TIER (SUPER_ADMIN + CEO) sees the call-budget
+                // dashboard, plus any DEVELOPER explicitly granted the
+                // `calls_usage` capability. Backend route mirrors this
+                // exact gate (callsUsageRouter in routes/index.ts).
+                <ProtectedRoute allow={OWNER_TIER} capability="calls_usage">
+                  <AdminCallsUsage />
                 </ProtectedRoute>
               }
             />

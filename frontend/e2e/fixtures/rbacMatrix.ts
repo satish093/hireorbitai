@@ -377,6 +377,18 @@ export const RBAC_MATRIX: RoutePolicy[] = [
     scope: 'global',
     primaryActions: ['view audit log'],
   },
+  {
+    path: '/admin/calls-usage',
+    sidebarLabel: 'Call Usage',
+    section: 'Admin',
+    allow: OWNER_TIER,
+    capability: 'calls_usage',
+    backendGate: 'requireRoleOrCapability(OWNER_TIER, calls_usage)',
+    scope: 'global',
+    primaryActions: ['read org-wide monthly call-hour budget'],
+    workspaceWideException:
+      'Call-usage dashboard is OWNER_TIER (SUPER_ADMIN + CEO) because the cap is a billing decision they own. CTO/DIRECTOR intentionally do NOT see this page (unlike Feature Flags / AI Settings where ADMIN_TIER gets read access).',
+  },
 ];
 
 /** A role (with optional DEVELOPER capabilities) is admitted to a route. */

@@ -71,6 +71,7 @@ const CAP_LABEL: Record<DeveloperCapability, string> = {
   invitations: 'Invitations',
   reports: 'Analytics / reports',
   ai_usage: 'AI usage dashboard',
+  calls_usage: 'Call usage dashboard',
 };
 
 /**

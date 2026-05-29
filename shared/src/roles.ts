@@ -67,6 +67,7 @@ export const DEVELOPER_CAPABILITIES = [
   'invitations', // send/manage invitations
   'reports', // analytics/reports
   'ai_usage', // AI usage dashboard
+  'calls_usage', // /admin/calls-usage — monthly call-hour budget dashboard
 ] as const;
 
 export type DeveloperCapability = (typeof DEVELOPER_CAPABILITIES)[number];

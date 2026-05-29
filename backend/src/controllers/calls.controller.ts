@@ -300,6 +300,46 @@ export const reject: RequestHandler = async (req, res) => {
 };
 
 // ---------------------------------------------------------------------------
+// GET /calls/usage — monthly call-hour budget snapshot
+// ---------------------------------------------------------------------------
+//
+// Read-only dashboard endpoint surfacing the same number the cap gate uses
+// (env.calls.monthlyHourCap vs the cached SUM of duration_seconds in the
+// current UTC calendar month). Gated by OWNER_TIER + the `calls_usage`
+// developer capability in the route — anyone who can see the page also has
+// permission to see the org-wide spend.
+//
+// Returns enough to render a single card without further math on the client:
+//   - used_hours   — float, current month so far
+//   - cap_hours    — env.calls.monthlyHourCap (0 means disabled)
+//   - percent_used — clamped 0..100, null when cap=0
+//   - cap_reached  — boolean, true when used_hours >= cap_hours
+//   - reset_at_utc — ISO timestamp for 00:00 UTC on the 1st of next month
+
+export const usage: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const usedHours = await getMonthlyHoursUsed();
+  const capHours = env.calls.monthlyHourCap;
+  const capActive = capHours > 0;
+  // First day of next UTC month at 00:00:00 — the moment the cache key
+  // flips (YYYY-MM rolls over) and counters effectively reset to 0.
+  const now = new Date();
+  const resetAt = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 0, 0, 0, 0),
+  ).toISOString();
+  res.json({
+    used_hours: Math.round(usedHours * 100) / 100, // 2dp
+    cap_hours: capHours,
+    cap_active: capActive,
+    percent_used: capActive
+      ? Math.max(0, Math.min(100, Math.round((usedHours / capHours) * 100 * 10) / 10))
+      : null,
+    cap_reached: capActive && usedHours >= capHours,
+    reset_at_utc: resetAt,
+  });
+};
+
+// ---------------------------------------------------------------------------
 // GET /calls/turn-credentials — mint short-lived ICE servers for the client
 // ---------------------------------------------------------------------------
 //

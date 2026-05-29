@@ -11,6 +11,7 @@ import {
   BUSINESS_ROLES,
   MESSAGING_ROLES,
   ADMIN_TIER,
+  OWNER_TIER,
   hasCapability,
   type DeveloperCapability,
 } from '../types';
@@ -42,6 +43,7 @@ import {
   IconGraduation,
   IconBookOpen,
   IconClipboard,
+  IconPhone,
 } from './Icons';
 import type { ComponentType, SVGProps } from 'react';
 
@@ -230,6 +232,19 @@ const sections: Section[] = [
       },
       { to: '/admin/ai-settings', label: 'AI Settings', icon: IconSparkles, roles: ADMIN_TIER },
       { to: '/admin/audit-log', label: 'Audit Log', icon: IconClipboard, roles: ADMIN_TIER },
+      {
+        // Call-budget dashboard. Visible to OWNER_TIER (SUPER_ADMIN + CEO)
+        // because the cap is a billing decision they own, plus any
+        // DEVELOPER granted the `calls_usage` capability. CTO/DIRECTOR
+        // intentionally do NOT see it by default (different from
+        // Feature Flags / AI Settings where ADMIN_TIER gets read access).
+        // Backend route at /api/calls-usage enforces the same gate.
+        to: '/admin/calls-usage',
+        label: 'Call Usage',
+        icon: IconPhone,
+        roles: OWNER_TIER,
+        capability: 'calls_usage',
+      },
     ],
   },
 ];

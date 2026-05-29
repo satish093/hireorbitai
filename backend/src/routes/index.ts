@@ -22,7 +22,7 @@ import { aiRouter } from './ai.routes';
 import { tasksRouter } from './tasks.routes';
 import { taskViewsRouter } from './taskViews.routes';
 import { messagesRouter } from './messages.routes';
-import { callsRouter } from './calls.routes';
+import { callsRouter, callsUsageRouter } from './calls.routes';
 import { realtimeRouter } from './realtime.routes';
 import * as realtimeCtl from '../controllers/realtime.controller';
 import { featureFlagsRouter } from './featureFlags.routes';
@@ -108,6 +108,11 @@ router.use('/glassdoor', glassdoorRouter);
 router.use('/activity', activityRouter);
 router.use('/recruiter-goals', recruiterGoalsRouter);
 router.use('/ai-usage', aiUsageRouter);
+// Mirrors /ai-usage: OWNER_TIER + DEVELOPER-with-cap can read the org-wide
+// monthly call-hour budget. Separate from the /calls/* router because the
+// latter sits behind messaging-feature + messaging-roles gates, neither of
+// which is the right gate for a billing-visibility surface.
+router.use('/calls-usage', callsUsageRouter);
 
 // --- Feature-flag gated routers ---------------------------------------------
 // Each module that maps 1:1 to a feature flag mounts behind requireFeature().
