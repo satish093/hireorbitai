@@ -71,14 +71,22 @@ interface FetchedIce {
  *  to an already-running RTCPeerConnection.
  *
  *  `kind === 'fetched'` ONLY when the response includes at least one TURN
- *  provider entry. A response containing only STUN entries (no TURN
- *  provider configured on the backend) is treated as 'fallback' too — a
- *  mid-call refresh that swapped TURN for STUN-only would strip the live
- *  PC's relay path the same way a fetch error would. */
-function hasTurnServer(servers: RTCIceServer[]): boolean {
+ *  provider entry. Both schemes count:
+ *    - `turn:`  — TURN over UDP/TCP (RFC 7065)
+ *    - `turns:` — TURN over TLS/TCP (RFC 7065). Common on corp / hotel
+ *      networks that block UDP and only allow 443/tcp; Metered and
+ *      Cloudflare both emit `turns:` URLs in that case.
+ *  A response containing only STUN entries (no TURN provider configured
+ *  on the backend) is treated as 'fallback' — a mid-call refresh that
+ *  swapped TURN for STUN-only would strip the live PC's relay path the
+ *  same way a fetch error would.
+ *
+ *  Exported for unit testing — the predicate is the core of the mid-call
+ *  refresh safety contract. */
+export function hasTurnServer(servers: RTCIceServer[]): boolean {
   return servers.some((s) => {
     const urls = Array.isArray(s.urls) ? s.urls : [s.urls];
-    return urls.some((u) => typeof u === 'string' && u.startsWith('turn:'));
+    return urls.some((u) => typeof u === 'string' && /^turns?:/i.test(u));
   });
 }
 
@@ -242,12 +250,14 @@ export function useCall(): UseCallReturn {
   // visibility, then re-acquired when visible again (per Wake Lock spec).
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
   const iceRestartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Serializes the disconnect→restartIce flow across its async fetch +
-  // setConfiguration + restartIce span. Without it, a flapping network
-  // (disconnected → connected → disconnected during the fetch await) can
-  // queue a second timer that fires another restartIce while the first is
-  // still settling — undefined-order setConfiguration races. Cleared in
-  // the timer's finally and in cleanup().
+  // Serializes ALL TURN-credential mutations against the live PC — both
+  // the proactive TTL-refresh path and the disconnect→restartIce path.
+  // Either path that's mid-flight blocks the other from entering. Without
+  // this cross-path serialization, the proactive refresh could fire
+  // setConfiguration while the disconnect path is still fetching its own
+  // fresh creds, leaving the final iceServers set determined by whichever
+  // fetch resolves last (non-deterministic, fresher creds can be
+  // clobbered by staler ones). Cleared in each path's finally + cleanup().
   const iceRestartInFlightRef = useRef(false);
   // Proactive TURN-credential refresh. Cloudflare-issued creds are TTL-bound
   // (default 1h); without a refresh, calls that survive past TTL would lose
@@ -449,27 +459,47 @@ export function useCall(): UseCallReturn {
         iceRefreshTimerRef.current = setTimeout(async function refresh() {
           iceRefreshTimerRef.current = null;
           if (pcRef.current !== pc) return; // call ended
-          const fresh = await fetchIceServers();
-          if (pcRef.current !== pc) return; // ended during the await
-          if (fresh.kind === 'fetched') {
-            iceRefreshFailuresRef.current = 0;
-            try {
-              pc.setConfiguration({ iceServers: fresh.iceServers });
-            } catch {
-              /* setConfiguration unsupported on very old Safari — no-op */
-            }
-            if (fresh.ttlSeconds && fresh.ttlSeconds >= 60) {
-              scheduleRefresh(Math.floor(fresh.ttlSeconds * 0.85));
-            }
+          // Yield to a disconnect-driven restart that's already mid-flight.
+          // Without this check, both paths could call setConfiguration in
+          // rapid succession with potentially different iceServer sets,
+          // leaving the final config determined by whichever fetch
+          // resolved last. The disconnect path is the more urgent of the
+          // two (the call is currently broken), so we cede and retry on
+          // the fallback cadence — it will catch the next TTL window.
+          if (iceRestartInFlightRef.current) {
+            scheduleRefresh(60);
             return;
           }
-          // Fallback: backend was unreachable / returned empty. Do NOT
-          // mutate the live PC. Retry at a fixed 60 s cadence until we
-          // exhaust MAX_REFRESH_FAILURES, then give up so we don't burn
-          // fetches forever against a dead backend.
-          iceRefreshFailuresRef.current += 1;
-          if (iceRefreshFailuresRef.current <= MAX_REFRESH_FAILURES) {
-            scheduleRefresh(60);
+          iceRestartInFlightRef.current = true;
+          try {
+            const fresh = await fetchIceServers();
+            if (pcRef.current !== pc) return; // ended during the await
+            if (fresh.kind === 'fetched') {
+              iceRefreshFailuresRef.current = 0;
+              try {
+                pc.setConfiguration({ iceServers: fresh.iceServers });
+              } catch {
+                /* setConfiguration unsupported on very old Safari — no-op */
+              }
+              if (fresh.ttlSeconds && fresh.ttlSeconds >= 60) {
+                scheduleRefresh(Math.floor(fresh.ttlSeconds * 0.85));
+              }
+              return;
+            }
+            // Fallback: backend was unreachable / returned empty. Do NOT
+            // mutate the live PC. Retry at a fixed 60 s cadence until we
+            // exhaust MAX_REFRESH_FAILURES, then give up so we don't burn
+            // fetches forever against a dead backend.
+            iceRefreshFailuresRef.current += 1;
+            if (iceRefreshFailuresRef.current <= MAX_REFRESH_FAILURES) {
+              scheduleRefresh(60);
+            }
+          } finally {
+            // Same cross-call-race guard as the disconnect path: only
+            // release the flag if we still own the PC. A stale call's
+            // fetch resolving after a new call started must not clobber
+            // the new call's serialization state.
+            if (pcRef.current === pc) iceRestartInFlightRef.current = false;
           }
         }, delaySec * 1000);
       };
@@ -530,6 +560,13 @@ export function useCall(): UseCallReturn {
             const fresh = await fetchIceServers();
             if (pcRef.current !== pc) return; // ended during the await
             if (fresh.kind === 'fetched') {
+              // A successful disconnect-path fetch also re-arms the
+              // proactive refresh path: if the proactive path had given
+              // up after MAX_REFRESH_FAILURES of backend outage, this
+              // tells us the backend is healthy again, so the next
+              // proactive timer (driven by buildPC's original ttl) can
+              // resume normal operation when it fires.
+              iceRefreshFailuresRef.current = 0;
               try {
                 pc.setConfiguration({ iceServers: fresh.iceServers });
               } catch {
@@ -542,7 +579,13 @@ export function useCall(): UseCallReturn {
               /* older browsers / Safari pre-13 don't support restartIce */
             }
           } finally {
-            iceRestartInFlightRef.current = false;
+            // Only release the in-flight flag if we still own the live PC.
+            // A stale call's fetch can resolve after the user has hung up
+            // and dialed again; without this guard, the stale finally
+            // would clobber the NEW call's in-flight flag and re-open the
+            // double-restartIce race the flag was introduced to close.
+            // cleanup() at end-call resets the flag on the same-call path.
+            if (pcRef.current === pc) iceRestartInFlightRef.current = false;
           }
         }, 4_000);
         return;

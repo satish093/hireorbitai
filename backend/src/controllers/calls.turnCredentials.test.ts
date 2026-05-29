@@ -213,6 +213,66 @@ describe('calls.turnCredentials — TURN-provider contract for frontend mid-call
     });
     expect(anyTurn).toBe(true);
   });
+
+  // TLS-TURN (`turns:`) is RFC 7065 §3.1 and is what Metered + Cloudflare
+  // emit on corp / hotel networks that block UDP and only allow 443/tcp.
+  // The frontend's hasTurnServer predicate matches /^turns?:/i so these
+  // responses ARE applied to live PCs mid-call; the contract pins both
+  // sides of that path so a future tightening can't silently re-introduce
+  // the "ship turns:, frontend misclassifies as fallback" failure mode.
+  const TURNS_REGEX = /^turns?:/i;
+
+  it('Metered turns: (TLS) URL is emitted verbatim and matches the turns?: contract', async () => {
+    mock.envOverride.meteredUsername = 'm-user';
+    mock.envOverride.meteredCredential = 'm-cred';
+    mock.envOverride.meteredUrls = ['turns:a.relay.metered.ca:443?transport=tcp'];
+    const { res } = await call(USER);
+    const body = res.body as { iceServers: Array<{ urls: string | string[] }> };
+    const anyTurn = body.iceServers.some((s) => {
+      const urls = Array.isArray(s.urls) ? s.urls : [s.urls];
+      return urls.some((u) => TURNS_REGEX.test(String(u)));
+    });
+    expect(anyTurn).toBe(true);
+  });
+
+  it('Cloudflare turns: (TLS) URL is surfaced and matches the turns?: contract', async () => {
+    mock.envOverride.cloudflareKeyId = 'cf-key';
+    mock.envOverride.cloudflareToken = 'cf-token';
+    mock.cloudflareResponse = {
+      ok: true,
+      json: async () => ({
+        iceServers: {
+          urls: ['turns:cf-edge.example:443?transport=tcp'],
+          username: 'cf-user',
+          credential: 'cf-cred',
+        },
+      }),
+    };
+    const { res } = await call(USER);
+    const body = res.body as { iceServers: Array<{ urls: string | string[] }> };
+    const anyTurn = body.iceServers.some((s) => {
+      const urls = Array.isArray(s.urls) ? s.urls : [s.urls];
+      return urls.some((u) => TURNS_REGEX.test(String(u)));
+    });
+    expect(anyTurn).toBe(true);
+  });
+
+  it('Mixed turn: + turns: list survives unchanged through the response', async () => {
+    mock.envOverride.meteredUsername = 'm-user';
+    mock.envOverride.meteredCredential = 'm-cred';
+    mock.envOverride.meteredUrls = [
+      'turn:a.relay.metered.ca:80',
+      'turns:a.relay.metered.ca:443?transport=tcp',
+    ];
+    const { res } = await call(USER);
+    const body = res.body as { iceServers: Array<{ urls: string | string[] }> };
+    const metered = body.iceServers.find((s) => Array.isArray(s.urls) && s.urls.length === 2);
+    expect(metered).toBeTruthy();
+    expect(metered!.urls).toEqual([
+      'turn:a.relay.metered.ca:80',
+      'turns:a.relay.metered.ca:443?transport=tcp',
+    ]);
+  });
 });
 
 describe('calls.turnCredentials — ttl_seconds contract', () => {
