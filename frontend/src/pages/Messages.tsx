@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { Avatar } from '../components/TaskBits';
@@ -14,6 +14,13 @@ import {
   IconFile,
 } from '../components/Icons';
 import { NotificationToggle } from '../components/NotificationToggle';
+import { useMediaViewer } from '../hooks/useMediaViewer';
+
+// Lazy-load the media viewer chunk — yet-another-react-lightbox +
+// @react-pdf-viewer + pdfjs-dist together push ~600 kB. The hook above
+// stays eager (just useState), so opening a chat doesn't pay the cost;
+// the chunk is fetched only when the user actually clicks an attachment.
+const MediaViewerModal = lazy(() => import('../components/MediaViewerModal'));
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useRealtime } from '../hooks/useRealtime';
@@ -157,6 +164,11 @@ export function Messages() {
 
   // Call state comes from the global CallProvider (mounted in App.tsx).
   const call = useCallContext();
+
+  // WhatsApp/Discord-style attachment viewer. Bubble-level AttachmentView
+  // calls `mediaViewer.open(message.attachments, clickedIndex)` to launch
+  // the image lightbox (gallery within the same message) or PDF viewer.
+  const mediaViewer = useMediaViewer();
 
   // True until the first /conversations + /directory pair has returned. Lets
   // the sidebar show a 3-row skeleton instead of either an empty state
@@ -919,6 +931,7 @@ export function Messages() {
                                 mine={m.sender_id === profile?.id}
                                 isHeadOfBurst={isHeadOfBurst}
                                 peerName={activePeer?.full_name?.trim() || activePeer?.email}
+                                onOpenMedia={mediaViewer.open}
                                 onReply={() => {
                                   setReplyingTo(m);
                                   composerRef.current?.focus();
@@ -1119,6 +1132,20 @@ export function Messages() {
           )}
         </main>
       </div>
+
+      {/* WhatsApp/Discord-style attachment viewer — portaled, ESC + click-
+          outside close. Image lightbox for image attachments, in-app PDF
+          viewer for PDFs, file card for anything else. Mounted ONCE at
+          page-level so it survives bubble re-renders and the SSE / poll
+          message merges don't tear it down mid-view.
+          Lazy-loaded — Suspense fallback is null because the viewer chunk
+          only loads on the first click anyway; a brief flash to load the
+          ~200 kB gzipped chunk is invisible against the click handler. */}
+      {mediaViewer.state && (
+        <Suspense fallback={null}>
+          <MediaViewerModal state={mediaViewer.state} onClose={mediaViewer.close} />
+        </Suspense>
+      )}
     </Layout>
   );
 }
@@ -1131,6 +1158,7 @@ function Bubble({
   onReply,
   onEdit,
   onDelete,
+  onOpenMedia,
 }: {
   message: Message;
   mine: boolean;
@@ -1145,6 +1173,10 @@ function Bubble({
   onReply?: () => void;
   onEdit?: (newBody: string) => void | Promise<void>;
   onDelete?: () => void | Promise<void>;
+  /** Opens the centered MediaViewerModal (image lightbox or PDF). The
+   *  bubble passes its OWN attachments list + the clicked index so the
+   *  lightbox can navigate across all images in the same message. */
+  onOpenMedia?: (attachments: NonNullable<Message['attachments']>, startIndex: number) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(message.body);
@@ -1317,8 +1349,15 @@ function Bubble({
                 means no separator div needed. */}
             {message.attachments && message.attachments.length > 0 && (
               <div className={clsx('flex flex-col gap-1.5', message.body ? 'mb-1.5' : '')}>
-                {message.attachments.map((a) => (
-                  <AttachmentView key={a.id} attachment={a} mine={mine} />
+                {message.attachments.map((a, idx) => (
+                  <AttachmentView
+                    key={a.id}
+                    attachment={a}
+                    mine={mine}
+                    onOpen={
+                      onOpenMedia ? () => onOpenMedia(message.attachments ?? [], idx) : undefined
+                    }
+                  />
                 ))}
               </div>
             )}
@@ -1484,27 +1523,61 @@ function AttachmentChip({
 }
 
 /** Bubble-side attachment view — inline image preview for image MIMEs,
- *  otherwise a clickable file row with name + size. */
-function AttachmentView({ attachment, mine }: { attachment: Attachment; mine: boolean }) {
+ *  otherwise a clickable file row with name + size.
+ *
+ *  If `onOpen` is provided, clicking the preview opens the WhatsApp-style
+ *  centered MediaViewerModal (image lightbox, PDF viewer, or file card)
+ *  instead of dumping the user into a new tab. Falls back to a plain
+ *  download link if no handler — keeps the chip functional when the modal
+ *  isn't mounted (older callers, SSR snapshot, etc.).
+ */
+function AttachmentView({
+  attachment,
+  mine,
+  onOpen,
+}: {
+  attachment: Attachment;
+  mine: boolean;
+  onOpen?: () => void;
+}) {
   const previewSrc = attachment.localPreview ?? attachment.download_url ?? undefined;
+  const isPdf =
+    attachment.mime_type === 'application/pdf' ||
+    attachment.file_name.toLowerCase().endsWith('.pdf');
+
+  // Inline image preview — click opens the lightbox (gallery of images in
+  // the same message). Optimistic local-preview rows (no download_url yet)
+  // still render the local blob: thumbnail; clicking is a no-op until the
+  // upload completes.
   if (attachment.is_image && previewSrc) {
+    if (onOpen && attachment.download_url) {
+      return (
+        <button
+          type="button"
+          onClick={onOpen}
+          className="block max-w-[280px] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/60 rounded-lg"
+          title={`Open ${attachment.file_name}`}
+        >
+          <img
+            src={previewSrc}
+            alt={attachment.file_name}
+            className="rounded-lg max-h-64 max-w-full object-contain bg-black/5"
+          />
+        </button>
+      );
+    }
     return (
-      <a
-        href={attachment.download_url ?? previewSrc}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="block max-w-[280px]"
-        title={attachment.file_name}
-      >
-        <img
-          src={previewSrc}
-          alt={attachment.file_name}
-          className="rounded-lg max-h-64 max-w-full object-contain bg-black/5"
-        />
-      </a>
+      <img
+        src={previewSrc}
+        alt={attachment.file_name}
+        className="block max-w-[280px] max-h-64 rounded-lg object-contain bg-black/5"
+      />
     );
   }
-  const content = (
+
+  // Non-image (PDF / docx / xlsx / zip / …). PDFs open the in-app viewer;
+  // everything else opens the FileCard modal which has Open + Close.
+  const card = (
     <div
       className={clsx(
         'inline-flex items-center gap-2 rounded-lg px-2.5 py-1.5 max-w-[260px]',
@@ -1520,6 +1593,7 @@ function AttachmentView({ attachment, mine }: { attachment: Attachment; mine: bo
           )}
         >
           {attachment.file_name}
+          {isPdf && <span className="ml-1 opacity-70">· PDF</span>}
         </div>
         <div className={clsx('text-[10px]', mine ? 'text-white/70' : 'text-muted')}>
           {attachment.uploading ? 'Uploading…' : formatBytes(attachment.size_bytes)}
@@ -1527,10 +1601,25 @@ function AttachmentView({ attachment, mine }: { attachment: Attachment; mine: bo
       </div>
     </div>
   );
-  if (!attachment.download_url) return content;
+
+  if (!attachment.download_url) return card;
+  if (onOpen) {
+    return (
+      <button
+        type="button"
+        onClick={onOpen}
+        className="text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/60 rounded-lg"
+        title={`Open ${attachment.file_name}`}
+      >
+        {card}
+      </button>
+    );
+  }
+  // No viewer wired — fall back to a plain download link so the chip
+  // still does *something* on click.
   return (
     <a href={attachment.download_url} target="_blank" rel="noopener noreferrer" download>
-      {content}
+      {card}
     </a>
   );
 }
