@@ -345,7 +345,18 @@ const callControlLimiter = rateLimit({
   keyGenerator: rateLimitKey,
   handler: (req, res, next) => sendRateLimitResponse(req, res, next, { windowMs: 60 * 1000 }),
 });
-for (const path of ['/calls/offer', '/calls/answer', '/calls/reject', '/calls/end']) {
+for (const path of [
+  '/calls/offer',
+  '/calls/answer',
+  '/calls/reject',
+  '/calls/end',
+  // /turn-credentials proxies the Cloudflare credential-issuance API. Without
+  // this limiter, an authed attacker could loop the endpoint to spray
+  // Cloudflare and inflate the 1,000 GB/mo free tier into billable territory
+  // (or mint thousands of relay credentials per window). 30/min is well
+  // above the legitimate one-fetch-per-call-start usage.
+  '/calls/turn-credentials',
+]) {
   app.use(path, callControlLimiter);
   app.use(`/api${path}`, callControlLimiter);
 }

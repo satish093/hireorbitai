@@ -44,19 +44,29 @@ interface TurnCredentialsResponse {
   providers?: { cloudflare?: boolean; metered?: boolean };
 }
 
+interface FetchedIce {
+  iceServers: RTCIceServer[];
+  /** Server-advertised credential lifetime in seconds, or null when not
+   *  provided (STUN-only path). Drives the proactive refresh timer in
+   *  buildPC so long-running calls don't end up with expired TURN creds
+   *  by the time WiFi ↔ cellular handoff triggers an ICE restart. */
+  ttlSeconds: number | null;
+}
+
 /** Fetch a fresh iceServers list from the backend before opening a peer
  *  connection. Fail-soft: any network/parse error degrades to STUN-only so
  *  the call still attempts (just without the TURN relay fallback). */
-async function fetchIceServers(): Promise<RTCIceServer[]> {
+async function fetchIceServers(): Promise<FetchedIce> {
   try {
     const { data } = await api.get<TurnCredentialsResponse>('/calls/turn-credentials');
     if (data?.iceServers && Array.isArray(data.iceServers) && data.iceServers.length > 0) {
-      return data.iceServers;
+      const ttl = typeof data.ttl_seconds === 'number' ? data.ttl_seconds : null;
+      return { iceServers: data.iceServers, ttlSeconds: ttl };
     }
-    return STUN_ONLY_ICE;
+    return { iceServers: STUN_ONLY_ICE, ttlSeconds: null };
   } catch (err) {
     console.warn('[useCall] turn-credentials fetch failed, falling back to STUN-only:', err);
-    return STUN_ONLY_ICE;
+    return { iceServers: STUN_ONLY_ICE, ttlSeconds: null };
   }
 }
 
@@ -198,6 +208,12 @@ export function useCall(): UseCallReturn {
   // visibility, then re-acquired when visible again (per Wake Lock spec).
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
   const iceRestartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Proactive TURN-credential refresh. Cloudflare-issued creds are TTL-bound
+  // (default 1h); without a refresh, calls that survive past TTL would lose
+  // their relay path when the next WiFi↔cellular handoff triggers an ICE
+  // restart. The timer fires at ~85% of TTL, refetches, and pushes the new
+  // iceServers into the live RTCPeerConnection via setConfiguration().
+  const iceRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Tick the duration once a second while connected.
   useEffect(() => {
@@ -310,6 +326,10 @@ export function useCall(): UseCallReturn {
       clearTimeout(iceRestartTimerRef.current);
       iceRestartTimerRef.current = null;
     }
+    if (iceRefreshTimerRef.current) {
+      clearTimeout(iceRefreshTimerRef.current);
+      iceRefreshTimerRef.current = null;
+    }
     releaseWakeLock();
     stopRing();
     stopVibration();
@@ -348,8 +368,40 @@ export function useCall(): UseCallReturn {
   // Build RTCPeerConnection + remote-stream wiring
   // -------------------------------------------------------------------------
 
-  function buildPC(peerId: string, iceServers: RTCIceServer[]): RTCPeerConnection {
+  function buildPC(
+    peerId: string,
+    iceServers: RTCIceServer[],
+    ttlSeconds: number | null,
+  ): RTCPeerConnection {
     const pc = new RTCPeerConnection({ iceServers });
+
+    // Proactive credential refresh. Cloudflare TURN creds are short-lived
+    // (default 1h). Without this, a call that crosses the TTL boundary and
+    // then triggers an ICE restart (the WiFi↔cellular handoff path below)
+    // would relay with expired creds and land in 'failed'. Refresh at 85%
+    // of TTL via setConfiguration() so the live RTCPeerConnection sees the
+    // new servers without a renegotiation. Only schedule when TTL is sane
+    // (>= 60s) so a misconfigured backend can't pin us into a tight loop.
+    if (ttlSeconds && ttlSeconds >= 60) {
+      const scheduleRefresh = (delaySec: number) => {
+        if (iceRefreshTimerRef.current) clearTimeout(iceRefreshTimerRef.current);
+        iceRefreshTimerRef.current = setTimeout(async function refresh() {
+          iceRefreshTimerRef.current = null;
+          if (pcRef.current !== pc) return; // call ended
+          const fresh = await fetchIceServers();
+          if (pcRef.current !== pc) return; // ended during the await
+          try {
+            pc.setConfiguration({ iceServers: fresh.iceServers });
+          } catch {
+            /* setConfiguration unsupported on very old Safari — no-op */
+          }
+          if (fresh.ttlSeconds && fresh.ttlSeconds >= 60) {
+            scheduleRefresh(Math.floor(fresh.ttlSeconds * 0.85));
+          }
+        }, delaySec * 1000);
+      };
+      scheduleRefresh(Math.floor(ttlSeconds * 0.85));
+    }
 
     // ICE / connection state diagnostics. Without these, a call that fails
     // NAT traversal (the most common silent-call symptom on mobile
@@ -377,16 +429,31 @@ export function useCall(): UseCallReturn {
         // candidates against the new network. Without this, the call
         // stays "disconnected" forever after a network switch.
         if (iceRestartTimerRef.current) return;
-        iceRestartTimerRef.current = setTimeout(() => {
+        iceRestartTimerRef.current = setTimeout(async () => {
           iceRestartTimerRef.current = null;
           if (pcRef.current !== pc) return; // call was already ended
-          if (pc.iceConnectionState === 'disconnected') {
-            console.info('[useCall] restarting ICE after disconnect');
+          if (pc.iceConnectionState !== 'disconnected') return; // recovered on its own
+          console.info('[useCall] restarting ICE after disconnect');
+          // Refetch credentials before restart. Cloudflare TURN creds are
+          // TTL-bound (~1h); a long call that survives past the TTL then
+          // hits a WiFi↔cellular handoff would otherwise restart with
+          // expired creds and land in 'failed'. Fail-soft: a fetch error
+          // leaves the current config in place so restartIce still runs.
+          try {
+            const fresh = await fetchIceServers();
+            if (pcRef.current !== pc) return; // ended during the await
             try {
-              pc.restartIce();
+              pc.setConfiguration({ iceServers: fresh.iceServers });
             } catch {
-              /* older browsers / Safari pre-13 don't support restartIce */
+              /* setConfiguration unsupported on very old Safari */
             }
+          } catch {
+            /* keep existing config */
+          }
+          try {
+            pc.restartIce();
+          } catch {
+            /* older browsers / Safari pre-13 don't support restartIce */
           }
         }, 4_000);
         return;
@@ -507,11 +574,12 @@ export function useCall(): UseCallReturn {
         // Fetch fresh ICE servers (Cloudflare + Metered + STUN) BEFORE
         // opening the peer connection so each call uses short-lived TURN
         // credentials and the freshest provider list. Failures fall back
-        // to STUN-only inside fetchIceServers().
-        const [stream, iceServers] = await Promise.all([getMicStream(), fetchIceServers()]);
+        // to STUN-only inside fetchIceServers(). ttlSeconds is wired into
+        // buildPC so the proactive refresh timer fires at ~85% of TTL.
+        const [stream, ice] = await Promise.all([getMicStream(), fetchIceServers()]);
         setLocalStream(stream);
 
-        const pc = buildPC(peerId, iceServers);
+        const pc = buildPC(peerId, ice.iceServers, ice.ttlSeconds);
         pcRef.current = pc;
         // Use addTransceiver('audio', {direction:'sendrecv'}) and attach the
         // track to its sender — instead of bare addTrack(). Two reasons:
@@ -587,11 +655,11 @@ export function useCall(): UseCallReturn {
     try {
       // Same per-call ICE fetch as startCall — keeps the callee's TURN
       // credentials fresh and lets the backend rotate providers without
-      // a frontend redeploy.
-      const [stream, iceServers] = await Promise.all([getMicStream(), fetchIceServers()]);
+      // a frontend redeploy. ttlSeconds drives the proactive refresh.
+      const [stream, ice] = await Promise.all([getMicStream(), fetchIceServers()]);
       setLocalStream(stream);
 
-      const pc = buildPC(caller.id, iceServers);
+      const pc = buildPC(caller.id, ice.iceServers, ice.ttlSeconds);
       pcRef.current = pc;
       callIdRef.current = call_id;
 

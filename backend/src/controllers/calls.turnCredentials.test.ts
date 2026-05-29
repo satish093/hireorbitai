@@ -157,6 +157,40 @@ describe('calls.turnCredentials — STUN-only fallback', () => {
   });
 });
 
+describe('calls.turnCredentials — ttl_seconds contract', () => {
+  // The frontend's useCall.ts uses ttl_seconds to schedule a proactive
+  // setConfiguration() refresh at ~85% of TTL. Audit caught the original
+  // implementation drop the field — this pins the contract so the same
+  // bug can't sneak back in.
+  it('always includes ttl_seconds in the response body (defaults to 3600)', async () => {
+    const { res } = await call(USER);
+    const body = res.body as { ttl_seconds?: number };
+    expect(typeof body.ttl_seconds).toBe('number');
+    expect(body.ttl_seconds).toBe(3600);
+  });
+
+  it('reflects the configured TURN_CREDENTIAL_TTL_SECONDS in the response', async () => {
+    mock.envOverride.credentialTtlSeconds = 1800;
+    const { res } = await call(USER);
+    const body = res.body as { ttl_seconds?: number };
+    expect(body.ttl_seconds).toBe(1800);
+  });
+
+  it('uses the same TTL it advertises when calling Cloudflare', async () => {
+    mock.envOverride.cloudflareKeyId = 'cf-key-id';
+    mock.envOverride.cloudflareToken = 'cf-secret-token';
+    mock.envOverride.credentialTtlSeconds = 7200;
+    mock.cloudflareResponse = {
+      ok: true,
+      json: async () => ({
+        iceServers: { urls: ['turn:cf-edge:3478'], username: 'u', credential: 'c' },
+      }),
+    };
+    await call(USER);
+    expect(JSON.parse(String(mock.fetchCalls[0]!.init?.body))).toEqual({ ttl: 7200 });
+  });
+});
+
 describe('calls.turnCredentials — Cloudflare path', () => {
   beforeEach(() => {
     mock.envOverride.cloudflareKeyId = 'cf-key-id';
