@@ -47,26 +47,60 @@ interface TurnCredentialsResponse {
 interface FetchedIce {
   iceServers: RTCIceServer[];
   /** Server-advertised credential lifetime in seconds, or null when not
-   *  provided (STUN-only path). Drives the proactive refresh timer in
-   *  buildPC so long-running calls don't end up with expired TURN creds
-   *  by the time WiFi ↔ cellular handoff triggers an ICE restart. */
+   *  provided (STUN-only fallback). Drives the proactive refresh timer in
+   *  buildPC so long-running calls don't end up with expired TURN creds. */
   ttlSeconds: number | null;
+  /** 'fetched' when the backend returned a real iceServers list.
+   *  'fallback' when we degraded to STUN-only because the request failed
+   *  or returned an empty list.
+   *
+   *  Mid-call refresh paths (proactive + disconnect→restartIce) MUST skip
+   *  pc.setConfiguration() when this is 'fallback'. Otherwise a transient
+   *  /calls/turn-credentials failure rips the still-valid Cloudflare TURN
+   *  servers off the live PC and leaves the call with NO relay path on
+   *  the next WiFi↔cellular handoff — exactly the silent-failure mode the
+   *  whole TURN-swap was meant to eliminate. Call-START paths still
+   *  accept the fallback (no working config to lose at that point). */
+  kind: 'fetched' | 'fallback';
 }
 
 /** Fetch a fresh iceServers list from the backend before opening a peer
  *  connection. Fail-soft: any network/parse error degrades to STUN-only so
- *  the call still attempts (just without the TURN relay fallback). */
+ *  the call still attempts (just without the TURN relay fallback). The
+ *  `kind` discriminator lets callers decide whether to apply the result
+ *  to an already-running RTCPeerConnection.
+ *
+ *  `kind === 'fetched'` ONLY when the response includes at least one TURN
+ *  provider entry. A response containing only STUN entries (no TURN
+ *  provider configured on the backend) is treated as 'fallback' too — a
+ *  mid-call refresh that swapped TURN for STUN-only would strip the live
+ *  PC's relay path the same way a fetch error would. */
+function hasTurnServer(servers: RTCIceServer[]): boolean {
+  return servers.some((s) => {
+    const urls = Array.isArray(s.urls) ? s.urls : [s.urls];
+    return urls.some((u) => typeof u === 'string' && u.startsWith('turn:'));
+  });
+}
+
 async function fetchIceServers(): Promise<FetchedIce> {
   try {
     const { data } = await api.get<TurnCredentialsResponse>('/calls/turn-credentials');
-    if (data?.iceServers && Array.isArray(data.iceServers) && data.iceServers.length > 0) {
+    if (
+      data?.iceServers &&
+      Array.isArray(data.iceServers) &&
+      data.iceServers.length > 0 &&
+      hasTurnServer(data.iceServers)
+    ) {
       const ttl = typeof data.ttl_seconds === 'number' ? data.ttl_seconds : null;
-      return { iceServers: data.iceServers, ttlSeconds: ttl };
+      return { iceServers: data.iceServers, ttlSeconds: ttl, kind: 'fetched' };
     }
-    return { iceServers: STUN_ONLY_ICE, ttlSeconds: null };
+    // Backend response existed but had no TURN provider (only STUN, or
+    // explicitly empty). Treat as fallback so mid-call refresh paths don't
+    // strip the live PC's TURN servers.
+    return { iceServers: STUN_ONLY_ICE, ttlSeconds: null, kind: 'fallback' };
   } catch (err) {
     console.warn('[useCall] turn-credentials fetch failed, falling back to STUN-only:', err);
-    return { iceServers: STUN_ONLY_ICE, ttlSeconds: null };
+    return { iceServers: STUN_ONLY_ICE, ttlSeconds: null, kind: 'fallback' };
   }
 }
 
@@ -208,12 +242,29 @@ export function useCall(): UseCallReturn {
   // visibility, then re-acquired when visible again (per Wake Lock spec).
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
   const iceRestartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Serializes the disconnect→restartIce flow across its async fetch +
+  // setConfiguration + restartIce span. Without it, a flapping network
+  // (disconnected → connected → disconnected during the fetch await) can
+  // queue a second timer that fires another restartIce while the first is
+  // still settling — undefined-order setConfiguration races. Cleared in
+  // the timer's finally and in cleanup().
+  const iceRestartInFlightRef = useRef(false);
   // Proactive TURN-credential refresh. Cloudflare-issued creds are TTL-bound
   // (default 1h); without a refresh, calls that survive past TTL would lose
   // their relay path when the next WiFi↔cellular handoff triggers an ICE
   // restart. The timer fires at ~85% of TTL, refetches, and pushes the new
   // iceServers into the live RTCPeerConnection via setConfiguration().
   const iceRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Bounded retry counter for the proactive refresh path. When the
+  // /calls/turn-credentials endpoint is transiently down, we keep retrying
+  // at a fixed 60 s cadence but cap attempts so a persistently-failing
+  // backend can't pin us into a forever-retry loop. Reset to 0 on a
+  // successful refresh.
+  const iceRefreshFailuresRef = useRef(0);
+  // Cap at ~10 minutes of 60 s retries before giving up; the call still
+  // works with its current (possibly soon-stale) creds — we just stop
+  // burning fetch attempts.
+  const MAX_REFRESH_FAILURES = 10;
 
   // Tick the duration once a second while connected.
   useEffect(() => {
@@ -330,6 +381,8 @@ export function useCall(): UseCallReturn {
       clearTimeout(iceRefreshTimerRef.current);
       iceRefreshTimerRef.current = null;
     }
+    iceRestartInFlightRef.current = false;
+    iceRefreshFailuresRef.current = 0;
     releaseWakeLock();
     stopRing();
     stopVibration();
@@ -382,6 +435,14 @@ export function useCall(): UseCallReturn {
     // of TTL via setConfiguration() so the live RTCPeerConnection sees the
     // new servers without a renegotiation. Only schedule when TTL is sane
     // (>= 60s) so a misconfigured backend can't pin us into a tight loop.
+    //
+    // CRITICAL: only apply the new config when fetchIceServers returned
+    // real backend data (kind === 'fetched'). A transient backend failure
+    // returns the STUN-only fallback; calling setConfiguration with that
+    // would rip the still-valid Cloudflare/Metered TURN servers off the
+    // live PC, leaving the next WiFi↔cellular handoff with no relay path.
+    // On fallback we instead retry sooner (60 s, bounded) so we recover
+    // when the backend comes back.
     if (ttlSeconds && ttlSeconds >= 60) {
       const scheduleRefresh = (delaySec: number) => {
         if (iceRefreshTimerRef.current) clearTimeout(iceRefreshTimerRef.current);
@@ -390,13 +451,25 @@ export function useCall(): UseCallReturn {
           if (pcRef.current !== pc) return; // call ended
           const fresh = await fetchIceServers();
           if (pcRef.current !== pc) return; // ended during the await
-          try {
-            pc.setConfiguration({ iceServers: fresh.iceServers });
-          } catch {
-            /* setConfiguration unsupported on very old Safari — no-op */
+          if (fresh.kind === 'fetched') {
+            iceRefreshFailuresRef.current = 0;
+            try {
+              pc.setConfiguration({ iceServers: fresh.iceServers });
+            } catch {
+              /* setConfiguration unsupported on very old Safari — no-op */
+            }
+            if (fresh.ttlSeconds && fresh.ttlSeconds >= 60) {
+              scheduleRefresh(Math.floor(fresh.ttlSeconds * 0.85));
+            }
+            return;
           }
-          if (fresh.ttlSeconds && fresh.ttlSeconds >= 60) {
-            scheduleRefresh(Math.floor(fresh.ttlSeconds * 0.85));
+          // Fallback: backend was unreachable / returned empty. Do NOT
+          // mutate the live PC. Retry at a fixed 60 s cadence until we
+          // exhaust MAX_REFRESH_FAILURES, then give up so we don't burn
+          // fetches forever against a dead backend.
+          iceRefreshFailuresRef.current += 1;
+          if (iceRefreshFailuresRef.current <= MAX_REFRESH_FAILURES) {
+            scheduleRefresh(60);
           }
         }, delaySec * 1000);
       };
@@ -428,32 +501,48 @@ export function useCall(): UseCallReturn {
         // force an ICE restart so the connection can re-negotiate
         // candidates against the new network. Without this, the call
         // stays "disconnected" forever after a network switch.
-        if (iceRestartTimerRef.current) return;
+        // Re-entry guards: bail if a timer is queued OR a previous restart
+        // is mid-flight (waiting on the credentials fetch). Without the
+        // in-flight ref, a disconnected→connected→disconnected flap during
+        // the async await would queue a second restart while the first is
+        // still settling — two restartIce calls 3–4 s apart with racing
+        // setConfiguration completion order.
+        if (iceRestartTimerRef.current || iceRestartInFlightRef.current) return;
         iceRestartTimerRef.current = setTimeout(async () => {
           iceRestartTimerRef.current = null;
           if (pcRef.current !== pc) return; // call was already ended
           if (pc.iceConnectionState !== 'disconnected') return; // recovered on its own
-          console.info('[useCall] restarting ICE after disconnect');
-          // Refetch credentials before restart. Cloudflare TURN creds are
-          // TTL-bound (~1h); a long call that survives past the TTL then
-          // hits a WiFi↔cellular handoff would otherwise restart with
-          // expired creds and land in 'failed'. Fail-soft: a fetch error
-          // leaves the current config in place so restartIce still runs.
+          if (iceRestartInFlightRef.current) return; // belt + braces
+          iceRestartInFlightRef.current = true;
           try {
+            console.info('[useCall] restarting ICE after disconnect');
+            // Refetch credentials before restart. Cloudflare TURN creds are
+            // TTL-bound (~1h); a long call that survives past the TTL then
+            // hits a WiFi↔cellular handoff would otherwise restart with
+            // expired creds and land in 'failed'.
+            //
+            // CRITICAL: only apply the new config when the fetch returned
+            // real backend data. A transient backend failure returns the
+            // STUN-only fallback; applying it would rip the still-valid
+            // Cloudflare TURN servers off the live PC and leave restartIce
+            // gathering with no relay path — exactly the H1 failure mode
+            // the credential refresh was meant to prevent.
             const fresh = await fetchIceServers();
             if (pcRef.current !== pc) return; // ended during the await
-            try {
-              pc.setConfiguration({ iceServers: fresh.iceServers });
-            } catch {
-              /* setConfiguration unsupported on very old Safari */
+            if (fresh.kind === 'fetched') {
+              try {
+                pc.setConfiguration({ iceServers: fresh.iceServers });
+              } catch {
+                /* setConfiguration unsupported on very old Safari */
+              }
             }
-          } catch {
-            /* keep existing config */
-          }
-          try {
-            pc.restartIce();
-          } catch {
-            /* older browsers / Safari pre-13 don't support restartIce */
+            try {
+              pc.restartIce();
+            } catch {
+              /* older browsers / Safari pre-13 don't support restartIce */
+            }
+          } finally {
+            iceRestartInFlightRef.current = false;
           }
         }, 4_000);
         return;

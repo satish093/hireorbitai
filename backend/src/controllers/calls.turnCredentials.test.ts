@@ -157,6 +157,64 @@ describe('calls.turnCredentials — STUN-only fallback', () => {
   });
 });
 
+describe('calls.turnCredentials — TURN-provider contract for frontend mid-call refresh', () => {
+  // The frontend's useCall.fetchIceServers checks for at least one `urls`
+  // starting with `turn:` to decide whether the response is safe to apply
+  // to a LIVE RTCPeerConnection via setConfiguration() (the proactive +
+  // disconnect refresh paths). A response without any TURN provider would
+  // otherwise strip the working Cloudflare TURN servers off the call. Pin
+  // both directions of that contract here.
+
+  it('STUN-only response contains NO turn: URLs (must be treated as fallback by frontend)', async () => {
+    const { res } = await call(USER);
+    const body = res.body as { iceServers: Array<{ urls: string | string[] }> };
+    for (const s of body.iceServers) {
+      const urls = Array.isArray(s.urls) ? s.urls : [s.urls];
+      for (const u of urls) {
+        expect(String(u).startsWith('turn:')).toBe(false);
+      }
+    }
+  });
+
+  it('Cloudflare path response DOES include at least one turn: URL (safe to apply mid-call)', async () => {
+    mock.envOverride.cloudflareKeyId = 'cf-key';
+    mock.envOverride.cloudflareToken = 'cf-token';
+    mock.cloudflareResponse = {
+      ok: true,
+      json: async () => ({
+        iceServers: {
+          urls: ['turn:cf-edge.example:3478'],
+          username: 'cf-user',
+          credential: 'cf-cred',
+        },
+      }),
+    };
+    const { res } = await call(USER);
+    const body = res.body as { iceServers: Array<{ urls: string | string[] }> };
+    const anyTurn = body.iceServers.some((s) => {
+      const urls = Array.isArray(s.urls) ? s.urls : [s.urls];
+      return urls.some((u) => String(u).startsWith('turn:'));
+    });
+    expect(anyTurn).toBe(true);
+  });
+
+  it('Metered fallback (no Cloudflare) DOES include turn: URLs (safe to apply mid-call)', async () => {
+    mock.envOverride.meteredUsername = 'm-user';
+    mock.envOverride.meteredCredential = 'm-cred';
+    mock.envOverride.meteredUrls = [
+      'turn:a.relay.metered.ca:80',
+      'turn:a.relay.metered.ca:443?transport=tcp',
+    ];
+    const { res } = await call(USER);
+    const body = res.body as { iceServers: Array<{ urls: string | string[] }> };
+    const anyTurn = body.iceServers.some((s) => {
+      const urls = Array.isArray(s.urls) ? s.urls : [s.urls];
+      return urls.some((u) => String(u).startsWith('turn:'));
+    });
+    expect(anyTurn).toBe(true);
+  });
+});
+
 describe('calls.turnCredentials — ttl_seconds contract', () => {
   // The frontend's useCall.ts uses ttl_seconds to schedule a proactive
   // setConfiguration() refresh at ~85% of TTL. Audit caught the original
