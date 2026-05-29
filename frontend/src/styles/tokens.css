@@ -27,10 +27,15 @@
   --hover: oklch(0.96 0.005 250);
   --border: oklch(0.92 0.006 250);
   --border-strong: oklch(0.86 0.008 250);
-  /* sRGB hex equivalent of oklch(0.2 0.012 260) — axe-core cannot parse oklch */
+  /* sRGB hex equivalents of the original oklch tokens — axe-core cannot
+   * parse oklch from getComputedStyle, which was the source of intermittent
+   * dashboard color-contrast failures in CI (e.g. CI sampled --ink-2 as
+   * #888a8f → 3.39:1 on #fdfdfe). Headroom over the WCAG AA 4.5:1
+   * threshold so 10–11 px labels stay green even with antialiasing
+   * variance between local + CI Chromium. */
   --ink: #13161c;
-  --ink-2: oklch(0.36 0.012 260);
-  --muted: #696d73; /* sRGB hex — 5:1 on bg #fafbfc; axe-core cannot parse oklch */
+  --ink-2: #4f535b; /* ~7.5:1 on #ffffff, ~7.4:1 on #fdfdfe */
+  --muted: #5d6066; /* ~6.0:1 on #ffffff (was #696d73 ≈ 5.1:1) */
   --faint: oklch(0.7 0.01 260);
   --accent: oklch(0.535 0.22 275);
   --accent-2: oklch(0.47 0.23 280);

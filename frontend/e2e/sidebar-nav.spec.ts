@@ -59,7 +59,14 @@ test.describe('Sidebar parity by role (matrix-driven)', () => {
         // Assert DOM presence (membership parity) rather than toBeVisible — a
         // collapsible section's open/close animation can momentarily zero an
         // item's height, which would flake a strict visibility check.
-        await expect(navLink(page, label), `${role} should see "${label}"`).toHaveCount(1);
+        // Bump the timeout to 12s (Playwright default 5s) so slow CI
+        // runners have headroom for the post-feature-flag-fetch re-render
+        // pipeline. Can't use waitForLoadState('networkidle') because the
+        // SSE realtime stream keeps the network busy for the lifetime of
+        // the page (would never settle).
+        await expect(navLink(page, label), `${role} should see "${label}"`).toHaveCount(1, {
+          timeout: 12_000,
+        });
       }
       for (const label of ALL_SIDEBAR_LABELS) {
         if (expected.has(label)) continue;

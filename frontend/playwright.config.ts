@@ -19,7 +19,13 @@ export default defineConfig({
   outputDir: './e2e-results',
   // Fail the build on CI if test.only was committed.
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 1 : 0,
+  // 2 retries on CI. The mocked-backend suite is deterministic locally
+  // but the GitHub Actions runner has shown intermittent slow-render
+  // races on the sidebar matrix + a11y contrast scans (axe re-samples
+  // CSS variables mid-paint when the runner is loaded). Two retries
+  // covers both classes without masking real regressions: a genuine
+  // bug fails all 3 attempts, a load-spike flake clears on a retry.
+  retries: process.env.CI ? 2 : 0,
   // Single worker keeps the shared dev server happy and output deterministic.
   workers: 1,
   reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : [['list']],
