@@ -6,6 +6,7 @@ import { canMessageUser } from '../services/permission.service';
 import { publishToUser } from '../services/realtime.service';
 import { audit } from '../services/audit.service';
 import { logger } from '../config/logger';
+import { env } from '../config/env';
 
 // ---------------------------------------------------------------------------
 // Schema helpers
@@ -244,4 +245,127 @@ export const reject: RequestHandler = async (req, res) => {
   logger.info({ call_id, callee_id: me.id }, 'call:rejected');
 
   res.json({ ok: true });
+};
+
+// ---------------------------------------------------------------------------
+// GET /calls/turn-credentials — mint short-lived ICE servers for the client
+// ---------------------------------------------------------------------------
+//
+// The previous useCall.ts shipped with free OpenRelay TURN baked into the
+// frontend bundle (single US region, shared with thousands of strangers,
+// throttled). The new flow: the client asks the backend for a fresh
+// iceServers array right before opening a call, and the backend stitches
+// together up to three sources:
+//
+//   1. Cloudflare Realtime TURN (primary) — anycast across hundreds of POPs,
+//      so a US peer relays through the closest US edge and an India peer
+//      relays through the closest India edge. 1,000 GB/month free.
+//      Credentials are ephemeral (TTL configurable, capped 24h) and minted
+//      server-side so the bearer token never reaches the browser.
+//
+//   2. Metered.ca free TURN (fallback) — static creds, ~15 GB/month. Used
+//      only if the browser fails to bind via the Cloudflare entry, which is
+//      rare but happens behind some corporate firewalls.
+//
+//   3. Google STUN (always last) — for the happy path where peers can talk
+//      directly (same-WiFi, modern home routers). Free, no creds.
+//
+// Every block is optional: if Cloudflare creds aren't configured the
+// endpoint still returns Metered + STUN; if neither TURN provider is
+// configured it returns STUN-only. That keeps dev/test running without
+// any external dependency.
+//
+// Endpoint is gated by the same MESSAGING_ROLES + requireFeature('messages')
+// the rest of /calls/* sits behind (see routes/index.ts). No body — auth
+// alone identifies who the credentials are for.
+
+interface IceServer {
+  urls: string | string[];
+  username?: string;
+  credential?: string;
+}
+
+/** Cloudflare Realtime: POST a TTL → get { iceServers: { urls, username, credential } }. */
+async function fetchCloudflareIceServers(reqLog: {
+  warn: (...a: unknown[]) => void;
+}): Promise<IceServer | null> {
+  const { keyId, token } = env.turn.cloudflare;
+  if (!keyId || !token) return null;
+  try {
+    // Cloudflare Realtime TURN credential issuance:
+    //   POST https://rtc.live.cloudflare.com/v1/turn/keys/{keyId}/credentials/generate
+    //   body: { ttl: <seconds> }
+    // Response shape (per Cloudflare Realtime docs):
+    //   { iceServers: { urls: string|string[], username, credential } }
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 5000);
+    const resp = await fetch(
+      `https://rtc.live.cloudflare.com/v1/turn/keys/${encodeURIComponent(keyId)}/credentials/generate`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ ttl: env.turn.credentialTtlSeconds }),
+        signal: ctrl.signal,
+      },
+    );
+    clearTimeout(timer);
+    if (!resp.ok) {
+      reqLog.warn(
+        { status: resp.status },
+        'turn-credentials: Cloudflare credential generation failed',
+      );
+      return null;
+    }
+    const data = (await resp.json()) as { iceServers?: IceServer };
+    if (!data?.iceServers?.urls) return null;
+    return data.iceServers;
+  } catch (err) {
+    reqLog.warn({ err: (err as Error).message }, 'turn-credentials: Cloudflare fetch errored');
+    return null;
+  }
+}
+
+export const turnCredentials: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+
+  const reqLog = (req as unknown as { log?: { warn: (...a: unknown[]) => void } }).log ?? logger;
+  const iceServers: IceServer[] = [];
+
+  // 1. Cloudflare (primary). May return null if not configured or the API
+  // call failed — we degrade silently to the fallback chain in either case.
+  const cf = await fetchCloudflareIceServers(reqLog);
+  if (cf) iceServers.push(cf);
+
+  // 2. Metered.ca free (fallback). Static creds, multiple URLs (UDP/TCP on
+  // 80 + 443) so the client gets the broadest port coverage.
+  const { username, credential, urls } = env.turn.metered;
+  if (username && credential && urls.length > 0) {
+    iceServers.push({ urls, username, credential });
+  }
+
+  // 3. Google STUN (always last). Free, no creds. Lets peers with non-NATed
+  // public IPs (rare on home networks, more common in datacenters) skip
+  // TURN entirely.
+  iceServers.push({ urls: 'stun:stun.l.google.com:19302' });
+  iceServers.push({ urls: 'stun:stun1.l.google.com:19302' });
+
+  // Short-cache hint. Browsers don't honor it for fetch() responses by
+  // default but it's good documentation; the frontend already refetches
+  // before every call start so caching beyond the TTL would only matter
+  // for replay-style attacks (creds are scoped to the user anyway).
+  res.set(
+    'Cache-Control',
+    `private, max-age=${Math.max(60, Math.floor(env.turn.credentialTtlSeconds / 2))}`,
+  );
+  res.json({
+    iceServers,
+    ttl_seconds: env.turn.credentialTtlSeconds,
+    providers: {
+      cloudflare: cf !== null,
+      metered: !!(username && credential && urls.length > 0),
+    },
+  });
 };

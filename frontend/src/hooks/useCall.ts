@@ -17,46 +17,48 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../services/api';
 import { ring, stopRing, playConnect, playDisconnect } from '../utils/callSounds';
 
-// Public ICE servers.
+// ICE servers are now fetched per-call from the backend
+// (GET /calls/turn-credentials). The backend stitches together Cloudflare
+// Realtime TURN (primary, anycast global edge, 1,000 GB/month free) +
+// Metered.ca free fallback + Google STUN. See
+// backend/src/controllers/calls.controller.ts (turnCredentials handler)
+// for the composition rules.
 //
-// STUN-only works when at least one peer is on an open network (typical
-// desktop-on-WiFi case). It FAILS when both peers are behind symmetric NAT
-// — which is exactly what happens between two cellular phones, and was
-// the reason calls "connected" on the UI but had zero audio when both
-// sides were on mobile data. Adding TURN gives us a relay fallback for
-// that case.
+// Why per-call: Cloudflare-issued TURN credentials are short-lived (~1h,
+// configurable via TURN_CREDENTIAL_TTL_SECONDS on the backend). Fetching
+// once per call keeps the credentials fresh AND lets the backend rotate
+// providers without a frontend redeploy.
 //
-// OpenRelay (metered.ca) publishes free public TURN credentials —
-// intentionally shared, ~100 GB/month per project. Three URLs so the
-// client can fall back through transports:
-//   - turn:…:80           — UDP on port 80 (works through most NATs)
-//   - turn:…:443          — UDP on the TLS port (works through filters
-//                           that only allow 80/443)
-//   - turn:…:443?transport=tcp — TCP relay for symmetric NAT + UDP-blocking
-//                                firewalls (corporate WiFi / hotel networks)
-//
-// If our usage outgrows the free tier or we need self-hosted relay, swap
-// in a coturn instance on the VPS — the URLs/credentials are the only
-// thing that changes here.
-const ICE_SERVERS: RTCIceServer[] = [
+// STUN-only is the absolute-fallback the hook uses when the backend
+// endpoint is unreachable. Same-WiFi calls still work (STUN punches
+// through symmetric NAT for local-net peers); cross-network calls will
+// drop to ICE-failed and surface the existing "couldn't connect" error.
+const STUN_ONLY_ICE: RTCIceServer[] = [
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
-  {
-    urls: 'turn:openrelay.metered.ca:80',
-    username: 'openrelayproject',
-    credential: 'openrelayproject',
-  },
-  {
-    urls: 'turn:openrelay.metered.ca:443',
-    username: 'openrelayproject',
-    credential: 'openrelayproject',
-  },
-  {
-    urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-    username: 'openrelayproject',
-    credential: 'openrelayproject',
-  },
 ];
+
+interface TurnCredentialsResponse {
+  iceServers: RTCIceServer[];
+  ttl_seconds?: number;
+  providers?: { cloudflare?: boolean; metered?: boolean };
+}
+
+/** Fetch a fresh iceServers list from the backend before opening a peer
+ *  connection. Fail-soft: any network/parse error degrades to STUN-only so
+ *  the call still attempts (just without the TURN relay fallback). */
+async function fetchIceServers(): Promise<RTCIceServer[]> {
+  try {
+    const { data } = await api.get<TurnCredentialsResponse>('/calls/turn-credentials');
+    if (data?.iceServers && Array.isArray(data.iceServers) && data.iceServers.length > 0) {
+      return data.iceServers;
+    }
+    return STUN_ONLY_ICE;
+  } catch (err) {
+    console.warn('[useCall] turn-credentials fetch failed, falling back to STUN-only:', err);
+    return STUN_ONLY_ICE;
+  }
+}
 
 // How long to wait for the callee to answer before auto-cancelling (45 s).
 const CALL_TIMEOUT_MS = 45_000;
@@ -346,8 +348,8 @@ export function useCall(): UseCallReturn {
   // Build RTCPeerConnection + remote-stream wiring
   // -------------------------------------------------------------------------
 
-  function buildPC(peerId: string): RTCPeerConnection {
-    const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+  function buildPC(peerId: string, iceServers: RTCIceServer[]): RTCPeerConnection {
+    const pc = new RTCPeerConnection({ iceServers });
 
     // ICE / connection state diagnostics. Without these, a call that fails
     // NAT traversal (the most common silent-call symptom on mobile
@@ -502,10 +504,14 @@ export function useCall(): UseCallReturn {
       }, CALL_TIMEOUT_MS);
 
       try {
-        const stream = await getMicStream();
+        // Fetch fresh ICE servers (Cloudflare + Metered + STUN) BEFORE
+        // opening the peer connection so each call uses short-lived TURN
+        // credentials and the freshest provider list. Failures fall back
+        // to STUN-only inside fetchIceServers().
+        const [stream, iceServers] = await Promise.all([getMicStream(), fetchIceServers()]);
         setLocalStream(stream);
 
-        const pc = buildPC(peerId);
+        const pc = buildPC(peerId, iceServers);
         pcRef.current = pc;
         // Use addTransceiver('audio', {direction:'sendrecv'}) and attach the
         // track to its sender — instead of bare addTrack(). Two reasons:
@@ -579,10 +585,13 @@ export function useCall(): UseCallReturn {
     setPeer({ id: caller.id, full_name: caller.full_name ?? null, email: caller.email });
 
     try {
-      const stream = await getMicStream();
+      // Same per-call ICE fetch as startCall — keeps the callee's TURN
+      // credentials fresh and lets the backend rotate providers without
+      // a frontend redeploy.
+      const [stream, iceServers] = await Promise.all([getMicStream(), fetchIceServers()]);
       setLocalStream(stream);
 
-      const pc = buildPC(caller.id);
+      const pc = buildPC(caller.id, iceServers);
       pcRef.current = pc;
       callIdRef.current = call_id;
 

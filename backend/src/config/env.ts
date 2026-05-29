@@ -167,6 +167,40 @@ const envSchema = z.object({
   // the check entirely (use only if your DB names don't follow the convention).
   DB_GUARD: z.enum(['enforce', 'warn', 'off']).default('enforce'),
 
+  // --- TURN / WebRTC NAT traversal ---
+  // The voice-call stack (frontend/src/hooks/useCall.ts) used to ship with
+  // free public OpenRelay (openrelayproject) TURN credentials baked into the
+  // bundle. That fell over for cross-continent calls — single US region,
+  // shared with thousands of strangers, routinely throttled.
+  //
+  // The new flow: backend issues short-lived TURN credentials via
+  // GET /calls/turn-credentials. The handler asks Cloudflare for ephemeral
+  // creds (free 1,000 GB/month, anycast edge across hundreds of POPs),
+  // appends a static Metered.ca free fallback (~15 GB/month, regional), and
+  // always includes Google STUN. Both providers are optional — if neither
+  // is set, the handler still returns STUN-only so dev/test keeps working
+  // (calls between same-WiFi devices still work, just no NAT-relay fallback).
+  //
+  // Cloudflare credentials live at:
+  //   dash.cloudflare.com → Realtime → TURN keys
+  // Create a TURN key, then copy:
+  //   CLOUDFLARE_REALTIME_TURN_KEY_ID  → the key id (cf-…)
+  //   CLOUDFLARE_REALTIME_TURN_TOKEN   → the bearer token
+  // Metered free creds are issued at dashboard.metered.ca → TURN, then
+  // copy the static username + password. Personal free tier: 0.5 GB/day.
+  CLOUDFLARE_REALTIME_TURN_KEY_ID: optionalKey,
+  CLOUDFLARE_REALTIME_TURN_TOKEN: optionalKey,
+  METERED_TURN_USERNAME: optionalKey,
+  METERED_TURN_CREDENTIAL: optionalKey,
+  // Comma-separated TURN URLs from your Metered dashboard. Typically:
+  //   turn:a.relay.metered.ca:80,turn:a.relay.metered.ca:443,turn:a.relay.metered.ca:443?transport=tcp
+  // Empty disables the Metered fallback even if credentials are set.
+  METERED_TURN_URLS: optionalKey,
+  // How long Cloudflare-issued TURN creds live before the client must refetch.
+  // Cloudflare caps at 24h; we default to 1h so a leaked credential's blast
+  // radius is small. The frontend refetches on every call start anyway.
+  TURN_CREDENTIAL_TTL_SECONDS: z.coerce.number().int().min(60).max(86400).default(3600),
+
   // --- Development tooling ---
   // Master switch for the development-only surface: the role/user switch
   // endpoints (/auth/dev/*) and the Super-Admin test panel API (/dev/*).
@@ -332,4 +366,20 @@ export const env = {
   maxFailedLogins: e.MAX_FAILED_LOGINS,
   lockoutMinutes: e.LOCKOUT_MINUTES,
   cookieSecret: e.COOKIE_SECRET,
+  turn: {
+    cloudflare: {
+      keyId: e.CLOUDFLARE_REALTIME_TURN_KEY_ID || undefined,
+      token: e.CLOUDFLARE_REALTIME_TURN_TOKEN || undefined,
+    },
+    metered: {
+      username: e.METERED_TURN_USERNAME || undefined,
+      credential: e.METERED_TURN_CREDENTIAL || undefined,
+      urls: e.METERED_TURN_URLS
+        ? e.METERED_TURN_URLS.split(',')
+            .map((u) => u.trim())
+            .filter(Boolean)
+        : [],
+    },
+    credentialTtlSeconds: e.TURN_CREDENTIAL_TTL_SECONDS,
+  },
 } as const;
