@@ -1,6 +1,8 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
+import { MobileBottomNav } from './MobileBottomNav';
+import { MobileMoreSheet } from './MobileMoreSheet';
 import { useAuth } from '../context/AuthContext';
 
 /**
@@ -15,13 +17,18 @@ import { useAuth } from '../context/AuthContext';
  *
  * The mobile drawer open-state lives here too and is shared with the per-page
  * Header (which renders the hamburger) via NavContext.
+ *
+ * MobileBottomNav + MobileMoreSheet are also mounted here — they are
+ * `position: fixed` and `md:hidden` so they only appear below the md breakpoint
+ * and don't affect the desktop layout flow.
  */
 
 interface NavCtx {
   openNav: () => void;
+  openMore: () => void;
 }
 
-const NavContext = createContext<NavCtx>({ openNav: () => {} });
+const NavContext = createContext<NavCtx>({ openNav: () => {}, openMore: () => {} });
 
 /** Header reads this to wire its mobile hamburger to the shared drawer state. */
 export function useNav(): NavCtx {
@@ -32,6 +39,7 @@ export function AppChrome() {
   const { profile } = useAuth();
   const loc = useLocation();
   const [navOpen, setNavOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
 
   // Close the mobile drawer whenever the route changes.
   useEffect(() => {
@@ -39,7 +47,12 @@ export function AppChrome() {
   }, [loc.pathname]);
 
   return (
-    <NavContext.Provider value={{ openNav: () => setNavOpen(true) }}>
+    <NavContext.Provider
+      value={{
+        openNav: () => setNavOpen(true),
+        openMore: () => setMoreOpen(true),
+      }}
+    >
       <div className="flex min-h-dvh bg-bg text-ink">
         {/* Only show the nav once we have an authenticated profile — the child
             routes are ProtectedRoute-gated, so an unauthed render is just the
@@ -47,6 +60,10 @@ export function AppChrome() {
         {profile && <Sidebar mobileOpen={navOpen} onMobileClose={() => setNavOpen(false)} />}
         <Outlet />
       </div>
+
+      {/* Mobile-only navigation — fixed overlay, hidden above md breakpoint. */}
+      {profile && <MobileBottomNav onMore={() => setMoreOpen(true)} />}
+      {profile && <MobileMoreSheet open={moreOpen} onClose={() => setMoreOpen(false)} />}
     </NavContext.Provider>
   );
 }

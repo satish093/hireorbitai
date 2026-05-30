@@ -32,7 +32,7 @@ export function Layout({
           animate-page-enter and the CSS stagger cascade. */}
       <main
         key={loc.pathname}
-        className="flex-1 p-4 sm:p-6 lg:p-8 overflow-auto animate-page-enter"
+        className="flex-1 p-4 sm:p-6 lg:p-8 pb-20 md:pb-6 lg:pb-8 overflow-auto animate-page-enter"
         tabIndex={0}
       >
         {children}

@@ -27,7 +27,7 @@ export function Header({ title, crumbs, onMenuClick }: Props) {
         type="button"
         onClick={onMenuClick}
         aria-label="Open navigation"
-        className="md:hidden -ml-1 w-9 h-9 inline-flex items-center justify-center rounded-lg text-muted hover:text-ink hover:bg-hover"
+        className="hidden -ml-1 w-9 h-9 inline-flex items-center justify-center rounded-lg text-muted hover:text-ink hover:bg-hover"
       >
         <svg
           width="20"

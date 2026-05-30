@@ -4,23 +4,19 @@
  *   - Image attachments open in a fullscreen lightbox (gallery navigation
  *     when multiple images are in the same message). Powered by
  *     yet-another-react-lightbox.
- *   - PDF attachments open in a centered modal with the bundled
- *     @react-pdf-viewer toolbar (zoom, page navigation, fit-to-width).
+ *   - PDF attachments open in a centered modal using the browser's built-in
+ *     PDF renderer via a plain <iframe>. This eliminates pdfjs-dist and its
+ *     GHSA-wgrm-67xf-hhpq arbitrary-JS-execution advisory entirely. The
+ *     browser's native PDF viewer is sandboxed at the OS/GPU process level.
  *   - Other file types show a centered file card with download/open buttons.
  *
  * This file is the HEAVY entry point. It pulls in:
  *   yet-another-react-lightbox + plugins + their CSS
- *   @react-pdf-viewer/core + default-layout + their CSS
- *   pdfjs-dist (the PDF.js engine, ~2 MB)
  *
  * Callers MUST import it via React.lazy so the inbox chunk doesn't pay
  * the download until the user clicks an attachment. The corresponding
  * lightweight hook (useMediaViewer) lives in hooks/useMediaViewer.ts and
  * is safe to import eagerly.
- *
- * The PDF.js worker is bundled with Vite's ?url import — no CDN fetch, so
- * offline / air-gapped deployments work and there's no version skew with
- * pdfjs-dist itself.
  */
 
 import { useEffect, useMemo, useRef } from 'react';
@@ -33,17 +29,6 @@ import Captions from 'yet-another-react-lightbox/plugins/captions';
 import 'yet-another-react-lightbox/styles.css';
 import 'yet-another-react-lightbox/plugins/counter.css';
 import 'yet-another-react-lightbox/plugins/captions.css';
-
-import { Viewer, Worker } from '@react-pdf-viewer/core';
-import { defaultLayoutPlugin } from '@react-pdf-viewer/default-layout';
-import '@react-pdf-viewer/core/lib/styles/index.css';
-import '@react-pdf-viewer/default-layout/lib/styles/index.css';
-
-// Local-bundle the PDF.js worker via Vite's ?url import. Replaces the
-// previous CDN reference to unpkg.com — fixes offline / on-prem deploys
-// AND removes the version-skew risk (the worker is always the exact
-// pdfjs-dist version that's bundled).
-import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.js?url';
 
 import { IconX, IconFile } from './Icons';
 import type { MediaViewerState, ViewerAttachment } from '../hooks/useMediaViewer';
@@ -130,7 +115,8 @@ function ImageLightbox({ state, onClose }: { state: MediaViewerState; onClose: (
 }
 
 // ---------------------------------------------------------------------------
-// PDF viewer
+// PDF viewer — uses the browser's native renderer via <iframe>.
+// No pdfjs-dist; no arbitrary-JS-execution risk (GHSA-wgrm-67xf-hhpq).
 // ---------------------------------------------------------------------------
 function PdfViewerModal({
   attachment,
@@ -139,8 +125,6 @@ function PdfViewerModal({
   attachment: ViewerAttachment;
   onClose: () => void;
 }) {
-  const layout = useMemo(() => defaultLayoutPlugin(), []);
-  const sheetRef = useRef<HTMLDivElement>(null);
   useEscKey(onClose);
 
   useEffect(() => {
@@ -151,25 +135,14 @@ function PdfViewerModal({
     };
   }, []);
 
-  if (!attachment.download_url) {
-    return createPortal(
-      <Backdrop onClose={onClose}>
-        <div className="bg-surface border border-border rounded-2xl p-6 text-sm text-ink shadow-xl">
-          The PDF is not available right now. Try again in a moment.
-        </div>
-      </Backdrop>,
-      document.body,
-    );
-  }
-
   return createPortal(
     <Backdrop onClose={onClose}>
       <div
-        ref={sheetRef}
         className="w-full max-w-5xl h-[calc(100dvh-3rem)] bg-surface rounded-2xl shadow-2xl overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-4 py-2 border-b border-border flex items-center gap-2 bg-surface">
+        {/* Title bar */}
+        <div className="px-4 py-2 border-b border-border flex items-center gap-2 bg-surface shrink-0">
           <IconFile size={16} className="text-muted shrink-0" />
           <div
             className="text-sm font-medium text-ink truncate flex-1"
@@ -177,14 +150,16 @@ function PdfViewerModal({
           >
             {attachment.file_name}
           </div>
-          <a
-            href={attachment.download_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-accent hover:underline shrink-0"
-          >
-            Open in new tab ↗
-          </a>
+          {attachment.download_url && (
+            <a
+              href={attachment.download_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-accent hover:underline shrink-0"
+            >
+              Open in new tab ↗
+            </a>
+          )}
           <button
             type="button"
             onClick={onClose}
@@ -194,24 +169,20 @@ function PdfViewerModal({
             <IconX size={16} />
           </button>
         </div>
-        <div className="flex-1 min-h-0 bg-slate-100 dark:bg-slate-900">
-          <Worker workerUrl={pdfWorkerUrl}>
-            <Viewer
-              fileUrl={attachment.download_url}
-              plugins={[layout]}
-              // CVE mitigation (GHSA-wgrm-67xf-hhpq): pdfjs-dist v3 can be
-              // tricked into eval()-ing attacker-controlled strings via a
-              // malicious PDF. @react-pdf-viewer hasn't bumped to pdfjs v4
-              // yet (where it's fixed by default), so we forward the
-              // documented workaround: tell pdfjs the host does NOT permit
-              // eval. The viewer falls back to a slower (but safe) renderer.
-              transformGetDocumentParams={(opts) => ({
-                ...opts,
-                isEvalSupported: false,
-              })}
-            />
-          </Worker>
-        </div>
+
+        {/* PDF content */}
+        {attachment.download_url ? (
+          <iframe
+            src={attachment.download_url}
+            title={attachment.file_name}
+            className="flex-1 min-h-0 w-full border-0 bg-slate-100 dark:bg-slate-900"
+            aria-label={`PDF: ${attachment.file_name}`}
+          />
+        ) : (
+          <div className="flex-1 flex items-center justify-center text-sm text-muted p-6">
+            The PDF is not available right now. Try again in a moment.
+          </div>
+        )}
       </div>
     </Backdrop>,
     document.body,

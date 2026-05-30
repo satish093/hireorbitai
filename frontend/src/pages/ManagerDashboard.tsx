@@ -112,6 +112,35 @@ export function ManagerDashboard() {
 
   return (
     <Layout title="Manager dashboard">
+      {/* Mobile urgent ribbon — only shown below md when there are critical tasks */}
+      {tasks && tasks.critical_open > 0 && (
+        <div
+          className="md:hidden flex items-center gap-3 p-3 rounded-xl mb-4"
+          style={{
+            background: 'var(--danger-soft)',
+            border: '1px solid color-mix(in srgb, var(--danger) 20%, transparent)',
+          }}
+        >
+          <span
+            className="w-2.5 h-2.5 rounded-full shrink-0 animate-pulse"
+            style={{ background: 'var(--danger)' }}
+          />
+          <div className="flex-1 text-sm" style={{ color: 'var(--ink)' }}>
+            <strong style={{ fontWeight: 700 }}>
+              {tasks.critical_open} critical task{tasks.critical_open > 1 ? 's' : ''}
+            </strong>{' '}
+            need{tasks.critical_open === 1 ? 's' : ''} attention
+          </div>
+          <Link
+            to="/tasks"
+            className="text-xs font-semibold shrink-0"
+            style={{ color: 'var(--danger)', textDecoration: 'none' }}
+          >
+            View →
+          </Link>
+        </div>
+      )}
+
       {/* Greeting */}
       <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
         <div>

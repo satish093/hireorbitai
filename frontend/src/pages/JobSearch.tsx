@@ -154,7 +154,7 @@ export function JobSearch() {
         )}
 
         {/* Job grid — each card links to its own detail page at /jobs/:id. */}
-        {loading ? (
+        {loading && page === 1 ? (
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" aria-label="Loading jobs">
             {Array.from({ length: 6 }).map((_, i) => (
               <SkeletonCard key={i} lines={3} />

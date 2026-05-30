@@ -499,3 +499,30 @@ body {
     color: var(--ink-2);
   }
 }
+
+/* ── Mobile sheet animation ─────────────────────────────────────────────── */
+@keyframes ho-sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+.animate-sheet-in {
+  animation: ho-sheet-in 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-sheet-in {
+    animation: none !important;
+  }
+}
+
+/* Hide scrollbars while keeping scrollability (used in mobile inner panels) */
+.noscroll::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+.noscroll {
+  scrollbar-width: none;
+}

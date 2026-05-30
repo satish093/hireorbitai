@@ -683,7 +683,7 @@ export function Messages() {
       title="Messages"
       crumbs={[{ label: 'Workspace', to: '/dashboard' }, { label: 'Messages' }]}
     >
-      <div className="bg-surface border border-border rounded-xl overflow-hidden h-[calc(100dvh-180px)] min-h-[480px] flex flex-col sm:flex-row">
+      <div className="bg-surface border border-border rounded-xl overflow-hidden h-[calc(100dvh-238px)] md:h-[calc(100dvh-180px)] min-h-[480px] flex flex-col sm:flex-row">
         {/* Left: conversation list. Becomes a full-width column on phones
             (stacked above the chat pane); fixed 20rem rail on tablet+. */}
         <aside
@@ -845,7 +845,7 @@ export function Messages() {
             <>
               <header className="px-5 py-3 border-b border-border flex items-center gap-3 bg-surface">
                 <button
-                  className="sm:hidden -ml-1 mr-1 p-1.5 rounded-lg hover:bg-hover text-muted shrink-0"
+                  className="md:hidden -ml-1 mr-1 p-1.5 rounded-lg hover:bg-hover text-muted shrink-0"
                   onClick={() => {
                     const next = new URLSearchParams(params);
                     next.delete('with');

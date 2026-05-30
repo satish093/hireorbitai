@@ -15,8 +15,7 @@ import {
   hasCapability,
   type DeveloperCapability,
 } from '../types';
-import { api } from '../services/api';
-import { useInvalidationListener } from '../hooks/useInvalidate';
+import { useBadgeCounts } from '../hooks/useBadgeCounts';
 import { useFeatureFlags } from '../hooks/useFeatureFlags';
 import { Brand } from './Brand';
 import {
@@ -369,7 +368,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps = {}
   const { flags } = useFeatureFlags();
   const location = useLocation();
   const role = profile?.role;
-  const [counts, setCounts] = useState<{ tasks?: number; reminders?: number; inbox?: number }>({});
+  const counts = useBadgeCounts();
   const [collapsed, setCollapsed] = useState<Set<string>>(loadCollapsed);
 
   const toggleSection = (heading: string) => {
@@ -384,88 +383,6 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps = {}
       return next;
     });
   };
-
-  // ── Badge polling ────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!profile) return;
-    let cancelled = false;
-    let inflight = false;
-    let timer: ReturnType<typeof setTimeout> | null = null;
-
-    const BASE_MS = 60_000;
-    const MAX_MS = 5 * 60_000;
-    let currentMs = BASE_MS;
-
-    const tick = async () => {
-      if (cancelled) return;
-      if (typeof document !== 'undefined' && document.hidden) {
-        schedule();
-        return;
-      }
-      if (inflight) {
-        schedule();
-        return;
-      }
-      inflight = true;
-      try {
-        const [t, r, u] = await Promise.all([
-          api.get('/tasks/assigned-to-me').catch(() => null),
-          api.get('/reminders', { params: { status: 'PENDING' } }).catch(() => null),
-          api.get('/messages/unread-count').catch(() => null),
-        ]);
-        if (cancelled) return;
-        if (t == null || r == null || u == null) {
-          currentMs = Math.min(MAX_MS, currentMs * 2);
-        } else {
-          currentMs = BASE_MS;
-        }
-        setCounts({
-          tasks: (t?.data ?? []).length,
-          reminders: (r?.data ?? []).length,
-          inbox: u?.data?.unread ?? 0,
-        });
-      } finally {
-        inflight = false;
-        schedule();
-      }
-    };
-
-    function schedule() {
-      if (cancelled) return;
-      const jitter = currentMs * 0.1 * Math.random();
-      timer = setTimeout(tick, currentMs + jitter);
-    }
-
-    void tick();
-
-    const onVisibility = () => {
-      if (cancelled || document.hidden || inflight) return;
-      if (timer) {
-        clearTimeout(timer);
-        timer = null;
-      }
-      void tick();
-    };
-    document.addEventListener('visibilitychange', onVisibility);
-
-    return () => {
-      cancelled = true;
-      if (timer) clearTimeout(timer);
-      document.removeEventListener('visibilitychange', onVisibility);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile?.id]);
-
-  // Instant unread-badge refresh when a realtime message:new arrives (the
-  // RealtimeNotifications surface fires invalidate('messages')). Without this
-  // the badge would lag until the next 60s poll.
-  useInvalidationListener('messages', () => {
-    if (!profile) return;
-    void api
-      .get('/messages/unread-count')
-      .then((u) => setCounts((prev) => ({ ...prev, inbox: u?.data?.unread ?? prev.inbox })))
-      .catch(() => {});
-  });
 
   // ── Close on Escape (mobile) ─────────────────────────────────────────────
   useEffect(() => {
