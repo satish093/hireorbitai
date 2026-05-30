@@ -84,7 +84,11 @@ router.use(blockIfMustChangePassword);
 
 router.use('/invitations', invitationsRouter);
 router.use('/consultants', consultantsRouter);
-router.use('/work-auth-docs', workAuthDocsRouter);
+// Sensitive immigration PII (H1B/EAD/I-20/passport). Defense-in-depth outer
+// gate: BUSINESS_ROLES (excludes DEVELOPER) — the controller's
+// authorizeConsultantAccess still scopes per-row (consultant→self,
+// recruiter→own, lead→group, admin→all, else 404).
+router.use('/work-auth-docs', requireRole(...BUSINESS_ROLES), workAuthDocsRouter);
 router.use('/recruiters', recruitersRouter);
 router.use('/managers', managersRouter);
 router.use('/resumes', resumesRouter);
@@ -94,17 +98,27 @@ router.use('/resumes', resumesRouter);
 router.use('/jobs', requireRole(...OPERATOR_TIER), jobsRouter);
 router.use('/vendors', vendorsRouter);
 router.use('/clients', clientsRouter);
-// Applications is an operator pipeline tool. CONSULTANT has no
-// dedicated "My Applications" page, and the operator view exposes
-// recruiter-side context (assigned recruiter, internal notes, ATS scoring)
-// that a consultant must not see. Gate at the mount so every applications
-// endpoint inherits OPERATOR_TIER (admins, group leads, recruiters).
-router.use('/applications', requireRole(...OPERATOR_TIER), applicationsRouter);
+// Applications is an operator pipeline tool whose responses carry recruiter-
+// side context (assigned recruiter, internal notes, ATS scoring) a consultant
+// must not see — so every operator endpoint stays OPERATOR_TIER, gated
+// PER-ROUTE inside applications.routes.ts. The mount is BUSINESS_ROLES (still
+// excludes DEVELOPER) only so the self-scoped, narrowed-projection
+// GET /applications/mine is reachable by a CONSULTANT for their own dashboard.
+router.use('/applications', requireRole(...BUSINESS_ROLES), applicationsRouter);
 router.use('/feature-flags', featureFlagsRouter);
 router.use('/user-groups', userGroupsRouter);
 router.use('/users', usersRouter);
 router.use('/admin/users', adminUsersRouter);
-router.use('/glassdoor', glassdoorRouter);
+// Interview-prep enrichment proxied from a third-party (RapidAPI) — read-only
+// external data with no internal exposure, but a paid quota. No frontend calls
+// it today; gate it to the operator interview-prep audience + the interviews
+// feature so a CONSULTANT/DEVELOPER can't burn the external quota.
+router.use(
+  '/glassdoor',
+  requireRole(...OPERATOR_TIER),
+  requireFeature('interviews'),
+  glassdoorRouter,
+);
 router.use('/activity', activityRouter);
 router.use('/recruiter-goals', recruiterGoalsRouter);
 router.use('/ai-usage', aiUsageRouter);

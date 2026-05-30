@@ -480,6 +480,97 @@ export const remove: RequestHandler = async (req, res) => {
   res.json({ ok: true });
 };
 
+// ---------------------------------------------------------------------------
+// Contacts allowed — permission-filtered contact list with relationship labels
+// ---------------------------------------------------------------------------
+
+/**
+ * GET /messages/contacts/allowed?q=
+ *
+ * Returns users this caller is permitted to message, optionally filtered by a
+ * search string, each annotated with a human-readable `relationship` label
+ * ("Your assigned consultant", "Your manager", "Peer recruiter", etc.).
+ *
+ * Used by the contact picker so the UI never shows users the caller can't reach.
+ * The server enforces the same check on POST /messages — this endpoint is purely
+ * for pre-filtering the UI and must never be trusted as the sole auth gate.
+ */
+export const contactsAllowed: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const me = req.user;
+  const q = typeof req.query.q === 'string' ? req.query.q.toLowerCase().trim() : '';
+
+  const peerIds = await getAccessibleUserIds({
+    id: me.id,
+    role: me.role,
+    group_id: me.group_id ?? null,
+  });
+  if (peerIds.size === 0) {
+    res.json([]);
+    return;
+  }
+
+  let { data, error } = await db
+    .from('users')
+    .select(partySelect())
+    .in('id', Array.from(peerIds))
+    .order('full_name');
+  if (error && isSchemaError(error)) {
+    downgrade();
+    ({ data, error } = await db
+      .from('users')
+      .select(partySelect())
+      .in('id', Array.from(peerIds))
+      .order('full_name'));
+  }
+  if (error) throw httpError(500, 'Database error');
+
+  const users = (data ?? []) as Array<{
+    id: string;
+    email: string;
+    full_name?: string | null;
+    role?: string | null;
+    last_seen_at?: string | null;
+    group_id?: string | null;
+  }>;
+
+  // Apply search filter
+  const filtered = q
+    ? users.filter((u) => {
+        const name = (u.full_name ?? u.email ?? '').toLowerCase();
+        return name.includes(q);
+      })
+    : users;
+
+  // Annotate with relationship label based on role pairing (lightweight, no DB join)
+  const result = filtered.map((u) => ({
+    ...u,
+    relationship: relationshipLabel(me.role, u.role ?? ''),
+  }));
+
+  res.json(result);
+};
+
+/** Map (callerRole, targetRole) → a human-readable relationship hint. */
+function relationshipLabel(callerRole: string, targetRole: string): string {
+  if (targetRole === 'DEVELOPER') return 'Support & Engineering';
+  if (callerRole === 'CONSULTANT') return 'Your recruiter';
+  if (callerRole === 'RECRUITER') {
+    if (targetRole === 'CONSULTANT') return 'Your assigned consultant';
+    if (['MANAGER', 'HR_MANAGER', 'DIRECTOR', 'CTO', 'CEO', 'SUPER_ADMIN'].includes(targetRole))
+      return 'Your manager';
+    if (targetRole === 'RECRUITER') return 'Peer recruiter';
+  }
+  if (['MANAGER', 'HR_MANAGER'].includes(callerRole)) {
+    if (targetRole === 'CONSULTANT') return 'Group consultant';
+    if (targetRole === 'RECRUITER') return 'Your recruiter';
+    if (['MANAGER', 'HR_MANAGER', 'DIRECTOR', 'CTO', 'CEO'].includes(targetRole))
+      return 'Peer manager';
+  }
+  if (['DIRECTOR', 'CTO', 'CEO', 'SUPER_ADMIN'].includes(callerRole)) return 'Team member';
+  return 'Contact';
+}
+
 /** PATCH /messages/:id — sender edits the body. */
 export const edit: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');

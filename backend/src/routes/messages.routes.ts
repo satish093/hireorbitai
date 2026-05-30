@@ -6,6 +6,7 @@ import { uploadAttachment, verifyUploadMagic } from '../middleware/upload';
 export const messagesRouter = Router();
 
 // Literal paths first so they don't fall into /:userId-style matches.
+messagesRouter.get('/contacts/allowed', c.contactsAllowed);
 messagesRouter.get('/directory', c.directory);
 messagesRouter.get('/conversations', c.conversations);
 messagesRouter.get('/unread-count', c.unreadCount);

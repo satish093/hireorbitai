@@ -9,7 +9,8 @@ import { describe, it, expect, vi } from 'vitest';
 vi.mock('../config/db', () => ({ db: {}, pool: {} }));
 vi.mock('../config/env', () => ({ env: {} }));
 
-import { requireRoleOrCapability, hasCapability } from './auth';
+import { requireRole, requireRoleOrCapability, hasCapability } from './auth';
+import { OWNER_TIER } from '../types';
 import type { Role } from '../types';
 
 const TIER: Role[] = ['SUPER_ADMIN', 'CEO', 'CTO', 'DIRECTOR', 'MANAGER', 'HR_MANAGER'];
@@ -81,5 +82,35 @@ describe('requireRoleOrCapability', () => {
     expect(gate({ role: 'SUPER_ADMIN' })).toBe(200);
     expect(gate({ role: 'DEVELOPER', capabilities: ['feature_flags'] })).toBe(200);
     expect(gate({ role: 'DEVELOPER', capabilities: [] })).toBe(403);
+  });
+});
+
+// The feature-flag WRITE routes (PATCH /feature-flags/:key, PUT /groups/:g/:k)
+// use plain requireRole(...OWNER_TIER) — NOT requireRoleOrCapability — so a
+// `feature_flags`-capable DEVELOPER (and CTO/DIRECTOR) can READ flag state but
+// can never TOGGLE it. Capability grants visibility, not write authority. This
+// pins that invariant against a future "helpful" swap to requireRoleOrCapability.
+describe('feature-flag WRITE gate is requireRole(OWNER_TIER) — capability does NOT grant writes', () => {
+  const writeGate = (user: any): number => {
+    let passed = false;
+    try {
+      requireRole(...OWNER_TIER)({ user } as any, {} as any, () => {
+        passed = true;
+      });
+    } catch (e) {
+      return (e as { status?: number }).status ?? 0;
+    }
+    return passed ? 200 : 0;
+  };
+
+  it('admits OWNER_TIER (SUPER_ADMIN, CEO)', () => {
+    expect(writeGate({ role: 'SUPER_ADMIN' })).toBe(200);
+    expect(writeGate({ role: 'CEO' })).toBe(200);
+  });
+
+  it('rejects CTO/DIRECTOR and a feature_flags-capable DEVELOPER (read-only, not write)', () => {
+    expect(writeGate({ role: 'CTO' })).toBe(403);
+    expect(writeGate({ role: 'DIRECTOR' })).toBe(403);
+    expect(writeGate({ role: 'DEVELOPER', capabilities: ['feature_flags'] })).toBe(403);
   });
 });

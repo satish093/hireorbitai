@@ -10,6 +10,8 @@ callsRouter.post('/answer', callsCtl.answer);
 callsRouter.post('/ice-candidate', callsCtl.iceCandidate);
 callsRouter.post('/end', callsCtl.end);
 callsRouter.post('/reject', callsCtl.reject);
+// Read-only call log for the messaging context panel + mobile Calls tab.
+callsRouter.get('/history', callsCtl.history);
 // Short-lived ICE/TURN credentials minted server-side so the Cloudflare
 // bearer token never reaches the browser. Frontend fetches this once per
 // call (before opening the offer / accepting an incoming call) and feeds

@@ -12,7 +12,7 @@ import {
 } from '../types';
 import { logger } from '../config/logger';
 import * as authSvc from '../services/auth.service';
-import { assertOutranks } from './adminUsers.controller';
+import { assertOutranks, assertNotLastSuperAdmin } from './adminUsers.controller';
 import { canViewUser } from '../services/permission.service';
 import { managerGroupUserIds } from '../services/groupScope';
 import { wireHierarchy } from '../services/invitationHierarchy.service';
@@ -323,32 +323,11 @@ function assertNotSelf(req: { user?: { id: string } }, targetId: string): void {
   }
 }
 
-/** Throws if removing this user would leave zero active SUPER_ADMINs. The
- *  last SUPER_ADMIN is a soft singleton — losing them locks every admin
- *  surface for the whole org. */
-async function assertNotLastSuperAdmin(targetId: string): Promise<void> {
-  const { data: target, error: tErr } = await db
-    .from('users')
-    .select('role, is_active')
-    .eq('id', targetId)
-    .maybeSingle();
-  if (tErr) throw httpError(500, tErr.message);
-  if (!target) throw httpError(404, 'User not found');
-  if (target.role !== 'SUPER_ADMIN' || target.is_active === false) return;
-
-  const { count, error } = await db
-    .from('users')
-    .select('id', { count: 'exact', head: true })
-    .eq('role', 'SUPER_ADMIN')
-    .eq('is_active', true);
-  if (error) throw httpError(500, 'Database error');
-  if ((count ?? 0) <= 1) {
-    throw httpError(
-      409,
-      'Refusing to remove the last active SUPER_ADMIN. Promote another admin first.',
-    );
-  }
-}
+// assertNotLastSuperAdmin is imported from adminUsers.controller — the canonical
+// implementation locks the candidate row with SELECT … FOR UPDATE and counts
+// PEER super-admins, defeating the concurrent-deactivation race that the prior
+// local SELECT+COUNT copy here was vulnerable to. Both lifecycle paths
+// (/admin/users and these legacy /users routes) now share that one guard.
 
 /** POST /users/:id/deactivate — set status=inactive AND is_active=false,
  *  revoke sessions, audit. Funnels through the shared setUserStatus() so

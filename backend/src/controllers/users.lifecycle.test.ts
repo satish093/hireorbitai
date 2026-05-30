@@ -30,7 +30,16 @@ vi.mock('../config/db', () => {
       from: () => builder(),
       auth: { admin: { deleteUser: vi.fn().mockResolvedValue({ error: null }) } },
     },
-    pool: {},
+    // assertNotLastSuperAdmin (shared from adminUsers.controller) locks the
+    // target row via pool.query(... FOR UPDATE). Return the target row; for a
+    // non-SUPER_ADMIN target the guard returns early (no peer-count query).
+    pool: {
+      query: vi
+        .fn()
+        .mockImplementation(() =>
+          Promise.resolve({ rows: [{ role: mock.targetRole, is_active: true }] }),
+        ),
+    },
   };
 });
 vi.mock('../services/auth.service', () => ({

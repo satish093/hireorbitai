@@ -300,6 +300,86 @@ export const reject: RequestHandler = async (req, res) => {
 };
 
 // ---------------------------------------------------------------------------
+// GET /calls/history — recent calls for the current user (optionally with a peer)
+// ---------------------------------------------------------------------------
+//
+// Surfaces the call log shown in the messaging context panel + mobile Calls
+// tab. Returns each call from the CALLER-OR-CALLEE perspective of the viewer:
+//   - direction: 'in' | 'out' relative to the viewer
+//   - outcome:   'completed' | 'missed' | 'declined'  (missed = never accepted)
+//   - peer:      the OTHER party's id + name + email + role
+//   - duration_seconds, started_at, ended_at
+//
+// Scope is inherently self — a user only sees calls they participated in, so no
+// extra permission gate beyond the MESSAGING_ROLES + feature gate on the
+// router. `peer_id` narrows to a single conversation (used by the context
+// panel); without it the endpoint returns the viewer's whole recent log.
+export const history: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const me = req.user;
+
+  const peerId = typeof req.query.peer_id === 'string' ? req.query.peer_id : null;
+  const limit = Math.min(Number(req.query.limit) || 30, 100);
+
+  const params: unknown[] = [me.id];
+  let peerClause = '';
+  if (peerId) {
+    params.push(peerId);
+    peerClause = `AND (c.caller_id = $2 OR c.callee_id = $2)`;
+  }
+
+  const { rows } = await pool.query<{
+    id: string;
+    caller_id: string;
+    callee_id: string;
+    status: string;
+    started_at: string | null;
+    ended_at: string | null;
+    duration_seconds: number | null;
+    peer_id: string;
+    peer_name: string | null;
+    peer_email: string;
+    peer_role: string | null;
+  }>(
+    `SELECT c.id, c.caller_id, c.callee_id, c.status, c.started_at, c.ended_at,
+            c.duration_seconds,
+            u.id AS peer_id, u.full_name AS peer_name, u.email AS peer_email, u.role AS peer_role
+       FROM public.calls c
+       JOIN public.users u
+         ON u.id = CASE WHEN c.caller_id = $1 THEN c.callee_id ELSE c.caller_id END
+      WHERE (c.caller_id = $1 OR c.callee_id = $1)
+        ${peerClause}
+      ORDER BY COALESCE(c.ended_at, c.started_at, c.created_at) DESC
+      LIMIT ${limit}`,
+    params,
+  );
+
+  const result = rows.map((r) => {
+    const direction = r.caller_id === me.id ? 'out' : 'in';
+    // missed = never accepted (no started_at) and not an explicit decline;
+    // declined = callee rejected; completed = had a live leg.
+    const outcome =
+      r.status === 'rejected' ? 'declined' : r.started_at == null ? 'missed' : 'completed';
+    return {
+      id: r.id,
+      direction,
+      outcome,
+      duration_seconds: r.duration_seconds,
+      started_at: r.started_at,
+      ended_at: r.ended_at,
+      peer: {
+        id: r.peer_id,
+        full_name: r.peer_name,
+        email: r.peer_email,
+        role: r.peer_role,
+      },
+    };
+  });
+
+  res.json(result);
+};
+
+// ---------------------------------------------------------------------------
 // GET /calls/usage — monthly call-hour budget snapshot
 // ---------------------------------------------------------------------------
 //

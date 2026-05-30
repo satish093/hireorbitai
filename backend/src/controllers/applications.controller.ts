@@ -14,14 +14,17 @@ import {
 // ---------------------------------------------------------------------------
 // Authorization helpers
 //
-// The applications router is mounted behind requireAuth but has no per-route
-// role gate (every signed-in user reaches these handlers). Every endpoint
-// therefore has to scope by the caller's principal:
+// The router mount is requireRole(...BUSINESS_ROLES); the OPERATOR_TIER
+// endpoints (list, create, update, events, …) are additionally gated per-route
+// in applications.routes.ts. Only GET /applications/mine is reachable by a
+// CONSULTANT. Each handler ALSO scopes by the caller's principal as
+// defense-in-depth:
 //   - MANAGER_TIER (super-admin, ceo, cto, director, manager, …) — full view.
 //   - RECRUITER  — only applications where applications.recruiter_id ==
 //                   <their recruiters.id>.
-//   - CONSULTANT — only applications where applications.consultant_id ==
-//                   <their consultants.id>.
+//   - CONSULTANT — only their own rows, via the narrowed listMine projection
+//                   (the operator `list` consultant branch below is retained as
+//                   defense-in-depth but is unreachable behind the route gate).
 // ---------------------------------------------------------------------------
 
 function isManagerTier(role?: string): boolean {
@@ -144,6 +147,36 @@ export const list: RequestHandler = async (req, res) => {
 
   if (status) qb = qb.eq('status', status);
   const { data, error } = await qb.order('submitted_at', { ascending: false });
+  if (error) throw httpError(500, 'Database error');
+  res.json(data);
+};
+
+// ---------------------------------------------------------------------------
+// GET /applications/mine — consultant-safe view of the caller's OWN submissions.
+//
+// The operator `list` above is mounted OPERATOR_TIER and returns `*` (which
+// carries recruiter-side context: recruiter_id, ats_score, internal notes) —
+// deliberately hidden from consultants (see routes/index.ts mount comment).
+// This endpoint exists so a CONSULTANT can power their dashboard with a
+// NARROWED projection of their own applications and nothing else. It self-
+// scopes to the caller's consultants row; a caller with no consultant row
+// (any non-consultant, or a not-yet-onboarded consultant) gets [].
+// ---------------------------------------------------------------------------
+export const listMine: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const myConsId = await getCallerConsultantRowId(req.user.id);
+  if (!myConsId) {
+    res.json([]);
+    return;
+  }
+  // Explicit safe projection — NO recruiter_id / ats_score / notes / recruiter embed.
+  const { data, error } = await db
+    .from('applications')
+    .select(
+      'id, status, submitted_at, job:jobs(id, title, company_name), vendor:vendors(id, company_name)',
+    )
+    .eq('consultant_id', myConsId)
+    .order('submitted_at', { ascending: false });
   if (error) throw httpError(500, 'Database error');
   res.json(data);
 };
