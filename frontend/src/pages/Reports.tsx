@@ -15,20 +15,20 @@ import {
   type ReportTab,
 } from '../components/reports/types';
 import { useAuth } from '../context/AuthContext';
+import { KpiCard } from '../components/KpiCard';
+import { SkeletonMetricGrid } from '../components/Skeleton';
 import type {
   PipelinePayload,
   RecruitersPayload,
   ConsultantsPayload,
   PlacementsPayload,
   SourcesPayload,
-  AIUsagePayload,
 } from '../components/reports/types';
 import { PipelineReport } from '../components/reports/PipelineReport';
 import { RecruiterReport } from '../components/reports/RecruiterReport';
 import { ConsultantReport } from '../components/reports/ConsultantReport';
 import { PlacementsReport } from '../components/reports/PlacementsReport';
 import { SourcesReport } from '../components/reports/SourcesReport';
-import { AIUsageReport } from '../components/reports/AIUsageReport';
 import { DailyActivityReport } from '../components/reports/DailyActivityReport';
 import { TimeInAppReport } from '../components/reports/TimeInAppReport';
 import { SubmissionsReport } from '../components/reports/SubmissionsReport';
@@ -76,6 +76,44 @@ function ReportsInner() {
         action={<ReportControls onExport={handleExport} />}
       />
 
+      {/* ── KPI summary row (top 4 KPIs from the active analytics report) ── */}
+      {analyticsTab && (
+        <div className="mb-5">
+          {loading ? (
+            <SkeletonMetricGrid count={4} />
+          ) : data &&
+            'kpis' in data &&
+            Array.isArray((data as any).kpis) &&
+            (data as any).kpis.length > 0 ? (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5 stagger-children">
+              {(
+                (data as any).kpis as Array<{
+                  label: string;
+                  value: string;
+                  delta?: string;
+                  trend?: string;
+                  positive?: boolean;
+                }>
+              )
+                .slice(0, 4)
+                .map((kpi) => {
+                  const numeric = parseFloat(kpi.value.replace(/[^0-9.-]/g, ''));
+                  return (
+                    <KpiCard
+                      key={kpi.label}
+                      label={kpi.label}
+                      value={isNaN(numeric) ? kpi.value : numeric}
+                      delta={kpi.delta}
+                      up={kpi.trend === 'up' || kpi.positive}
+                      accent={kpi.trend === 'up' ? 'green' : kpi.trend === 'down' ? 'red' : 'brand'}
+                    />
+                  );
+                })}
+            </div>
+          ) : null}
+        </div>
+      )}
+
       <div className="mb-5">
         <ReportTabs tab={tab} onTab={setTab} tabs={allowedTabs} />
       </div>
@@ -96,7 +134,6 @@ function ReportsInner() {
         {tab === 'sources' && (
           <SourcesReport data={data as SourcesPayload | null} loading={loading} />
         )}
-        {tab === 'ai' && <AIUsageReport data={data as AIUsagePayload | null} loading={loading} />}
         {tab === 'submissions' && <SubmissionsReport />}
         {tab === 'daily' && <DailyActivityReport />}
         {tab === 'usertime' && <TimeInAppReport />}

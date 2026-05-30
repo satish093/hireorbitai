@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import clsx from 'clsx';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -43,6 +43,7 @@ import {
   IconBookOpen,
   IconClipboard,
   IconPhone,
+  IconShield,
 } from './Icons';
 import type { ComponentType, SVGProps } from 'react';
 
@@ -55,14 +56,12 @@ interface Item {
   icon: IconCmp;
   badgeKey?: 'tasks' | 'reminders' | 'inbox';
   flagKey?: string;
-  /** If set, a DEVELOPER granted this capability also sees the item. */
   capability?: DeveloperCapability;
 }
 
 interface Section {
   heading: string;
   items: Item[];
-  /** Show a collapse toggle on the heading. */
   collapsible?: boolean;
 }
 
@@ -84,9 +83,6 @@ const sections: Section[] = [
         to: '/messages',
         label: 'Inbox',
         icon: IconInbox,
-        // The ONE business-app surface DEVELOPER also sees, so users can DM a
-        // developer for bug/error reporting. Every other Workspace item stays
-        // BUSINESS_ROLES (developer excluded).
         roles: MESSAGING_ROLES,
         badgeKey: 'inbox',
         flagKey: 'messages',
@@ -99,8 +95,6 @@ const sections: Section[] = [
         badgeKey: 'reminders',
         flagKey: 'reminders',
       },
-      // Consultant self-service. Operator-tier uses /resumes ("Resumes") for
-      // the multi-consultant management view.
       { to: '/my-resume', label: 'My Resume', icon: IconFile, roles: ['CONSULTANT'] },
     ],
   },
@@ -110,8 +104,6 @@ const sections: Section[] = [
       { to: '/consultants', label: 'Consultants', icon: IconUsers, roles: OPERATOR_TIER },
       { to: '/recruiters', label: 'Recruiters', icon: IconUser, roles: MANAGER_TIER },
       { to: '/managers', label: 'Managers', icon: IconUsersCog, roles: MANAGER_TIER },
-      // Jobs are a pipeline tool for operators (recruiters + managers/admins),
-      // NOT for consultants — a consultant browses nothing here.
       { to: '/jobs', label: 'Jobs', icon: IconBriefcase, roles: OPERATOR_TIER },
       { to: '/applications', label: 'Applications', icon: IconFileText, roles: OPERATOR_TIER },
       {
@@ -125,10 +117,6 @@ const sections: Section[] = [
       { to: '/vendors', label: 'Vendors', icon: IconBuilding, roles: OPERATOR_TIER },
       { to: '/clients', label: 'Clients', icon: IconBuilding2, roles: OPERATOR_TIER },
       {
-        // RECRUITER gets the link too — the /reports page filters the
-        // tab strip down to "Submissions" + "Daily log" for them and the
-        // backend self-scopes the rows. Consultants are excluded by
-        // OPERATOR_TIER.
         to: '/reports',
         label: 'Analytics',
         icon: IconBarChart,
@@ -219,10 +207,6 @@ const sections: Section[] = [
       },
       { to: '/admin/deactivated', label: 'Deactivated', icon: IconUserX, roles: ADMIN_TIER },
       {
-        // Visible to ADMIN_TIER (CTO + Director get read-only access)
-        // and any DEVELOPER granted `feature_flags`. The page disables
-        // toggles for non-OWNER_TIER callers and the backend rejects
-        // writes that aren't OWNER_TIER.
         to: '/admin/features',
         label: 'Feature Flags',
         icon: IconToggle,
@@ -232,12 +216,6 @@ const sections: Section[] = [
       { to: '/admin/ai-settings', label: 'AI Settings', icon: IconSparkles, roles: ADMIN_TIER },
       { to: '/admin/audit-log', label: 'Audit Log', icon: IconClipboard, roles: ADMIN_TIER },
       {
-        // Call-budget dashboard. Visible to OWNER_TIER (SUPER_ADMIN + CEO)
-        // because the cap is a billing decision they own, plus any
-        // DEVELOPER granted the `calls_usage` capability. CTO/DIRECTOR
-        // intentionally do NOT see it by default (different from
-        // Feature Flags / AI Settings where ADMIN_TIER gets read access).
-        // Backend route at /api/calls-usage enforces the same gate.
         to: '/admin/calls-usage',
         label: 'Call Usage',
         icon: IconPhone,
@@ -248,7 +226,15 @@ const sections: Section[] = [
   },
 ];
 
-// ── Helpers ────────────────────────────────────────────────────────────────
+// ── Avatar helpers ─────────────────────────────────────────────────────────
+
+const AVATAR_COLORS = ['#2563eb', '#7c3aed', '#0369a1', '#2e7a42', '#b45309', '#be123c', '#4338ca'];
+
+function avatarColor(seed: string): string {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+  return AVATAR_COLORS[h % AVATAR_COLORS.length]!;
+}
 
 function initials(name?: string | null, email?: string | null): string {
   const src = (name && name.trim()) || (email && email.split('@')[0]) || '';
@@ -257,6 +243,8 @@ function initials(name?: string | null, email?: string | null): string {
   if (parts.length === 1) return parts[0]!.slice(0, 2).toUpperCase();
   return (parts[0]![0]! + parts[1]![0]!).toUpperCase();
 }
+
+// ── Section collapse helpers ───────────────────────────────────────────────
 
 function ChevronIcon({ open }: { open: boolean }) {
   return (
@@ -280,63 +268,7 @@ function ChevronIcon({ open }: { open: boolean }) {
   );
 }
 
-/**
- * When a role sees at most this many nav items total, skip the section
- * headings and render one flat list — grouping a short list just adds noise.
- * Longer lists (recruiters, managers, admins) keep the grouped headings.
- */
 const FLAT_THRESHOLD = 8;
-
-/** A single nav row. Module-level so it isn't recreated each render. */
-function NavItem({ item, badge }: { item: Item; badge?: number }) {
-  const Icon = item.icon;
-  return (
-    <NavLink
-      to={item.to}
-      data-tour={`nav-${item.to}`}
-      className={({ isActive }) =>
-        clsx(
-          'group relative flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-sm transition-all duration-200 ease-out',
-          isActive
-            ? 'bg-brand-50 text-brand-700 font-medium'
-            : 'text-ink hover:bg-hover hover:text-ink hover:translate-x-0.5',
-        )
-      }
-    >
-      {({ isActive }) => (
-        <>
-          <span
-            aria-hidden="true"
-            className={clsx(
-              'absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-r-full bg-brand-600 origin-center transition-transform duration-200 ease-out',
-              isActive ? 'scale-y-100' : 'scale-y-0',
-            )}
-          />
-          <Icon
-            size={17}
-            className={clsx(
-              'shrink-0 transition-colors',
-              isActive ? 'text-brand-600' : 'text-muted group-hover:text-ink',
-            )}
-          />
-          <span className="flex-1 truncate">{item.label}</span>
-          {typeof badge === 'number' && badge > 0 && (
-            <span
-              key={badge}
-              className={clsx(
-                'text-[10px] font-semibold px-1.5 py-0.5 rounded-full tabular-nums animate-pop',
-                isActive ? 'bg-brand-600 text-white' : 'bg-hover text-ink',
-              )}
-            >
-              {badge}
-            </span>
-          )}
-        </>
-      )}
-    </NavLink>
-  );
-}
-
 const COLLAPSE_KEY = 'hireorbit-nav-collapsed';
 
 function loadCollapsed(): Set<string> {
@@ -356,7 +288,103 @@ function saveCollapsed(set: Set<string>) {
   }
 }
 
-// ── Component ─────────────────────────────────────────────────────────────
+// ── NavItem ────────────────────────────────────────────────────────────────
+
+function NavItem({ item, badge }: { item: Item; badge?: number }) {
+  const Icon = item.icon;
+  return (
+    <NavLink
+      to={item.to}
+      data-tour={`nav-${item.to}`}
+      className={({ isActive }) =>
+        clsx(
+          // Base layout — position:relative for the left-bar pseudo-element
+          'group relative flex items-center gap-2.5 px-2.5 py-[7.5px] rounded-lg',
+          'text-[13.5px] transition-all duration-150 ease-out',
+          isActive
+            ? // Active: brand-soft fill + brand-on-soft text (design spec)
+              'bg-brand-soft text-brand-on-soft font-semibold'
+            : 'text-ink-2 font-medium hover:bg-hover hover:text-ink',
+        )
+      }
+    >
+      {({ isActive }) => (
+        <>
+          {/* 3px left accent bar — only visible when active */}
+          <span
+            aria-hidden="true"
+            className={clsx(
+              'absolute left-0 top-[7px] bottom-[7px] w-[3px] rounded-r-full',
+              'origin-center transition-transform duration-200 ease-out',
+              isActive ? 'scale-y-100 bg-brand-on-soft' : 'scale-y-0 bg-transparent',
+            )}
+          />
+          <Icon
+            size={17}
+            className={clsx(
+              'shrink-0 transition-colors',
+              isActive ? 'text-brand-on-soft' : 'text-muted group-hover:text-ink',
+            )}
+          />
+          <span className="flex-1 truncate leading-tight">{item.label}</span>
+          {typeof badge === 'number' && badge > 0 && (
+            <span
+              key={badge}
+              className={clsx(
+                'ml-auto text-[10.5px] font-bold min-w-[18px] h-[18px] px-[5px]',
+                'rounded-full grid place-items-center tabular-nums animate-pop',
+                isActive
+                  ? // Active badge: brand-on-soft bg + white text
+                    'bg-brand-on-soft text-white'
+                  : // Inactive badge: subtle
+                    'bg-hover text-ink-2',
+              )}
+            >
+              {badge > 99 ? '99+' : badge}
+            </span>
+          )}
+        </>
+      )}
+    </NavLink>
+  );
+}
+
+// ── Super Admin ribbon ─────────────────────────────────────────────────────
+
+function SuperAdminRibbon() {
+  return (
+    <div
+      className="mx-3 mb-1.5 px-2.5 py-2 rounded-[9px] flex items-center gap-2"
+      style={{
+        background: 'linear-gradient(120deg, #1e293b, #0f172a)',
+        border: '1px solid rgba(255,255,255,0.08)',
+      }}
+    >
+      <IconShield
+        size={13}
+        strokeWidth={2}
+        className="shrink-0"
+        style={{ color: 'rgba(255,255,255,0.7)' }}
+      />
+      <span
+        className="flex-1 text-[11px] font-bold tracking-[0.04em] uppercase"
+        style={{ color: 'rgba(255,255,255,0.85)' }}
+      >
+        Full access
+      </span>
+      {/* Online/active status dot */}
+      <span
+        className="w-1.5 h-1.5 rounded-full shrink-0"
+        style={{
+          background: '#34d399',
+          boxShadow: '0 0 0 3px rgba(52,211,153,0.2)',
+        }}
+      />
+    </div>
+  );
+}
+
+// ── Component ──────────────────────────────────────────────────────────────
 
 interface SidebarProps {
   mobileOpen?: boolean;
@@ -367,24 +395,24 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps = {}
   const { profile, signOut } = useAuth();
   const { flags } = useFeatureFlags();
   const location = useLocation();
+  const navigate = useNavigate();
   const role = profile?.role;
   const counts = useBadgeCounts();
   const [collapsed, setCollapsed] = useState<Set<string>>(loadCollapsed);
 
+  const isSuperAdmin = role === 'SUPER_ADMIN';
+
   const toggleSection = (heading: string) => {
     setCollapsed((prev) => {
       const next = new Set(prev);
-      if (next.has(heading)) {
-        next.delete(heading);
-      } else {
-        next.add(heading);
-      }
+      if (next.has(heading)) next.delete(heading);
+      else next.add(heading);
       saveCollapsed(next);
       return next;
     });
   };
 
-  // ── Close on Escape (mobile) ─────────────────────────────────────────────
+  // Close on Escape (mobile drawer)
   useEffect(() => {
     if (!mobileOpen) return;
     const onKey = (e: KeyboardEvent) => {
@@ -394,9 +422,14 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps = {}
     return () => window.removeEventListener('keydown', onKey);
   }, [mobileOpen, onMobileClose]);
 
-  // ── Render ───────────────────────────────────────────────────────────────
+  // Avatar
+  const seed = profile?.email ?? profile?.full_name ?? '';
+  const bgColor = avatarColor(seed);
+  const displayInitials = initials(profile?.full_name, profile?.email);
+
   return (
     <>
+      {/* Mobile backdrop */}
       {mobileOpen && (
         <div
           className="md:hidden fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-sm animate-fade-in"
@@ -404,38 +437,48 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps = {}
           aria-hidden="true"
         />
       )}
+
       <aside
         className={clsx(
-          'w-60 shrink-0 bg-surface border-r border-border flex flex-col',
+          // Desktop: static column, full viewport height
           'md:static md:min-h-dvh md:translate-x-0',
+          // Mobile: off-canvas drawer
           'fixed inset-y-0 left-0 z-50 h-dvh transition-transform duration-200 ease-out safe-pt safe-pb',
           mobileOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full',
+          // Shared
+          'w-[248px] shrink-0 flex flex-col',
+          isSuperAdmin ? 'border-r border-border-strong' : 'border-r border-border',
         )}
+        style={{ background: 'var(--surface)' }}
         aria-label="Primary navigation"
       >
-        {/* Brand */}
-        <div className="px-4 py-4 border-b border-border flex items-center justify-between">
+        {/* ── Brand header (60px) ── */}
+        <div className="h-[60px] px-[18px] flex items-center justify-between shrink-0 border-b border-border">
           <Brand size="md" />
           <button
             type="button"
             onClick={onMobileClose}
             aria-label="Close navigation"
-            className="md:hidden -mr-1 w-8 h-8 inline-flex items-center justify-center rounded-md text-muted hover:text-ink hover:bg-hover"
+            className="md:hidden -mr-1 w-8 h-8 inline-flex items-center justify-center rounded-lg text-muted hover:text-ink hover:bg-hover"
           >
             ✕
           </button>
         </div>
 
-        {/* Nav */}
-        <nav className="flex-1 overflow-y-auto p-3 space-y-4">
+        {/* ── Super Admin ribbon ── */}
+        {isSuperAdmin && (
+          <div className="pt-3">
+            <SuperAdminRibbon />
+          </div>
+        )}
+
+        {/* ── Nav ── */}
+        <nav className="flex-1 overflow-y-auto px-3 py-[14px] space-y-4" aria-label="Sidebar">
           {(() => {
-            // Resolve which sections/items this role can see.
             const visibleSections = sections
               .map((section) => ({
                 ...section,
                 items: section.items.filter((i) => {
-                  // Visible if the role is in the item's tier OR a DEVELOPER
-                  // holds the item's capability grant.
                   const roleOk =
                     !role ||
                     i.roles.includes(role) ||
@@ -445,16 +488,16 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps = {}
                   return true;
                 }),
               }))
-              .filter((section) => section.items.length > 0);
+              .filter((s) => s.items.length > 0);
 
             const totalItems = visibleSections.reduce((n, s) => n + s.items.length, 0);
 
-            // Short nav (e.g. consultants) → one flat list, no headings.
+            // Short nav (e.g. consultant) → flat list, no headings
             if (totalItems <= FLAT_THRESHOLD) {
               return (
                 <div className="space-y-0.5">
-                  {visibleSections.flatMap((section) =>
-                    section.items.map((i) => (
+                  {visibleSections.flatMap((s) =>
+                    s.items.map((i) => (
                       <NavItem
                         key={i.to}
                         item={i}
@@ -466,7 +509,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps = {}
               );
             }
 
-            // Long nav → grouped headings with smooth collapse.
+            // Long nav → grouped headings with smooth collapse
             return visibleSections.map((section) => {
               const hasActive = section.items.some((i) => location.pathname.startsWith(i.to));
               const isOpen = !section.collapsible || hasActive || !collapsed.has(section.heading);
@@ -480,18 +523,24 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps = {}
                       className="w-full flex items-center justify-between px-2 mb-1.5 group"
                       aria-expanded={isOpen}
                     >
-                      <span className="text-[10px] font-semibold tracking-widest text-muted uppercase group-hover:text-ink transition-colors">
+                      <span
+                        className="text-[10px] font-semibold tracking-[0.12em] uppercase group-hover:text-ink transition-colors"
+                        style={{ color: 'var(--muted)' }}
+                      >
                         {section.heading}
                       </span>
                       <ChevronIcon open={isOpen} />
                     </button>
                   ) : (
-                    <div className="px-2 mb-1.5 text-[10px] font-semibold tracking-widest text-muted uppercase">
+                    <div
+                      className="px-2 mb-1.5 text-[10px] font-semibold tracking-[0.12em] uppercase"
+                      style={{ color: 'var(--muted)' }}
+                    >
                       {section.heading}
                     </div>
                   )}
 
-                  {/* grid-rows 0fr→1fr animates the collapse height smoothly. */}
+                  {/* grid-rows 0fr→1fr animates collapse height */}
                   <div
                     className={clsx(
                       'grid transition-[grid-template-rows] duration-200 ease-out',
@@ -516,38 +565,69 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps = {}
           })()}
         </nav>
 
-        {/* User card */}
-        <div className="border-t border-border p-3">
-          <div className="flex items-center gap-2.5 px-1.5 py-1.5 rounded-md hover:bg-hover">
-            <NavLink
-              to={profile?.id ? `/users/${profile.id}` : '#'}
-              data-tour="nav-profile"
-              className="flex items-center gap-2.5 flex-1 min-w-0 hover:bg-hover rounded-md -mx-1 px-1 py-0.5"
-              title="View your profile"
-            >
-              <div className="relative">
-                <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 flex items-center justify-center text-xs font-semibold">
-                  {initials(profile?.full_name, profile?.email)}
-                </div>
-                <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-surface rounded-full">
-                  <span className="absolute inset-0 rounded-full bg-emerald-500 animate-ping opacity-60" />
-                </span>
+        {/* ── Pinned user card ── */}
+        <div className="shrink-0 border-t border-border px-3 py-[10px]">
+          <div
+            className="flex items-center gap-2.5 px-2 py-2 rounded-[9px] cursor-pointer hover:bg-hover transition-colors"
+            onClick={() => navigate(profile?.id ? `/users/${profile.id}` : '#')}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ')
+                navigate(profile?.id ? `/users/${profile.id}` : '#');
+            }}
+            data-tour="nav-profile"
+            title="View your profile"
+          >
+            {/* Avatar with dynamic color */}
+            <div className="relative shrink-0">
+              <div
+                className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold"
+                style={{
+                  background: `${bgColor}22`,
+                  color: bgColor,
+                }}
+              >
+                {displayInitials}
               </div>
-              <div className="flex-1 min-w-0 leading-tight">
-                <div className="text-[13px] font-medium text-ink truncate">
-                  {profile?.full_name ?? profile?.email}
-                </div>
-                <div className="text-[10px] uppercase tracking-wider text-muted">
-                  {role && ROLE_LABEL[role]}
-                </div>
+              {/* Online status dot */}
+              <span
+                className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2"
+                style={{
+                  background: 'var(--success)',
+                  borderColor: 'var(--surface)',
+                }}
+              >
+                <span
+                  className="absolute inset-0 rounded-full animate-ping opacity-60"
+                  style={{ background: 'var(--success)' }}
+                />
+              </span>
+            </div>
+
+            <div className="flex-1 min-w-0 leading-tight">
+              <div className="text-[13px] font-medium truncate" style={{ color: 'var(--ink)' }}>
+                {profile?.full_name ?? profile?.email}
               </div>
-            </NavLink>
+              <div
+                className="text-[10px] uppercase tracking-[0.06em]"
+                style={{ color: 'var(--muted)' }}
+              >
+                {role && ROLE_LABEL[role]}
+              </div>
+            </div>
+
             <button
-              onClick={signOut}
+              onClick={(e) => {
+                e.stopPropagation();
+                void signOut();
+              }}
               title="Sign out"
-              className="text-muted hover:text-ink p-1.5 rounded-md hover:bg-hover transition-colors"
+              aria-label="Sign out"
+              className="shrink-0 p-1.5 rounded-md transition-colors hover:bg-hover"
+              style={{ color: 'var(--muted)' }}
             >
-              <IconLogOut size={16} />
+              <IconLogOut size={15} />
             </button>
           </div>
         </div>

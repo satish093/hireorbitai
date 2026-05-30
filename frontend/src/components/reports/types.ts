@@ -1,6 +1,10 @@
 // Shared types for the Reports analytics workspace.
 
-export type ReportTab = 'pipeline' | 'recruiters' | 'consultants' | 'placements' | 'sources' | 'ai';
+// NOTE: there is intentionally no 'ai' analytics tab here. AI cost/usage lives
+// on the dedicated /ai-usage page (backed by the real GET /ai-usage/summary).
+// A Reports 'ai' tab previously had no backend endpoint and silently rendered a
+// bundled mock — removed to avoid showing fabricated spend numbers.
+export type ReportTab = 'pipeline' | 'recruiters' | 'consultants' | 'placements' | 'sources';
 
 export const REPORT_TABS: { key: ReportTab; label: string }[] = [
   { key: 'pipeline', label: 'Pipeline' },
@@ -8,7 +12,6 @@ export const REPORT_TABS: { key: ReportTab; label: string }[] = [
   { key: 'consultants', label: 'Consultants' },
   { key: 'placements', label: 'Placements' },
   { key: 'sources', label: 'Sources' },
-  { key: 'ai', label: 'AI usage' },
 ];
 
 /**
@@ -138,16 +141,10 @@ export interface SourcesPayload {
   kpis: Kpi[];
   table: Record<string, unknown>[];
 }
-export interface AIUsagePayload {
-  kpis: Kpi[];
-  charts: { series: AreaPoint[]; tokenSpend: BarRow[] };
-}
-
 export interface ReportPayloadMap {
   pipeline: PipelinePayload;
   recruiters: RecruitersPayload;
   consultants: ConsultantsPayload;
   placements: PlacementsPayload;
   sources: SourcesPayload;
-  ai: AIUsagePayload;
 }

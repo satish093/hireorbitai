@@ -17,6 +17,7 @@ import { UserTable, Pager } from '../components/admin/UserTable';
 import { UserDetailPane } from '../components/admin/UserDetailPane';
 import { ConfirmDialog, type ConfirmSpec } from '../components/admin/ConfirmDialog';
 import { useAdminUsers, useColumnPrefs } from '../components/admin/useAdminUsers';
+import { SuperAdminBanner } from '../components/admin/SuperAdminBanner';
 
 type BulkAction = 'reset-password' | 'change-role' | 'move-group' | 'suspend' | 'deactivate';
 
@@ -124,6 +125,9 @@ export function AdminUsers() {
         }
       />
 
+      {/* Super Admin full-access banner — shown only to SUPER_ADMIN viewers */}
+      {me?.role === 'SUPER_ADMIN' && <SuperAdminBanner />}
+
       <AdminKpiStrip kpi={a.kpi} loading={a.loading && !a.kpi} />
       <UserSegments segments={segments} active={a.segment} onSelect={a.setSegment} />
 
@@ -153,8 +157,9 @@ export function AdminUsers() {
         />
       )}
 
+      {/* Desktop: split grid with inline detail pane. Mobile: single column, detail pane hidden. */}
       <div
-        className="grid gap-4 items-start transition-[grid-template-columns] duration-300 ease-out"
+        className="md:grid gap-4 items-start transition-[grid-template-columns] duration-300 ease-out"
         style={{
           gridTemplateColumns: selectedUserId ? 'minmax(0,1fr) 380px' : 'minmax(0,1fr) 0px',
         }}
@@ -176,7 +181,7 @@ export function AdminUsers() {
           />
           {!a.loading && <Pager page={a.page} totalPages={totalPages} onPage={a.setPage} />}
         </div>
-        <div className="overflow-hidden">
+        <div className="hidden md:block overflow-hidden">
           {selectedUserId && (
             <div className="sticky top-4 h-[calc(100dvh-8rem)] overflow-hidden rounded-xl border border-border">
               <UserDetailPane

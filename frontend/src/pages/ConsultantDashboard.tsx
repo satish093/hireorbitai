@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Layout } from '../components/Layout';
-import { DashboardCard } from '../components/DashboardCard';
+import { KpiCard } from '../components/KpiCard';
 import { SkeletonMetricGrid } from '../components/Skeleton';
 import { DataTable } from '../components/DataTable';
 import { StatusBadge } from '../components/StatusBadge';
@@ -28,9 +28,13 @@ export function ConsultantDashboard() {
         const me = (r.data ?? []).find((c: any) => c.user_id === profile.id);
         setConsultant(me ?? null);
         if (!me) return;
+        // Resilient, independent loads. /applications/mine is the consultant-
+        // safe self-read (narrowed projection); /interviews is feature-gated and
+        // may 403 if the flag is off. Each failure degrades to an empty list
+        // instead of aborting the whole dashboard.
         const [aRes, iRes] = await Promise.all([
-          api.get(`/applications?consultant_id=${me.id}`),
-          api.get(`/interviews?consultant_id=${me.id}`),
+          api.get('/applications/mine').catch(() => ({ data: [] })),
+          api.get(`/interviews?consultant_id=${me.id}`).catch(() => ({ data: [] })),
         ]);
         if (cancelled) return;
         setApps(aRes.data ?? []);
@@ -69,19 +73,15 @@ export function ConsultantDashboard() {
         </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 stagger-children">
-          <DashboardCard
-            label="Marketing status"
-            value={consultant?.marketing_status ?? '—'}
-            accent="blue"
-          />
-          <DashboardCard label="Submissions" value={apps.length} accent="amber" />
-          <DashboardCard
+          <KpiCard label="Status" value={consultant?.marketing_status ?? '—'} accent="blue" />
+          <KpiCard label="Submissions" value={apps.length} delta="active" accent="amber" />
+          <KpiCard
             label="Interviews"
             value={interviews.length}
-            hint={upcomingInterviews > 0 ? `${upcomingInterviews} upcoming` : undefined}
+            delta={upcomingInterviews > 0 ? `${upcomingInterviews} upcoming` : undefined}
             accent="green"
           />
-          <DashboardCard label="Offers" value={offers} accent="slate" />
+          <KpiCard label="Offers" value={offers} accent="brand" />
         </div>
       )}
 

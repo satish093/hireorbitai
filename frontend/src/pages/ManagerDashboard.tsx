@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { DashboardCard } from '../components/DashboardCard';
+import { KpiCard } from '../components/KpiCard';
 import { SkeletonMetricGrid } from '../components/Skeleton';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -236,49 +237,30 @@ export function ManagerDashboard() {
         </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 stagger-children">
-          <DashboardCard
+          <KpiCard
             label="Open tasks"
-            value={tasks?.open ?? '—'}
+            value={tasks?.open ?? 0}
+            delta={tasks ? `${tasks.total} total` : 'Run tasks migration'}
             accent="slate"
-            hint={
-              tasks ? (
-                <span className="text-muted">{tasks.total} total</span>
-              ) : (
-                <span className="text-muted">Run tasks migration</span>
-              )
-            }
           />
-          <DashboardCard
+          <KpiCard
             label="Overdue"
-            value={
-              <span className={tasks && tasks.overdue > 0 ? 'text-red-600 dark:text-red-400' : ''}>
-                {tasks?.overdue ?? '—'}
-              </span>
-            }
+            value={tasks?.overdue ?? 0}
+            delta={tasks?.critical_open ? `${tasks.critical_open} critical` : undefined}
             accent="red"
-            hint={
-              tasks && tasks.critical_open > 0 ? (
-                <span className="text-red-600 dark:text-red-400">
-                  {tasks.critical_open} critical
-                </span>
-              ) : null
-            }
           />
-          <DashboardCard
+          <KpiCard
             label="Due this week"
-            value={tasks?.due_this_week ?? '—'}
+            value={tasks?.due_this_week ?? 0}
+            delta={summary ? `${summary.recruiters_count} recruiters` : undefined}
             accent="amber"
-            hint={
-              summary ? (
-                <span className="text-muted">across {summary.recruiters_count} recruiters</span>
-              ) : null
-            }
           />
-          <DashboardCard
+          <KpiCard
             label="Completed (7d)"
-            value={tasks?.completed_last_7_days ?? '—'}
+            value={tasks?.completed_last_7_days ?? 0}
+            delta="last 7 days"
+            up
             accent="green"
-            hint={<span className="text-emerald-700 dark:text-emerald-300">last 7 days</span>}
           />
         </div>
       )}
@@ -411,7 +393,7 @@ function QuickActions({ hasJobs, hasTasks }: { hasJobs: boolean; hasTasks: boole
         <QuickActionCard
           done={hasJobs}
           title="Pull live jobs"
-          desc="Sync real-time listings from Greenhouse, Lever, and RemoteOK."
+          desc="Sync real-time listings from LinkedIn, Dice, Monster, and CareerBuilder."
           to="/jobs"
           cta={hasJobs ? 'Manage sources →' : 'Open Jobs →'}
         />

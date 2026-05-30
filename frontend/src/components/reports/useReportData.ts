@@ -10,7 +10,6 @@ import recruiters from '../../mocks/reports/recruiters.json';
 import consultants from '../../mocks/reports/consultants.json';
 import placements from '../../mocks/reports/placements.json';
 import sources from '../../mocks/reports/sources.json';
-import ai from '../../mocks/reports/ai.json';
 
 const MOCKS = {
   pipeline,
@@ -18,7 +17,6 @@ const MOCKS = {
   consultants,
   placements,
   sources,
-  ai,
 } as unknown as ReportPayloadMap;
 
 export function useReportData<T extends ReportTab>(

@@ -518,6 +518,24 @@ body {
   }
 }
 
+/* Desktop Drawer — slides in from the right */
+@keyframes slide-in-right {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+.animate-slide-in-right {
+  animation: slide-in-right 0.26s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-slide-in-right {
+    animation: none !important;
+  }
+}
+
 /* Hide scrollbars while keeping scrollability (used in mobile inner panels) */
 .noscroll::-webkit-scrollbar {
   width: 0;

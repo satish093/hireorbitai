@@ -75,6 +75,11 @@ function moreGroups(role: string | undefined): NavGroup[] {
       {
         heading: 'Talent',
         items: [
+          // Consultants + Applications are OPERATOR_TIER routes the recruiter
+          // can access — surface them here so the mobile nav matches the
+          // desktop sidebar (the bottom-nav Work tab only routes to /jobs).
+          { to: '/consultants', label: 'Consultants', Icon: IconUsers },
+          { to: '/applications', label: 'Applications', Icon: IconFileText },
           { to: '/resumes', label: 'Resumes', Icon: IconFile },
           { to: '/reports', label: 'Analytics', Icon: IconBarChart },
         ],

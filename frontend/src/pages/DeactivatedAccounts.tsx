@@ -7,6 +7,10 @@ import { PageHeader } from '../components/PageHeader';
 import { SelectInput } from '../components/SelectInput';
 import { Button } from '../components/Button';
 import { GroupBadge } from '../components/GroupBadge';
+import { BottomSheet } from '../components/BottomSheet';
+import { EmptyState } from '../components/EmptyState';
+import { SkeletonCard } from '../components/Skeleton';
+import { DeactivatedCard } from '../components/DeactivatedCard';
 import { api } from '../services/api';
 import { invalidate, useInvalidationListener } from '../hooks/useInvalidate';
 import { ALL_ROLES, ROLE_LABEL, Role } from '../types';
@@ -59,6 +63,7 @@ export function DeactivatedAccounts() {
   const [loading, setLoading] = useState(true);
   const [role, setRole] = useState<RoleFilter>('ALL');
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [confirmRow, setConfirmRow] = useState<DeactivatedRow | null>(null);
 
   async function load(filter: RoleFilter) {
     setLoading(true);
@@ -85,7 +90,9 @@ export function DeactivatedAccounts() {
     load(role);
   });
 
+  /** Confirm then reactivate — called after the user acknowledges in the BottomSheet. */
   async function reactivate(row: DeactivatedRow) {
+    setConfirmRow(null);
     if (busyId) return;
     setBusyId(row.id);
     try {
@@ -136,105 +143,179 @@ export function DeactivatedAccounts() {
         />
       </div>
 
-      <DataTable
-        loading={loading}
-        empty={
-          role === 'ALL'
-            ? 'No deactivated accounts. Nothing to see here.'
-            : `No deactivated ${ROLE_LABEL[role as Role]} accounts.`
-        }
-        columns={[
-          {
-            key: 'email',
-            header: 'User',
-            render: (r: DeactivatedRow) => (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => nav(`/users/${r.id}`)}
-                className="text-left"
-              >
-                <div className="font-medium text-ink">{r.full_name || r.email}</div>
-                {r.full_name && <div className="text-xs text-muted">{r.email}</div>}
-              </Button>
-            ),
-          },
-          {
-            key: 'role',
-            header: 'Role',
-            render: (r: DeactivatedRow) => (
-              <span className="text-[11px] font-medium bg-hover text-ink px-1.5 py-0.5 rounded">
-                {ROLE_LABEL[r.role] ?? r.role}
-              </span>
-            ),
-          },
-          {
-            key: 'group',
-            header: 'Group',
-            hideOnMobile: true,
-            render: (r: DeactivatedRow) => <GroupBadge groupId={r.group_id} />,
-          },
-          {
-            key: 'status',
-            header: 'Status',
-            render: (r: DeactivatedRow) => {
-              // status is the canonical field; fall back to is_active for
-              // pre-migration rows so old deactivations still render.
-              const s: Status = r.status ?? (r.is_active === false ? 'inactive' : 'active');
-              return (
-                <span
-                  className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border ${STATUS_PILL[s]}`}
-                  title={r.status_reason ?? undefined}
-                >
-                  {s.replace(/_/g, ' ')}
-                </span>
-              );
-            },
-          },
-          {
-            key: 'status_changed_at',
-            header: 'Changed',
-            hideOnMobile: true,
-            render: (r: DeactivatedRow) => {
-              const at = r.status_changed_at ?? r.updated_at;
-              return at ? new Date(at).toLocaleString() : '—';
-            },
-          },
-          {
-            key: 'last_seen_at',
-            header: 'Last seen',
-            hideOnMobile: true,
-            render: (r: DeactivatedRow) =>
-              r.last_seen_at ? (
-                new Date(r.last_seen_at).toLocaleString()
-              ) : (
-                <span className="text-muted">Never</span>
-              ),
-          },
-          {
-            key: 'actions',
-            header: '',
-            align: 'right',
-            render: (r: DeactivatedRow) => (
-              <div className="flex items-center justify-end gap-1">
-                <Button size="sm" variant="ghost" onClick={() => nav(`/users/${r.id}`)}>
-                  Open profile
-                </Button>
+      {/* ── Mobile cards (< md) ── */}
+      <div className="flex md:hidden flex-col gap-3 mb-4">
+        {loading ? (
+          <>
+            <SkeletonCard />
+            <SkeletonCard />
+          </>
+        ) : rows.length === 0 ? (
+          <EmptyState
+            title="No deactivated accounts"
+            description={
+              role === 'ALL'
+                ? 'Nothing to see here.'
+                : `No deactivated ${ROLE_LABEL[role as Role]} accounts.`
+            }
+            compact
+          />
+        ) : (
+          rows.map((r) => (
+            <DeactivatedCard
+              key={r.id}
+              row={r}
+              busy={busyId === r.id}
+              onReactivate={(row) => setConfirmRow(rows.find((r) => r.id === row.id) ?? null)}
+              onOpenProfile={nav}
+            />
+          ))
+        )}
+      </div>
+
+      {/* ── Desktop DataTable (≥ md) ── */}
+      <div className="hidden md:block">
+        <DataTable
+          loading={loading}
+          empty={
+            role === 'ALL'
+              ? 'No deactivated accounts. Nothing to see here.'
+              : `No deactivated ${ROLE_LABEL[role as Role]} accounts.`
+          }
+          columns={[
+            {
+              key: 'email',
+              header: 'User',
+              render: (r: DeactivatedRow) => (
                 <Button
-                  size="sm"
                   variant="ghost"
-                  loading={busyId === r.id}
-                  onClick={() => reactivate(r)}
-                  className="text-emerald-700 dark:text-emerald-300 hover:text-emerald-800"
+                  size="sm"
+                  onClick={() => nav(`/users/${r.id}`)}
+                  className="text-left"
                 >
-                  Reactivate
+                  <div className="font-medium text-ink">{r.full_name || r.email}</div>
+                  {r.full_name && <div className="text-xs text-muted">{r.email}</div>}
                 </Button>
-              </div>
-            ),
-          },
-        ]}
-        rows={rows}
-      />
+              ),
+            },
+            {
+              key: 'role',
+              header: 'Role',
+              render: (r: DeactivatedRow) => (
+                <span className="text-[11px] font-medium bg-hover text-ink px-1.5 py-0.5 rounded">
+                  {ROLE_LABEL[r.role] ?? r.role}
+                </span>
+              ),
+            },
+            {
+              key: 'group',
+              header: 'Group',
+              hideOnMobile: true,
+              render: (r: DeactivatedRow) => <GroupBadge groupId={r.group_id} />,
+            },
+            {
+              key: 'status',
+              header: 'Status',
+              render: (r: DeactivatedRow) => {
+                // status is the canonical field; fall back to is_active for
+                // pre-migration rows so old deactivations still render.
+                const s: Status = r.status ?? (r.is_active === false ? 'inactive' : 'active');
+                return (
+                  <span
+                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border ${STATUS_PILL[s]}`}
+                    title={r.status_reason ?? undefined}
+                  >
+                    {s.replace(/_/g, ' ')}
+                  </span>
+                );
+              },
+            },
+            {
+              key: 'status_changed_at',
+              header: 'Changed',
+              hideOnMobile: true,
+              render: (r: DeactivatedRow) => {
+                const at = r.status_changed_at ?? r.updated_at;
+                return at ? new Date(at).toLocaleString() : '—';
+              },
+            },
+            {
+              key: 'last_seen_at',
+              header: 'Last seen',
+              hideOnMobile: true,
+              render: (r: DeactivatedRow) =>
+                r.last_seen_at ? (
+                  new Date(r.last_seen_at).toLocaleString()
+                ) : (
+                  <span className="text-muted">Never</span>
+                ),
+            },
+            {
+              key: 'actions',
+              header: '',
+              align: 'right',
+              render: (r: DeactivatedRow) => (
+                <div className="flex items-center justify-end gap-1">
+                  <Button size="sm" variant="ghost" onClick={() => nav(`/users/${r.id}`)}>
+                    Open profile
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    loading={busyId === r.id}
+                    onClick={() => setConfirmRow(r)}
+                    className="text-emerald-700 dark:text-emerald-300 hover:text-emerald-800"
+                  >
+                    Reactivate
+                  </Button>
+                </div>
+              ),
+            },
+          ]}
+          rows={rows}
+        />
+      </div>
+      {/* end desktop DataTable */}
+
+      {/* ── Reactivate confirmation (both breakpoints — desktop + mobile route
+             through confirmRow so the destructive action always confirms) ── */}
+      <BottomSheet
+        open={!!confirmRow}
+        onClose={() => setConfirmRow(null)}
+        title="Reactivate account?"
+        maxHeightFraction={0.45}
+        footer={
+          <div className="flex gap-2">
+            <Button variant="ghost" block onClick={() => setConfirmRow(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="outline"
+              block
+              loading={!!busyId}
+              onClick={() => confirmRow && reactivate(confirmRow)}
+              className="text-emerald-700 dark:text-emerald-300"
+            >
+              Reactivate
+            </Button>
+          </div>
+        }
+      >
+        {confirmRow && (
+          <div className="text-sm" style={{ color: 'var(--ink-2)' }}>
+            <p>
+              This will re-enable{' '}
+              <strong style={{ color: 'var(--ink)' }}>
+                {confirmRow.full_name ?? confirmRow.email}
+              </strong>{' '}
+              and allow them to sign in again.
+            </p>
+            <p className="mt-2" style={{ color: 'var(--muted)' }}>
+              Their role, group, and permissions will be restored to their previous state.
+            </p>
+          </div>
+        )}
+      </BottomSheet>
     </Layout>
   );
 }

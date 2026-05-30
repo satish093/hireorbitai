@@ -7,6 +7,9 @@ import { FormInput } from '../components/FormInput';
 import { DateTimePicker } from '../components/DateTimePicker';
 import { PageHeader } from '../components/PageHeader';
 import { Button } from '../components/Button';
+import { EmptyState } from '../components/EmptyState';
+import { SkeletonCard } from '../components/Skeleton';
+import { ReminderCard } from '../components/ReminderCard';
 import { api } from '../services/api';
 import toast from 'react-hot-toast';
 
@@ -71,35 +74,62 @@ export function Reminders() {
         description="Personal nudges. The scheduler ships emails at due time once configured."
         action={<Button onClick={() => setOpen(true)}>+ New reminder</Button>}
       />
-      <DataTable
-        loading={loading}
-        empty="No reminders. Add one to track an upcoming follow-up."
-        columns={[
-          { key: 'title', header: 'Title' },
-          {
-            key: 'due_at',
-            header: 'Due',
-            render: (r: any) => (r.due_at ? new Date(r.due_at).toLocaleString() : '—'),
-          },
-          {
-            key: 'status',
-            header: 'Status',
-            render: (r: any) => <StatusBadge status={r.status} />,
-          },
-          {
-            key: 'actions',
-            header: '',
-            align: 'right',
-            render: (r: any) =>
-              r.status !== 'DONE' ? (
-                <Button size="sm" variant="ghost" onClick={() => complete(r.id)}>
-                  Mark done
-                </Button>
-              ) : null,
-          },
-        ]}
-        rows={rows}
-      />
+      {/* ── Mobile cards (< md) ── */}
+      <div className="flex md:hidden flex-col gap-3 mb-4">
+        {loading ? (
+          <>
+            <SkeletonCard />
+            <SkeletonCard />
+          </>
+        ) : rows.length === 0 ? (
+          <EmptyState
+            title="No reminders"
+            description="Add a reminder to track an upcoming follow-up."
+            action={
+              <Button variant="accent" onClick={() => setOpen(true)}>
+                + New reminder
+              </Button>
+            }
+            compact
+          />
+        ) : (
+          rows.map((r: any) => <ReminderCard key={r.id} reminder={r} onComplete={complete} />)
+        )}
+      </div>
+
+      {/* ── Desktop DataTable (≥ md) ── */}
+      <div className="hidden md:block">
+        <DataTable
+          loading={loading}
+          empty="No reminders. Add one to track an upcoming follow-up."
+          columns={[
+            { key: 'title', header: 'Title' },
+            {
+              key: 'due_at',
+              header: 'Due',
+              render: (r: any) => (r.due_at ? new Date(r.due_at).toLocaleString() : '—'),
+            },
+            {
+              key: 'status',
+              header: 'Status',
+              render: (r: any) => <StatusBadge status={r.status} />,
+            },
+            {
+              key: 'actions',
+              header: '',
+              align: 'right',
+              render: (r: any) =>
+                r.status !== 'DONE' ? (
+                  <Button size="sm" variant="ghost" onClick={() => complete(r.id)}>
+                    Mark done
+                  </Button>
+                ) : null,
+            },
+          ]}
+          rows={rows}
+        />
+      </div>
+      {/* end desktop DataTable */}
       <Modal
         open={open}
         onClose={() => {

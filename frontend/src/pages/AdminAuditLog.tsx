@@ -71,6 +71,15 @@ function actionTone(action: string): string {
   return 'text-sky-700 dark:text-sky-400 bg-sky-50 dark:bg-sky-500/10';
 }
 
+/** Returns the CSS color of the severity dot for a given action. */
+function severityDot(action: string): string {
+  if (/failed|denied|blocked|locked|deleted|deactivated|invalid|disabled/.test(action))
+    return 'var(--danger)';
+  if (/role_changed|bulk|impersonated|suspended/.test(action)) return 'var(--warn)';
+  if (/created|reactivated|unlocked|reset_completed/.test(action)) return 'var(--success)';
+  return 'var(--accent)';
+}
+
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleString(undefined, {
     month: 'short',
@@ -252,8 +261,22 @@ export function AdminAuditLog() {
                     className="w-full text-left px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4"
                     onClick={() => setExpanded(expanded === ev.id ? null : ev.id)}
                   >
-                    <span className="shrink-0 text-xs text-muted w-40">
-                      {fmtDate(ev.created_at)}
+                    {/* Severity dot — visible on all breakpoints for quick scanning */}
+                    <span
+                      className="shrink-0 w-2 h-2 rounded-full hidden sm:block"
+                      style={{ background: severityDot(ev.action) }}
+                      aria-hidden="true"
+                    />
+                    <span className="flex items-center gap-2 sm:contents">
+                      {/* Mobile: dot inline with date */}
+                      <span
+                        className="w-2 h-2 rounded-full shrink-0 sm:hidden"
+                        style={{ background: severityDot(ev.action) }}
+                        aria-hidden="true"
+                      />
+                      <span className="shrink-0 text-xs text-muted sm:w-40">
+                        {fmtDate(ev.created_at)}
+                      </span>
                     </span>
                     <span
                       className={`shrink-0 text-[11px] font-medium px-2 py-0.5 rounded-full ${actionTone(ev.action)}`}

@@ -3,6 +3,12 @@ import { useSearchParams } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { PageHeader } from '../components/PageHeader';
 import { SkeletonCard } from '../components/Skeleton';
+import { TaskCard } from '../components/TaskCard';
+import { EmptyState } from '../components/EmptyState';
+import { Button } from '../components/Button';
+import { SelectInput } from '../components/SelectInput';
+import { IconSearch } from '../components/Icons';
+import { TASK_STATUSES, TASK_STATUS_LABEL, type TaskStatus } from '../types';
 import { useTasksData } from '../components/tasks/useTasksData';
 import { useSavedTaskViews } from '../components/tasks/useSavedTaskViews';
 import {
@@ -102,7 +108,70 @@ export function Tasks({ initialAssigneeMe = false }: { initialAssigneeMe?: boole
     <Layout title="Tasks" crumbs={[{ label: 'Workspace', to: '/dashboard' }, { label: 'Tasks' }]}>
       <PageHeader title="Tasks" description="Track and organize your team's work." />
 
-      <div className="space-y-3">
+      {/* ── Mobile toolbar (< md): search + status filter + create ──
+          The full TaskFilterBar (with the New-task button) is desktop-only, so
+          mobile previously had no way to create, search, or filter tasks. */}
+      <div className="flex md:hidden flex-col gap-2 mb-4">
+        <div className="flex items-center gap-2">
+          <div
+            className="flex items-center gap-2 h-10 px-3 rounded-xl flex-1"
+            style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
+          >
+            <IconSearch size={15} className="text-muted shrink-0" />
+            <input
+              value={filters.q ?? ''}
+              onChange={(e) => setFilters((f) => ({ ...f, q: e.target.value }))}
+              placeholder="Search tasks…"
+              className="flex-1 bg-transparent outline-none text-ink placeholder:text-muted"
+              style={{ fontSize: 16 }}
+            />
+          </div>
+          {isManager && (
+            <Button variant="primary" onClick={() => setCreateOpen(true)} className="shrink-0">
+              + New
+            </Button>
+          )}
+        </div>
+        <SelectInput
+          value={filters.status ?? ''}
+          onChange={(e) =>
+            setFilters((f) => ({ ...f, status: (e.target.value || '') as TaskStatus | '' }))
+          }
+          options={[
+            { value: '', label: 'All statuses' },
+            ...TASK_STATUSES.map((s) => ({ value: s, label: TASK_STATUS_LABEL[s] })),
+          ]}
+        />
+      </div>
+
+      {/* ── Mobile task list (< md) ── */}
+      <div className="flex md:hidden flex-col gap-3 mb-4">
+        {loading ? (
+          <>
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+          </>
+        ) : visible.length === 0 ? (
+          <EmptyState
+            title="All clear"
+            description="No tasks match your current filters."
+            compact
+          />
+        ) : (
+          visible.map((t) => (
+            <TaskCard
+              key={t.id}
+              task={t}
+              onToggle={(id, done) => patchStatus(id, done ? 'COMPLETED' : 'TODO')}
+              onClick={(id) => setSelected(id)}
+            />
+          ))
+        )}
+      </div>
+
+      {/* ── Desktop views (≥ md) ── */}
+      <div className="hidden md:block space-y-3">
         <TaskFilterBar
           filters={filters}
           onChange={(patch) => setFilters((f) => ({ ...f, ...patch }))}

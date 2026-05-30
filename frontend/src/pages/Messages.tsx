@@ -26,6 +26,8 @@ import { useAuth } from '../context/AuthContext';
 import { useRealtime } from '../hooks/useRealtime';
 import { useCallContext } from '../context/CallContext';
 import { Role, ROLE_LABEL } from '../types';
+import { ContactPanel } from '../components/messages/ContactPanel';
+import { BottomSheet } from '../components/BottomSheet';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
 
@@ -149,6 +151,7 @@ export function Messages() {
   // Cleared on send + on peer change.
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [peerTyping, setPeerTyping] = useState(false);
+  const [contactPanelOpen, setContactPanelOpen] = useState(false);
   const peerTypingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Local throttle so we don't POST /typing on every keystroke — once
   // every TYPING_PING_MS while text is being entered is plenty (server
@@ -871,8 +874,30 @@ export function Messages() {
                     {activePeer.role && ROLE_LABEL[activePeer.role]} · {activePeer.email}
                   </div>
                 </div>
+                {/* Context panel toggle (mobile/tablet — hidden on lg where panel is always visible) */}
+                <button
+                  type="button"
+                  aria-label="View contact info"
+                  onClick={() => setContactPanelOpen(true)}
+                  className="lg:hidden ml-auto p-2 rounded-lg hover:bg-hover text-muted"
+                  title="Contact info"
+                >
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.75"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <circle cx="12" cy="7" r="4" />
+                    <path d="M20 21a8 8 0 1 0-16 0" />
+                  </svg>
+                </button>
                 {/* Voice call — disabled while already in a call */}
-                <div className="ml-auto flex items-center gap-1 text-muted">
+                <div className="flex items-center gap-1 text-muted">
                   <Button
                     type="button"
                     variant="ghost"
@@ -889,12 +914,45 @@ export function Messages() {
                       // "Tap to hear" inside the call screen.
                       call.primeAudio();
                       call
-                        .startCall(activePeer.id, activePeer.full_name ?? null, activePeer.email)
+                        .startCall(
+                          activePeer.id,
+                          activePeer.full_name ?? null,
+                          activePeer.email,
+                          activePeer.role,
+                        )
                         .catch((e: Error) => toast.error(e.message));
                     }}
                   />
                 </div>
               </header>
+
+              {/* Active-call bar — live green strip while on a call with THIS peer.
+                  Click to re-expand the (minimized) call; quick minimize button. */}
+              {call.status === 'connected' && call.peer?.id === activePeer.id && (
+                <button
+                  type="button"
+                  onClick={() => call.expand()}
+                  aria-label="Return to call"
+                  className="w-full flex items-center gap-2.5 px-5 py-2 text-left text-white"
+                  // Fixed accessible fills (white text ≥ 4.6:1 in both themes).
+                  // A call strip stays vivid regardless of theme, so it
+                  // intentionally doesn't track the theme-flipping --success
+                  // token (whose dark value is too light for white text).
+                  style={{ background: call.reconnecting ? '#b45309' : '#047857' }}
+                >
+                  <span className="relative flex h-2 w-2" aria-hidden="true">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white/70" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-white" />
+                  </span>
+                  <span className="text-[13px] font-semibold">
+                    {call.reconnecting ? 'Reconnecting…' : 'On call'}
+                  </span>
+                  <span className="text-[13px] font-mono tabular-nums opacity-90">
+                    {call.callDurationLabel}
+                  </span>
+                  <span className="ml-auto text-[12px] font-medium opacity-90">Tap to open</span>
+                </button>
+              )}
 
               {accessDenied ? (
                 // Hierarchy says we no longer have access to this peer. Shown
@@ -1152,7 +1210,65 @@ export function Messages() {
             </>
           )}
         </main>
+
+        {/* Right: context panel — desktop only (lg+). On mobile/tablet it's a BottomSheet. */}
+        {activePeer && (
+          <aside
+            className="hidden lg:flex lg:w-72 shrink-0 border-l border-border flex-col"
+            style={{ background: 'var(--surface)' }}
+          >
+            <ContactPanel
+              peer={activePeer}
+              onCall={
+                call.status === 'idle'
+                  ? () => {
+                      call.primeAudio();
+                      call
+                        .startCall(
+                          activePeer.id,
+                          activePeer.full_name ?? null,
+                          activePeer.email,
+                          activePeer.role,
+                        )
+                        .catch((e: Error) => toast.error(e.message));
+                    }
+                  : undefined
+              }
+            />
+          </aside>
+        )}
       </div>
+
+      {/* Mobile contact info BottomSheet */}
+      {activePeer && (
+        <BottomSheet
+          open={contactPanelOpen}
+          onClose={() => setContactPanelOpen(false)}
+          title="Contact info"
+          maxHeightFraction={0.75}
+        >
+          <ContactPanel
+            peer={activePeer}
+            onClose={() => setContactPanelOpen(false)}
+            onCall={
+              call.status === 'idle'
+                ? () => {
+                    setContactPanelOpen(false);
+                    call.primeAudio();
+                    call
+                      .startCall(
+                        activePeer.id,
+                        activePeer.full_name ?? null,
+                        activePeer.email,
+                        activePeer.role,
+                      )
+                      .catch((e: Error) => toast.error(e.message));
+                  }
+                : undefined
+            }
+          />
+        </BottomSheet>
+      )}
 
       {/* WhatsApp/Discord-style attachment viewer — portaled, ESC + click-
           outside close. Image lightbox for image attachments, in-app PDF

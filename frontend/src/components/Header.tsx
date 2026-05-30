@@ -1,5 +1,7 @@
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../hooks/useTheme';
+import { useAuth } from '../context/AuthContext';
+import { useBadgeCounts } from '../hooks/useBadgeCounts';
 import { Button } from './Button';
 
 interface Crumb {
@@ -10,67 +12,144 @@ interface Crumb {
 interface Props {
   title: string;
   crumbs?: Crumb[];
-  /** Called when the mobile hamburger is tapped. Layout wires this to the
-   *  Sidebar's mobile-drawer state. */
   onMenuClick?: () => void;
 }
 
-export function Header({ title, crumbs, onMenuClick }: Props) {
+// ── Avatar helpers (same palette as Sidebar) ───────────────────────────────
+
+const AVATAR_COLORS = ['#2563eb', '#7c3aed', '#0369a1', '#2e7a42', '#b45309', '#be123c', '#4338ca'];
+
+function avatarColor(seed: string): string {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+  return AVATAR_COLORS[h % AVATAR_COLORS.length]!;
+}
+
+function initials(name?: string | null, email?: string | null): string {
+  const src = (name && name.trim()) || (email && email.split('@')[0]) || '';
+  const parts = src.split(/\s+|\.|_|-/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0]!.slice(0, 2).toUpperCase();
+  return (parts[0]![0]! + parts[1]![0]!).toUpperCase();
+}
+
+// ── Header ─────────────────────────────────────────────────────────────────
+
+export function Header({ title, crumbs, onMenuClick: _onMenuClick }: Props) {
   const loc = useLocation();
+  const navigate = useNavigate();
   const resolved: Crumb[] = crumbs ?? defaultCrumbs(loc.pathname, title);
   const { theme, toggle } = useTheme();
+  const { profile } = useAuth();
+  const counts = useBadgeCounts();
+
+  const inboxUnread = counts.inbox ?? 0;
+  const seed = profile?.email ?? profile?.full_name ?? '';
+  const bgColor = avatarColor(seed);
+  const displayInitials = initials(profile?.full_name, profile?.email);
 
   return (
-    <header className="bg-surface border-b border-border px-4 sm:px-6 py-3 flex items-center gap-3 sm:gap-4">
-      {/* Hamburger — mobile only. Opens the sidebar drawer. */}
-      <button
-        type="button"
-        onClick={onMenuClick}
-        aria-label="Open navigation"
-        className="hidden -ml-1 w-9 h-9 inline-flex items-center justify-center rounded-lg text-muted hover:text-ink hover:bg-hover"
-      >
-        <svg
-          width="20"
-          height="20"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-        >
-          <line x1="3" y1="6" x2="21" y2="6" />
-          <line x1="3" y1="12" x2="21" y2="12" />
-          <line x1="3" y1="18" x2="21" y2="18" />
-        </svg>
-      </button>
-
+    <header
+      className="sticky top-0 z-20 h-[60px] flex items-center gap-4 px-5 sm:px-6 border-b border-border shrink-0"
+      style={{
+        background: 'color-mix(in srgb, var(--bg-elev) 90%, transparent)',
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
+      }}
+    >
+      {/* ── Breadcrumb (desktop) / Page title (mobile) ── */}
       <nav
         aria-label="Breadcrumb"
-        className="flex items-center gap-2 text-sm text-muted min-w-0 flex-1"
+        className="flex items-center gap-1.5 text-[13px] min-w-0 flex-1"
+        style={{ color: 'var(--muted)' }}
       >
         {resolved.map((c, i) => (
-          <span key={i} className="flex items-center gap-2 min-w-0">
+          <span key={i} className="flex items-center gap-1.5 min-w-0">
             {c.to ? (
-              <Link to={c.to} className="hover:text-ink truncate">
+              <Link
+                to={c.to}
+                className="hover:text-ink truncate transition-colors hidden sm:inline"
+              >
                 {c.label}
               </Link>
             ) : (
               <span
-                className={i === resolved.length - 1 ? 'text-ink font-medium truncate' : 'truncate'}
+                className={
+                  i === resolved.length - 1 ? 'font-semibold truncate' : 'truncate hidden sm:inline'
+                }
+                style={{ color: i === resolved.length - 1 ? 'var(--ink)' : undefined }}
               >
                 {c.label}
               </span>
             )}
-            {i < resolved.length - 1 && (
-              <span className="text-muted opacity-50 hidden sm:inline">›</span>
-            )}
+            {i < resolved.length - 1 && <ChevronSep />}
           </span>
         ))}
       </nav>
 
-      {/* Light / dark theme switcher — flips the [data-theme] attribute via
-          useTheme(), persisted to localStorage. */}
-      <div className="flex items-center shrink-0">
+      {/* ── ⌘K Search (desktop only) ── */}
+      <div
+        className="hidden md:flex items-center gap-2 h-9 px-3 rounded-[9px] cursor-text shrink-0"
+        style={{
+          width: 'min(280px, 32vw)',
+          background: 'var(--surface-2)',
+          border: '1px solid var(--border)',
+          color: 'var(--muted)',
+        }}
+        role="button"
+        aria-label="Search (⌘K)"
+        tabIndex={0}
+        onClick={() => {
+          // ⌘K global search — placeholder for Phase 2+ command palette
+          const event = new KeyboardEvent('keydown', {
+            key: 'k',
+            metaKey: true,
+            bubbles: true,
+          });
+          document.dispatchEvent(event);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') e.currentTarget.click();
+        }}
+      >
+        <SearchIcon />
+        <span className="flex-1 text-[13.5px] select-none">Search…</span>
+        <kbd
+          className="text-[10.5px] font-semibold px-1 py-px rounded"
+          style={{
+            color: 'var(--faint)',
+            border: '1px solid var(--border)',
+            lineHeight: 1.4,
+          }}
+        >
+          ⌘K
+        </kbd>
+      </div>
+
+      {/* ── Actions ── */}
+      <div className="flex items-center gap-1 shrink-0">
+        {/* Notification bell */}
+        <button
+          type="button"
+          aria-label={inboxUnread > 0 ? `Inbox — ${inboxUnread} unread` : 'Inbox'}
+          onClick={() => navigate('/messages')}
+          className="relative w-9 h-9 rounded-[9px] grid place-items-center transition-colors hover:bg-hover"
+          style={{ color: 'var(--ink-2)' }}
+        >
+          <BellIcon />
+          {inboxUnread > 0 && (
+            <span
+              aria-hidden="true"
+              className="absolute top-[7px] right-[7px] w-[7px] h-[7px] rounded-full border-[1.5px]"
+              style={{
+                background: 'var(--danger)',
+                borderColor: 'var(--bg-elev)',
+              }}
+            />
+          )}
+        </button>
+
+        {/* Theme toggle */}
         <Button
           variant="ghost"
           size="sm"
@@ -80,8 +159,84 @@ export function Header({ title, crumbs, onMenuClick }: Props) {
           aria-pressed={theme === 'dark'}
           leftIcon={theme === 'dark' ? <SunIcon /> : <MoonIcon />}
         />
+
+        {/* Avatar (desktop only) */}
+        {profile && (
+          <button
+            type="button"
+            aria-label="Your profile"
+            onClick={() => navigate(profile.id ? `/users/${profile.id}` : '#')}
+            className="hidden md:flex w-8 h-8 ml-1 rounded-full items-center justify-center text-xs font-bold transition-opacity hover:opacity-80"
+            style={{
+              background: `${bgColor}22`,
+              color: bgColor,
+            }}
+            title={profile.full_name ?? profile.email}
+          >
+            {displayInitials}
+          </button>
+        )}
       </div>
     </header>
+  );
+}
+
+// ── Inline icons (keep Header self-contained) ──────────────────────────────
+
+function ChevronSep() {
+  return (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className="opacity-40 shrink-0 hidden sm:block"
+    >
+      <polyline points="9 18 15 12 9 6" />
+    </svg>
+  );
+}
+
+function SearchIcon() {
+  return (
+    <svg
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="11" cy="11" r="8" />
+      <line x1="21" y1="21" x2="16.65" y2="16.65" />
+    </svg>
+  );
+}
+
+function BellIcon() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+    </svg>
   );
 }
 
@@ -128,6 +283,8 @@ function SunIcon() {
     </svg>
   );
 }
+
+// ── Default breadcrumb builder ─────────────────────────────────────────────
 
 function defaultCrumbs(pathname: string, title: string): Crumb[] {
   const segs = pathname.split('/').filter(Boolean);

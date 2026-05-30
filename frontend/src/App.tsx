@@ -536,7 +536,11 @@ export default function App() {
             <Route
               path="/admin/audit-log"
               element={
-                <ProtectedRoute allow={ADMIN_TIER}>
+                // Backend gate is requireRoleOrCapability(ADMIN_TIER, 'users')
+                // (the whole /admin/users router) — mirror it here so a
+                // DEVELOPER granted the `users` capability isn't shown the page
+                // and then bounced to /unauthorized by a narrower frontend gate.
+                <ProtectedRoute allow={ADMIN_TIER} capability="users">
                   <AdminAuditLog />
                 </ProtectedRoute>
               }

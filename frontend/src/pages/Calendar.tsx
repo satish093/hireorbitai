@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import clsx from 'clsx';
 import { Layout } from '../components/Layout';
 import { PageHeader } from '../components/PageHeader';
 import { Button } from '../components/Button';
@@ -333,7 +332,19 @@ export function Calendar({
       />
 
       {/* ── Sidebar + main view ──────────────────────────────────── */}
-      {/* pb-24 on mobile reserves space above the fixed bottom tab bar */}
+      {/* Mobile view switcher — inline (the page no longer renders its own
+          fixed bottom bar, which used to collide with the global MobileBottomNav). */}
+      <div className="md:hidden mb-3">
+        <ButtonGroup>
+          {VIEWS.map((v) => (
+            <ButtonGroupItem key={v.key} pressed={view === v.key} onClick={() => setView(v.key)}>
+              {v.label}
+            </ButtonGroupItem>
+          ))}
+        </ButtonGroup>
+      </div>
+
+      {/* pb on mobile clears the floating FAB + the global bottom nav */}
       <div className="flex flex-col md:flex-row md:gap-5 md:items-start pb-24 md:pb-0">
         {/* Sidebar: hidden on mobile — use bottom tab bar + FAB instead */}
         <div className="hidden md:block">
@@ -375,9 +386,12 @@ export function Calendar({
         </div>
       </div>
 
-      {/* ── Mobile FAB ───────────────────────────────────────────── */}
+      {/* ── Mobile FAB ───────────────────────────────────────────────
+          Sits ABOVE the global MobileBottomNav (58px + safe area), not above a
+          calendar-local bar (removed). z-30 keeps it below modals/sheets. */}
       <button
-        className="md:hidden fixed bottom-[80px] right-5 w-14 h-14 rounded-full bg-accent text-white shadow-xl z-40 flex items-center justify-center text-3xl font-light leading-none active:scale-95 transition-transform"
+        style={{ bottom: 'calc(72px + env(safe-area-inset-bottom))' }}
+        className="md:hidden fixed right-5 w-14 h-14 rounded-full bg-accent text-white shadow-xl z-30 flex items-center justify-center text-3xl font-light leading-none active:scale-95 transition-transform"
         onClick={() => {
           if (isInterviews) {
             setEditInterview(null);
@@ -392,27 +406,9 @@ export function Calendar({
         +
       </button>
 
-      {/* ── Mobile bottom tab bar ────────────────────────────────── */}
-      <nav
-        className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-surface border-t border-border safe-pb"
-        aria-label="Calendar views"
-      >
-        <div className="flex h-16">
-          {VIEWS.map((v) => (
-            <button
-              key={v.key}
-              onClick={() => setView(v.key)}
-              className={clsx(
-                'flex-1 flex flex-col items-center justify-center gap-1 transition-colors',
-                view === v.key ? 'text-accent' : 'text-muted hover:text-ink',
-              )}
-            >
-              {v.icon}
-              <span className="text-[10px] font-medium tracking-wide">{v.label}</span>
-            </button>
-          ))}
-        </div>
-      </nav>
+      {/* (The calendar-local fixed bottom tab bar was removed — it collided with
+          the global MobileBottomNav. The view switcher is now the inline
+          segmented control above the calendar body.) */}
 
       {/* Modals */}
       {isInterviews ? (

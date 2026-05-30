@@ -3,43 +3,33 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { DataTable } from '../components/DataTable';
 import { Modal } from '../components/Modal';
+import { Drawer } from '../components/Drawer';
+import { BottomSheet } from '../components/BottomSheet';
 import { SelectInput } from '../components/SelectInput';
 import { Avatar } from '../components/TaskBits';
+import { StatusBadge } from '../components/StatusBadge';
 import { PageHeader } from '../components/PageHeader';
 import { Button } from '../components/Button';
+import { EmptyState } from '../components/EmptyState';
+import { SkeletonCard } from '../components/Skeleton';
 import { GroupBadge, useUserGroups, invalidateUserGroupsCache } from '../components/GroupBadge';
 import { Popover } from '../components/ui/Popover';
+import {
+  ConsultantCard,
+  filterConsultants,
+  type ConsultantRow,
+} from '../components/ConsultantCard';
+import { NewSubmissionModal } from '../components/NewSubmissionModal';
+import { useEntityList } from '../hooks/useEntityList';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { ADMIN_TIER, MANAGER_TIER } from '../types';
+import { IconSearch, IconUsers } from '../components/Icons';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
 
-interface ConsultantRow {
-  id: string;
-  primary_skill?: string | null;
-  visa_status?: string | null;
-  total_experience_years?: number | null;
-  marketing_status: 'ACTIVE' | 'PAUSED' | 'PLACED';
-  current_location?: string | null;
-  recruiter_id?: string | null;
-  user?: {
-    id?: string;
-    full_name?: string | null;
-    email?: string | null;
-    group_id?: string | null;
-  } | null;
-  recruiter?: {
-    id: string;
-    team?: string | null;
-    user?: {
-      id?: string;
-      full_name?: string | null;
-      email?: string | null;
-      group_id?: string | null;
-    } | null;
-  } | null;
-}
+// ── Re-export so existing callers still compile ─────────────────────────────
+export type { ConsultantRow };
 
 interface RecruiterRow {
   id: string;
@@ -124,30 +114,68 @@ function StatusSelect({
   );
 }
 
+// ── Status filter pills (desktop toolbar + mobile sheet) ───────────────────
+
+const FILTER_OPTIONS = [
+  { value: 'ALL', label: 'All' },
+  { value: 'ACTIVE', label: 'Active' },
+  { value: 'PAUSED', label: 'Paused' },
+  { value: 'PLACED', label: 'Placed' },
+];
+
+function StatusPills({ active, onChange }: { active: string; onChange: (v: string) => void }) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {FILTER_OPTIONS.map((o) => (
+        <button
+          key={o.value}
+          onClick={() => onChange(o.value)}
+          className={clsx(
+            'h-8 px-3 rounded-full text-[13px] font-semibold border transition-colors',
+            o.value === active
+              ? 'bg-ink text-bg border-ink'
+              : 'bg-surface text-ink-2 border-border hover:border-border-strong',
+          )}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function Consultants() {
   const { profile } = useAuth();
   const { groups } = useUserGroups();
-  // Only MANAGER_TIER may (re)assign recruiters — and only they may fetch the
-  // /recruiters directory (the backend now gates it to MANAGER_TIER). A
-  // RECRUITER sees the bench read-only, with no assign controls.
   const canAssignRecruiter =
     !!profile && (MANAGER_TIER as readonly string[]).includes(profile.role);
-  // Admin tier can move a consultant to any group; group leads can move within
-  // their own group only. Recruiters have no group-edit access.
   const canEditGroup = !!profile && (MANAGER_TIER as readonly string[]).includes(profile.role);
   const isAdminTierUser = !!profile && (ADMIN_TIER as readonly string[]).includes(profile.role);
-  // Drill-down from the Recruiters page: ?recruiter=<recruiterId> filters the
-  // bench to consultants assigned to that recruiter. The backend honours
-  // ?recruiter_id= for manager-tier and re-applies group scoping.
+
   const [searchParams, setSearchParams] = useSearchParams();
   const recruiterFilter = searchParams.get('recruiter');
+
+  // ── Data ──
   const [rows, setRows] = useState<ConsultantRow[]>([]);
   const [recruiters, setRecruiters] = useState<RecruiterRow[]>([]);
+  const [listLoading, setListLoading] = useState(true);
+
+  // ── Entity list state (search + status filter) ──
+  const { query, setQuery, filters, setFilter } = useEntityList<{ status: string }>({
+    status: 'ALL',
+  });
+
+  // ── Detail drawer ──
+  const [detail, setDetail] = useState<ConsultantRow | null>(null);
+  const [filterSheetOpen, setFilterSheetOpen] = useState(false);
+  const [submissionFor, setSubmissionFor] = useState<ConsultantRow | null>(null);
+
+  // ── Assign recruiter modal ──
   const [picked, setPicked] = useState<ConsultantRow | null>(null);
   const [selectedRecruiter, setSelectedRecruiter] = useState('');
   const [saving, setSaving] = useState(false);
-  const [listLoading, setListLoading] = useState(true);
-  // Group edit state
+
+  // ── Group edit modal ──
   const [groupPicked, setGroupPicked] = useState<ConsultantRow | null>(null);
   const [selectedGroup, setSelectedGroup] = useState<string>('');
   const [selectedGroupRecruiter, setSelectedGroupRecruiter] = useState<string>('');
@@ -166,8 +194,6 @@ export function Consultants() {
   useEffect(() => {
     let cancelled = false;
     load();
-    // Recruiter directory is manager-only; don't even fetch it for a RECRUITER
-    // (the call would 403).
     if (canAssignRecruiter) {
       api
         .get('/recruiters')
@@ -184,14 +210,16 @@ export function Consultants() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canAssignRecruiter, recruiterFilter]);
 
-  // Name for the active recruiter filter banner (best-effort from the directory
-  // or from a loaded row's recruiter embed).
   const filteredRecruiterName = recruiterFilter
     ? (recruiters.find((r) => r.id === recruiterFilter)?.user?.full_name ??
       rows.find((r) => r.recruiter_id === recruiterFilter)?.recruiter?.user?.full_name ??
       'selected recruiter')
     : null;
 
+  // Client-side filtering (search + status)
+  const filtered = filterConsultants(rows, query, filters.status);
+
+  // ── Assign recruiter ──
   function openAssign(c: ConsultantRow) {
     setPicked(c);
     setSelectedRecruiter(c.recruiter_id ?? '');
@@ -222,6 +250,7 @@ export function Consultants() {
     }
   }
 
+  // ── Group edit ──
   function openGroupEdit(c: ConsultantRow) {
     setGroupPicked(c);
     setSelectedGroup(c.user?.group_id ?? '');
@@ -278,6 +307,8 @@ export function Consultants() {
             : 'Active bench. Review profiles and update marketing status.'
         }
       />
+
+      {/* Recruiter filter banner */}
       {recruiterFilter && (
         <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-sm text-brand-800">
           <span>
@@ -296,123 +327,375 @@ export function Consultants() {
           </button>
         </div>
       )}
-      <DataTable
-        rows={rows}
-        loading={listLoading}
-        empty="No consultants yet."
-        columns={[
-          {
-            key: 'name',
-            header: 'Name',
-            render: (c: ConsultantRow) =>
-              c.user?.id ? (
-                <Link
-                  to={`/users/${c.user.id}`}
-                  className="inline-flex items-center gap-2 hover:bg-hover rounded-md -mx-1 px-1 py-0.5"
+
+      {/* ── Desktop toolbar (search + status pills) ── */}
+      <div className="hidden md:flex items-center gap-3 mb-4 flex-wrap">
+        <div
+          className="flex items-center gap-2 h-9 px-3 rounded-lg flex-1 max-w-xs"
+          style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
+        >
+          <IconSearch size={15} className="text-muted shrink-0" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search consultants…"
+            className="flex-1 bg-transparent text-sm outline-none text-ink placeholder:text-muted"
+            style={{ fontSize: 14 }}
+          />
+        </div>
+        <StatusPills active={filters.status} onChange={(v) => setFilter('status', v)} />
+      </div>
+
+      {/* ── Mobile toolbar (search + filter button) ── */}
+      <div className="flex md:hidden items-center gap-2 mb-4">
+        <div
+          className="flex items-center gap-2 h-10 px-3 rounded-xl flex-1"
+          style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
+        >
+          <IconSearch size={15} className="text-muted shrink-0" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search…"
+            className="flex-1 bg-transparent outline-none text-ink placeholder:text-muted"
+            style={{ fontSize: 16 }}
+          />
+        </div>
+        <button
+          onClick={() => setFilterSheetOpen(true)}
+          className={clsx(
+            'h-10 px-3 rounded-xl text-sm font-semibold border shrink-0',
+            filters.status !== 'ALL'
+              ? 'bg-ink text-bg border-ink'
+              : 'bg-surface text-ink-2 border-border',
+          )}
+        >
+          {filters.status !== 'ALL' ? filters.status : 'Filter'}
+        </button>
+      </div>
+
+      {/* ── Desktop: DataTable ── */}
+      <div className="hidden md:block">
+        <DataTable
+          rows={filtered}
+          loading={listLoading}
+          empty="No consultants match."
+          onRowClick={(c) => setDetail(c)}
+          columns={[
+            {
+              key: 'name',
+              header: 'Name',
+              render: (c: ConsultantRow) =>
+                c.user?.id ? (
+                  <Link
+                    to={`/users/${c.user.id}`}
+                    className="inline-flex items-center gap-2 hover:bg-hover rounded-md -mx-1 px-1 py-0.5"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Avatar name={c.user?.full_name} email={c.user?.email} size={26} />
+                    <div className="leading-tight">
+                      <div className="text-sm font-medium text-ink hover:underline">
+                        {c.user?.full_name ?? c.user?.email ?? '—'}
+                      </div>
+                      {c.current_location && (
+                        <div className="text-[11px] text-muted">{c.current_location}</div>
+                      )}
+                    </div>
+                  </Link>
+                ) : (
+                  <div className="inline-flex items-center gap-2">
+                    <Avatar name={c.user?.full_name} email={c.user?.email} size={26} />
+                    <div className="leading-tight">
+                      <div className="text-sm font-medium text-ink">
+                        {c.user?.full_name ?? c.user?.email ?? '—'}
+                      </div>
+                      {c.current_location && (
+                        <div className="text-[11px] text-muted">{c.current_location}</div>
+                      )}
+                    </div>
+                  </div>
+                ),
+            },
+            {
+              key: 'group',
+              header: 'Group',
+              hideOnMobile: true,
+              render: (c: ConsultantRow) => <GroupBadge groupId={c.user?.group_id ?? null} />,
+            },
+            {
+              key: 'primary_skill',
+              header: 'Primary skill',
+              render: (c: ConsultantRow) => c.primary_skill ?? '—',
+            },
+            {
+              key: 'visa_status',
+              header: 'Visa',
+              hideOnMobile: true,
+              render: (c: ConsultantRow) => c.visa_status ?? '—',
+            },
+            {
+              key: 'experience',
+              header: 'Exp',
+              hideOnMobile: true,
+              render: (c: ConsultantRow) => `${c.total_experience_years ?? 0} yrs`,
+            },
+            {
+              key: 'recruiter',
+              header: 'Recruiter',
+              render: (c: ConsultantRow) =>
+                c.recruiter ? (
+                  <div className="inline-flex items-center gap-1.5">
+                    <Avatar
+                      name={c.recruiter.user?.full_name}
+                      email={c.recruiter.user?.email}
+                      size={20}
+                    />
+                    <div className="leading-tight">
+                      <div className="text-sm text-ink">
+                        {c.recruiter.user?.full_name ?? c.recruiter.user?.email ?? '—'}
+                      </div>
+                      {c.recruiter.team && (
+                        <div className="text-[11px] text-muted">{c.recruiter.team}</div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <span className="text-xs italic text-muted">Unassigned</span>
+                ),
+            },
+            {
+              key: 'status',
+              header: 'Status',
+              render: (c: ConsultantRow) => (
+                <span onClick={(e) => e.stopPropagation()}>
+                  <StatusSelect value={c.marketing_status} onChange={(v) => setStatus(c.id, v)} />
+                </span>
+              ),
+            },
+            ...(canAssignRecruiter || canEditGroup
+              ? [
+                  {
+                    key: 'actions',
+                    header: '',
+                    align: 'right' as const,
+                    render: (c: ConsultantRow) => (
+                      <div
+                        className="flex items-center justify-end gap-1"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {canAssignRecruiter && (
+                          <Button size="sm" variant="ghost" onClick={() => openAssign(c)}>
+                            {c.recruiter ? 'Reassign' : 'Assign'}
+                          </Button>
+                        )}
+                        {canEditGroup && (
+                          <Button size="sm" variant="ghost" onClick={() => openGroupEdit(c)}>
+                            Group
+                          </Button>
+                        )}
+                      </div>
+                    ),
+                  },
+                ]
+              : []),
+          ]}
+        />
+      </div>
+
+      {/* ── Mobile: entity cards ── */}
+      <div className="flex md:hidden flex-col gap-3">
+        {listLoading ? (
+          <>
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+          </>
+        ) : filtered.length === 0 ? (
+          <EmptyState
+            icon={<IconUsers size={22} className="text-muted" />}
+            title="No consultants"
+            description={
+              query || filters.status !== 'ALL'
+                ? 'Try clearing your search or filter.'
+                : 'No consultants on the bench yet.'
+            }
+            compact
+          />
+        ) : (
+          filtered.map((c) => (
+            <ConsultantCard key={c.id} consultant={c} onClick={() => setDetail(c)} />
+          ))
+        )}
+      </div>
+
+      {/* ── Consultant detail Drawer ── */}
+      <Drawer
+        open={!!detail}
+        onClose={() => setDetail(null)}
+        title={detail?.user?.full_name ?? detail?.user?.email ?? 'Consultant'}
+        description={detail?.primary_skill ?? undefined}
+        footer={
+          detail ? (
+            <div className="flex gap-2 flex-wrap">
+              <Button
+                variant="accent"
+                onClick={() => {
+                  setSubmissionFor(detail);
+                  setDetail(null);
+                }}
+              >
+                New submission
+              </Button>
+              {canAssignRecruiter && (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    openAssign(detail);
+                    setDetail(null);
+                  }}
                 >
-                  <Avatar name={c.user?.full_name} email={c.user?.email} size={26} />
-                  <div className="leading-tight">
-                    <div className="text-sm font-medium text-ink hover:underline">
-                      {c.user?.full_name ?? c.user?.email ?? '—'}
-                    </div>
-                    {c.current_location && (
-                      <div className="text-[11px] text-muted">{c.current_location}</div>
-                    )}
-                  </div>
-                </Link>
-              ) : (
-                <div className="inline-flex items-center gap-2">
-                  <Avatar name={c.user?.full_name} email={c.user?.email} size={26} />
-                  <div className="leading-tight">
-                    <div className="text-sm font-medium text-ink">
-                      {c.user?.full_name ?? c.user?.email ?? '—'}
-                    </div>
-                    {c.current_location && (
-                      <div className="text-[11px] text-muted">{c.current_location}</div>
-                    )}
-                  </div>
+                  {detail.recruiter ? 'Reassign' : 'Assign recruiter'}
+                </Button>
+              )}
+            </div>
+          ) : null
+        }
+      >
+        {detail && (
+          <div className="space-y-6">
+            {/* Profile header */}
+            <div className="flex items-center gap-4">
+              <Avatar name={detail.user?.full_name} email={detail.user?.email} size={56} />
+              <div>
+                <div className="text-lg font-semibold text-ink">
+                  {detail.user?.full_name ?? detail.user?.email ?? '—'}
                 </div>
-              ),
-          },
-          {
-            key: 'group',
-            header: 'Group',
-            hideOnMobile: true,
-            render: (c: ConsultantRow) => <GroupBadge groupId={c.user?.group_id ?? null} />,
-          },
-          { key: 'primary_skill', header: 'Primary skill' },
-          { key: 'visa_status', header: 'Visa', hideOnMobile: true },
-          {
-            key: 'experience',
-            header: 'Exp',
-            hideOnMobile: true,
-            render: (c: ConsultantRow) => `${c.total_experience_years ?? 0} yrs`,
-          },
-          {
-            key: 'recruiter',
-            header: 'Recruiter',
-            render: (c: ConsultantRow) =>
-              c.recruiter ? (
-                <div className="inline-flex items-center gap-1.5">
-                  <Avatar
-                    name={c.recruiter.user?.full_name}
-                    email={c.recruiter.user?.email}
-                    size={20}
-                  />
-                  <div className="leading-tight">
-                    <div className="text-sm text-ink">
-                      {c.recruiter.user?.full_name ?? c.recruiter.user?.email ?? '—'}
-                    </div>
-                    {c.recruiter.team && (
-                      <div className="text-[11px] text-muted">{c.recruiter.team}</div>
-                    )}
-                  </div>
+                {detail.primary_skill && (
+                  <div className="text-sm text-muted mt-0.5">{detail.primary_skill}</div>
+                )}
+                <div className="mt-1.5">
+                  <StatusBadge status={detail.marketing_status} />
                 </div>
-              ) : (
-                <span className="text-xs italic text-muted">Unassigned</span>
-              ),
-          },
-          {
-            key: 'status',
-            header: 'Status',
-            render: (c: ConsultantRow) => (
-              <StatusSelect value={c.marketing_status} onChange={(v) => setStatus(c.id, v)} />
-            ),
-          },
-          // Assign/Reassign is manager-only; recruiters see the bench read-only.
-          ...(canAssignRecruiter || canEditGroup
-            ? [
+              </div>
+            </div>
+
+            {/* Facts grid */}
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { label: 'Visa', value: detail.visa_status ?? '—' },
                 {
-                  key: 'actions',
-                  header: '',
-                  align: 'right' as const,
-                  render: (c: ConsultantRow) => (
-                    <div className="flex items-center justify-end gap-1">
-                      {canAssignRecruiter && (
-                        <Button size="sm" variant="ghost" onClick={() => openAssign(c)}>
-                          {c.recruiter ? 'Reassign' : 'Assign'}
-                        </Button>
-                      )}
-                      {canEditGroup && (
-                        <Button size="sm" variant="ghost" onClick={() => openGroupEdit(c)}>
-                          Group
-                        </Button>
-                      )}
-                    </div>
-                  ),
+                  label: 'Experience',
+                  value:
+                    detail.total_experience_years != null
+                      ? `${detail.total_experience_years} years`
+                      : '—',
                 },
-              ]
-            : []),
-        ]}
+                { label: 'Location', value: detail.current_location ?? '—' },
+                {
+                  label: 'Recruiter',
+                  value:
+                    detail.recruiter?.user?.full_name ??
+                    detail.recruiter?.user?.email ??
+                    'Unassigned',
+                },
+              ].map(({ label, value }) => (
+                <div
+                  key={label}
+                  className="rounded-xl px-3 py-2.5"
+                  style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}
+                >
+                  <div
+                    className="text-[10.5px] font-bold uppercase tracking-wide mb-1"
+                    style={{ color: 'var(--muted)' }}
+                  >
+                    {label}
+                  </div>
+                  <div className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
+                    {value}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Group */}
+            {detail.user?.group_id && (
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-wide text-muted mb-2">
+                  Group
+                </div>
+                <GroupBadge groupId={detail.user.group_id} />
+              </div>
+            )}
+
+            {/* Manager-only actions */}
+            {canEditGroup && (
+              <div className="pt-2 border-t border-border">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    openGroupEdit(detail);
+                    setDetail(null);
+                  }}
+                >
+                  Move group…
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+      </Drawer>
+
+      {/* ── Mobile filter BottomSheet ── */}
+      <BottomSheet
+        open={filterSheetOpen}
+        onClose={() => setFilterSheetOpen(false)}
+        title="Filter consultants"
+        footer={
+          <div className="flex gap-2">
+            <Button
+              variant="ghost"
+              block
+              onClick={() => {
+                setFilter('status', 'ALL');
+                setFilterSheetOpen(false);
+              }}
+            >
+              Reset
+            </Button>
+            <Button variant="primary" block onClick={() => setFilterSheetOpen(false)}>
+              Done
+            </Button>
+          </div>
+        }
+      >
+        <div className="pt-2">
+          <div className="text-xs font-semibold uppercase tracking-wide text-muted mb-3">
+            Status
+          </div>
+          <StatusPills active={filters.status} onChange={(v) => setFilter('status', v)} />
+        </div>
+      </BottomSheet>
+
+      {/* ── New submission modal (pre-filled from detail) ── */}
+      <NewSubmissionModal
+        open={!!submissionFor}
+        onClose={() => setSubmissionFor(null)}
+        preConsultantId={submissionFor?.id}
+        preConsultantLabel={
+          submissionFor?.user?.full_name ?? submissionFor?.user?.email ?? undefined
+        }
+        onSuccess={() => setSubmissionFor(null)}
       />
 
+      {/* ── Assign recruiter modal ── */}
       <Modal
         open={!!picked}
         onClose={() => setPicked(null)}
         title={
           picked?.recruiter
             ? `Reassign ${picked.user?.full_name ?? 'consultant'}`
-            : `Assign recruiter`
+            : 'Assign recruiter'
         }
         footer={
           <>
@@ -451,7 +734,8 @@ export function Consultants() {
           />
         </div>
       </Modal>
-      {/* Group edit modal */}
+
+      {/* ── Group edit modal ── */}
       <Modal
         open={!!groupPicked}
         onClose={() => setGroupPicked(null)}
@@ -481,8 +765,7 @@ export function Consultants() {
               <span className="font-medium">
                 {groupPicked.recruiter.user?.full_name ?? groupPicked.recruiter.user?.email}
               </span>
-              . Their recruiter must belong to the same group — the backend will block the move if
-              there is a mismatch.
+              . Their recruiter must belong to the same group.
             </p>
           )}
           <SelectInput
@@ -496,12 +779,10 @@ export function Consultants() {
                 recruiters.find((r) => r.user?.group_id === nextGroup)?.id ?? '';
               setSelectedGroupRecruiter(firstRecruiter);
             }}
-            options={
-              // Group leads only see their own group; admin tier sees all.
-              (isAdminTierUser ? groups : groups.filter((g) => g.id === profile?.group_id)).map(
-                (g) => ({ value: g.id, label: g.name }),
-              )
-            }
+            options={(isAdminTierUser
+              ? groups
+              : groups.filter((g) => g.id === profile?.group_id)
+            ).map((g) => ({ value: g.id, label: g.name }))}
           />
           {selectedGroup && (
             <SelectInput
@@ -523,6 +804,8 @@ export function Consultants() {
             )}
         </div>
       </Modal>
+
+      {/* ── Confirm group move ── */}
       <Modal
         open={confirmGroupMoveOpen}
         onClose={() => setConfirmGroupMoveOpen(false)}

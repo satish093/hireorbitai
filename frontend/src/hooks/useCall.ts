@@ -125,6 +125,9 @@ export type CallStatus =
   | 'connected' // media flowing both ways
   | 'ended'; // call finished (for any reason)
 
+/** Why a call landed in the terminal `ended` state — drives the resolution card. */
+export type CallEndReason = 'ended' | 'declined' | 'missed';
+
 /** Kept for SSE/DB compatibility — only `'audio'` is produced by the UI now. */
 export type CallType = 'audio';
 
@@ -151,6 +154,13 @@ export interface UseCallReturn {
   callDuration: number;
   /** Formatted MM:SS (or H:MM:SS for long calls) string of callDuration. */
   callDurationLabel: string;
+  /** True while the live connection is recovering (ICE disconnected → restart).
+   *  Status stays `connected` and the timer keeps ticking; the UI shows a
+   *  "Reconnecting…" / poor-network banner. */
+  reconnecting: boolean;
+  /** Why the last call ended — read while status === 'ended' to pick the
+   *  resolution copy (ended / declined / missed). */
+  endReason: CallEndReason | null;
   /** Most recent media / permission error, or null. Read by CallContext to
    *  show a toast — set on permission denial / device-not-found etc., cleared
    *  the moment the next call attempt starts or succeeds. */
@@ -234,6 +244,8 @@ export function useCall(): UseCallReturn {
   const [isMuted, setIsMuted] = useState(false);
   const [callDuration, setCallDuration] = useState(0);
   const [lastError, setLastError] = useState<string | null>(null);
+  const [reconnecting, setReconnecting] = useState(false);
+  const [endReason, setEndReason] = useState<CallEndReason | null>(null);
 
   const clearError = useCallback(() => setLastError(null), []);
 
@@ -413,12 +425,14 @@ export function useCall(): UseCallReturn {
     callIdRef.current = null;
     connectedAtRef.current = null;
     setCallDuration(0);
+    setReconnecting(false);
   }, []);
 
   const finalise = useCallback(
-    (next: CallStatus, playSound = true) => {
+    (next: CallStatus, playSound = true, reason: CallEndReason = 'ended') => {
       cleanup();
       if (playSound && next === 'ended') playDisconnect();
+      if (next === 'ended') setEndReason(reason);
       setStatus(next);
       setPeer(null);
       setIncomingCall(null);
@@ -523,9 +537,16 @@ export function useCall(): UseCallReturn {
           clearTimeout(iceRestartTimerRef.current);
           iceRestartTimerRef.current = null;
         }
+        // Recovered — clear the "Reconnecting…" / poor-network banner.
+        setReconnecting(false);
         return;
       }
       if (pc.iceConnectionState === 'disconnected') {
+        // Surface the poor-network banner immediately. Status stays
+        // 'connected' (timer keeps running) — the banner overlays it. The
+        // 4 s ICE-restart recovery below either restores the connection
+        // (→ setReconnecting(false) above) or the call eventually fails.
+        setReconnecting(true);
         // Transient — usually the user switched WiFi ↔ cellular or hit a
         // brief network blip. Give it 4 s to recover on its own, then
         // force an ICE restart so the connection can re-negotiate
@@ -687,16 +708,18 @@ export function useCall(): UseCallReturn {
     async (peerId: string, peerName: string | null, peerEmail: string) => {
       if (status !== 'idle') return;
       setLastError(null); // any stale "mic blocked" from a previous attempt
+      setEndReason(null); // clear a previous call's resolution
       setStatus('calling');
       setPeer({ id: peerId, full_name: peerName, email: peerEmail });
 
       // Ringback tone for the caller — stops once the callee answers.
       ring();
 
-      // Auto-cancel if no answer within 45 s.
+      // Auto-cancel if no answer within 45 s — caller side reads this as a
+      // missed (unanswered) call in the resolution card + history.
       callTimeoutRef.current = setTimeout(() => {
         const callId = callIdRef.current;
-        finalise('ended');
+        finalise('ended', true, 'missed');
         if (callId) {
           api.post('/calls/end', { call_id: callId, peer_id: peerId }).catch(() => {});
         }
@@ -908,6 +931,7 @@ export function useCall(): UseCallReturn {
           .catch(() => {});
         return;
       }
+      setEndReason(null); // clear a previous call's resolution
       setIncomingCall(data);
       setStatus('ringing');
       ring();
@@ -947,11 +971,14 @@ export function useCall(): UseCallReturn {
     },
 
     'call:ended': () => {
-      finalise('ended');
+      // If the peer hung up while we were still ringing (never accepted),
+      // that's a missed call for us; otherwise a normal end.
+      finalise('ended', true, status === 'ringing' ? 'missed' : 'ended');
     },
 
     'call:rejected': () => {
-      finalise('ended');
+      // Outbound side: the callee declined.
+      finalise('ended', true, 'declined');
     },
 
     // Multi-tab clearance: when the callee answers (or rejects) on ANOTHER
@@ -1006,6 +1033,8 @@ export function useCall(): UseCallReturn {
     isMuted,
     callDuration,
     callDurationLabel: formatDuration(callDuration),
+    reconnecting,
+    endReason,
     lastError,
     clearError,
     startCall,

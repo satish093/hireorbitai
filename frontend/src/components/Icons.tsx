@@ -237,3 +237,13 @@ export const IconPhoneOff = ({ size, strokeWidth, ...p }: IconProps) => (
     <path d="M6.6 6.6A19.5 19.5 0 0 0 3.07 8.67 2 2 0 0 0 2 10.72v3a2 2 0 0 0 1.72 2c.97.13 1.9.36 2.8.7a2 2 0 0 1 2.11-.45l.01-.01" />
   </svg>
 );
+export const IconShield = ({ size, strokeWidth, ...p }: IconProps) => (
+  <svg {...base(size, strokeWidth)} {...p}>
+    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+  </svg>
+);
+export const IconChevronLeft = ({ size, strokeWidth, ...p }: IconProps) => (
+  <svg {...base(size, strokeWidth)} {...p}>
+    <polyline points="15 18 9 12 15 6" />
+  </svg>
+);

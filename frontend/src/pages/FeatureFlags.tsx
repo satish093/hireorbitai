@@ -89,9 +89,10 @@ export function FeatureFlags() {
       await api.put(`/feature-flags/groups/${groupId}/${key}`, { enabled: next });
       await refresh();
       invalidate('feature-flags');
-      // Same as the global toggle: reload so every component picks up the
-      // new override without depending on per-component re-render hooks.
-      window.location.reload();
+      // No full-page reload: refresh() updates the FeatureFlags context and
+      // invalidate('feature-flags') notifies listeners (sidebar, route guards).
+      // A window.location.reload() here would tear down app-level state —
+      // including an in-progress voice call owned by CallContext.
     } catch (e: any) {
       toast.error(e?.response?.data?.error ?? 'Failed to update override');
       // Reload to rebuild canonical state on failure.
@@ -110,13 +111,14 @@ export function FeatureFlags() {
       await api.patch(`/feature-flags/${row.key}`, { enabled: !previous });
       await refresh();
       invalidate('feature-flags');
-      // Hard-reload the page so the sidebar, route guards, and every
-      // open module reflect the new flag state without any caching or
-      // stale-context concerns. The in-memory invalidate() above already
-      // updates the local context — the reload guarantees nothing
-      // residual is showing the old value (e.g. an already-mounted
-      // page that doesn't re-render on flag changes).
-      window.location.reload();
+      // refresh() re-pulls the effective flags into the FeatureFlags context
+      // and invalidate('feature-flags') fans the change out to listeners
+      // (sidebar badges, route guards). We intentionally do NOT
+      // window.location.reload() — a hard reload would drop app-level state,
+      // most importantly an active voice call held by CallContext. Any page
+      // that must react to a flag change subscribes via
+      // useInvalidationListener('feature-flags').
+      toast.success(`${row.key} ${!previous ? 'enabled' : 'disabled'}`);
     } catch (e: any) {
       // Roll back.
       setRows((rs) => rs.map((r) => (r.key === row.key ? { ...r, enabled: previous } : r)));

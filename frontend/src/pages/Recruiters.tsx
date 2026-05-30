@@ -10,6 +10,11 @@ import { SelectInput } from '../components/SelectInput';
 import { GroupBadge, useUserGroups, invalidateUserGroupsCache } from '../components/GroupBadge';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useEntityList } from '../hooks/useEntityList';
+import { RecruiterCard, filterRecruiters } from '../components/RecruiterCard';
+import { EmptyState } from '../components/EmptyState';
+import { SkeletonCard } from '../components/Skeleton';
+import { IconSearch, IconUsers } from '../components/Icons';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
 import { Role, ROLE_LABEL, ADMIN_TIER, MANAGER_TIER } from '../types';
@@ -66,6 +71,7 @@ export function Recruiters() {
   const { profile } = useAuth();
   const { groups } = useUserGroups();
   const isAdminTierUser = !!profile && (ADMIN_TIER as readonly string[]).includes(profile.role);
+  const { query, setQuery } = useEntityList<Record<string, never>>({});
   const [rows, setRows] = useState<RecruiterRow[]>([]);
   const [candidates, setCandidates] = useState<CandidateUser[]>([]);
   const [groupManagers, setGroupManagers] = useState<ManagerCandidate[]>([]);
@@ -198,112 +204,161 @@ export function Recruiters() {
         title="Recruiters"
         description="The team and reporting lines. Manage supervisor assignments per recruiter."
       />
-      <DataTable
-        rows={rows}
-        loading={loading}
-        empty="No recruiters yet."
-        columns={[
-          {
-            key: 'name',
-            header: 'Name',
-            render: (r: RecruiterRow) =>
-              r.user?.id ? (
-                <Link
-                  to={`/users/${r.user.id}`}
-                  className="inline-flex items-center gap-2 hover:bg-hover rounded-md -mx-1 px-1 py-0.5"
-                >
-                  <Avatar name={r.user?.full_name} email={r.user?.email} size={26} />
-                  <div className="text-sm font-medium text-ink hover:underline">
-                    {r.user?.full_name ?? r.user?.email ?? '—'}
+
+      {/* ── Search bar (both breakpoints) ── */}
+      <div
+        className="flex items-center gap-2 h-10 px-3 rounded-xl mb-4"
+        style={{ background: 'var(--surface)', border: '1px solid var(--border)', maxWidth: 360 }}
+      >
+        <IconSearch size={15} className="text-muted shrink-0" />
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search recruiters…"
+          className="flex-1 bg-transparent outline-none text-ink placeholder:text-muted"
+          style={{ fontSize: 15 }}
+        />
+      </div>
+
+      {/* ── Mobile cards (< md) ── */}
+      <div className="flex md:hidden flex-col gap-3 mb-4">
+        {loading ? (
+          <>
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+          </>
+        ) : filterRecruiters(rows, query).length === 0 ? (
+          <EmptyState
+            icon={<IconUsers size={22} className="text-muted" />}
+            title="No recruiters found"
+            description={query ? 'Try a different search.' : 'No recruiters on the team yet.'}
+            compact
+          />
+        ) : (
+          filterRecruiters(rows, query).map((r) => (
+            <RecruiterCard
+              key={r.id}
+              recruiter={{
+                ...r,
+                primaryManager: effectiveManagers(r)[0]?.manager?.full_name ?? null,
+              }}
+            />
+          ))
+        )}
+      </div>
+
+      {/* ── Desktop DataTable (≥ md) ── */}
+      <div className="hidden md:block">
+        <DataTable
+          rows={filterRecruiters(rows, query) as RecruiterRow[]}
+          loading={loading}
+          empty="No recruiters yet."
+          columns={[
+            {
+              key: 'name',
+              header: 'Name',
+              render: (r: RecruiterRow) =>
+                r.user?.id ? (
+                  <Link
+                    to={`/users/${r.user.id}`}
+                    className="inline-flex items-center gap-2 hover:bg-hover rounded-md -mx-1 px-1 py-0.5"
+                  >
+                    <Avatar name={r.user?.full_name} email={r.user?.email} size={26} />
+                    <div className="text-sm font-medium text-ink hover:underline">
+                      {r.user?.full_name ?? r.user?.email ?? '—'}
+                    </div>
+                  </Link>
+                ) : (
+                  <div className="inline-flex items-center gap-2">
+                    <Avatar name={r.user?.full_name} email={r.user?.email} size={26} />
+                    <div className="text-sm font-medium text-ink">
+                      {r.user?.full_name ?? r.user?.email ?? '—'}
+                    </div>
                   </div>
-                </Link>
-              ) : (
-                <div className="inline-flex items-center gap-2">
-                  <Avatar name={r.user?.full_name} email={r.user?.email} size={26} />
-                  <div className="text-sm font-medium text-ink">
-                    {r.user?.full_name ?? r.user?.email ?? '—'}
+                ),
+            },
+            { key: 'team', header: 'Team', hideOnMobile: true },
+            {
+              key: 'group',
+              header: 'Group',
+              hideOnMobile: true,
+              render: (r: RecruiterRow) => <GroupBadge groupId={r.user?.group_id ?? null} />,
+            },
+            {
+              key: 'consultants',
+              header: 'Consultants',
+              align: 'right',
+              render: (r: RecruiterRow) => {
+                const n = r.consultant_count ?? 0;
+                if (n === 0) return <span className="text-xs text-muted">0</span>;
+                // Drill-down: jump to the consultants list filtered to this recruiter.
+                return (
+                  <Link
+                    to={`/consultants?recruiter=${r.id}`}
+                    className="inline-flex items-center justify-center min-w-[1.75rem] rounded-full bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-700 hover:bg-brand-100"
+                    title={`View ${n} consultant${n === 1 ? '' : 's'} assigned to this recruiter`}
+                  >
+                    {n}
+                  </Link>
+                );
+              },
+            },
+            {
+              key: 'managers',
+              header: 'Reports to',
+              render: (r: RecruiterRow) => {
+                const mgrs = effectiveManagers(r);
+                if (mgrs.length === 0)
+                  return <span className="text-xs italic text-muted">None</span>;
+                return (
+                  <div className="flex flex-wrap gap-1.5">
+                    {mgrs.map((m) => (
+                      <span
+                        key={m.manager!.id}
+                        className={clsx(
+                          'inline-flex items-center gap-1.5 text-xs rounded-full px-2 py-0.5 border',
+                          m.is_primary
+                            ? 'bg-brand-50 text-brand-700 border-brand-200'
+                            : 'bg-hover text-ink border-border',
+                        )}
+                        title={m.is_primary ? 'Primary supervisor' : 'Secondary supervisor'}
+                      >
+                        <Avatar name={m.manager!.full_name} email={m.manager!.email} size={16} />
+                        <span>{m.manager!.full_name ?? m.manager!.email}</span>
+                        {m.is_primary && <span className="text-[10px]">★</span>}
+                      </span>
+                    ))}
                   </div>
+                );
+              },
+            },
+            {
+              key: 'target',
+              header: 'Weekly target',
+              align: 'right',
+              hideOnMobile: true,
+              render: (r: RecruiterRow) => r.target_submissions_per_week ?? '—',
+            },
+            {
+              key: 'actions',
+              header: '',
+              align: 'right',
+              render: (r: RecruiterRow) => (
+                <div className="flex items-center justify-end gap-1">
+                  <Button size="sm" variant="ghost" onClick={() => setPicked(r)}>
+                    Supervisors
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => openGroupEdit(r)}>
+                    Group
+                  </Button>
                 </div>
               ),
-          },
-          { key: 'team', header: 'Team', hideOnMobile: true },
-          {
-            key: 'group',
-            header: 'Group',
-            hideOnMobile: true,
-            render: (r: RecruiterRow) => <GroupBadge groupId={r.user?.group_id ?? null} />,
-          },
-          {
-            key: 'consultants',
-            header: 'Consultants',
-            align: 'right',
-            render: (r: RecruiterRow) => {
-              const n = r.consultant_count ?? 0;
-              if (n === 0) return <span className="text-xs text-muted">0</span>;
-              // Drill-down: jump to the consultants list filtered to this recruiter.
-              return (
-                <Link
-                  to={`/consultants?recruiter=${r.id}`}
-                  className="inline-flex items-center justify-center min-w-[1.75rem] rounded-full bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-700 hover:bg-brand-100"
-                  title={`View ${n} consultant${n === 1 ? '' : 's'} assigned to this recruiter`}
-                >
-                  {n}
-                </Link>
-              );
             },
-          },
-          {
-            key: 'managers',
-            header: 'Reports to',
-            render: (r: RecruiterRow) => {
-              const mgrs = effectiveManagers(r);
-              if (mgrs.length === 0) return <span className="text-xs italic text-muted">None</span>;
-              return (
-                <div className="flex flex-wrap gap-1.5">
-                  {mgrs.map((m) => (
-                    <span
-                      key={m.manager!.id}
-                      className={clsx(
-                        'inline-flex items-center gap-1.5 text-xs rounded-full px-2 py-0.5 border',
-                        m.is_primary
-                          ? 'bg-brand-50 text-brand-700 border-brand-200'
-                          : 'bg-hover text-ink border-border',
-                      )}
-                      title={m.is_primary ? 'Primary supervisor' : 'Secondary supervisor'}
-                    >
-                      <Avatar name={m.manager!.full_name} email={m.manager!.email} size={16} />
-                      <span>{m.manager!.full_name ?? m.manager!.email}</span>
-                      {m.is_primary && <span className="text-[10px]">★</span>}
-                    </span>
-                  ))}
-                </div>
-              );
-            },
-          },
-          {
-            key: 'target',
-            header: 'Weekly target',
-            align: 'right',
-            hideOnMobile: true,
-            render: (r: RecruiterRow) => r.target_submissions_per_week ?? '—',
-          },
-          {
-            key: 'actions',
-            header: '',
-            align: 'right',
-            render: (r: RecruiterRow) => (
-              <div className="flex items-center justify-end gap-1">
-                <Button size="sm" variant="ghost" onClick={() => setPicked(r)}>
-                  Supervisors
-                </Button>
-                <Button size="sm" variant="ghost" onClick={() => openGroupEdit(r)}>
-                  Group
-                </Button>
-              </div>
-            ),
-          },
-        ]}
-      />
+          ]}
+        />
+      </div>
+      {/* end desktop DataTable */}
 
       {/* Group edit modal */}
       <Modal
