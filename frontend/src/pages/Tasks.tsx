@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useSearchParams } from 'react-router-dom';
+import { useIsMobile } from '../hooks/useIsMobile';
 import { Layout } from '../components/Layout';
 import { PageHeader } from '../components/PageHeader';
 import { SkeletonCard } from '../components/Skeleton';
@@ -37,6 +39,9 @@ export function Tasks({ initialAssigneeMe = false }: { initialAssigneeMe?: boole
   const { profile, isManager, tasks, users, loading, patchStatus, reload } = useTasksData();
   const { views, saveView } = useSavedTaskViews();
   const visible = filterTasks(tasks, filters);
+  // Render the detail EITHER inline (desktop) OR as a full-screen overlay
+  // (mobile) — never both — so TaskDetailPane mounts (and fetches) once.
+  const isMobile = useIsMobile();
 
   function setParam(key: string, value: string | null) {
     const next = new URLSearchParams(params);
@@ -198,7 +203,7 @@ export function Tasks({ initialAssigneeMe = false }: { initialAssigneeMe?: boole
         >
           <div className="min-w-0">{body}</div>
           <div className="overflow-hidden">
-            {selectedTaskId && (
+            {!isMobile && selectedTaskId && (
               <div className="sticky top-4 h-[calc(100dvh-10rem)] overflow-hidden rounded-xl border border-border">
                 <TaskDetailPane
                   taskId={selectedTaskId}
@@ -211,6 +216,31 @@ export function Tasks({ initialAssigneeMe = false }: { initialAssigneeMe?: boole
           </div>
         </div>
       </div>
+
+      {/* ── Mobile task detail (< md): full-screen takeover ──
+          TaskDetailPane is self-contained (own header + close + sticky
+          composer) and fills h-full, so it gets a plain portaled fixed
+          overlay rather than the Drawer/BottomSheet chrome (which would
+          double the header). z-50 sits above the z-30 MobileBottomNav. */}
+      {isMobile &&
+        selectedTaskId &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-50 animate-fade-in safe-pt safe-pb"
+            style={{ background: 'var(--bg-elev)' }}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Task detail"
+          >
+            <TaskDetailPane
+              taskId={selectedTaskId}
+              onClose={() => setSelected(null)}
+              users={users}
+              onChanged={reload}
+            />
+          </div>,
+          document.body,
+        )}
 
       <CreateTaskModal
         open={createOpen}

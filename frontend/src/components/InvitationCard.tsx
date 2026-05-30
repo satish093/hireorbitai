@@ -1,4 +1,5 @@
 import { StatusBadge } from './StatusBadge';
+import { Button } from './Button';
 import { ROLE_LABEL } from '../types';
 
 export interface InvitationRow {
@@ -13,16 +14,21 @@ export interface InvitationRow {
 
 interface Props {
   invitation: InvitationRow;
+  /** Mobile parity with desktop row actions — shown only for PENDING invites. */
+  onCopyLink?: () => void;
+  onRevoke?: () => void;
 }
 
 /**
  * Mobile entity card for an Invitation (< 768px).
  * Pairs with the desktop DataTable row.
  */
-export function InvitationCard({ invitation: inv }: Props) {
+export function InvitationCard({ invitation: inv, onCopyLink, onRevoke }: Props) {
   const roleLabel = ROLE_LABEL[inv.role as keyof typeof ROLE_LABEL] ?? inv.role;
   const date = inv.created_at ? new Date(inv.created_at).toLocaleDateString() : null;
   const name = inv.invitee_name;
+  const isPending = inv.status === 'PENDING';
+  const hasActions = isPending && !!(onCopyLink || onRevoke);
 
   return (
     <div
@@ -64,6 +70,26 @@ export function InvitationCard({ invitation: inv }: Props) {
         {inv.group?.name && <span>{inv.group.name}</span>}
         {date && <span className="ml-auto">{date}</span>}
       </div>
+
+      {hasActions && (
+        <div className="flex gap-2 mt-3 pt-3 border-t" style={{ borderColor: 'var(--border)' }}>
+          {onCopyLink && (
+            <Button size="sm" variant="ghost" className="flex-1" onClick={onCopyLink}>
+              Copy link
+            </Button>
+          )}
+          {onRevoke && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="flex-1 text-red-600 dark:text-red-400 hover:text-red-700"
+              onClick={onRevoke}
+            >
+              Revoke
+            </Button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { useIsMobile } from '../hooks/useIsMobile';
 import { Layout } from '../components/Layout';
 import { PageHeader } from '../components/PageHeader';
 import { Button } from '../components/Button';
@@ -32,6 +34,10 @@ export function AdminUsers() {
   const total = a.data?.total ?? 0;
   const totalPages = a.data?.total_pages ?? 0;
   const segments = useUserSegments(a.kpi);
+
+  // Render the detail EITHER inline (desktop) OR as a full-screen overlay
+  // (mobile) — never both — so UserDetailPane mounts (and fetches) once.
+  const isMobile = useIsMobile();
 
   const selectedUserId = params.get('user');
   const setSelected = (id: string | null) =>
@@ -182,7 +188,7 @@ export function AdminUsers() {
           {!a.loading && <Pager page={a.page} totalPages={totalPages} onPage={a.setPage} />}
         </div>
         <div className="hidden md:block overflow-hidden">
-          {selectedUserId && (
+          {!isMobile && selectedUserId && (
             <div className="sticky top-4 h-[calc(100dvh-8rem)] overflow-hidden rounded-xl border border-border">
               <UserDetailPane
                 userId={selectedUserId}
@@ -195,6 +201,31 @@ export function AdminUsers() {
           )}
         </div>
       </div>
+
+      {/* ── Mobile user detail (< md): full-screen takeover ──
+          UserDetailPane is self-contained (own header + close button) and
+          fills h-full, so it gets a plain portaled fixed overlay rather than
+          Drawer/BottomSheet chrome. z-50 sits above the z-30 MobileBottomNav. */}
+      {isMobile &&
+        selectedUserId &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-50 animate-fade-in safe-pt safe-pb"
+            style={{ background: 'var(--bg-elev)' }}
+            role="dialog"
+            aria-modal="true"
+            aria-label="User detail"
+          >
+            <UserDetailPane
+              userId={selectedUserId}
+              onClose={() => setSelected(null)}
+              groups={a.groups}
+              me={me ? { id: me.id } : null}
+              onChanged={a.reload}
+            />
+          </div>,
+          document.body,
+        )}
 
       <ConfirmDialog spec={confirm} onClose={() => setConfirm(null)} />
     </Layout>

@@ -171,7 +171,13 @@ export function Managers() {
             compact
           />
         ) : (
-          filterManagers(rows, query).map((m) => <ManagerCard key={m.id} manager={m} />)
+          (filterManagers(rows, query) as ManagerRow[]).map((m) => (
+            <ManagerCard
+              key={m.id}
+              manager={m}
+              onMoveGroup={canEditGroup ? () => openGroupEdit(m) : undefined}
+            />
+          ))
         )}
       </div>
 

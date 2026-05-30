@@ -243,6 +243,8 @@ export function Recruiters() {
                 ...r,
                 primaryManager: effectiveManagers(r)[0]?.manager?.full_name ?? null,
               }}
+              onSupervisors={() => setPicked(r)}
+              onGroup={() => openGroupEdit(r)}
             />
           ))
         )}

@@ -321,7 +321,14 @@ export function Invitations() {
             compact
           />
         ) : (
-          rows.map((r: any) => <InvitationCard key={r.id} invitation={r} />)
+          rows.map((r: any) => (
+            <InvitationCard
+              key={r.id}
+              invitation={r}
+              onCopyLink={r.invite_url ? () => copyLink(r.invite_url) : undefined}
+              onRevoke={() => revoke(r.id)}
+            />
+          ))
         )}
       </div>
 
