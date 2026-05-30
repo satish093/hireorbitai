@@ -728,7 +728,7 @@ export function TrainingCourseDetails() {
               className="mt-1 w-full text-sm border border-border rounded-md px-2 py-1.5"
             />
           </label>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <LField
               label="Video URL"
               value={lessonForm.video_url}

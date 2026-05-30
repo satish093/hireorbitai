@@ -198,7 +198,7 @@ export function CreateTrainingCourse() {
                 hint="e.g. React Interview Preparation, AWS for Beginners"
                 required
               />
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Selector
                   label="Category"
                   value={gen.category}
@@ -274,7 +274,7 @@ export function CreateTrainingCourse() {
               className="mt-1 w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
             />
           </label>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Selector
               label="Category"
               value={form.category}

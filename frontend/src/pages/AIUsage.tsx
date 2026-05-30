@@ -273,7 +273,7 @@ function FreeTab({
   return (
     <>
       {/* KPI strip */}
-      <div className="grid grid-cols-3 gap-3 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
         <DashboardCard
           label="Free Calls"
           value={loading ? '…' : (ft?.calls ?? 0)}

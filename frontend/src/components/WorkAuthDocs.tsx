@@ -270,7 +270,7 @@ export function WorkAuthDocs({ consultantId }: Props) {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-muted mb-1">
                 Issue date <span className="text-muted/60">(optional)</span>

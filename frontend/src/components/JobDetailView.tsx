@@ -600,7 +600,7 @@ export function JobDetailView({ job, isConsultant }: { job: Job; isConsultant: b
         {/* Right rail */}
         <div className="space-y-4 min-w-0 lg:sticky lg:top-4">
           <Section title="Key facts">
-            <div className="grid grid-cols-2 gap-2.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               <FactTile label="Location" value={job.location ?? '—'} />
               <FactTile label="Work model" value={workModel} />
               <FactTile label="Type" value={prettyType(job.job_type)} />

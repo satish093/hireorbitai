@@ -368,7 +368,7 @@ export function UserProfile() {
               editing={editing}
               onChange={(v) => setForm((f) => ({ ...f, address_line2: v }))}
             />
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field
                 label="City"
                 value={editing ? (form.city ?? '') : (user.city ?? '')}
@@ -382,7 +382,7 @@ export function UserProfile() {
                 onChange={(v) => setForm((f) => ({ ...f, state: v }))}
               />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field
                 label="Postal code"
                 value={editing ? (form.postal_code ?? '') : (user.postal_code ?? '')}

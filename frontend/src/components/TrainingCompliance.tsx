@@ -865,7 +865,7 @@ function FinalAssessmentGradeModal({
           </pre>
         </div>
       )}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <label className="block">
           <span className="text-[10px] font-semibold uppercase tracking-widest text-muted">
             Score (0–100)

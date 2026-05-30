@@ -110,7 +110,7 @@ export function SourcesDrawer({
       {/* Add new source */}
       <div className="-mx-5 -mt-5 px-5 py-4 border-b border-border bg-hover mb-5">
         <h3 className="text-sm font-semibold text-ink mb-2">Add a company / feed</h3>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
           <select
             value={newSource}
             onChange={(e) => setNewSource(e.target.value as 'jooble' | 'manual')}
