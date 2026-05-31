@@ -81,7 +81,7 @@ export function ResumeProfileCard({ profile: initialProfile, resumeId, onParsed 
   // (.claude/rules/frontend-responsive.md) — every other surface already
   // uses dvh, this one was the last hold-out.
   return (
-    <div className="overflow-y-auto max-h-[calc(100dvh-260px)] pr-1">
+    <div className="md:overflow-y-auto md:max-h-[calc(100dvh-260px)] pr-1">
       {parseOverlay}
       {/* ── Header: name + contact ── */}
       <div className="pb-4 border-b border-border">

@@ -207,7 +207,7 @@ export function AgendaView({
 
   if (allGroups.length === 0) {
     return (
-      <div className="w-full flex items-center justify-center min-h-[65vh]">
+      <div className="w-full flex items-center justify-center min-h-[65dvh]">
         <div className="text-center space-y-2">
           <p className="text-4xl">📅</p>
           <p className="text-[14px] text-muted">Nothing scheduled from this date</p>

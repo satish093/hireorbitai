@@ -726,7 +726,12 @@ export function Messages() {
       title="Messages"
       crumbs={[{ label: 'Workspace', to: '/dashboard' }, { label: 'Messages' }]}
     >
-      <div className="bg-surface border border-border rounded-xl overflow-hidden h-[calc(100dvh-238px)] md:h-[calc(100dvh-180px)] min-h-[480px] flex flex-col sm:flex-row">
+      {/* Full-bleed edge-to-edge on phones (escape the page padding), a bordered
+          card on tablet+. Height fills the space between the sticky header and
+          the bottom nav from the page chrome — NO forced min-height on mobile
+          (that used to overflow short phones and make the whole page scroll
+          instead of just the message list). */}
+      <div className="bg-surface overflow-hidden flex flex-col sm:flex-row -mx-4 sm:mx-0 border-y sm:border border-border rounded-none sm:rounded-xl h-[calc(100dvh-156px)] sm:h-[calc(100dvh-168px)] md:h-[calc(100dvh-140px)] sm:min-h-[480px]">
         {/* Left: conversation list. Becomes a full-width column on phones
             (stacked above the chat pane); fixed 20rem rail on tablet+. */}
         <aside
@@ -869,8 +874,9 @@ export function Messages() {
                           </div>
                         </div>
                       </button>
-                      {/* Pin / archive actions — appear on hover/focus */}
-                      <div className="absolute top-1.5 right-2 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                      {/* Pin / archive actions. Always visible on touch (no
+                          hover on mobile); hover/focus-reveal on desktop. */}
+                      <div className="absolute top-1.5 right-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100 transition-opacity">
                         <Popover
                           align="right"
                           button={(open) => (
@@ -1258,7 +1264,7 @@ export function Messages() {
                         ))}
                       </div>
                     )}
-                    <div className="px-3 py-3 flex items-end gap-2">
+                    <div className="px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:pb-3 flex items-end gap-2">
                       <input
                         ref={fileInputRef}
                         type="file"

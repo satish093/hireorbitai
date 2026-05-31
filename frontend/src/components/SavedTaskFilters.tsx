@@ -290,7 +290,7 @@ export function SavedTaskFilters({ current, onApply, onLoadDefault }: Props) {
                       </span>
                       <div className="text-[11px] text-muted truncate">{summarize(f.criteria)}</div>
                     </button>
-                    <div className="opacity-0 group-hover:opacity-100 transition flex items-center gap-1">
+                    <div className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition flex items-center gap-1">
                       <button
                         onClick={() => setDefault(f.id, !f.is_default)}
                         title={f.is_default ? 'Unset as default' : 'Set as default'}
