@@ -6,6 +6,8 @@ import { FormInput } from '../components/FormInput';
 import { PageHeader } from '../components/PageHeader';
 import { Button } from '../components/Button';
 import { api } from '../services/api';
+import { useAuth } from '../context/AuthContext';
+import { ADMIN_TIER, MANAGER_TIER } from '../types';
 import toast from 'react-hot-toast';
 
 const EMPTY = { company_name: '', industry: '', contact_name: '', contact_email: '', location: '' };
@@ -20,12 +22,24 @@ function formatDate(value?: string | null) {
 }
 
 export function Clients() {
+  const { profile } = useAuth();
   const [rows, setRows] = useState<any[]>([]);
   const [open, setOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [selected, setSelected] = useState<any | null>(null);
   const [form, setForm] = useState<any>(EMPTY);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  // Role-based gating mirroring the backend (clients.routes.ts +
+  // clients.controller.loadAndAuthorizeClient): admin-tier may edit/delete any
+  // client; group leads + recruiter only rows THEY created; delete is
+  // MANAGER_TIER-only (recruiter excluded).
+  const role = profile?.role;
+  const isAdmin = !!role && ADMIN_TIER.includes(role);
+  const canEditRow = (row: any) => isAdmin || row?.created_by === profile?.id;
+  const canDeleteRow = (row: any) =>
+    !!role && MANAGER_TIER.includes(role) && (isAdmin || row?.created_by === profile?.id);
 
   function load() {
     setLoading(true);
@@ -39,6 +53,26 @@ export function Clients() {
     load();
   }, []);
 
+  function closeForm() {
+    setOpen(false);
+    setEditingId(null);
+    setForm(EMPTY);
+  }
+
+  // Prefill ONLY writable fields — the update schema is `.strict()`.
+  function openEdit(row: any) {
+    setForm({
+      company_name: row.company_name ?? '',
+      industry: row.industry ?? '',
+      contact_name: row.contact_name ?? '',
+      contact_email: row.contact_email ?? '',
+      location: row.location ?? '',
+    });
+    setEditingId(row.id);
+    setSelected(null);
+    setOpen(true);
+  }
+
   async function save() {
     if (saving) return;
     if (!form.company_name) {
@@ -47,15 +81,31 @@ export function Clients() {
     }
     setSaving(true);
     try {
-      await api.post('/clients', form);
-      toast.success('Client added');
-      setOpen(false);
-      setForm(EMPTY);
+      if (editingId) {
+        await api.patch(`/clients/${editingId}`, form);
+        toast.success('Client updated');
+      } else {
+        await api.post('/clients', form);
+        toast.success('Client added');
+      }
+      closeForm();
       load();
     } catch (e: any) {
       toast.error(e?.response?.data?.error ?? 'Something went wrong. Please try again.');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function remove(row: any) {
+    if (!confirm(`Delete client “${row.company_name}”? This cannot be undone.`)) return;
+    try {
+      await api.delete(`/clients/${row.id}`);
+      setRows((prev) => prev.filter((r) => r.id !== row.id));
+      setSelected(null);
+      toast.success('Client deleted');
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error ?? 'Delete failed');
     }
   }
 
@@ -112,24 +162,15 @@ export function Clients() {
       />
       <Modal
         open={open}
-        onClose={() => {
-          setOpen(false);
-          setForm(EMPTY);
-        }}
-        title="New client"
+        onClose={closeForm}
+        title={editingId ? 'Edit client' : 'New client'}
         footer={
           <>
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setOpen(false);
-                setForm(EMPTY);
-              }}
-            >
+            <Button variant="secondary" onClick={closeForm}>
               Cancel
             </Button>
             <Button onClick={save} loading={saving}>
-              {saving ? 'Saving' : 'Save client'}
+              {saving ? 'Saving' : editingId ? 'Save changes' : 'Save client'}
             </Button>
           </>
         }
@@ -172,9 +213,21 @@ export function Clients() {
         onClose={() => setSelected(null)}
         title={selected?.company_name ?? 'Client details'}
         footer={
-          <Button variant="secondary" onClick={() => setSelected(null)}>
-            Close
-          </Button>
+          <>
+            {selected && canDeleteRow(selected) && (
+              <Button variant="danger-ghost" className="mr-auto" onClick={() => remove(selected)}>
+                Delete
+              </Button>
+            )}
+            {selected && canEditRow(selected) && (
+              <Button variant="secondary" onClick={() => openEdit(selected)}>
+                Edit
+              </Button>
+            )}
+            <Button variant="secondary" onClick={() => setSelected(null)}>
+              Close
+            </Button>
+          </>
         }
       >
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">

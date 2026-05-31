@@ -6,6 +6,8 @@ import { FormInput } from '../components/FormInput';
 import { PageHeader } from '../components/PageHeader';
 import { Button } from '../components/Button';
 import { api } from '../services/api';
+import { useAuth } from '../context/AuthContext';
+import { ADMIN_TIER, MANAGER_TIER } from '../types';
 import { isSafeHttpsUrl } from '../utils/safeUrl';
 import toast from 'react-hot-toast';
 
@@ -28,12 +30,25 @@ function formatDate(value?: string | null) {
 }
 
 export function Vendors() {
+  const { profile } = useAuth();
   const [rows, setRows] = useState<any[]>([]);
   const [open, setOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [selected, setSelected] = useState<any | null>(null);
   const [form, setForm] = useState<any>(EMPTY);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  // Role-based gating that mirrors the backend (vendors.routes.ts +
+  // vendors.controller.loadAndAuthorizeVendor): admin-tier may edit/delete any
+  // vendor; group leads + recruiter may only touch rows THEY created; delete is
+  // MANAGER_TIER-only (recruiter excluded). Showing a button the server would
+  // 404 is bad UX, so the affordance follows the same rule the server enforces.
+  const role = profile?.role;
+  const isAdmin = !!role && ADMIN_TIER.includes(role);
+  const canEditRow = (row: any) => isAdmin || row?.created_by === profile?.id;
+  const canDeleteRow = (row: any) =>
+    !!role && MANAGER_TIER.includes(role) && (isAdmin || row?.created_by === profile?.id);
 
   function load() {
     setLoading(true);
@@ -47,6 +62,28 @@ export function Vendors() {
     load();
   }, []);
 
+  function closeForm() {
+    setOpen(false);
+    setEditingId(null);
+    setForm(EMPTY);
+  }
+
+  // Prefill with ONLY the writable fields — the update schema is `.strict()`,
+  // so sending id / created_by / created_at would 400.
+  function openEdit(row: any) {
+    setForm({
+      company_name: row.company_name ?? '',
+      contact_name: row.contact_name ?? '',
+      contact_email: row.contact_email ?? '',
+      contact_phone: row.contact_phone ?? '',
+      website: row.website ?? '',
+      tier: row.tier ?? '',
+    });
+    setEditingId(row.id);
+    setSelected(null);
+    setOpen(true);
+  }
+
   async function save() {
     if (saving) return;
     if (!form.company_name) {
@@ -55,15 +92,31 @@ export function Vendors() {
     }
     setSaving(true);
     try {
-      await api.post('/vendors', form);
-      toast.success('Vendor added');
-      setOpen(false);
-      setForm(EMPTY);
+      if (editingId) {
+        await api.patch(`/vendors/${editingId}`, form);
+        toast.success('Vendor updated');
+      } else {
+        await api.post('/vendors', form);
+        toast.success('Vendor added');
+      }
+      closeForm();
       load();
     } catch (e: any) {
       toast.error(e?.response?.data?.error ?? 'Something went wrong. Please try again.');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function remove(row: any) {
+    if (!confirm(`Delete vendor “${row.company_name}”? This cannot be undone.`)) return;
+    try {
+      await api.delete(`/vendors/${row.id}`);
+      setRows((prev) => prev.filter((r) => r.id !== row.id));
+      setSelected(null);
+      toast.success('Vendor deleted');
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error ?? 'Delete failed');
     }
   }
 
@@ -120,25 +173,20 @@ export function Vendors() {
       />
       <Modal
         open={open}
-        onClose={() => {
-          setOpen(false);
-          setForm(EMPTY);
-        }}
-        title="New vendor"
-        description="Create a vendor record so submissions can reference them."
+        onClose={closeForm}
+        title={editingId ? 'Edit vendor' : 'New vendor'}
+        description={
+          editingId
+            ? 'Update this vendor record.'
+            : 'Create a vendor record so submissions can reference them.'
+        }
         footer={
           <>
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setOpen(false);
-                setForm(EMPTY);
-              }}
-            >
+            <Button variant="secondary" onClick={closeForm}>
               Cancel
             </Button>
             <Button onClick={save} loading={saving}>
-              {saving ? 'Saving' : 'Save vendor'}
+              {saving ? 'Saving' : editingId ? 'Save changes' : 'Save vendor'}
             </Button>
           </>
         }
@@ -188,9 +236,21 @@ export function Vendors() {
         onClose={() => setSelected(null)}
         title={selected?.company_name ?? 'Vendor details'}
         footer={
-          <Button variant="secondary" onClick={() => setSelected(null)}>
-            Close
-          </Button>
+          <>
+            {selected && canDeleteRow(selected) && (
+              <Button variant="danger-ghost" className="mr-auto" onClick={() => remove(selected)}>
+                Delete
+              </Button>
+            )}
+            {selected && canEditRow(selected) && (
+              <Button variant="secondary" onClick={() => openEdit(selected)}>
+                Edit
+              </Button>
+            )}
+            <Button variant="secondary" onClick={() => setSelected(null)}>
+              Close
+            </Button>
+          </>
         }
       >
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
