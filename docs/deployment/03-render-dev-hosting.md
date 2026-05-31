@@ -40,7 +40,7 @@ build/start commands. Then jump to **"Set the env vars"** below to fill
 
 **New → Web Service → connect repo →** branch **`dev`**, runtime **Node**:
 
-- **Build command:** `npm ci && npm run shared:build && npm --prefix backend run build`
+- **Build command:** `npm ci && npm run shared:build && npm --prefix backend run build && node scripts/db-bootstrap.mjs`
 - **Start command:** `node backend/dist/server.js`
 - **Health check path:** `/health`
 - **Auto-Deploy:** **On** (Render redeploys on every push to `dev`)
@@ -60,6 +60,30 @@ build/start commands. Then jump to **"Set the env vars"** below to fill
 
 After the services exist you'll know their `*.onrender.com` URLs. Set them so the
 two halves point at each other (chicken-and-egg: create first, then fill URLs).
+
+> **Serious-testing profile (real email + AI + inviting).** `render.yaml` now ships
+> the dev service in "everything on" mode. The table below is the zero-spend
+> baseline; for a real test environment apply these **overrides** + secrets:
+>
+> | Key                                                          | Value for serious testing                                                                                 |
+> | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
+> | `BREVO_MOCK`                                                 | `false` — actually send invitations / resets / welcome emails                                             |
+> | `BREVO_API_KEY`                                              | your real `xkeysib-…` key                                                                                 |
+> | `BREVO_SENDER_EMAIL`                                         | a sender address **verified in your Brevo account** (else sends bounce)                                   |
+> | `TRAINING_AI_PROVIDER`                                       | `api` (with `ANTHROPIC_API_KEY`) — or `oauth` / keep `stub`                                               |
+> | `ANTHROPIC_API_KEY` and/or `GROQ_API_KEY` / `GEMINI_API_KEY` | at least one real AI key (matching, scoring, AI email, training)                                          |
+> | `LLAMA_CLOUD_API_KEY`                                        | enables resume-PDF parsing (free tier)                                                                    |
+> | `RUN_SCHEDULER`                                              | `true` — runs reminders + daily-digest (watch free-tier RAM)                                              |
+> | `SEED_PASSWORD`                                              | (optional) override the seeded accounts' password to match what you used before (default `Passw0rd!2026`) |
+>
+> **Admin login:** a first deploy against an **empty** DB auto-seeds the known dev
+> accounts — log in as **`admin@hireorbitai.test`** with the seed password
+> (default `Passw0rd!2026`, or your `SEED_PASSWORD`). The full org tree is seeded,
+> so you can invite users and exercise every feature immediately. An existing DB
+> is never re-seeded; set `SEED_DEV=false` for a blank, schema-only environment.
+>
+> Live **job ingestion** stays mocked (`JOB_SOURCES_MOCK=true`) to avoid RapidAPI
+> spend; set it `false` + `RAPIDAPI_KEY`/`JSEARCH_API_KEY` to test real feeds.
 
 **`hireorbit-api-dev` → Environment:**
 
@@ -105,14 +129,19 @@ deploy hook from CI — but for a throwaway dev box, auto-deploy is the clean de
 
 ## First deploy + smoke
 
-1. **Initialise the Neon dev DB once** (schema → migrations → seed users → mock
-   data) from your machine, pointed at the Neon `hireorbit_dev` string:
-   ```bash
-   node --env-file=backend/.env scripts/reset-dev.mjs --yes --seed
-   ```
-   This also applies the `dev_settings` migration the test panel needs. After
-   the first init, normal deploys don't touch the DB; apply later migrations with
-   `npm --prefix backend run migrate:up`.
+1. **DB initialises itself on deploy.** The backend build runs
+   `scripts/db-bootstrap.mjs`, which on an **empty** Neon DB applies the full
+   `database/init.sql` schema (all feature tables + `feature_flags` seeded
+   all-enabled), then the incremental migrations, then **seeds the known dev
+   accounts** (admin + full org tree + demo data). On an already-initialised DB it
+   only applies new migrations and never drops or re-seeds data.
+   - Log in as **`admin@hireorbitai.test`** with the seed password (default
+     `Passw0rd!2026`, or your `SEED_PASSWORD`). Want a blank env? Set `SEED_DEV=false`.
+   - Want to start completely over? Run this once from your machine (destructive —
+     wipes the dev DB), then redeploy:
+     ```bash
+     node --env-file=backend/.env scripts/reset-dev.mjs --yes --seed
+     ```
 2. Push to `dev` (or click **Manual Deploy** on each service).
 3. Open `https://hireorbit-web-dev.onrender.com` — first load wakes the backend
    (~30s), then the app works. The **DEV toolbar** appears bottom-left; use it to

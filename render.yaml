@@ -24,7 +24,10 @@ services:
     plan: free
     branch: dev
     autoDeploy: true
-    buildCommand: npm ci && npm run shared:build && npm --prefix backend run build && npm --prefix backend run migrate:ci
+    # db-bootstrap applies database/init.sql on a FRESH database (then migrations
+    # + first-time admin), and is a no-op on an already-initialised DB. It owns
+    # the migrate step, so migrate:ci is no longer called separately here.
+    buildCommand: npm ci && npm run shared:build && npm --prefix backend run build && node scripts/db-bootstrap.mjs
     startCommand: node backend/dist/server.js
     healthCheckPath: /health
     envVars:
@@ -51,6 +54,13 @@ services:
         sync: false
       - key: BREVO_API_KEY
         sync: false
+      # First deploy against an EMPTY DB auto-seeds the known dev accounts, so you
+      # log in with the same admin as always — admin@hireorbitai.test — using the
+      # seed password (default Passw0rd!2026; override here to match what you used
+      # before). The full org tree (satish@, rishi@, …) is seeded too. An existing
+      # DB is never re-seeded. Set SEED_DEV=false for a blank, schema-only env.
+      - key: SEED_PASSWORD
+        sync: false
       # ---- generated once by Render, stable across deploys ----
       - key: JWT_SECRET
         generateValue: true
@@ -63,20 +73,32 @@ services:
       # enable on the live VPS even by mistake.
       - key: DEV_TOOLS
         value: 'true'
-      # Skip the background-job scheduler (reminders/jobs-sync/digest/purge) to
-      # stay within the free instance's RAM.
+      # Background-job scheduler (reminders / jobs-sync / daily-digest / session
+      # purge). ON for serious testing of reminders + digests. NOTE: the free
+      # instance is RAM-constrained — if the service OOM-restarts, either bump
+      # the instance plan or set this back to 'false'.
       - key: RUN_SCHEDULER
-        value: 'false'
-      # ---- dev-safe defaults: ephemeral uploads, no AI/API/email spend ----
+        value: 'true'
+      # ---- "serious testing" profile: real email + AI enabled ----
+      # (Set the matching secrets below in the dashboard. Flip the *_MOCK keys
+      #  back to 'true' / provider to 'stub' to return to zero-spend mode.)
       - key: UPLOADS_DIR
         value: /tmp/uploads
+      # Real AI for training-content generation via ANTHROPIC_API_KEY. Use
+      # 'oauth' (ANTHROPIC_OAUTH_TOKEN) or 'stub' (no spend) as alternatives.
       - key: TRAINING_AI_PROVIDER
-        value: stub
-      # Log emails instead of sending them (zero Brevo spend on dev).
+        value: api
+      # Send real transactional email (invitations, password reset, welcome).
+      # Requires a real BREVO_API_KEY + a Brevo-VERIFIED BREVO_SENDER_EMAIL.
       - key: BREVO_MOCK
-        value: 'true'
-      # Optional: set to a real sk-ant-… key to enable Anthropic AI on dev.
-      # Leave blank (sync:false, set in dashboard) for zero API spend.
+        value: 'false'
+      # Must be a sender address verified in your Brevo account, or sends bounce.
+      - key: BREVO_SENDER_EMAIL
+        sync: false
+      - key: BREVO_SENDER_NAME
+        value: HireOrbit AI (Dev)
+      # Set to a real sk-ant-… key to enable Anthropic AI (matching/scoring/
+      # training). At least one AI key (Anthropic / Groq / Gemini) must be set.
       - key: ANTHROPIC_API_KEY
         sync: false
       # Free AI stack — values entered in the Render dashboard (sync:false keeps
@@ -88,11 +110,16 @@ services:
         sync: false
       - key: LLAMA_CLOUD_API_KEY
         sync: false
+      # Live job ingestion costs real RapidAPI/JSearch budget, so it stays MOCKED
+      # by default even in the serious-testing profile. To test real ingestion:
+      # set JOB_SOURCES_MOCK='false' and provide the source keys (RAPIDAPI_KEY +
+      # JSEARCH_API_KEY per the 4-source policy in CLAUDE.md). Synthetic MOCK-*
+      # jobs are produced otherwise.
       - key: JOB_SOURCES_MOCK
         value: 'true'
-      # Set to real Jooble key (jooble.org/api/index) to test live data.
-      # Leave unset to stay in mock mode (no API spend).
-      - key: JOOBLE_API_KEY
+      - key: RAPIDAPI_KEY
+        sync: false
+      - key: JSEARCH_API_KEY
         sync: false
 
   # --------------------------------------------------------------- frontend ---
