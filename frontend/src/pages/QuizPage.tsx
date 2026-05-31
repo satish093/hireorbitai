@@ -30,6 +30,8 @@ export function QuizPage() {
   const [score, setScore] = useState<{ correct: number; total: number; points: number } | null>(
     null,
   );
+  // One-question-at-a-time stepper index.
+  const [current, setCurrent] = useState(0);
 
   useEffect(() => {
     if (!id) return;
@@ -90,6 +92,7 @@ export function QuizPage() {
       }
       setResults(r);
       setScore({ correct, total: quiz.length, points });
+      setCurrent(0); // restart the stepper at Q1 for review
     } catch (e: any) {
       toast.error(e?.response?.data?.error ?? 'Failed to submit');
     } finally {
@@ -105,6 +108,10 @@ export function QuizPage() {
         </div>
       </Layout>
     );
+
+  const total = quiz.length;
+  const q = quiz[current];
+  const atLast = current >= total - 1;
 
   return (
     <Layout
@@ -147,47 +154,68 @@ export function QuizPage() {
           </div>
         )}
 
-        <div className="space-y-3">
-          {quiz.map((q) => {
-            const r = results[q.id];
-            return (
-              <QuizQuestionCard
-                key={q.id}
-                question={q}
-                selected={picks[q.id] ?? null}
-                onChange={(v) => setPicks({ ...picks, [q.id]: v })}
-                result={
-                  r
-                    ? {
-                        is_correct: r.is_correct,
-                        correct_answer: r.correct_answer,
-                        explanation: r.explanation ?? undefined,
-                      }
-                    : undefined
-                }
+        {quiz.length > 0 && q && (
+          <>
+            {/* Progress — one question at a time */}
+            <div className="mb-2 flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-muted">
+              <span>
+                Question {current + 1} of {total}
+              </span>
+              <span>{Object.keys(picks).length} answered</span>
+            </div>
+            <div className="h-1 rounded-full bg-hover mb-4 overflow-hidden">
+              <div
+                className="h-full bg-accent rounded-full transition-all"
+                style={{ width: `${total ? ((current + 1) / total) * 100 : 0}%` }}
               />
-            );
-          })}
-        </div>
+            </div>
 
-        {!score && quiz.length > 0 && (
-          <div className="mt-5 flex justify-between">
-            <Button variant="outline" onClick={() => nav(-1)}>
-              Back
-            </Button>
-            <Button variant="primary" onClick={submit} disabled={submitting} loading={submitting}>
-              {submitting
-                ? 'Submitting…'
-                : `Submit (${Object.keys(picks).length} / ${quiz.length})`}
-            </Button>
-          </div>
-        )}
-        {score && (
-          <div className="mt-5 flex justify-end">
-            <Button variant="primary" onClick={() => nav(`/training/assignments/${id}`)}>
-              Back to course
-            </Button>
-          </div>
+            <QuizQuestionCard
+              key={q.id}
+              question={q}
+              selected={picks[q.id] ?? null}
+              onChange={(v) => setPicks({ ...picks, [q.id]: v })}
+              result={
+                results[q.id]
+                  ? {
+                      is_correct: results[q.id]!.is_correct,
+                      correct_answer: results[q.id]!.correct_answer,
+                      explanation: results[q.id]!.explanation ?? undefined,
+                    }
+                  : undefined
+              }
+            />
+
+            <div className="mt-5 flex items-center justify-between gap-2">
+              <Button
+                variant="outline"
+                onClick={() => (current === 0 ? nav(-1) : setCurrent((c) => c - 1))}
+              >
+                {current === 0 ? 'Back' : 'Previous'}
+              </Button>
+              {!score && atLast ? (
+                <Button
+                  variant="primary"
+                  onClick={submit}
+                  disabled={submitting}
+                  loading={submitting}
+                >
+                  {submitting ? 'Submitting…' : `Submit (${Object.keys(picks).length} / ${total})`}
+                </Button>
+              ) : score && atLast ? (
+                <Button variant="primary" onClick={() => nav(`/training/assignments/${id}`)}>
+                  Back to course
+                </Button>
+              ) : (
+                <Button
+                  variant="primary"
+                  onClick={() => setCurrent((c) => Math.min(total - 1, c + 1))}
+                >
+                  Next
+                </Button>
+              )}
+            </div>
+          </>
         )}
       </div>
     </Layout>

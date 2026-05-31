@@ -528,7 +528,10 @@ export default function App() {
             <Route
               path="/admin/ai-settings"
               element={
-                <ProtectedRoute allow={ADMIN_TIER}>
+                // Owner-tier only: every action here (Claude auth refresh /
+                // re-login / check-token) is OWNER_TIER on the backend, so
+                // ADMIN_TIER would show CTO/DIRECTOR a page whose buttons 403.
+                <ProtectedRoute allow={OWNER_TIER}>
                   <AdminAISettings />
                 </ProtectedRoute>
               }

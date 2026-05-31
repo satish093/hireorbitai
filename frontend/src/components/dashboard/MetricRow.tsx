@@ -1,4 +1,4 @@
-import { DashboardCard } from '../DashboardCard';
+import { KpiCard } from '../KpiCard';
 import type { DashApplication, DashConsultant } from './types';
 
 const WEEK = 7 * 24 * 3_600_000;
@@ -27,13 +27,13 @@ export function MetricRow({
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 stagger-children">
-      <DashboardCard label="My consultants" value={consultants.length} accent="blue" />
-      <DashboardCard label="Active" value={active} hint={`${placed} placed`} accent="green" />
-      <DashboardCard label="Submissions" value={subs7d} hint="Last 7 days" accent="amber" />
-      <DashboardCard
+      <KpiCard label="My consultants" value={consultants.length} accent="blue" />
+      <KpiCard label="Active" value={active} delta={`${placed} placed`} accent="green" />
+      <KpiCard label="Submissions" value={subs7d} delta="Last 7 days" accent="amber" />
+      <KpiCard
         label="Match avg"
         value={matchAvg == null ? '—' : `${matchAvg}%`}
-        hint={scored.length ? `${scored.length} scored` : 'No scores yet'}
+        delta={scored.length ? `${scored.length} scored` : 'No scores yet'}
         accent="brand"
       />
     </div>

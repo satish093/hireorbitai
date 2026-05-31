@@ -3,180 +3,15 @@ import { NavLink, useLocation } from 'react-router-dom';
 import clsx from 'clsx';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../hooks/useTheme';
-import { ROLE_LABEL, MANAGER_TIER, ADMIN_TIER } from '../types';
+import { useFeatureFlags } from '../hooks/useFeatureFlags';
+import { ROLE_LABEL } from '../types';
 import { Avatar } from './TaskBits';
-import {
-  IconCalendar,
-  IconTasks,
-  IconReminder,
-  IconBriefcase,
-  IconFileText,
-  IconFile,
-  IconBarChart,
-  IconMailPlus,
-  IconGraduation,
-  IconBookOpen,
-  IconClipboard,
-  IconUsers,
-  IconUser,
-  IconUsersCog,
-  IconToggle,
-  IconSparkles,
-  IconLogOut,
-  IconX,
-} from './Icons';
-import type { ComponentType, SVGProps } from 'react';
+import { filterNavSections } from './Sidebar';
+import { IconLogOut, IconX } from './Icons';
 
-type IconCmp = ComponentType<SVGProps<SVGSVGElement> & { size?: number; strokeWidth?: number }>;
-
-interface NavItem {
-  to: string;
-  label: string;
-  Icon: IconCmp;
-}
-
-interface NavGroup {
-  heading: string;
-  items: NavItem[];
-}
-
-function moreGroups(role: string | undefined): NavGroup[] {
-  if (!role) return [];
-
-  if (role === 'CONSULTANT') {
-    return [
-      {
-        heading: 'Workspace',
-        items: [
-          { to: '/calendar', label: 'Calendar', Icon: IconCalendar },
-          { to: '/reminders', label: 'Reminders', Icon: IconReminder },
-        ],
-      },
-      {
-        heading: 'Me',
-        items: [
-          { to: '/my-resume', label: 'My Resume', Icon: IconFile },
-          { to: '/training', label: 'My Training', Icon: IconGraduation },
-        ],
-      },
-    ];
-  }
-
-  if (role === 'RECRUITER') {
-    return [
-      {
-        heading: 'Workspace',
-        items: [
-          { to: '/calendar', label: 'Calendar', Icon: IconCalendar },
-          { to: '/tasks', label: 'Tasks', Icon: IconTasks },
-          { to: '/reminders', label: 'Reminders', Icon: IconReminder },
-        ],
-      },
-      {
-        heading: 'Talent',
-        items: [
-          // Consultants + Applications are OPERATOR_TIER routes the recruiter
-          // can access — surface them here so the mobile nav matches the
-          // desktop sidebar (the bottom-nav Work tab only routes to /jobs).
-          { to: '/consultants', label: 'Consultants', Icon: IconUsers },
-          { to: '/applications', label: 'Applications', Icon: IconFileText },
-          { to: '/resumes', label: 'Resumes', Icon: IconFile },
-          { to: '/reports', label: 'Analytics', Icon: IconBarChart },
-        ],
-      },
-      {
-        heading: 'Pipeline',
-        items: [
-          { to: '/invitations', label: 'Invitations', Icon: IconMailPlus },
-          { to: '/training', label: 'My Training', Icon: IconGraduation },
-        ],
-      },
-    ];
-  }
-
-  if (MANAGER_TIER.includes(role as never) && role !== 'RECRUITER') {
-    return [
-      {
-        heading: 'Workspace',
-        items: [
-          { to: '/calendar', label: 'Calendar', Icon: IconCalendar },
-          { to: '/tasks', label: 'Tasks', Icon: IconTasks },
-          { to: '/reminders', label: 'Reminders', Icon: IconReminder },
-        ],
-      },
-      {
-        heading: 'Talent',
-        items: [
-          { to: '/jobs', label: 'Jobs', Icon: IconBriefcase },
-          { to: '/applications', label: 'Applications', Icon: IconFileText },
-          { to: '/resumes', label: 'Resumes', Icon: IconFile },
-        ],
-      },
-      {
-        heading: 'Training',
-        items: [
-          { to: '/training/courses', label: 'Courses', Icon: IconBookOpen },
-          { to: '/training/assignments', label: 'Assignments', Icon: IconClipboard },
-          { to: '/training', label: 'My Training', Icon: IconGraduation },
-        ],
-      },
-      {
-        heading: 'Admin',
-        items: [
-          { to: '/invitations', label: 'Invitations', Icon: IconMailPlus },
-          { to: '/ai-usage', label: 'AI Usage', Icon: IconSparkles },
-        ],
-      },
-    ];
-  }
-
-  if (ADMIN_TIER.includes(role as never)) {
-    return [
-      {
-        heading: 'Workspace',
-        items: [
-          { to: '/calendar', label: 'Calendar', Icon: IconCalendar },
-          { to: '/tasks', label: 'Tasks', Icon: IconTasks },
-        ],
-      },
-      {
-        heading: 'Talent',
-        items: [
-          { to: '/consultants', label: 'Consultants', Icon: IconUsers },
-          { to: '/recruiters', label: 'Recruiters', Icon: IconUser },
-          { to: '/managers', label: 'Managers', Icon: IconUsersCog },
-        ],
-      },
-      {
-        heading: 'Admin',
-        items: [
-          { to: '/admin/users', label: 'Users', Icon: IconUsers },
-          { to: '/admin/groups', label: 'User Groups', Icon: IconUsersCog },
-          { to: '/invitations', label: 'Invitations', Icon: IconMailPlus },
-          { to: '/admin/features', label: 'Feature Flags', Icon: IconToggle },
-          { to: '/ai-usage', label: 'AI Usage', Icon: IconSparkles },
-          { to: '/admin/audit-log', label: 'Audit Log', Icon: IconClipboard },
-        ],
-      },
-    ];
-  }
-
-  // DEVELOPER
-  return [
-    {
-      heading: 'Capabilities',
-      items: [
-        { to: '/admin/features', label: 'Feature Flags', Icon: IconToggle },
-        { to: '/ai-usage', label: 'AI Usage', Icon: IconSparkles },
-        { to: '/admin/audit-log', label: 'Audit Log', Icon: IconClipboard },
-      ],
-    },
-    {
-      heading: 'Support',
-      items: [{ to: '/reminders', label: 'Reminders', Icon: IconReminder }],
-    },
-  ];
-}
+// Bottom-nav tabs (MobileBottomNav) that already have a dedicated home — omit
+// them from the More sheet so we don't list duplicate primary destinations.
+const BOTTOM_NAV_PATHS = new Set(['/dashboard', '/messages']);
 
 interface Props {
   open: boolean;
@@ -186,6 +21,7 @@ interface Props {
 /** MobileMoreSheet — slides up from the bottom on mobile (<md) to expose secondary navigation. */
 export function MobileMoreSheet({ open, onClose }: Props) {
   const { profile, signOut } = useAuth();
+  const { flags } = useFeatureFlags();
   const { theme, toggle: toggleTheme } = useTheme();
   const loc = useLocation();
 
@@ -197,7 +33,20 @@ export function MobileMoreSheet({ open, onClose }: Props) {
 
   if (!open) return null;
 
-  const groups = moreGroups(profile?.role);
+  // Derive the menu from the SAME role/capability/flag-gated nav model the
+  // desktop Sidebar renders — so mobile reaches every destination the user can
+  // (including Vendors/Clients/Interviews/AI Email/Call Usage/AI Settings/…),
+  // minus the items that are already primary bottom-nav tabs. One source of
+  // truth: no more drift between the sidebar and the mobile More sheet.
+  const groups = filterNavSections(profile?.role, profile, flags)
+    .map((s) => ({
+      heading: s.heading,
+      items: s.items
+        .filter((i) => !BOTTOM_NAV_PATHS.has(i.to))
+        .map((i) => ({ to: i.to, label: i.label, Icon: i.icon })),
+    }))
+    .filter((g) => g.items.length > 0);
+
   const displayName = profile?.full_name || profile?.email || '';
   const roleLabel = profile?.role ? ROLE_LABEL[profile.role] : '';
 
@@ -271,7 +120,7 @@ export function MobileMoreSheet({ open, onClose }: Props) {
             </div>
           </div>
 
-          {/* Role-aware nav groups */}
+          {/* Role-aware nav groups (derived from the shared gated nav model) */}
           {groups.map((group) => (
             <div key={group.heading}>
               <div

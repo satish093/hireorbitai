@@ -14,6 +14,7 @@ interface UserGroup {
   description: string | null;
   is_active: boolean;
   member_count: number;
+  color: string | null;
 }
 
 interface UserLite {
@@ -37,6 +38,9 @@ export function UserGroups() {
   // auto-tracks the name. Once the user types in the slug field directly,
   // we stop overwriting it.
   const [slugEdited, setSlugEdited] = useState(false);
+  // New-group color (the backend accepts an optional 7-char hex; GroupBadge
+  // renders it everywhere a group appears). Default = the brand indigo.
+  const [color, setColor] = useState('#6366F1');
 
   async function load() {
     setLoading(true);
@@ -116,10 +120,12 @@ export function UserGroups() {
       await api.post('/user-groups', {
         name: name.trim(),
         slug: slug.trim().toLowerCase().replace(/\s+/g, '-'),
+        color,
       });
       setName('');
       setSlug('');
       setSlugEdited(false);
+      setColor('#6366F1');
       toast.success('Group created');
       load();
     } catch (e: any) {
@@ -184,6 +190,14 @@ export function UserGroups() {
           placeholder="slug"
           className="border border-border rounded-lg px-3 py-1.5 text-sm font-mono"
         />
+        <input
+          type="color"
+          value={color}
+          onChange={(e) => setColor(e.target.value)}
+          aria-label="Group color"
+          title="Group color"
+          className="h-9 w-10 rounded-lg border border-border cursor-pointer bg-surface p-0.5 shrink-0"
+        />
         <Button variant="primary" onClick={create}>
           + Create group
         </Button>
@@ -219,6 +233,11 @@ export function UserGroups() {
                 <div className="px-5 py-3 border-b border-border flex items-center gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
+                      <span
+                        className="w-2.5 h-2.5 rounded-full shrink-0"
+                        style={{ background: g.color ?? '#6366F1' }}
+                        aria-hidden="true"
+                      />
                       <h3 className="text-sm font-semibold text-ink">{g.name}</h3>
                       <span className="text-[10px] font-mono text-muted bg-hover px-1.5 py-0.5 rounded">
                         {g.slug}

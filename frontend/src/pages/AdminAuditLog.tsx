@@ -149,6 +149,37 @@ export function AdminAuditLog() {
     setFilterTo('');
   }
 
+  /** Export the currently-loaded events as a CSV download (client-side). */
+  function exportCsv() {
+    if (events.length === 0) return;
+    const headers = ['Time', 'Action', 'Email', 'User ID', 'IP address', 'User agent', 'Metadata'];
+    const esc = (v: unknown) => {
+      const s = v == null ? '' : typeof v === 'string' ? v : JSON.stringify(v);
+      return `"${s.replace(/"/g, '""')}"`;
+    };
+    const lines = events.map((ev) =>
+      [
+        fmtDate(ev.created_at),
+        ev.action,
+        ev.email ?? '',
+        ev.user_id ?? '',
+        ev.ip_address ?? '',
+        ev.user_agent ?? '',
+        ev.metadata ?? '',
+      ]
+        .map(esc)
+        .join(','),
+    );
+    const csv = [headers.map(esc).join(','), ...lines].join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `audit-log-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <Layout
       title="Audit Log"
@@ -166,6 +197,14 @@ export function AdminAuditLog() {
               All security and data-access events across the platform.
             </p>
           </div>
+          <button
+            type="button"
+            onClick={exportCsv}
+            disabled={events.length === 0}
+            className="shrink-0 text-sm font-medium px-4 py-1.5 rounded-md border border-border hover:border-accent/40 hover:text-ink text-muted transition disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Export CSV ({events.length})
+          </button>
         </div>
 
         {/* Filters */}

@@ -17,20 +17,7 @@ import { useAuth } from '../context/AuthContext';
 import { invalidate } from '../hooks/useInvalidate';
 import { ADMIN_TIER, ROLE_LABEL, assignableRolesFor } from '../types';
 import toast from 'react-hot-toast';
-
-function useIsMobile(): boolean {
-  const [mobile, setMobile] = useState(
-    () => typeof window !== 'undefined' && window.innerWidth < 768,
-  );
-  useEffect(() => {
-    const mq = window.matchMedia('(max-width: 767px)');
-    setMobile(mq.matches);
-    const handler = (e: MediaQueryListEvent) => setMobile(e.matches);
-    mq.addEventListener('change', handler);
-    return () => mq.removeEventListener('change', handler);
-  }, []);
-  return mobile;
-}
+import { useIsMobile } from '../hooks/useIsMobile';
 
 type ParentUser = { id: string; full_name: string | null; email: string; role: string };
 
