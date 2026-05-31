@@ -113,7 +113,14 @@ export function AcceptInvitation() {
       return;
     }
     if (password !== confirm) {
-      setSubmitErr("Passwords don't match.");
+      // A trailing/leading space (common from mobile autocorrect when the
+      // password is revealed) makes two identical-looking values mismatch —
+      // call it out specifically so the user knows what to fix.
+      setSubmitErr(
+        password.trim() === confirm.trim()
+          ? 'Passwords differ only by spaces — check for an extra space at the start or end.'
+          : "Passwords don't match.",
+      );
       return;
     }
     if (!preview) return;
@@ -215,6 +222,18 @@ export function AcceptInvitation() {
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
               />
+              {confirm.length > 0 &&
+                (password === confirm ? (
+                  <p className="text-[11px] text-emerald-700 dark:text-emerald-300 -mt-2 flex items-center gap-1">
+                    <span aria-hidden="true">✓</span> Passwords match
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-red-600 dark:text-red-400 -mt-2">
+                    {password.trim() === confirm.trim()
+                      ? 'Differs only by spaces — check for an extra space at the start or end.'
+                      : "Passwords don't match yet."}
+                  </p>
+                ))}
 
               {submitErr && (
                 <p

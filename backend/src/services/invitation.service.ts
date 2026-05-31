@@ -38,6 +38,22 @@ export async function createInvitation(input: CreateInvitationInput) {
   const expiresAt = new Date(Date.now() + env.invitationExpiryHours * 3600 * 1000).toISOString();
   const emailLc = input.email.trim().toLowerCase();
 
+  // Block re-inviting an email that already has an account. Without this the
+  // invite is created with no error and the dead-end is only hit at the final
+  // step — db.auth.admin.createUser rejects the duplicate email and the invitee
+  // gets a vague 400 AFTER filling out the whole form. Surface it now.
+  const { data: existingUser } = await db
+    .from('users')
+    .select('id')
+    .eq('email', emailLc)
+    .maybeSingle();
+  if (existingUser) {
+    throw httpError(
+      409,
+      `${emailLc} already has an account. They can sign in or use “Forgot password” — no new invite is needed.`,
+    );
+  }
+
   const { data, error } = await db
     .from('invitations')
     .insert({
@@ -83,6 +99,29 @@ async function buildResponse(
   token: string,
   input: CreateInvitationInput,
 ) {
+  // Supersede any OTHER still-pending invitation for this email so only the
+  // freshest link is valid — re-inviting is effectively "resend with a new
+  // link". Best-effort: a failure here just leaves the old invite live (the
+  // prior behaviour), it must not block issuing the new one.
+  const newId = data?.id;
+  if (newId) {
+    await db
+      .from('invitations')
+      .update({ status: 'REVOKED' })
+      .eq('email', emailLc)
+      .eq('status', 'PENDING')
+      .neq('id', String(newId))
+      .then(
+        () => undefined,
+        (err: unknown) => {
+          logger.warn(
+            { err, email: emailLc },
+            'failed to supersede prior pending invitations (non-fatal)',
+          );
+        },
+      );
+  }
+
   let invitedByName: string | undefined;
   if (input.invitedBy) {
     const { data: inviter } = await db

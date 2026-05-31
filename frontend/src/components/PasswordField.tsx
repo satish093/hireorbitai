@@ -22,6 +22,15 @@ export const PasswordField = forwardRef<HTMLInputElement, Props>(function Passwo
         <input
           ref={ref}
           type={show ? 'text' : 'password'}
+          // Revealing the password flips the field to type="text", which on
+          // mobile re-enables the keyboard's autocorrect / autocapitalize and
+          // the "insert a space after a word" behaviour — that silently appends
+          // an invisible trailing space, so two identical-looking passwords
+          // fail the confirm-match check. Disable all of it. Callers can still
+          // override via `...rest`.
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
           {...rest}
           className={clsx(
             'w-full rounded-lg border bg-surface pl-3 pr-10 py-2 text-sm shadow-sm transition',
