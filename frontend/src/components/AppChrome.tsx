@@ -3,6 +3,7 @@ import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { MobileBottomNav } from './MobileBottomNav';
 import { MobileMoreSheet } from './MobileMoreSheet';
+import { CommandPalette } from './CommandPalette';
 import { useAuth } from '../context/AuthContext';
 
 /**
@@ -64,6 +65,9 @@ export function AppChrome() {
       {/* Mobile-only navigation — fixed overlay, hidden above md breakpoint. */}
       {profile && <MobileBottomNav onMore={() => setMoreOpen(true)} />}
       {profile && <MobileMoreSheet open={moreOpen} onClose={() => setMoreOpen(false)} />}
+
+      {/* Global ⌘K command palette — mounted once so it survives navigation. */}
+      {profile && <CommandPalette />}
     </NavContext.Provider>
   );
 }

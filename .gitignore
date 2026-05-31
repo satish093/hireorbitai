@@ -114,3 +114,9 @@ scripts/test-ai-live.mjs
 
 # Stray files from local testing
 /*.pdf
+
+# Design handoff bundle — fetched reference material (prototypes / specs /
+# plans): the visual + written source of truth for the redesign, NOT project
+# source. Never committed; re-fetch via the design share URL if missing.
+design_handoff_hireorbitai/
+dh_response.bin

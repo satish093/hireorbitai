@@ -3,6 +3,7 @@ import { useTheme } from '../hooks/useTheme';
 import { useAuth } from '../context/AuthContext';
 import { useBadgeCounts } from '../hooks/useBadgeCounts';
 import { Button } from './Button';
+import { openCommandPalette } from './CommandPalette';
 
 interface Crumb {
   label: string;
@@ -99,15 +100,7 @@ export function Header({ title, crumbs, onMenuClick: _onMenuClick }: Props) {
         role="button"
         aria-label="Search (⌘K)"
         tabIndex={0}
-        onClick={() => {
-          // ⌘K global search — placeholder for Phase 2+ command palette
-          const event = new KeyboardEvent('keydown', {
-            key: 'k',
-            metaKey: true,
-            bubbles: true,
-          });
-          document.dispatchEvent(event);
-        }}
+        onClick={openCommandPalette}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') e.currentTarget.click();
         }}

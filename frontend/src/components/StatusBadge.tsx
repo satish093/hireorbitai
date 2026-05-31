@@ -2,9 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { Pill, PillTone } from './Pill';
 
-// Tones for each known status string. Falls back to a neutral slate tone when
-// the backend ships a status we don't know about yet.
-const tone: Record<string, PillTone> = {
+// Tone for each known status string. Exported as a standalone, importable map
+// so any surface (mobile entity cards, KPI chips, custom inline chips) can reuse
+// the exact same tone families WITHOUT rendering the full StatusBadge component.
+// Falls back to a neutral slate tone when the backend ships an unknown status.
+// Dark mode uses pale `/15` chip fills (never glowing pastels) per the handoff.
+export const STATUS_TONES: Record<string, PillTone> = {
   ACTIVE: {
     bg: 'bg-emerald-50 dark:bg-emerald-500/15',
     text: 'text-emerald-700 dark:text-emerald-300',
@@ -90,7 +93,7 @@ const tone: Record<string, PillTone> = {
   REVOKED: { bg: 'bg-hover', text: 'text-muted', dot: 'bg-muted' },
 };
 
-const DEFAULT_TONE: PillTone = {
+export const DEFAULT_STATUS_TONE: PillTone = {
   bg: 'bg-hover',
   text: 'text-ink',
   dot: 'bg-muted',
@@ -98,7 +101,17 @@ const DEFAULT_TONE: PillTone = {
 
 // Statuses that benefit from a slow ambient pulse on the dot (active states
 // the user wants to *notice*).
-const PULSING = new Set(['SCHEDULED', 'INTERVIEW', 'PENDING', 'SCREENING', 'ACTIVE']);
+export const STATUS_PULSING = new Set(['SCHEDULED', 'INTERVIEW', 'PENDING', 'SCREENING', 'ACTIVE']);
+
+/**
+ * Standalone, importable tone helper. Returns the {@link PillTone} for a status
+ * string (or the neutral default for unknown statuses). Use this to colour a
+ * bare dot, a custom chip, or any surface that needs the status palette without
+ * the full StatusBadge chrome — the single source of truth for status colour.
+ */
+export function statusTone(status: string): PillTone {
+  return STATUS_TONES[status] ?? DEFAULT_STATUS_TONE;
+}
 
 export function StatusBadge({ status }: { status: string }) {
   const prev = useRef(status);
@@ -116,10 +129,18 @@ export function StatusBadge({ status }: { status: string }) {
   }, [status]);
 
   if (!status) return <span className="text-muted text-xs italic">—</span>;
-  const t = tone[status] ?? DEFAULT_TONE;
   return (
-    <Pill tone={t} pulseDot={PULSING.has(status)} className={clsx(pop && 'animate-pop')}>
+    <Pill
+      tone={statusTone(status)}
+      pulseDot={STATUS_PULSING.has(status)}
+      className={clsx(pop && 'animate-pop')}
+    >
       {status.replace(/_/g, ' ')}
     </Pill>
   );
 }
+
+// Semantic alias — the mobile + desktop "status chip" in the handoff IS the
+// StatusBadge. Exported under the design-system name so call sites can import
+// either name; both render identically and reuse the same tone map.
+export const StatusChip = StatusBadge;

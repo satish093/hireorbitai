@@ -14,6 +14,7 @@ import {
   OWNER_TIER,
   hasCapability,
   type DeveloperCapability,
+  type UserProfile,
 } from '../types';
 import { useBadgeCounts } from '../hooks/useBadgeCounts';
 import { useFeatureFlags } from '../hooks/useFeatureFlags';
@@ -49,7 +50,7 @@ import type { ComponentType, SVGProps } from 'react';
 
 type IconCmp = ComponentType<SVGProps<SVGSVGElement> & { size?: number; strokeWidth?: number }>;
 
-interface Item {
+export interface Item {
   to: string;
   label: string;
   roles: Role[];
@@ -59,13 +60,13 @@ interface Item {
   capability?: DeveloperCapability;
 }
 
-interface Section {
+export interface Section {
   heading: string;
   items: Item[];
   collapsible?: boolean;
 }
 
-const sections: Section[] = [
+export const NAV_SECTIONS: Section[] = [
   {
     heading: 'Workspace',
     items: [
@@ -213,7 +214,7 @@ const sections: Section[] = [
         roles: ADMIN_TIER,
         capability: 'feature_flags',
       },
-      { to: '/admin/ai-settings', label: 'AI Settings', icon: IconSparkles, roles: ADMIN_TIER },
+      { to: '/admin/ai-settings', label: 'AI Settings', icon: IconSparkles, roles: OWNER_TIER },
       { to: '/admin/audit-log', label: 'Audit Log', icon: IconClipboard, roles: ADMIN_TIER },
       {
         to: '/admin/calls-usage',
@@ -225,6 +226,30 @@ const sections: Section[] = [
     ],
   },
 ];
+
+/**
+ * Gate the nav model for a given user: drop items the role/capability/flag
+ * rules hide, then drop now-empty sections. Shared by the Sidebar and the
+ * global Command Palette so both surfaces show exactly the same destinations.
+ */
+export function filterNavSections(
+  role: Role | undefined,
+  profile: Pick<UserProfile, 'role' | 'capabilities'> | null | undefined,
+  flags: Record<string, boolean | undefined>,
+): Section[] {
+  return NAV_SECTIONS.map((section) => ({
+    ...section,
+    items: section.items.filter((i) => {
+      const roleOk =
+        !role ||
+        i.roles.includes(role) ||
+        (i.capability ? hasCapability(profile, i.capability) : false);
+      if (!roleOk) return false;
+      if (i.flagKey && flags[i.flagKey] === false) return false;
+      return true;
+    }),
+  })).filter((s) => s.items.length > 0);
+}
 
 // ── Avatar helpers ─────────────────────────────────────────────────────────
 
@@ -475,20 +500,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps = {}
         {/* ── Nav ── */}
         <nav className="flex-1 overflow-y-auto px-3 py-[14px] space-y-4" aria-label="Sidebar">
           {(() => {
-            const visibleSections = sections
-              .map((section) => ({
-                ...section,
-                items: section.items.filter((i) => {
-                  const roleOk =
-                    !role ||
-                    i.roles.includes(role) ||
-                    (i.capability ? hasCapability(profile, i.capability) : false);
-                  if (!roleOk) return false;
-                  if (i.flagKey && flags[i.flagKey] === false) return false;
-                  return true;
-                }),
-              }))
-              .filter((s) => s.items.length > 0);
+            const visibleSections = filterNavSections(role, profile, flags);
 
             const totalItems = visibleSections.reduce((n, s) => n + s.items.length, 0);
 

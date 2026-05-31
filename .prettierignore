@@ -12,6 +12,9 @@ frontend/playwright-report/
 _dev2_compare/
 *.zip
 *.svg
+# Design handoff bundle — fetched reference prototypes/specs, not project source
+design_handoff_hireorbitai/
+dh_response.bin
 # claude-flow and claude-sdk generated tool infrastructure (not project source)
 .claude-flow/
 .claude/agents/
