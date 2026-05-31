@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { requireRole } from '../middleware/auth';
-import { OPERATOR_TIER } from '../types';
+import { OPERATOR_TIER, ADMIN_TIER } from '../types';
 import * as c from '../controllers/applications.controller';
 
 export const applicationsRouter = Router();
@@ -22,6 +22,9 @@ applicationsRouter.get('/check-duplicate', operatorOnly, c.checkDuplicate);
 applicationsRouter.post('/', operatorOnly, c.create);
 applicationsRouter.post('/from-job', operatorOnly, c.fromJob);
 applicationsRouter.patch('/:id', operatorOnly, c.update);
+// Hard-delete is admin-tier only — destructive (cascades to interviews + the
+// apply-funnel event log), so it sits above the operator gate.
+applicationsRouter.delete('/:id', requireRole(...ADMIN_TIER), c.remove);
 applicationsRouter.post('/:id/ats-score', operatorOnly, c.runAtsScore);
 applicationsRouter.get('/:id/events', operatorOnly, c.listEvents);
 applicationsRouter.post('/:id/events', operatorOnly, c.appendEvent);

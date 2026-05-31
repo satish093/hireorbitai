@@ -107,9 +107,18 @@ async function loadAndAuthorize(
 export const list: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   const { consultant_id, recruiter_id, status } = req.query as Record<string, string | undefined>;
+  // Embed the consultant's + recruiter's `user` row so the Applications table
+  // can render their names. `consultants(*)` alone carries no name (that lives
+  // on users), and the recruiter wasn't embedded at all — both columns fell
+  // through to "—". This list is OPERATOR_TIER-gated (consultants use
+  // /applications/mine), so surfacing recruiter context here is fine.
   let qb = db
     .from('applications')
-    .select('*, job:jobs(*), vendor:vendors(*), consultant:consultants(*)');
+    .select(
+      '*, job:jobs(*), vendor:vendors(*), ' +
+        'consultant:consultants(*, user:users!user_id(id, full_name, email)), ' +
+        'recruiter:recruiters(*, user:users!user_id(id, full_name, email))',
+    );
 
   if (isManagerTier(req.user.role)) {
     if (consultant_id) qb = qb.eq('consultant_id', consultant_id);
@@ -301,6 +310,23 @@ export const update: RequestHandler = async (req, res) => {
     throw httpError(500, 'Database error');
   }
   res.json(data);
+};
+
+// ---------------------------------------------------------------------------
+// DELETE /applications/:id — hard-delete a submission. Route-gated to
+// ADMIN_TIER (see applications.routes.ts), so only admin-tier callers reach it.
+// `application_events` and `interviews` both reference applications ON DELETE
+// CASCADE, so the submission's audit trail + scheduled interviews go with it.
+// ---------------------------------------------------------------------------
+export const remove: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  // The route is ADMIN_TIER-gated; loadAndAuthorize returns the row for admin
+  // tier (or 404 if it doesn't exist) so delete can't be used as an existence
+  // oracle and the ownership model stays consistent if the gate ever widens.
+  await loadAndAuthorize(req.user, req.params.id);
+  const { error } = await db.from('applications').delete().eq('id', req.params.id);
+  if (error) throw httpError(500, 'Database error');
+  res.json({ ok: true });
 };
 
 // ---------------------------------------------------------------------------

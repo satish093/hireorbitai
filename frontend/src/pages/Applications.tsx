@@ -11,6 +11,7 @@ import { NewSubmissionModal } from '../components/NewSubmissionModal';
 import { api } from '../services/api';
 import { invalidate, useInvalidationListener } from '../hooks/useInvalidate';
 import { useAuth } from '../context/AuthContext';
+import { ADMIN_TIER } from '../types';
 import { IconFileText } from '../components/Icons';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
@@ -65,6 +66,27 @@ export function Applications() {
   );
 
   const canSubmit = profile?.role !== 'CONSULTANT';
+  // Admin-tier (SUPER_ADMIN / CEO / CTO / DIRECTOR) can hard-delete a
+  // submission — matches the backend DELETE /applications/:id gate. Destructive:
+  // it cascades to the submission's interviews + apply-event history.
+  const canDelete = !!profile && ADMIN_TIER.includes(profile.role);
+
+  async function remove(id: string) {
+    if (
+      !confirm(
+        'Delete this submission? This also removes its scheduled interviews and apply history, and cannot be undone.',
+      )
+    )
+      return;
+    try {
+      await api.delete(`/applications/${id}`);
+      setRows((prev) => prev.filter((r) => r.id !== id));
+      toast.success('Submission deleted');
+      invalidate('applications');
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error ?? 'Delete failed');
+    }
+  }
 
   return (
     <Layout title="Applications">
@@ -154,6 +176,27 @@ export function Applications() {
               header: 'Status',
               render: (a: ApplicationRow) => <StatusBadge status={a.status} />,
             },
+            ...(canDelete
+              ? [
+                  {
+                    key: 'actions',
+                    header: '',
+                    align: 'right' as const,
+                    render: (a: ApplicationRow) => (
+                      <Button
+                        variant="danger-ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          remove(a.id);
+                        }}
+                      >
+                        Delete
+                      </Button>
+                    ),
+                  },
+                ]
+              : []),
           ]}
           rows={visible}
         />
@@ -188,7 +231,20 @@ export function Applications() {
             compact
           />
         ) : (
-          visible.map((a) => <ApplicationCard key={a.id} application={a} />)
+          visible.map((a) =>
+            canDelete ? (
+              <div key={a.id}>
+                <ApplicationCard application={a} />
+                <div className="mt-1 flex justify-end">
+                  <Button variant="danger-ghost" size="sm" onClick={() => remove(a.id)}>
+                    Delete
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <ApplicationCard key={a.id} application={a} />
+            ),
+          )
         )}
       </div>
 
