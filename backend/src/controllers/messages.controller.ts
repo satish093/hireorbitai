@@ -1,6 +1,6 @@
 import { RequestHandler } from 'express';
 import { z } from 'zod';
-import { db } from '../config/db';
+import { db, pool } from '../config/db';
 import { httpError } from '../types';
 import {
   canMessageUser,
@@ -122,7 +122,12 @@ export const conversations: RequestHandler = async (req, res) => {
       unread_count: number;
     }
   >();
+  // SECURITY: a consultant never sees internal notes — skip them so they can't
+  // surface as a last-message preview or bump the unread count. Robust to the
+  // pre-migration state (is_internal undefined → not skipped → no notes exist).
+  const hideInternal = req.user.role === 'CONSULTANT';
   for (const m of (data ?? []) as any[]) {
+    if (hideInternal && m.is_internal) continue;
     const iAmSender = m.sender_id === me;
     const peer = iAmSender ? m.recipient : m.sender;
     if (!peer?.id) continue;
@@ -134,26 +139,121 @@ export const conversations: RequestHandler = async (req, res) => {
   }
   // Embed attachments on each conversation's last_message so the
   // conversation list can render "📎 file.pdf" previews next to the body.
-  const rows = Array.from(buckets.values());
+  const rows = Array.from(buckets.values()) as Array<{
+    peer: { id: string };
+    last_message: { id: string; created_at?: string };
+    pinned?: boolean;
+    archived?: boolean;
+  }>;
   const lastMessages = rows.map((r) => r.last_message as { id: string });
   const withAtt = await attachAttachments(lastMessages);
   rows.forEach((r, i) => {
-    r.last_message = withAtt[i];
+    r.last_message = withAtt[i] as { id: string; created_at?: string };
+  });
+
+  // Attach the caller's personal pin/archive state. Robust to the pre-migration
+  // state: if conversation_states doesn't exist yet, everything is unpinned /
+  // unarchived (the query errors → empty map → defaults).
+  const byPeer = new Map<string, { pinned: boolean; archived: boolean }>();
+  try {
+    const { data: states, error: stErr } = await db
+      .from('conversation_states')
+      .select('peer_id, pinned, archived')
+      .eq('user_id', me);
+    if (!stErr) {
+      for (const s of (states ?? []) as Array<{
+        peer_id: string;
+        pinned: boolean;
+        archived: boolean;
+      }>) {
+        byPeer.set(s.peer_id, { pinned: !!s.pinned, archived: !!s.archived });
+      }
+    }
+  } catch {
+    /* table not migrated yet — leave all defaults */
+  }
+  for (const r of rows) {
+    const st = byPeer.get(r.peer.id);
+    r.pinned = st?.pinned ?? false;
+    r.archived = st?.archived ?? false;
+  }
+  // Pinned conversations float to the top; within each group keep recency order.
+  rows.sort((a, b) => {
+    if (!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1;
+    const at = new Date(a.last_message?.created_at ?? 0).getTime();
+    const bt = new Date(b.last_message?.created_at ?? 0).getTime();
+    return bt - at;
   });
   res.json(rows);
+};
+
+/**
+ * PATCH /messages/with/:userId/state — set the caller's personal pin/archive
+ * state for a conversation. Self-scoped (user_id = caller); no data exposure,
+ * so no canMessage gate. A partial PATCH merges onto the existing row.
+ * Pre-migration the table is absent → silently no-ops so the UI never errors.
+ */
+export const setConversationState: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const me = req.user.id;
+  const peer = req.params.userId;
+  if (!z.string().uuid().safeParse(peer).success || peer === me) {
+    throw httpError(400, 'Invalid peer id');
+  }
+  const schema = z
+    .object({ pinned: z.boolean().optional(), archived: z.boolean().optional() })
+    .strict();
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
+
+  try {
+    const { rows: existing } = await pool.query(
+      'select pinned, archived from public.conversation_states where user_id = $1 and peer_id = $2',
+      [me, peer],
+    );
+    const cur = existing[0] ?? { pinned: false, archived: false };
+    const pinned = parsed.data.pinned ?? cur.pinned;
+    const archived = parsed.data.archived ?? cur.archived;
+    await pool.query(
+      `insert into public.conversation_states (user_id, peer_id, pinned, archived, updated_at)
+       values ($1, $2, $3, $4, now())
+       on conflict (user_id, peer_id) do update set pinned = $3, archived = $4, updated_at = now()`,
+      [me, peer, pinned, archived],
+    );
+    res.json({ ok: true, pinned, archived });
+  } catch {
+    // Table not migrated yet — no-op so the inbox stays usable.
+    res.json({
+      ok: true,
+      pinned: parsed.data.pinned ?? false,
+      archived: parsed.data.archived ?? false,
+    });
+  }
 };
 
 /** GET /messages/unread-count */
 export const unreadCount: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   // Exclude soft-deleted rows from the unread count so a retracted DM
-  // doesn't leave a phantom badge on the recipient's nav.
-  const { count, error } = await db
-    .from('messages')
-    .select('*', { count: 'exact', head: true })
-    .eq('recipient_id', req.user.id)
-    .is('read_at', null)
-    .is('deleted_at', null);
+  // doesn't leave a phantom badge on the recipient's nav. A consultant must
+  // also never have an internal note counted — filter is_internal=false for
+  // them, with a retry that drops the filter pre-migration (when the column
+  // doesn't exist yet there are no internal notes, so the count is still right).
+  const meId = req.user.id;
+  const hideInternal = req.user.role === 'CONSULTANT';
+  const base = () =>
+    db
+      .from('messages')
+      .select('*', { count: 'exact', head: true })
+      .eq('recipient_id', meId)
+      .is('read_at', null)
+      .is('deleted_at', null);
+  let q = base();
+  if (hideInternal) q = q.eq('is_internal', false);
+  let { count, error } = await q;
+  if (error && /is_internal|schema cache|column/i.test(error.message ?? '')) {
+    ({ count, error } = await base());
+  }
   if (error) throw httpError(500, 'Database error');
   res.json({ unread: count ?? 0 });
 };
@@ -208,11 +308,69 @@ export const thread: RequestHandler = async (req, res) => {
       .order('created_at', { ascending: true }));
   }
   if (error) throw httpError(500, 'Database error');
-  const withAttachments = await attachAttachments((data ?? []) as { id: string }[]);
+  // SECURITY: a consultant must never see an internal note. Filter server-side
+  // (JS, not SQL) so it stays correct even before the is_internal column exists
+  // — pre-migration `is_internal` is undefined → falsy → kept (no internal
+  // notes exist yet anyway). Applied before attachment/reply resolution so an
+  // internal note never even gets enriched for a consultant.
+  let rows = (data ?? []) as Array<{ id: string; is_internal?: boolean }>;
+  if (req.user.role === 'CONSULTANT') rows = rows.filter((m) => !m.is_internal);
+  const withAttachments = await attachAttachments(rows as { id: string }[]);
   const withReplies = await resolveReplyParents(
     withAttachments as Array<{ id: string; reply_to_message_id?: string | null }>,
   );
   res.json(withReplies);
+};
+
+/**
+ * GET /messages/with/:userId/context — lightweight peer context for the
+ * conversation panel. Gated by canViewConversation (the SAME rule as the
+ * thread), so a viewer only ever sees context for a peer they may message.
+ * Returns the peer's most-recent application (with job + vendor) when the peer
+ * is a consultant; { application: null } for a staff peer or when none exists.
+ * Read-only and answer-narrow — no recruiter-side internal fields are exposed.
+ */
+export const conversationContext: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const me = req.user.id;
+  const other = req.params.userId;
+  if (me === other) {
+    res.json({ application: null });
+    return;
+  }
+  const allowed = await canViewConversation(
+    { id: me, role: req.user.role, group_id: req.user.group_id ?? null },
+    other,
+  );
+  if (!allowed) throw httpError(403, 'You cannot view this conversation.');
+
+  // Peer → consultant row (staff peers have none → no related work).
+  const { data: consultant } = await db
+    .from('consultants')
+    .select('id')
+    .eq('user_id', other)
+    .maybeSingle();
+  const consId = (consultant as { id?: string } | null)?.id;
+  if (!consId) {
+    res.json({ application: null });
+    return;
+  }
+
+  // Latest application for that consultant — narrow, consultant-safe projection
+  // (no recruiter_id / ats_score / internal notes).
+  const { data, error } = await db
+    .from('applications')
+    .select(
+      'id, status, submitted_at, job:jobs(id, title, company_name), vendor:vendors(id, company_name)',
+    )
+    .eq('consultant_id', consId)
+    .order('submitted_at', { ascending: false })
+    .limit(1);
+  if (error) {
+    res.json({ application: null });
+    return;
+  }
+  res.json({ application: ((data ?? []) as unknown[])[0] ?? null });
 };
 
 /**
@@ -314,6 +472,10 @@ export const send: RequestHandler = async (req, res) => {
       // belongs to THIS pair (sender ↔ recipient) — enforced server-side
       // below, so a forged id from another conversation can't be quoted.
       reply_to_message_id: z.string().uuid().optional().nullable(),
+      // Internal note: a staff-only annotation. Honoured only for non-consultant
+      // senders (forced false below for a CONSULTANT) and never delivered to a
+      // consultant recipient on any read path.
+      is_internal: z.boolean().optional().default(false),
     })
     .refine((d) => d.body.trim().length > 0 || d.attachment_ids.length > 0, {
       message: 'Message body or at least one attachment is required',
@@ -327,11 +489,17 @@ export const send: RequestHandler = async (req, res) => {
   // Recipient must exist in public.users.
   const { data: recipient } = await db
     .from('users')
-    .select('id, is_active')
+    .select('id, is_active, role')
     .eq('id', parsed.data.recipient_id)
     .maybeSingle();
   if (!recipient) throw httpError(404, 'Recipient not found');
   if (recipient.is_active === false) throw httpError(400, 'Recipient is inactive');
+
+  // Internal note: staff-only. A CONSULTANT may never CREATE one (forced
+  // false) and a CONSULTANT recipient may never RECEIVE one (the realtime
+  // push below is suppressed; every read path filters them out server-side).
+  const isInternal = parsed.data.is_internal === true && req.user.role !== 'CONSULTANT';
+  const recipientIsConsultant = (recipient as { role?: string }).role === 'CONSULTANT';
 
   // Hierarchy-aware send authorization. Without this, any signed-in user
   // could POST a message to any other user (the original IDOR). The check
@@ -380,16 +548,19 @@ export const send: RequestHandler = async (req, res) => {
     body: parsed.data.body.trim(),
   };
   if (replyToId) insertRow.reply_to_message_id = replyToId;
+  if (isInternal) insertRow.is_internal = true;
   let { data: inserted, error: insErr } = await db
     .from('messages')
     .insert(insertRow)
     .select('id')
     .single();
-  // Schema lag: the column may not exist on a DB that hasn't run the
-  // 1754000000000 migration yet. Retry without the field so a body-only
-  // send still works before the migration lands.
-  if (insErr && /reply_to_message_id|schema cache/i.test(insErr.message ?? '')) {
+  // Schema lag: reply_to_message_id (1754000000000) or is_internal
+  // (1755000000000) may not exist on a DB that hasn't run those migrations
+  // yet. Strip the late-arrival columns and retry so a body-only send still
+  // works before the migration lands.
+  if (insErr && /reply_to_message_id|is_internal|schema cache/i.test(insErr.message ?? '')) {
     delete insertRow.reply_to_message_id;
+    delete insertRow.is_internal;
     ({ data: inserted, error: insErr } = await db
       .from('messages')
       .insert(insertRow)
@@ -439,7 +610,13 @@ export const send: RequestHandler = async (req, res) => {
   // Fan out to both ends. Recipient gets the message:new event for inbox /
   // active-thread updates; sender gets it too so a second tab on the
   // sender's side mirrors the new message without a poll cycle.
-  void publishToUser(parsed.data.recipient_id, 'message:new', withReply);
+  //
+  // SECURITY: an internal note must never reach a consultant — suppress the
+  // recipient push when the note is internal and the recipient is a consultant
+  // (mirrors the read-path filtering). The staff sender still gets the echo.
+  if (!(isInternal && recipientIsConsultant)) {
+    void publishToUser(parsed.data.recipient_id, 'message:new', withReply);
+  }
   void publishToUser(req.user.id, 'message:new', withReply);
   res.status(201).json(withReply);
 };

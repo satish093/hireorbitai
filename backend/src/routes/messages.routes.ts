@@ -22,6 +22,8 @@ messagesRouter.delete('/attachments/:id', att.remove);
 messagesRouter.post('/', c.send);
 
 messagesRouter.get('/with/:userId', c.thread);
+messagesRouter.get('/with/:userId/context', c.conversationContext);
+messagesRouter.patch('/with/:userId/state', c.setConversationState);
 messagesRouter.post('/with/:userId/read', c.markRead);
 messagesRouter.post('/with/:userId/typing', c.typing);
 

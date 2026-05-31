@@ -23,6 +23,8 @@ import { useMediaViewer } from '../hooks/useMediaViewer';
 const MediaViewerModal = lazy(() => import('../components/MediaViewerModal'));
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { QuickReplyMenu } from '../components/messages/QuickReplyMenu';
+import { Popover } from '../components/ui/Popover';
 import { useRealtime } from '../hooks/useRealtime';
 import { useCallContext } from '../context/CallContext';
 import { Role, ROLE_LABEL } from '../types';
@@ -72,12 +74,17 @@ interface Message {
   attachments?: Attachment[];
   reply_to_message_id?: string | null;
   reply_to?: ReplyParent | null;
+  /** Staff-only annotation — the server never delivers this to a consultant. */
+  is_internal?: boolean;
 }
 
 interface Conversation {
   peer: Party;
   last_message: Message;
   unread_count: number;
+  /** Caller's personal inbox state for this conversation. */
+  pinned?: boolean;
+  archived?: boolean;
 }
 
 // Two cadences. The active thread polls fast for snappy UX; the conversation
@@ -101,10 +108,15 @@ export function Messages() {
   const [directory, setDirectory] = useState<Party[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState('');
+  // Internal-note composer mode (staff only). When on, the message is flagged
+  // is_internal and the server keeps it away from the consultant entirely.
+  const [internalNote, setInternalNote] = useState(false);
   // Single search box at the top of the chat list. Filters existing
   // conversations and, when non-empty, surfaces matching directory people so
   // you can start a brand-new chat without a separate compose popover.
   const [search, setSearch] = useState('');
+  // Inbox filter tabs: All / Unread / Pinned / Archived.
+  const [convFilter, setConvFilter] = useState<'all' | 'unread' | 'pinned' | 'archived'>('all');
   const [sending, setSending] = useState(false);
   // Synchronous re-entry guard for send(). setSending(true) is async — a
   // fast Enter-Enter (or Enter-then-click) fires send() twice before React
@@ -608,6 +620,7 @@ export function Messages() {
       sender_id: profile?.id ?? '',
       recipient_id: activePeerId,
       body,
+      is_internal: internalNote,
       read_at: null,
       created_at: new Date().toISOString(),
       attachments: stagedAttachments,
@@ -618,6 +631,7 @@ export function Messages() {
     };
     setMessages((m) => [...m, optimistic]);
     setDraft('');
+    setInternalNote(false);
     setPendingAttachments([]);
     setReplyingTo(null);
     stickToBottomRef.current = true;
@@ -633,6 +647,7 @@ export function Messages() {
         body,
         attachment_ids: stagedAttachments.filter((a) => !a.id.startsWith('tmp-')).map((a) => a.id),
         reply_to_message_id: stagedReply?.id ?? null,
+        is_internal: internalNote,
       });
       const saved = res.data as Message;
       setMessages((m) => {
@@ -663,13 +678,30 @@ export function Messages() {
     }
   }
 
+  // Set the caller's personal pin/archive state for a conversation (optimistic,
+  // self-scoped on the server). Rolls back to server truth on failure.
+  async function setConvState(peerId: string, patch: { pinned?: boolean; archived?: boolean }) {
+    setConversations((prev) => prev.map((c) => (c.peer.id === peerId ? { ...c, ...patch } : c)));
+    try {
+      await api.patch(`/messages/with/${peerId}/state`, patch);
+    } catch {
+      void refresh();
+    }
+  }
+
   const q = search.trim().toLowerCase();
   const conversationPeerIds = new Set(conversations.map((c) => c.peer.id));
-  // Existing conversations matching the search box.
-  const filteredConversations = conversations.filter((c) => {
-    if (!q) return true;
-    return (c.peer.full_name ?? c.peer.email).toLowerCase().includes(q);
-  });
+  // Existing conversations matching the active tab + the search box. Archived
+  // chats are hidden from All/Unread/Pinned and only appear under Archived.
+  const filteredConversations = conversations
+    .filter((c) => {
+      if (convFilter === 'archived') return c.archived === true;
+      if (c.archived) return false;
+      if (convFilter === 'unread') return c.unread_count > 0;
+      if (convFilter === 'pinned') return c.pinned === true;
+      return true;
+    })
+    .filter((c) => !q || (c.peer.full_name ?? c.peer.email).toLowerCase().includes(q));
   // Always surface the rest of the user's permitted directory under the
   // existing conversations — Discord-style: every person you can DM is
   // visible from the start, you don't have to "search to discover". The
@@ -723,6 +755,26 @@ export function Messages() {
             </div>
           </div>
 
+          {/* Inbox filter tabs */}
+          <div className="px-3 pb-2 flex items-center gap-1">
+            {(['all', 'unread', 'pinned', 'archived'] as const).map((f) => (
+              <button
+                key={f}
+                type="button"
+                onClick={() => setConvFilter(f)}
+                aria-pressed={convFilter === f}
+                className={clsx(
+                  'text-xs font-medium px-2.5 py-1 rounded-full capitalize transition-colors',
+                  convFilter === f
+                    ? 'bg-brand-soft text-brand-on-soft'
+                    : 'text-muted hover:bg-hover hover:text-ink',
+                )}
+              >
+                {f}
+              </button>
+            ))}
+          </div>
+
           <div className="flex-1 overflow-y-auto">
             {initialLoad && conversations.length === 0 && directory.length === 0 ? (
               <div className="px-3 py-2 space-y-2" aria-label="Loading conversations">
@@ -747,56 +799,113 @@ export function Messages() {
                 {filteredConversations.map((c) => {
                   const active = c.peer.id === activePeerId;
                   return (
-                    <button
-                      key={c.peer.id}
-                      onClick={() => setParams({ with: c.peer.id })}
-                      className={clsx(
-                        'w-full flex items-start gap-3 px-3 py-3 text-left transition-colors hover:bg-hover/60',
-                        active && 'bg-hover',
-                      )}
-                    >
-                      <div className="relative shrink-0">
-                        <Avatar name={c.peer.full_name} email={c.peer.email} size={44} />
-                        <PresenceDot
-                          lastSeenAt={c.peer.last_seen_at}
-                          className="absolute -bottom-0.5 -right-0.5"
-                        />
-                      </div>
-                      <div className="flex-1 min-w-0 border-b border-border/60 pb-2.5 -mt-0.5">
-                        <div className="flex items-baseline justify-between gap-2">
-                          <span className="text-sm font-medium truncate inline-flex items-center gap-1.5 text-ink">
-                            <GroupBadge groupId={c.peer.group_id ?? null} compact hideEmpty />
-                            {c.peer.full_name ?? c.peer.email}
-                          </span>
-                          <span
-                            className={clsx(
-                              'text-[11px] shrink-0',
-                              c.unread_count > 0
-                                ? 'text-brand-600 dark:text-brand-200 font-semibold'
-                                : 'text-muted',
-                            )}
-                          >
-                            {relative(c.last_message.created_at)}
-                          </span>
+                    <div key={c.peer.id} className="relative group">
+                      <button
+                        onClick={() => setParams({ with: c.peer.id })}
+                        className={clsx(
+                          'w-full flex items-start gap-3 px-3 py-3 text-left transition-colors hover:bg-hover/60',
+                          active && 'bg-hover',
+                        )}
+                      >
+                        <div className="relative shrink-0">
+                          <Avatar name={c.peer.full_name} email={c.peer.email} size={44} />
+                          <PresenceDot
+                            lastSeenAt={c.peer.last_seen_at}
+                            className="absolute -bottom-0.5 -right-0.5"
+                          />
                         </div>
-                        <div className="flex items-center justify-between gap-2 mt-0.5">
-                          <p
-                            className={clsx(
-                              'text-xs truncate',
-                              c.unread_count > 0 ? 'text-ink font-medium' : 'text-muted',
+                        <div className="flex-1 min-w-0 border-b border-border/60 pb-2.5 -mt-0.5">
+                          <div className="flex items-baseline justify-between gap-2">
+                            <span className="text-sm font-medium truncate inline-flex items-center gap-1.5 text-ink">
+                              {c.pinned && (
+                                <svg
+                                  width="11"
+                                  height="11"
+                                  viewBox="0 0 24 24"
+                                  fill="currentColor"
+                                  className="shrink-0 text-muted"
+                                  aria-hidden="true"
+                                >
+                                  <path d="M14 4v6l3 3v2h-5v5l-1 1-1-1v-5H4v-2l3-3V4H6V2h10v2h-2z" />
+                                </svg>
+                              )}
+                              <GroupBadge groupId={c.peer.group_id ?? null} compact hideEmpty />
+                              {c.peer.full_name ?? c.peer.email}
+                            </span>
+                            <span
+                              className={clsx(
+                                'text-[11px] shrink-0',
+                                c.unread_count > 0
+                                  ? 'text-brand-600 dark:text-brand-200 font-semibold'
+                                  : 'text-muted',
+                              )}
+                            >
+                              {relative(c.last_message.created_at)}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between gap-2 mt-0.5">
+                            <p
+                              className={clsx(
+                                'text-xs truncate',
+                                c.unread_count > 0 ? 'text-ink font-medium' : 'text-muted',
+                              )}
+                            >
+                              {c.last_message.sender_id === profile?.id ? 'You: ' : ''}
+                              {previewForConversation(c.last_message)}
+                            </p>
+                            {c.unread_count > 0 && (
+                              <span className="shrink-0 bg-brand-500 text-white text-[10px] font-semibold rounded-full px-1.5 min-w-[18px] h-[18px] flex items-center justify-center">
+                                {c.unread_count}
+                              </span>
                             )}
-                          >
-                            {c.last_message.sender_id === profile?.id ? 'You: ' : ''}
-                            {previewForConversation(c.last_message)}
-                          </p>
-                          {c.unread_count > 0 && (
-                            <span className="shrink-0 bg-brand-500 text-white text-[10px] font-semibold rounded-full px-1.5 min-w-[18px] h-[18px] flex items-center justify-center">
-                              {c.unread_count}
+                          </div>
+                        </div>
+                      </button>
+                      {/* Pin / archive actions — appear on hover/focus */}
+                      <div className="absolute top-1.5 right-2 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                        <Popover
+                          align="right"
+                          button={(open) => (
+                            <span
+                              role="button"
+                              aria-label="Conversation options"
+                              className={clsx(
+                                'w-7 h-7 grid place-items-center rounded-full border text-muted hover:text-ink transition-colors',
+                                open && 'text-ink',
+                              )}
+                              style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
+                            >
+                              ⋯
                             </span>
                           )}
-                        </div>
+                        >
+                          {(close) => (
+                            <div className="min-w-[150px]">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  void setConvState(c.peer.id, { pinned: !c.pinned });
+                                  close();
+                                }}
+                                className="w-full text-left px-2 py-1.5 rounded-md text-[13px] text-ink hover:bg-hover transition-colors"
+                              >
+                                {c.pinned ? 'Unpin' : 'Pin to top'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  void setConvState(c.peer.id, { archived: !c.archived });
+                                  close();
+                                }}
+                                className="w-full text-left px-2 py-1.5 rounded-md text-[13px] text-ink hover:bg-hover transition-colors"
+                              >
+                                {c.archived ? 'Unarchive' : 'Archive'}
+                              </button>
+                            </div>
+                          )}
+                        </Popover>
                       </div>
-                    </button>
+                    </div>
                   );
                 })}
 
@@ -1162,6 +1271,51 @@ export function Messages() {
                       >
                         <IconPaperclip size={18} />
                       </button>
+                      <QuickReplyMenu
+                        peerName={activePeer.full_name ?? activePeer.email ?? ''}
+                        myName={profile?.full_name ?? ''}
+                        onInsert={(text) => {
+                          setDraft((d) => (d.trim() ? `${d.replace(/\s*$/, '')} ${text}` : text));
+                          composerRef.current?.focus();
+                        }}
+                      />
+                      {/* Internal-note toggle — staff only. Consultants never
+                          see this (and the server forces is_internal=false for
+                          a consultant sender regardless). */}
+                      {profile?.role !== 'CONSULTANT' && (
+                        <button
+                          type="button"
+                          onClick={() => setInternalNote((v) => !v)}
+                          aria-pressed={internalNote}
+                          aria-label="Internal note (staff only)"
+                          title={
+                            internalNote
+                              ? 'Internal note — only staff can see this'
+                              : 'Mark as internal note (staff only)'
+                          }
+                          className={clsx(
+                            'shrink-0 h-10 w-10 flex items-center justify-center rounded-full transition-colors',
+                            internalNote
+                              ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300'
+                              : 'text-muted hover:text-ink hover:bg-hover',
+                          )}
+                        >
+                          <svg
+                            width="17"
+                            height="17"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.9"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                          >
+                            <rect x="5" y="11" width="14" height="10" rx="2" />
+                            <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+                          </svg>
+                        </button>
+                      )}
                       <textarea
                         ref={composerRef}
                         value={draft}
@@ -1186,8 +1340,17 @@ export function Messages() {
                           }
                         }}
                         rows={1}
-                        placeholder="Write a message… (Shift+Enter for newline)"
-                        className="flex-1 resize-none bg-hover/60 rounded-2xl px-4 py-2.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-brand-500/40 max-h-36 overflow-y-auto"
+                        placeholder={
+                          internalNote
+                            ? 'Internal note — only staff will see this…'
+                            : 'Write a message… (Shift+Enter for newline)'
+                        }
+                        className={clsx(
+                          'flex-1 resize-none rounded-2xl px-4 py-2.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-2 max-h-36 overflow-y-auto',
+                          internalNote
+                            ? 'bg-amber-50 dark:bg-amber-500/10 focus:ring-amber-400/50'
+                            : 'bg-hover/60 focus:ring-brand-500/40',
+                        )}
                       />
                       <Button
                         type="submit"
@@ -1401,11 +1564,32 @@ function Bubble({
       <div
         className={clsx(
           'max-w-[70%] px-3 py-2 rounded-2xl text-sm whitespace-pre-wrap break-words shadow-sm',
-          mine
-            ? 'bg-brand-600 text-white rounded-br-sm'
-            : 'bg-surface border border-border text-ink rounded-bl-sm',
+          message.is_internal
+            ? 'bg-amber-50 dark:bg-amber-500/10 border border-dashed border-amber-400/70 text-amber-900 dark:text-amber-100 rounded-bl-sm'
+            : mine
+              ? 'bg-brand-600 text-white rounded-br-sm'
+              : 'bg-surface border border-border text-ink rounded-bl-sm',
         )}
       >
+        {message.is_internal && (
+          <div className="flex items-center gap-1 mb-1 text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300">
+            <svg
+              width="11"
+              height="11"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <rect x="5" y="11" width="14" height="10" rx="2" />
+              <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+            </svg>
+            Internal note
+          </div>
+        )}
         {editing ? (
           <div className="space-y-1.5">
             <textarea

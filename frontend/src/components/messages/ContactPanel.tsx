@@ -3,10 +3,12 @@ import { Link } from 'react-router-dom';
 import { Avatar } from '../TaskBits';
 import { PresencePill } from '../PresenceDot';
 import { GroupBadge } from '../GroupBadge';
+import { StatusBadge } from '../StatusBadge';
 import { ROLE_LABEL, type Role } from '../../types';
 import { relationshipLabel } from '../../lib/canMessage';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/api';
+import { BugReportModal } from './BugReportModal';
 
 interface Party {
   id: string;
@@ -24,6 +26,14 @@ interface CallLogEntry {
   duration_seconds: number | null;
   ended_at: string | null;
   started_at: string | null;
+}
+
+interface RelatedApp {
+  id: string;
+  status: string;
+  submitted_at: string | null;
+  job?: { id: string; title: string; company_name?: string | null } | null;
+  vendor?: { id: string; company_name?: string | null } | null;
 }
 
 interface Props {
@@ -55,6 +65,7 @@ export function ContactPanel({ peer, onCall, onClose }: Props) {
   const roleLabel = peer.role ? (ROLE_LABEL[peer.role] ?? peer.role) : '';
   const rel = relationshipLabel(profile?.role, peer.role ?? undefined);
   const isAdmin = profile?.role && ['SUPER_ADMIN', 'CEO', 'CTO', 'DIRECTOR'].includes(profile.role);
+  const [bugOpen, setBugOpen] = useState(false);
 
   // Recent calls with this peer (read-only log).
   const [calls, setCalls] = useState<CallLogEntry[]>([]);
@@ -67,6 +78,25 @@ export function ContactPanel({ peer, onCall, onClose }: Props) {
       })
       .catch(() => {
         /* feature flag off or endpoint unavailable — hide the section */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [peer.id]);
+
+  // Related work — the peer's latest application (when the peer is a
+  // consultant the viewer may see). Server gates this by canViewConversation.
+  const [relatedApp, setRelatedApp] = useState<RelatedApp | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    setRelatedApp(null);
+    api
+      .get(`/messages/with/${peer.id}/context`)
+      .then((r) => {
+        if (!cancelled) setRelatedApp(r.data?.application ?? null);
+      })
+      .catch(() => {
+        /* endpoint unavailable / not permitted — hide the section */
       });
     return () => {
       cancelled = true;
@@ -175,7 +205,51 @@ export function ContactPanel({ peer, onCall, onClose }: Props) {
           <PhoneIcon />
           Voice call
         </button>
+
+        {/* Report an issue — opens the structured bug-report form. */}
+        <button
+          type="button"
+          onClick={() => setBugOpen(true)}
+          className="flex items-center justify-center gap-2 h-9 rounded-lg text-sm font-medium transition-colors"
+          style={{ color: 'var(--muted)' }}
+        >
+          Report an issue
+        </button>
       </div>
+
+      <BugReportModal open={bugOpen} onClose={() => setBugOpen(false)} />
+
+      {/* Related work — the peer consultant's latest application */}
+      {relatedApp && (
+        <>
+          <div className="shrink-0 mx-4 border-t" style={{ borderColor: 'var(--border)' }} />
+          <div className="px-4 py-4">
+            <div
+              className="text-[10.5px] font-bold uppercase tracking-wide mb-2"
+              style={{ color: 'var(--muted)' }}
+            >
+              Related work
+            </div>
+            <Link
+              to={relatedApp.job?.id ? `/jobs/${relatedApp.job.id}` : '/applications'}
+              className="block rounded-lg p-3 transition-colors hover:bg-hover"
+              style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}
+            >
+              <div className="text-sm font-medium truncate" style={{ color: 'var(--ink)' }}>
+                {relatedApp.job?.title ?? 'Application'}
+              </div>
+              <div className="text-xs mt-0.5 truncate" style={{ color: 'var(--muted)' }}>
+                {relatedApp.job?.company_name ?? relatedApp.vendor?.company_name ?? '—'}
+                {relatedApp.submitted_at &&
+                  ` · ${new Date(relatedApp.submitted_at).toLocaleDateString()}`}
+              </div>
+              <div className="mt-1.5">
+                <StatusBadge status={relatedApp.status} />
+              </div>
+            </Link>
+          </div>
+        </>
+      )}
 
       {/* Recent calls */}
       {calls.length > 0 && (

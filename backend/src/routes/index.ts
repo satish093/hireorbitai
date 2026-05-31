@@ -22,6 +22,7 @@ import { aiRouter } from './ai.routes';
 import { tasksRouter } from './tasks.routes';
 import { taskViewsRouter } from './taskViews.routes';
 import { messagesRouter } from './messages.routes';
+import { supportRouter } from './support.routes';
 import { callsRouter, callsUsageRouter } from './calls.routes';
 import { realtimeRouter } from './realtime.routes';
 import * as realtimeCtl from '../controllers/realtime.controller';
@@ -120,6 +121,8 @@ router.use(
   glassdoorRouter,
 );
 router.use('/activity', activityRouter);
+// Bug reports / support tickets — any authenticated user may file one.
+router.use('/support', supportRouter);
 router.use('/recruiter-goals', recruiterGoalsRouter);
 router.use('/ai-usage', aiUsageRouter);
 // Mirrors /ai-usage: OWNER_TIER + DEVELOPER-with-cap can read the org-wide
