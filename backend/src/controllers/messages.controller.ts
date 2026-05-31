@@ -1,7 +1,7 @@
 import { RequestHandler } from 'express';
 import { z } from 'zod';
 import { db, pool } from '../config/db';
-import { httpError } from '../types';
+import { httpError, OPERATOR_TIER } from '../types';
 import {
   canMessageUser,
   canViewConversation,
@@ -344,6 +344,15 @@ export const conversationContext: RequestHandler = async (req, res) => {
   );
   if (!allowed) throw httpError(403, 'You cannot view this conversation.');
 
+  // Related work exposes application / job / company data. Restrict it to
+  // OPERATOR_TIER viewers who can already see that data elsewhere — a DEVELOPER
+  // can chat with everyone but has no business-data access by default, so it
+  // must not leak the consultant roster's pipeline through this endpoint.
+  if (!(OPERATOR_TIER as readonly string[]).includes(req.user.role)) {
+    res.json({ application: null });
+    return;
+  }
+
   // Peer → consultant row (staff peers have none → no related work).
   const { data: consultant } = await db
     .from('consultants')
@@ -431,14 +440,26 @@ export const markRead: RequestHandler = async (req, res) => {
   // `message:read` SSE event to the peer so their sent-tick (✓✓ blue)
   // updates instantly instead of waiting for the next 60s poll.
   const readAt = new Date().toISOString();
-  const { data: affected, error } = await db
-    .from('messages')
-    .update({ read_at: readAt })
-    .eq('recipient_id', me)
-    .eq('sender_id', other)
-    .is('read_at', null)
-    .is('deleted_at', null)
-    .select('id');
+  // A CONSULTANT must not mark internal notes read — they can't see them, and
+  // doing so would flash a false "Read" tick to the staff sender. Exclude
+  // is_internal for consultant markers, with a retry that drops the filter
+  // pre-migration (when the column doesn't exist there are no internal notes).
+  const hideInternal = req.user.role === 'CONSULTANT';
+  const runMarkRead = (withInternalFilter: boolean) => {
+    let u = db
+      .from('messages')
+      .update({ read_at: readAt })
+      .eq('recipient_id', me)
+      .eq('sender_id', other)
+      .is('read_at', null)
+      .is('deleted_at', null);
+    if (withInternalFilter) u = u.neq('is_internal', true);
+    return u.select('id');
+  };
+  let { data: affected, error } = await runMarkRead(hideInternal);
+  if (error && hideInternal && /is_internal|schema cache|column/i.test(error.message ?? '')) {
+    ({ data: affected, error } = await runMarkRead(false));
+  }
   if (error) throw httpError(500, 'Database error');
   const affectedIds = (affected ?? []).map((r: { id: string }) => r.id).filter(Boolean);
   if (affectedIds.length > 0) {
@@ -559,6 +580,16 @@ export const send: RequestHandler = async (req, res) => {
   // yet. Strip the late-arrival columns and retry so a body-only send still
   // works before the migration lands.
   if (insErr && /reply_to_message_id|is_internal|schema cache/i.test(insErr.message ?? '')) {
+    // SECURITY: never silently downgrade an internal note destined for a
+    // consultant into a plain, consultant-visible DM (the deploy-ahead-of-
+    // migration window). Reject so the staff user isn't misled by the amber
+    // "only staff will see this" composer.
+    if (isInternal && recipientIsConsultant) {
+      throw httpError(
+        503,
+        'Internal notes are temporarily unavailable — please try again shortly.',
+      );
+    }
     delete insertRow.reply_to_message_id;
     delete insertRow.is_internal;
     ({ data: inserted, error: insErr } = await db
@@ -769,8 +800,18 @@ export const edit: RequestHandler = async (req, res) => {
   if (error) throw httpError(500, 'Database error');
   if (!data) throw httpError(404, 'Message not found');
   // Push the edited body to both ends so live tabs reflect the update.
-  const m = data as { recipient_id: string; sender_id: string };
-  void publishToUser(m.recipient_id, 'message:edited', data);
+  // SECURITY: mirror send() — never push an internal note to a consultant
+  // recipient (the SSE payload carries the note body + is_internal). The staff
+  // sender's echo is unaffected.
+  const m = data as {
+    recipient_id: string;
+    sender_id: string;
+    is_internal?: boolean;
+    recipient?: { role?: string } | null;
+  };
+  if (!(m.is_internal && m.recipient?.role === 'CONSULTANT')) {
+    void publishToUser(m.recipient_id, 'message:edited', data);
+  }
   void publishToUser(m.sender_id, 'message:edited', data);
   res.json(data);
 };

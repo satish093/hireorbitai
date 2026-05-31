@@ -131,24 +131,26 @@ export function CommandPalette() {
         aria-label="Command palette"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => {
+          // Keys the palette consumes must not bubble to window-level keydown
+          // listeners (Modal/Drawer/BottomSheet/CallModal register Escape on
+          // window) — otherwise one Escape closes both the palette AND a modal
+          // underneath it. Stop propagation (incl. the native event) for them.
+          if (['Escape', 'Tab', 'ArrowDown', 'ArrowUp', 'Enter'].includes(e.key)) {
+            e.preventDefault();
+            e.stopPropagation();
+            e.nativeEvent.stopImmediatePropagation();
+          }
           if (e.key === 'Escape') {
-            e.preventDefault();
             setOpen(false);
-          } else if (e.key === 'Tab') {
-            // Trap focus — arrows handle list navigation, so there is nowhere
-            // for Tab to go inside the palette.
-            e.preventDefault();
           } else if (e.key === 'ArrowDown') {
-            e.preventDefault();
             setActive((a) => Math.min(results.length - 1, a + 1));
           } else if (e.key === 'ArrowUp') {
-            e.preventDefault();
             setActive((a) => Math.max(0, a - 1));
           } else if (e.key === 'Enter') {
-            e.preventDefault();
             const r = results[active];
             if (r) go(r.item.to);
           }
+          // Tab is trapped (preventDefault above) — focus stays in the input.
         }}
       >
         {/* Search input */}

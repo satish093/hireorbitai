@@ -709,9 +709,17 @@ export function Messages() {
   // (recruiter→assigned consultants + manager chain, consultant→recruiter
   // + chain, every user→active developers, etc.), so what lands here is
   // exactly the set the caller is allowed to chat with.
-  const filteredDirectory = directory
-    .filter((p) => !conversationPeerIds.has(p.id))
-    .filter((p) => !q || (p.full_name ?? p.email).toLowerCase().includes(q));
+  // The directory ("start a new chat") only belongs in the default All tab or
+  // while actively searching — never alongside the Pinned/Archived/Unread
+  // filters (otherwise the whole org roster bleeds into those tabs and the
+  // empty-state never shows). Gating at the source also fixes both render +
+  // empty-state guards downstream.
+  const filteredDirectory =
+    convFilter === 'all' || q
+      ? directory
+          .filter((p) => !conversationPeerIds.has(p.id))
+          .filter((p) => !q || (p.full_name ?? p.email).toLowerCase().includes(q))
+      : [];
 
   return (
     <Layout

@@ -259,6 +259,62 @@ describe('conversationContext — related-work resolver', () => {
     expect(err).toBeNull();
     expect((res.body as { application: { id: string } | null }).application?.id).toBe('a1');
   });
+
+  it('returns null for a non-operator (DEVELOPER) viewer even when they can chat', async () => {
+    // DEVELOPER passes canViewConversation (can message everyone) but has no
+    // business-data access — the resolver must not leak application/job data.
+    mock.canView = true;
+    mock.rows.consultants = [{ id: 'c1' }];
+    mock.rows.applications = [{ id: 'a1', status: 'SUBMITTED', submitted_at: null }];
+    const { err, res } = await call(
+      messages.conversationContext as Handler,
+      { id: 'u-dev', role: 'DEVELOPER', email: 'd@test.local' },
+      { params: { userId: PEER } },
+    );
+    expect(err).toBeNull();
+    expect((res.body as { application: unknown }).application).toBeNull();
+  });
+});
+
+describe('internal notes — edit() never echoes to a consultant recipient', () => {
+  const RECIP2 = '00000000-0000-0000-0000-000000000004';
+
+  it('suppresses message:edited to a consultant recipient for an internal note', async () => {
+    mock.rows.messages = [
+      {
+        id: 'm1',
+        recipient_id: RECIP2,
+        sender_id: MANAGER.id,
+        is_internal: true,
+        recipient: { role: 'CONSULTANT' },
+      },
+    ];
+    await call(messages.edit as Handler, MANAGER, {
+      params: { id: 'm1' },
+      body: { body: 'edited note' },
+    });
+    const calls = vi.mocked(publishToUser).mock.calls;
+    expect(calls.some((c) => c[0] === RECIP2 && c[1] === 'message:edited')).toBe(false);
+    expect(calls.some((c) => c[0] === MANAGER.id && c[1] === 'message:edited')).toBe(true);
+  });
+
+  it('still echoes a NORMAL edit to a consultant recipient', async () => {
+    mock.rows.messages = [
+      {
+        id: 'm2',
+        recipient_id: RECIP2,
+        sender_id: MANAGER.id,
+        is_internal: false,
+        recipient: { role: 'CONSULTANT' },
+      },
+    ];
+    await call(messages.edit as Handler, MANAGER, {
+      params: { id: 'm2' },
+      body: { body: 'hi there' },
+    });
+    const calls = vi.mocked(publishToUser).mock.calls;
+    expect(calls.some((c) => c[0] === RECIP2 && c[1] === 'message:edited')).toBe(true);
+  });
 });
 
 describe('setConversationState — pin/archive validation', () => {

@@ -154,7 +154,11 @@ export function AdminAuditLog() {
     if (events.length === 0) return;
     const headers = ['Time', 'Action', 'Email', 'User ID', 'IP address', 'User agent', 'Metadata'];
     const esc = (v: unknown) => {
-      const s = v == null ? '' : typeof v === 'string' ? v : JSON.stringify(v);
+      let s = v == null ? '' : typeof v === 'string' ? v : JSON.stringify(v);
+      // Neutralize spreadsheet formula injection: a cell starting with = + - @
+      // (or tab/CR) executes as a formula in Excel/Sheets even inside a quoted
+      // field. user_agent / email / metadata are attacker-controllable.
+      if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
       return `"${s.replace(/"/g, '""')}"`;
     };
     const lines = events.map((ev) =>

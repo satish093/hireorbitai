@@ -75,11 +75,23 @@ export function QuizPage() {
     setSubmitting(true);
     let correct = 0,
       points = 0;
-    const r: Record<string, AttemptResult> = {};
+    // Carry any attempts already recorded on a PRIOR (partially-failed) submit
+    // so a retry never re-POSTs an already-persisted quiz_id — re-posting would
+    // burn extra attempts and could trip the backend's attempts-exceeded → FAIL
+    // rule even when the learner answered correctly.
+    const r: Record<string, AttemptResult> = { ...results };
     try {
       for (const q of quiz) {
         const selected = picks[q.id];
         if (!selected) continue;
+        if (r[q.id]) {
+          // Already recorded (this attempt or a prior one) — count, don't re-POST.
+          if (r[q.id]!.is_correct) {
+            correct++;
+            points += r[q.id]!.score;
+          }
+          continue;
+        }
         const res = await api.post(`/training/assignments/${id}/quiz-attempt`, {
           quiz_id: q.id,
           selected_answer: selected,
@@ -94,6 +106,8 @@ export function QuizPage() {
       setScore({ correct, total: quiz.length, points });
       setCurrent(0); // restart the stepper at Q1 for review
     } catch (e: any) {
+      // Persist whatever DID succeed so a retry skips those questions.
+      setResults(r);
       toast.error(e?.response?.data?.error ?? 'Failed to submit');
     } finally {
       setSubmitting(false);
