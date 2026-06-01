@@ -85,7 +85,13 @@ export const create: RequestHandler = async (req, res) => {
     const pId = parsed.data.parent_user_id;
 
     // Non-admins must be able to see the target user via the permission service.
-    if (!isAdminCaller) {
+    // EXCEPT self: the inviter can always parent the invitee to themselves. This
+    // is the normal auto-resolved outcome whenever the inviter's rank qualifies
+    // (RECRUITER→CONSULTANT, HR_MANAGER/MANAGER→CONSULTANT|RECRUITER, …) —
+    // resolveAutoParent returns `inviter.id` in that case. canViewUser delegates
+    // to canMessageUser, which returns false for self (you can't message
+    // yourself), so without this carve-out the most common invite flow 403s.
+    if (!isAdminCaller && pId !== req.user.id) {
       const canSee = await canViewUser(
         { id: req.user.id, role: req.user.role, group_id: req.user.group_id ?? null },
         pId,
