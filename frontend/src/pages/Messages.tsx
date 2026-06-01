@@ -190,23 +190,13 @@ export function Messages() {
       /* private-mode / quota — fall back to in-memory only */
     }
   }, [desktopContactCollapsed]);
-  // Fullscreen mode — drops the app shell (sidebar + page header) and
-  // renders just the 3-pane filling the viewport. WhatsApp-web style.
-  // Persisted so it survives reloads; Escape exits.
-  const [fullscreen, setFullscreen] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem('hireorbit:inbox:fullscreen') === '1';
-    } catch {
-      return false;
-    }
-  });
-  useEffect(() => {
-    try {
-      localStorage.setItem('hireorbit:inbox:fullscreen', fullscreen ? '1' : '0');
-    } catch {
-      /* ignore */
-    }
-  }, [fullscreen]);
+  // Fullscreen mode — drops the app shell (sidebar + page header + mobile bottom
+  // nav) and renders just the panes filling the viewport, WhatsApp-web style.
+  // The inbox DEFAULTS to fullscreen every time it opens (the inbox is a focused
+  // surface — "remove all other"). The in-bar Exit button / Escape drops back to
+  // the normal app shell for the current view; intentionally NOT persisted, so
+  // reopening /messages always re-enters fullscreen.
+  const [fullscreen, setFullscreen] = useState<boolean>(true);
   // Escape exits fullscreen — but only when fullscreen is actually on,
   // so we don't intercept the key for unrelated UI (e.g. a focused modal
   // inside the inbox).
