@@ -65,11 +65,35 @@ export function UserProfile() {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<Partial<UserProfile>>({});
+  // Consultant-detail draft — lives on the `consultants` table, so it saves via
+  // a separate PATCH /consultants/:id. Kept as strings for the inputs; parsed
+  // and normalised in save(). marketing_status has its own OPERATOR_TIER route.
+  const [consForm, setConsForm] = useState({
+    primary_skill: '',
+    total_experience_years: '',
+    visa_status: '',
+    current_location: '',
+    skills: '',
+    marketing_status: '',
+  });
   const [saving, setSaving] = useState(false);
   const [actBusy, setActBusy] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
   const [showDeactivate, setShowDeactivate] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
+
+  // Seed the consultant draft from a loaded profile (mount / save / cancel).
+  function seedConsForm(k?: NonNullable<UserProfile['context']>['consultant']) {
+    setConsForm({
+      primary_skill: k?.primary_skill ?? '',
+      total_experience_years:
+        k?.total_experience_years != null ? String(k.total_experience_years) : '',
+      visa_status: k?.visa_status ?? '',
+      current_location: k?.current_location ?? '',
+      skills: (k?.skills ?? []).join(', '),
+      marketing_status: k?.marketing_status ?? '',
+    });
+  }
 
   // Close any open admin modal on Escape (when not mid-action). Native
   // window.confirm was previously used for the deactivate step — switching
@@ -96,6 +120,7 @@ export function UserProfile() {
         if (cancelled) return;
         setUser(r.data);
         setForm(r.data);
+        seedConsForm(r.data.context?.consultant);
       } catch (e: any) {
         if (cancelled) return;
         const status = e?.response?.status;
@@ -197,9 +222,47 @@ export function UserProfile() {
       if (k in form) patch[k] = (form as any)[k];
     }
     try {
-      const r = await api.patch(`/users/${user.id}`, patch);
-      setUser(r.data);
-      setForm(r.data);
+      // 1) User-table fields.
+      await api.patch(`/users/${user.id}`, patch);
+
+      // 2) Consultant-table fields (separate resource). Only the onboarding
+      //    allowlist keys — marketing_status has its own route below. Backend
+      //    scopes who may edit (admin/lead/recruiter-of-them/self); the page's
+      //    Edit button is already gated by canEdit.
+      const cons = user.context?.consultant;
+      if (cons?.id) {
+        const consPatch: Record<string, unknown> = {
+          primary_skill: consForm.primary_skill,
+          visa_status: consForm.visa_status,
+          current_location: consForm.current_location,
+          skills: consForm.skills
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean),
+        };
+        const yrs = parseFloat(consForm.total_experience_years);
+        if (!Number.isNaN(yrs)) consPatch.total_experience_years = yrs;
+        await api.patch(`/consultants/${cons.id}`, consPatch);
+
+        // marketing_status: dedicated OPERATOR_TIER route; only manager-tier can
+        // set it (a consultant can't market themselves), and only when changed.
+        if (
+          isManagerTier &&
+          consForm.marketing_status &&
+          consForm.marketing_status !== (cons.marketing_status ?? '')
+        ) {
+          await api.post(`/consultants/${cons.id}/marketing-status`, {
+            marketing_status: consForm.marketing_status,
+          });
+        }
+      }
+
+      // Refetch the merged profile (user + consultant context) so the view is
+      // authoritative rather than a hand-merged guess.
+      const fresh = await api.get(`/users/${user.id}`);
+      setUser(fresh.data);
+      setForm(fresh.data);
+      seedConsForm(fresh.data.context?.consultant);
       setEditing(false);
       toast.success('Profile saved');
     } catch (e: any) {
@@ -307,6 +370,7 @@ export function UserProfile() {
                 onClick={() => {
                   setEditing(false);
                   setForm(user);
+                  seedConsForm(user.context?.consultant);
                 }}
               >
                 Cancel
@@ -410,45 +474,93 @@ export function UserProfile() {
             <Card title="Consultant details">
               <Field
                 label="Primary skill"
-                value={user.context.consultant.primary_skill ?? ''}
-                readonly
+                value={
+                  editing ? consForm.primary_skill : (user.context.consultant.primary_skill ?? '')
+                }
+                editing={editing}
+                onChange={(v) => setConsForm((f) => ({ ...f, primary_skill: v }))}
               />
               <Field
                 label="Years of experience"
-                value={String(user.context.consultant.total_experience_years ?? '')}
-                readonly
+                type="number"
+                value={
+                  editing
+                    ? consForm.total_experience_years
+                    : String(user.context.consultant.total_experience_years ?? '')
+                }
+                editing={editing}
+                onChange={(v) => setConsForm((f) => ({ ...f, total_experience_years: v }))}
               />
               <Field
                 label="Visa status"
-                value={user.context.consultant.visa_status ?? ''}
-                readonly
+                value={editing ? consForm.visa_status : (user.context.consultant.visa_status ?? '')}
+                editing={editing}
+                onChange={(v) => setConsForm((f) => ({ ...f, visa_status: v }))}
               />
               <Field
                 label="Current location"
-                value={user.context.consultant.current_location ?? ''}
-                readonly
+                value={
+                  editing
+                    ? consForm.current_location
+                    : (user.context.consultant.current_location ?? '')
+                }
+                editing={editing}
+                onChange={(v) => setConsForm((f) => ({ ...f, current_location: v }))}
               />
-              <Field
-                label="Marketing status"
-                value={user.context.consultant.marketing_status ?? ''}
-                readonly
-              />
-              {user.context.consultant.skills && user.context.consultant.skills.length > 0 && (
-                <div className="pt-2">
-                  <div className="text-[10px] font-semibold uppercase tracking-widest text-muted mb-1">
-                    Skills
+              {/* Marketing status is a manager-tier decision via its own route —
+                  a consultant editing their own profile sees it read-only. */}
+              {editing && isManagerTier ? (
+                <label className="block">
+                  <span className="text-[10px] font-semibold uppercase tracking-widest text-muted">
+                    Marketing status
+                  </span>
+                  <select
+                    value={consForm.marketing_status}
+                    onChange={(e) =>
+                      setConsForm((f) => ({ ...f, marketing_status: e.target.value }))
+                    }
+                    className="mt-1 w-full text-sm bg-surface border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+                  >
+                    <option value="">Not set</option>
+                    <option value="ACTIVE">ACTIVE</option>
+                    <option value="PAUSED">PAUSED</option>
+                    <option value="PLACED">PLACED</option>
+                  </select>
+                </label>
+              ) : (
+                <Field
+                  label="Marketing status"
+                  value={user.context.consultant.marketing_status ?? ''}
+                  readonly
+                />
+              )}
+              {editing ? (
+                <Field
+                  label="Skills (comma-separated)"
+                  value={consForm.skills}
+                  editing={editing}
+                  onChange={(v) => setConsForm((f) => ({ ...f, skills: v }))}
+                  placeholder="React, Node.js, AWS"
+                />
+              ) : (
+                user.context.consultant.skills &&
+                user.context.consultant.skills.length > 0 && (
+                  <div className="pt-2">
+                    <div className="text-[10px] font-semibold uppercase tracking-widest text-muted mb-1">
+                      Skills
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {user.context.consultant.skills.map((s) => (
+                        <span
+                          key={s}
+                          className="text-[11px] bg-hover text-ink px-2 py-0.5 rounded-full"
+                        >
+                          {s}
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {user.context.consultant.skills.map((s) => (
-                      <span
-                        key={s}
-                        className="text-[11px] bg-hover text-ink px-2 py-0.5 rounded-full"
-                      >
-                        {s}
-                      </span>
-                    ))}
-                  </div>
-                </div>
+                )
               )}
             </Card>
           )}
