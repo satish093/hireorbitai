@@ -34,6 +34,7 @@ import { useRealtime } from '../hooks/useRealtime';
 import { useCallContext } from '../context/CallContext';
 import { Role, ROLE_LABEL } from '../types';
 import { ContactPanel } from '../components/messages/ContactPanel';
+import { RoleChip } from '../components/admin/UserBits';
 import { BottomSheet } from '../components/BottomSheet';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
@@ -939,15 +940,28 @@ export function Messages() {
               <>
                 {filteredConversations.map((c) => {
                   const active = c.peer.id === activePeerId;
+                  const isUnread = c.unread_count > 0;
                   return (
                     <div key={c.peer.id} className="relative group">
                       <button
                         onClick={() => setParams({ with: c.peer.id })}
                         className={clsx(
-                          'w-full flex items-start gap-3 px-3 py-3 text-left transition-colors hover:bg-hover/60',
-                          active && 'bg-hover',
+                          // Match the design's `.cc-convo` row treatment:
+                          // active row gets a brand-tinted background plus a
+                          // 3-px brand strip on the left edge (the strip is
+                          // ::before in the design's CSS — here we render an
+                          // absolute span). Plain hover stays the standard
+                          // hover tint.
+                          'relative w-full flex items-start gap-3 px-3 py-3 text-left transition-colors hover:bg-hover/60',
+                          active && 'bg-accent-soft/40 hover:bg-accent-soft/40',
                         )}
                       >
+                        {active && (
+                          <span
+                            aria-hidden="true"
+                            className="absolute left-0 top-0 bottom-0 w-[3px] bg-brand-500"
+                          />
+                        )}
                         <div className="relative shrink-0">
                           <Avatar name={c.peer.full_name} email={c.peer.email} size={44} />
                           <PresenceDot
@@ -957,7 +971,16 @@ export function Messages() {
                         </div>
                         <div className="flex-1 min-w-0 border-b border-border/60 pb-2.5 -mt-0.5">
                           <div className="flex items-baseline justify-between gap-2">
-                            <span className="text-sm font-medium truncate inline-flex items-center gap-1.5 text-ink">
+                            <span
+                              className={clsx(
+                                // Design uses weight 600 for default,
+                                // weight 700 for unread (.cc-convo.unread .nm).
+                                // Matches our `font-medium` (500) → `font-bold`
+                                // (700) split.
+                                'text-sm truncate inline-flex items-center gap-1.5',
+                                isUnread ? 'font-bold text-ink' : 'font-medium text-ink',
+                              )}
+                            >
                               {c.pinned && (
                                 <svg
                                   width="11"
@@ -976,7 +999,7 @@ export function Messages() {
                             <span
                               className={clsx(
                                 'text-[11px] shrink-0',
-                                c.unread_count > 0
+                                isUnread
                                   ? 'text-brand-600 dark:text-brand-200 font-semibold'
                                   : 'text-muted',
                               )}
@@ -984,18 +1007,28 @@ export function Messages() {
                               {relative(c.last_message.created_at)}
                             </span>
                           </div>
-                          <div className="flex items-center justify-between gap-2 mt-0.5">
+                          {/* Role chip line — matches the design handoff's
+                              `.cc-convo` second row (RoleChip sm). Helps
+                              recruiters tell at-a-glance whether a thread
+                              is with a Consultant vs a Manager vs another
+                              Recruiter when names blur together. */}
+                          {c.peer.role && (
+                            <div className="mt-1 -mb-0.5">
+                              <RoleChip role={c.peer.role} />
+                            </div>
+                          )}
+                          <div className="flex items-center justify-between gap-2 mt-1">
                             <p
                               className={clsx(
                                 'text-xs truncate',
-                                c.unread_count > 0 ? 'text-ink font-medium' : 'text-muted',
+                                isUnread ? 'text-ink-2 font-medium' : 'text-muted',
                               )}
                             >
                               {c.last_message.sender_id === profile?.id ? 'You: ' : ''}
                               {previewForConversation(c.last_message)}
                             </p>
-                            {c.unread_count > 0 && (
-                              <span className="shrink-0 bg-brand-500 text-white text-[10px] font-semibold rounded-full px-1.5 min-w-[18px] h-[18px] flex items-center justify-center">
+                            {isUnread && (
+                              <span className="shrink-0 bg-brand-500 text-white text-[10px] font-bold rounded-full px-1.5 min-w-[18px] h-[18px] flex items-center justify-center">
                                 {c.unread_count}
                               </span>
                             )}
@@ -1092,8 +1125,37 @@ export function Messages() {
         {/* Right: active thread */}
         <main className={clsx('flex-1 flex-col min-w-0', activePeer ? 'flex' : 'hidden sm:flex')}>
           {!activePeer ? (
-            <div className="flex-1 flex items-center justify-center text-muted text-sm bg-hover/30">
-              Select a conversation, or search a name to start a new one.
+            // Design's `.cc-empty` shape: centered icon + headline + subtitle.
+            // Previously just a single muted line — too easy to miss on first
+            // load, and made the middle pane feel broken when no thread was
+            // selected.
+            <div className="flex-1 flex items-center justify-center bg-hover/30 px-6">
+              <div className="text-center max-w-xs">
+                <div
+                  className="mx-auto mb-3 w-14 h-14 rounded-full grid place-items-center"
+                  style={{ background: 'var(--hover)', color: 'var(--muted)' }}
+                >
+                  <svg
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.75"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <polyline points="22 12 16 12 14 15 10 15 8 12 2 12" />
+                    <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
+                  </svg>
+                </div>
+                <h3 className="text-base font-semibold text-ink mb-1.5">Select a conversation</h3>
+                <p className="text-sm text-muted">
+                  Choose a thread on the left, or search a name to start a new permitted
+                  conversation.
+                </p>
+              </div>
             </div>
           ) : (
             <>
@@ -1117,13 +1179,16 @@ export function Messages() {
                   />
                 </div>
                 <div className="leading-tight min-w-0">
-                  <div className="text-sm font-semibold text-ink flex items-center gap-2">
+                  {/* Header row: name + role chip (per design's `.cc-thread-head`),
+                      presence pill trails. Role chip helps users tell at a
+                      glance who they're chatting with when the avatar/name
+                      isn't enough. */}
+                  <div className="text-sm font-semibold text-ink flex items-center gap-2 min-w-0">
                     <span className="truncate">{activePeer.full_name ?? activePeer.email}</span>
+                    {activePeer.role && <RoleChip role={activePeer.role} />}
                     <PresencePill lastSeenAt={activePeer.last_seen_at} />
                   </div>
-                  <div className="text-[11px] text-muted truncate">
-                    {activePeer.role && ROLE_LABEL[activePeer.role]} · {activePeer.email}
-                  </div>
+                  <div className="text-[11px] text-muted truncate">{activePeer.email}</div>
                 </div>
                 {/* Context panel toggle (mobile/tablet → opens BottomSheet) */}
                 <button
