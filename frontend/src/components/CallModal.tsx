@@ -335,6 +335,12 @@ export function CallModal({
  * Call-back action. Rendered by CallProvider from its own `resolution` state
  * so it persists long enough to act on, independent of the call status reset.
  */
+// How long the post-call card stays on screen before auto-dismissing.
+// Between react-hot-toast's default (~6 s) and WhatsApp's missed-call
+// snackbar (~10 s). Pause-on-hover gives a power user as long as they
+// want to read it.
+const CALL_RESOLUTION_AUTO_DISMISS_MS = 8_000;
+
 export function CallResolutionCard({
   reason,
   peerName,
@@ -353,15 +359,62 @@ export function CallResolutionCard({
   };
   const { icon, title } = copy[reason];
 
+  // Auto-dismiss after 8 s so the card doesn't permanently overlap the
+  // composer / message list. Paused while the cursor is over it (WCAG
+  // 2.2.1 — give power users time to read + decide). The onDismiss
+  // callback is the same handler the manual Dismiss button uses, so the
+  // teardown path is identical for both paths.
+  //
+  // Refs (not state) for both the timer handle AND the hover flag so we
+  // don't trigger an extra render on every mouse-enter / mouse-leave.
+  // The callback hangs onto the freshest onDismiss via a ref to avoid
+  // re-arming the timer whenever the parent re-renders with a new
+  // function identity.
+  const onDismissRef = useRef(onDismiss);
+  onDismissRef.current = onDismiss;
+  const isHoveredRef = useRef(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    function arm() {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => {
+        timerRef.current = null;
+        if (isHoveredRef.current) {
+          // Cursor parked on the card — re-arm so the user gets the
+          // FULL window once they finally move away. Without this, a
+          // single hover that crosses the deadline would dismiss
+          // immediately on mouse-out, which is jarring.
+          arm();
+          return;
+        }
+        onDismissRef.current();
+      }, CALL_RESOLUTION_AUTO_DISMISS_MS);
+    }
+    arm();
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, []);
+
   return createPortal(
     <div
       role="status"
       aria-live="polite"
       className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 w-[min(360px,calc(100vw-2rem))] animate-in fade-in slide-in-from-bottom-2 duration-200"
       style={{ bottom: 'max(24px, calc(env(safe-area-inset-bottom) + 16px))' }}
+      onMouseEnter={() => {
+        isHoveredRef.current = true;
+      }}
+      onMouseLeave={() => {
+        isHoveredRef.current = false;
+      }}
     >
       <div
-        className="rounded-2xl border p-4"
+        className="relative rounded-2xl border p-4 overflow-hidden"
         style={{
           background: 'var(--bg-elev)',
           borderColor: 'var(--border)',
@@ -389,6 +442,25 @@ export function CallResolutionCard({
             Call back
           </Button>
         </div>
+        {/* Auto-dismiss progress bar — full-width, drains over the timer
+            window. CSS transition handles the animation; aria-hidden
+            because the screen-reader already announces the card on mount
+            via role="status". Pointer-events-none so it can't block the
+            buttons above it. */}
+        <div
+          aria-hidden="true"
+          className="absolute left-0 bottom-0 right-0 h-0.5 pointer-events-none"
+          style={{ background: 'var(--border)' }}
+        >
+          <div
+            className="h-full origin-left"
+            style={{
+              background: 'var(--accent)',
+              animation: `callCardCountdown ${CALL_RESOLUTION_AUTO_DISMISS_MS}ms linear forwards`,
+            }}
+          />
+        </div>
+        <style>{`@keyframes callCardCountdown { from { transform: scaleX(1); } to { transform: scaleX(0); } }`}</style>
       </div>
     </div>,
     document.body,
