@@ -8,6 +8,7 @@ import { EmptyState } from '../components/EmptyState';
 import { SkeletonCard } from '../components/Skeleton';
 import { ApplicationCard, type ApplicationRow } from '../components/ApplicationCard';
 import { NewSubmissionModal } from '../components/NewSubmissionModal';
+import { Modal } from '../components/Modal';
 import { api } from '../services/api';
 import { invalidate, useInvalidationListener } from '../hooks/useInvalidate';
 import { useAuth } from '../context/AuthContext';
@@ -28,12 +29,30 @@ const STAGES = [
 
 type StageKey = (typeof STAGES)[number]['key'];
 
+// The application_status enum (database/schema.sql). The stage TABS use a
+// product-friendly subset; this is the full set a row can be moved between.
+const APP_STATUSES = [
+  'SUBMITTED',
+  'SCREENING',
+  'INTERVIEW',
+  'OFFER',
+  'REJECTED',
+  'WITHDRAWN',
+] as const;
+
 export function Applications() {
   const { profile } = useAuth();
   const [rows, setRows] = useState<ApplicationRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [stage, setStage] = useState<StageKey>('ALL');
   const [submissionOpen, setSubmissionOpen] = useState(false);
+  // Manage-submission modal (status / notes / rejection reason). The page is
+  // OPERATOR_TIER-gated, and PATCH /applications/:id scopes edits to the owning
+  // recruiter + managers — so anyone who can open this page + see a row may
+  // manage it (the backend 404s a row that isn't theirs).
+  const [editApp, setEditApp] = useState<ApplicationRow | null>(null);
+  const [editForm, setEditForm] = useState({ status: '', notes: '', rejection_reason: '' });
+  const [savingEdit, setSavingEdit] = useState(false);
 
   function load() {
     setLoading(true);
@@ -66,10 +85,46 @@ export function Applications() {
   );
 
   const canSubmit = profile?.role !== 'CONSULTANT';
+  // Only operators manage the pipeline. (Consultants can't reach this page, but
+  // gate anyway so the edit affordance never attaches for them.)
+  const canManage = canSubmit;
   // Admin-tier (SUPER_ADMIN / CEO / CTO / DIRECTOR) can hard-delete a
   // submission — matches the backend DELETE /applications/:id gate. Destructive:
   // it cascades to the submission's interviews + apply-event history.
   const canDelete = !!profile && ADMIN_TIER.includes(profile.role);
+
+  function openEdit(a: ApplicationRow) {
+    setEditApp(a);
+    setEditForm({
+      status: a.status,
+      notes: (a as any).notes ?? '',
+      rejection_reason: (a as any).rejection_reason ?? '',
+    });
+  }
+
+  async function saveEdit() {
+    if (!editApp || savingEdit) return;
+    setSavingEdit(true);
+    try {
+      const payload: Record<string, unknown> = {
+        status: editForm.status,
+        notes: editForm.notes || null,
+        // Only carry a rejection reason while REJECTED; clear it otherwise.
+        rejection_reason: editForm.status === 'REJECTED' ? editForm.rejection_reason || null : null,
+      };
+      await api.patch(`/applications/${editApp.id}`, payload);
+      const id = editApp.id;
+      const nextStatus = editForm.status;
+      setRows((prev) => prev.map((r) => (r.id === id ? { ...r, status: nextStatus } : r)));
+      toast.success('Submission updated');
+      setEditApp(null);
+      invalidate('applications');
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error ?? 'Update failed');
+    } finally {
+      setSavingEdit(false);
+    }
+  }
 
   async function remove(id: string) {
     if (
@@ -199,6 +254,7 @@ export function Applications() {
               : []),
           ]}
           rows={visible}
+          onRowClick={canManage ? openEdit : undefined}
         />
       </div>
 
@@ -231,22 +287,89 @@ export function Applications() {
             compact
           />
         ) : (
-          visible.map((a) =>
-            canDelete ? (
-              <div key={a.id}>
-                <ApplicationCard application={a} />
+          visible.map((a) => (
+            <div key={a.id}>
+              <ApplicationCard
+                application={a}
+                onClick={canManage ? () => openEdit(a) : undefined}
+              />
+              {canDelete && (
                 <div className="mt-1 flex justify-end">
                   <Button variant="danger-ghost" size="sm" onClick={() => remove(a.id)}>
                     Delete
                   </Button>
                 </div>
-              </div>
-            ) : (
-              <ApplicationCard key={a.id} application={a} />
-            ),
-          )
+              )}
+            </div>
+          ))
         )}
       </div>
+
+      {/* ── Manage submission (status / notes / rejection) ── */}
+      <Modal
+        open={!!editApp}
+        onClose={() => !savingEdit && setEditApp(null)}
+        title="Manage submission"
+        description={
+          editApp
+            ? `${editApp.consultant?.user?.full_name ?? editApp.consultant?.user?.email ?? 'Consultant'} · ${editApp.job?.title ?? 'Job'}`
+            : undefined
+        }
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setEditApp(null)} disabled={savingEdit}>
+              Cancel
+            </Button>
+            <Button variant="primary" onClick={saveEdit} loading={savingEdit}>
+              {savingEdit ? 'Saving…' : 'Save'}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          <label className="block">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted">
+              Status
+            </span>
+            <select
+              value={editForm.status}
+              onChange={(e) => setEditForm((f) => ({ ...f, status: e.target.value }))}
+              className="mt-1 w-full text-sm bg-surface border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+            >
+              {APP_STATUSES.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </label>
+          {editForm.status === 'REJECTED' && (
+            <label className="block">
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-muted">
+                Rejection reason
+              </span>
+              <input
+                type="text"
+                value={editForm.rejection_reason}
+                onChange={(e) => setEditForm((f) => ({ ...f, rejection_reason: e.target.value }))}
+                placeholder="e.g. Rate too high, role filled"
+                className="mt-1 w-full text-sm bg-surface border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+              />
+            </label>
+          )}
+          <label className="block">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted">
+              Notes
+            </span>
+            <textarea
+              value={editForm.notes}
+              onChange={(e) => setEditForm((f) => ({ ...f, notes: e.target.value }))}
+              rows={3}
+              className="mt-1 w-full text-sm bg-surface border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+            />
+          </label>
+        </div>
+      </Modal>
 
       {/* ── New submission 3-step flow ── */}
       <NewSubmissionModal

@@ -46,6 +46,18 @@ export function TaskDetail() {
   const [posting, setPosting] = useState(false);
   const [tagInput, setTagInput] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
+  // Assignable users for the reassign picker (manager-tier only) — same source
+  // and backend scoping the board's detail pane uses (admin → all, lead → group).
+  const [assignees, setAssignees] = useState<
+    Array<{ id: string; full_name: string | null; email: string }>
+  >([]);
+  useEffect(() => {
+    if (!isManager) return;
+    api
+      .get('/tasks/assignees')
+      .then((r) => setAssignees(r.data ?? []))
+      .catch(() => {});
+  }, [isManager]);
 
   async function loadAll() {
     if (!id) return;
@@ -453,7 +465,29 @@ export function TaskDetail() {
               </Field>
 
               <Field label="Assignee">
-                {task.assignee ? (
+                {canEdit ? (
+                  <SelectInput
+                    value={task.assignee_id ?? ''}
+                    onChange={(e) => patch({ assignee_id: e.target.value || null })}
+                    options={[
+                      { value: '', label: 'Unassigned' },
+                      // Keep the current assignee selectable even if they're
+                      // outside the fetched (scoped) list.
+                      ...(task.assignee_id && !assignees.some((u) => u.id === task.assignee_id)
+                        ? [
+                            {
+                              value: task.assignee_id,
+                              label:
+                                task.assignee?.full_name ??
+                                task.assignee?.email ??
+                                'Current assignee',
+                            },
+                          ]
+                        : []),
+                      ...assignees.map((u) => ({ value: u.id, label: u.full_name ?? u.email })),
+                    ]}
+                  />
+                ) : task.assignee ? (
                   <span className="inline-flex items-center gap-1.5 text-ink">
                     <Avatar name={task.assignee.full_name} email={task.assignee.email} size={22} />
                     <span className="truncate">

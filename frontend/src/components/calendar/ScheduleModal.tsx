@@ -35,6 +35,8 @@ export interface EditInterview {
   scheduled_at?: string | null;
   interviewer?: string | null;
   meeting_url?: string | null;
+  duration_minutes?: number | null;
+  notes?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -48,6 +50,8 @@ const EMPTY_FORM = {
   scheduled_at_local: '',
   interviewer: '',
   meeting_url: '',
+  duration_minutes: '',
+  notes: '',
 };
 
 const TYPE_OPTIONS = [
@@ -112,6 +116,9 @@ export function ScheduleModal({
         scheduled_at_local: local,
         interviewer: editInterview.interviewer ?? '',
         meeting_url: editInterview.meeting_url ?? '',
+        duration_minutes:
+          editInterview.duration_minutes != null ? String(editInterview.duration_minutes) : '',
+        notes: editInterview.notes ?? '',
       });
     } else if (defaultStartLocal) {
       setForm({
@@ -137,19 +144,27 @@ export function ScheduleModal({
     }
     setSaving(true);
     try {
+      const dur = parseInt(form.duration_minutes, 10);
       if (isEdit && editInterview) {
         // Edit/reschedule: PATCH only the mutable fields (type + consultant are
-        // immutable server-side and excluded from updateSchema).
-        await api.patch(`/interviews/${editInterview.id}`, {
+        // immutable server-side and excluded from updateSchema). duration is
+        // sent only when a value is entered, so leaving it blank doesn't wipe it.
+        const patch: Record<string, unknown> = {
           scheduled_at: form.scheduled_at,
           interviewer: form.interviewer || null,
           meeting_url: form.meeting_url || null,
-        });
+          notes: form.notes || null,
+        };
+        if (Number.isFinite(dur)) patch.duration_minutes = dur;
+        await api.patch(`/interviews/${editInterview.id}`, patch);
         toast.success('Interview updated');
       } else {
         const url = mock ? '/interviews/mock' : '/interviews';
-        const { scheduled_at_local: _slocal, ...payload } = form;
+        const { scheduled_at_local: _slocal, duration_minutes: _dm, ...rest } = form;
         void _slocal;
+        void _dm;
+        const payload: Record<string, unknown> = { ...rest, notes: form.notes || null };
+        if (Number.isFinite(dur)) payload.duration_minutes = dur;
         if (mock) delete (payload as any).type;
         await api.post(url, payload);
         toast.success(mock ? 'Mock scheduled' : 'Interview scheduled');
@@ -240,12 +255,29 @@ export function ScheduleModal({
             onChange={(e) => setForm({ ...form, interviewer: e.target.value })}
           />
           <FormInput
-            label="Meeting URL"
-            placeholder="https://meet.google.com/…"
-            value={form.meeting_url}
-            onChange={(e) => setForm({ ...form, meeting_url: e.target.value })}
+            label="Duration (minutes)"
+            type="number"
+            min={0}
+            placeholder="60"
+            value={form.duration_minutes}
+            onChange={(e) => setForm({ ...form, duration_minutes: e.target.value })}
           />
         </div>
+        <FormInput
+          label="Meeting URL"
+          placeholder="https://meet.google.com/…"
+          value={form.meeting_url}
+          onChange={(e) => setForm({ ...form, meeting_url: e.target.value })}
+        />
+        <label className="block">
+          <span className="block text-xs font-medium text-ink mb-1.5">Notes</span>
+          <textarea
+            value={form.notes}
+            onChange={(e) => setForm({ ...form, notes: e.target.value })}
+            rows={3}
+            className="w-full rounded-lg border border-border hover:border-muted bg-surface px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500"
+          />
+        </label>
       </div>
     </Modal>
   );

@@ -267,6 +267,12 @@ export function LessonEditorModal({
     content: lesson.content ?? '',
     key_takeaways: Array.isArray(lesson.key_takeaways) ? lesson.key_takeaways.join('\n') : '',
     content_status: lesson.content_status ?? 'READY',
+    // Per-lesson STEM-OPT compliance gates — previously only set by the AI
+    // generator; now hand-editable by managers.
+    lesson_objective: lesson.lesson_objective ?? '',
+    practical_example: lesson.practical_example ?? '',
+    knowledge_check_required: lesson.knowledge_check_required ?? false,
+    minimum_time_minutes: String(lesson.minimum_time_minutes ?? ''),
   });
   const [exercises, setExercises] = useState<any[]>(
     Array.isArray(lesson.exercises) ? lesson.exercises : [],
@@ -287,6 +293,10 @@ export function LessonEditorModal({
         key_takeaways: linesToArr(form.key_takeaways),
         exercises,
         content_status: form.content_status,
+        lesson_objective: form.lesson_objective || null,
+        practical_example: form.practical_example || null,
+        knowledge_check_required: form.knowledge_check_required,
+        minimum_time_minutes: form.minimum_time_minutes ? Number(form.minimum_time_minutes) : null,
       });
       toast.success('Lesson saved');
       onSaved();
@@ -410,6 +420,42 @@ export function LessonEditorModal({
           value={form.key_takeaways}
           onChange={(v) => setForm({ ...form, key_takeaways: v })}
         />
+
+        {/* STEM-OPT compliance gates */}
+        <div className="border-t border-border pt-3 space-y-3">
+          <div className="text-[10px] font-semibold uppercase tracking-widest text-muted">
+            Compliance gates
+          </div>
+          <EditArea
+            label="Lesson objective"
+            rows={2}
+            value={form.lesson_objective}
+            onChange={(v) => setForm({ ...form, lesson_objective: v })}
+          />
+          <EditArea
+            label="Practical example (shown to learners)"
+            rows={3}
+            value={form.practical_example}
+            onChange={(v) => setForm({ ...form, practical_example: v })}
+          />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
+            <EditField
+              label="Minimum time on lesson (minutes)"
+              type="number"
+              value={form.minimum_time_minutes}
+              onChange={(v) => setForm({ ...form, minimum_time_minutes: v })}
+            />
+            <label className="flex items-center gap-2 text-sm text-ink pb-1.5">
+              <input
+                type="checkbox"
+                checked={form.knowledge_check_required}
+                onChange={(e) => setForm({ ...form, knowledge_check_required: e.target.checked })}
+                className="h-4 w-4 rounded border-border"
+              />
+              Require knowledge check to complete
+            </label>
+          </div>
+        </div>
 
         <div>
           <div className="flex items-center justify-between mb-1">

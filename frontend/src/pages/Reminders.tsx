@@ -16,6 +16,7 @@ import toast from 'react-hot-toast';
 export function Reminders() {
   const [rows, setRows] = useState<any[]>([]);
   const [open, setOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<any>({});
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -32,6 +33,24 @@ export function Reminders() {
     load();
   }, []);
 
+  function closeForm() {
+    setOpen(false);
+    setEditingId(null);
+    setForm({});
+  }
+
+  function openEdit(r: any) {
+    const local = r.due_at ? isoToLocal(r.due_at) : '';
+    setForm({
+      title: r.title ?? '',
+      due_at: r.due_at ?? '',
+      due_at_local: local,
+      description: r.description ?? '',
+    });
+    setEditingId(r.id);
+    setOpen(true);
+  }
+
   async function save() {
     if (saving) return;
     if (!form.title || !form.due_at) {
@@ -40,16 +59,20 @@ export function Reminders() {
     }
     setSaving(true);
     try {
-      // Strip the local-only mirror field before POST. `due_at_local` is the
-      // raw `YYYY-MM-DDTHH:mm` string we pass to the picker; the server only
-      // wants `due_at` (ISO with timezone). Sending the extra field can hit
-      // strict-schema rejections or just bloat the payload.
+      // Strip the local-only mirror field. `due_at_local` is the raw
+      // `YYYY-MM-DDTHH:mm` string we pass to the picker; the server only wants
+      // `due_at` (ISO with timezone). The update schema is `.strict()`, so the
+      // extra field would be rejected.
       const { due_at_local: _local, ...payload } = form;
       void _local;
-      await api.post('/reminders', payload);
-      toast.success('Reminder added');
-      setOpen(false);
-      setForm({});
+      if (editingId) {
+        await api.patch(`/reminders/${editingId}`, payload);
+        toast.success('Reminder updated');
+      } else {
+        await api.post('/reminders', payload);
+        toast.success('Reminder added');
+      }
+      closeForm();
       load();
     } catch (e: any) {
       toast.error(e?.response?.data?.error ?? 'Something went wrong. Please try again.');
@@ -64,6 +87,17 @@ export function Reminders() {
       load();
     } catch (e: any) {
       toast.error(e?.response?.data?.error ?? 'Failed to mark done');
+    }
+  }
+
+  async function remove(id: string) {
+    if (!confirm('Delete this reminder? This cannot be undone.')) return;
+    try {
+      await api.delete(`/reminders/${id}`);
+      setRows((prev) => prev.filter((r) => r.id !== id));
+      toast.success('Reminder deleted');
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error ?? 'Delete failed');
     }
   }
 
@@ -93,7 +127,15 @@ export function Reminders() {
             compact
           />
         ) : (
-          rows.map((r: any) => <ReminderCard key={r.id} reminder={r} onComplete={complete} />)
+          rows.map((r: any) => (
+            <ReminderCard
+              key={r.id}
+              reminder={r}
+              onComplete={complete}
+              onEdit={openEdit}
+              onDelete={remove}
+            />
+          ))
         )}
       </div>
 
@@ -118,12 +160,21 @@ export function Reminders() {
               key: 'actions',
               header: '',
               align: 'right',
-              render: (r: any) =>
-                r.status !== 'DONE' ? (
-                  <Button size="sm" variant="ghost" onClick={() => complete(r.id)}>
-                    Mark done
+              render: (r: any) => (
+                <div className="flex items-center justify-end gap-1">
+                  {r.status !== 'DONE' && r.status !== 'SENT' && (
+                    <Button size="sm" variant="ghost" onClick={() => complete(r.id)}>
+                      Mark done
+                    </Button>
+                  )}
+                  <Button size="sm" variant="ghost" onClick={() => openEdit(r)}>
+                    Edit
                   </Button>
-                ) : null,
+                  <Button size="sm" variant="danger-ghost" onClick={() => remove(r.id)}>
+                    Delete
+                  </Button>
+                </div>
+              ),
             },
           ]}
           rows={rows}
@@ -132,24 +183,15 @@ export function Reminders() {
       {/* end desktop DataTable */}
       <Modal
         open={open}
-        onClose={() => {
-          setOpen(false);
-          setForm({});
-        }}
-        title="New reminder"
+        onClose={closeForm}
+        title={editingId ? 'Edit reminder' : 'New reminder'}
         footer={
           <>
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setOpen(false);
-                setForm({});
-              }}
-            >
+            <Button variant="secondary" onClick={closeForm}>
               Cancel
             </Button>
             <Button onClick={save} loading={saving}>
-              {saving ? 'Saving' : 'Save reminder'}
+              {saving ? 'Saving' : editingId ? 'Save changes' : 'Save reminder'}
             </Button>
           </>
         }
@@ -192,4 +234,13 @@ function localToIso(v: string): string {
   const withSeconds = v.length === 16 ? `${v}:00` : v;
   const d = new Date(withSeconds);
   return isNaN(d.getTime()) ? '' : d.toISOString();
+}
+
+// Inverse of localToIso — seeds the DateTimePicker (which wants a local
+// `YYYY-MM-DDTHH:mm` string) from a stored ISO `due_at` when editing.
+function isoToLocal(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }

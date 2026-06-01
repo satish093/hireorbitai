@@ -12,13 +12,15 @@ interface Reminder {
 interface Props {
   reminder: Reminder;
   onComplete: (id: string) => void;
+  onEdit?: (reminder: Reminder) => void;
+  onDelete?: (id: string) => void;
 }
 
 /**
  * Mobile entity card for a Reminder (< 768px).
  * Pairs with the desktop DataTable row.
  */
-export function ReminderCard({ reminder: r, onComplete }: Props) {
+export function ReminderCard({ reminder: r, onComplete, onEdit, onDelete }: Props) {
   const isDone = r.status === 'DONE' || r.status === 'SENT';
   const due = r.due_at ? new Date(r.due_at) : null;
   const isOverdue = due && !isDone ? due < new Date() : false;
@@ -84,12 +86,24 @@ export function ReminderCard({ reminder: r, onComplete }: Props) {
         )}
       </div>
 
-      {/* Status / action */}
-      {!isDone && (
-        <Button size="sm" variant="ghost" onClick={() => onComplete(r.id)} className="shrink-0">
-          Done
-        </Button>
-      )}
+      {/* Status / actions */}
+      <div className="flex flex-col items-end gap-1 shrink-0">
+        {!isDone && (
+          <Button size="sm" variant="ghost" onClick={() => onComplete(r.id)}>
+            Done
+          </Button>
+        )}
+        {onEdit && (
+          <Button size="sm" variant="ghost" onClick={() => onEdit(r)}>
+            Edit
+          </Button>
+        )}
+        {onDelete && (
+          <Button size="sm" variant="danger-ghost" onClick={() => onDelete(r.id)}>
+            Delete
+          </Button>
+        )}
+      </div>
     </div>
   );
 }
