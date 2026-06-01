@@ -54,7 +54,15 @@ export function AppChrome() {
         openMore: () => setMoreOpen(true),
       }}
     >
-      <div className="flex min-h-dvh bg-bg text-ink">
+      {/* Fixed-height app shell (h-dvh, was min-h-dvh): the sidebar stays put
+          and a page's <Layout> <main> becomes a real internal scroll region
+          (flex-1 + min-h-0 + overflow-auto). Previously min-h-dvh let the BODY
+          be the scroll container (body's overflow-x:hidden computes
+          overflow-y:auto), which is flaky on iOS Safari — the page often
+          wouldn't scroll. NOT overflow-hidden: a few in-app pages render bare
+          (no <Layout>) and must keep their own body-scroll fallback rather than
+          be clipped. */}
+      <div className="flex h-dvh bg-bg text-ink">
         {/* Only show the nav once we have an authenticated profile — the child
             routes are ProtectedRoute-gated, so an unauthed render is just the
             redirect flash. */}

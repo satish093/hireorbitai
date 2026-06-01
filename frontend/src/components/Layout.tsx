@@ -26,13 +26,17 @@ export function Layout({
   const { openNav } = useNav();
 
   return (
-    <div className="flex-1 flex flex-col min-w-0">
+    // min-h-0 lets this flex column shrink within the fixed-height shell so
+    // <main>'s overflow-auto becomes a real scroll region (without it, flex
+    // items have min-height:auto and refuse to shrink below content — the page
+    // wouldn't scroll on iOS).
+    <div className="flex-1 flex flex-col min-w-0 min-h-0">
       <Header title={title} crumbs={crumbs} onMenuClick={openNav} />
       {/* key remounts <main> on every route change, re-triggering
-          animate-page-enter and the CSS stagger cascade. */}
+          animate-page-enter + the CSS stagger cascade (also resets scroll). */}
       <main
         key={loc.pathname}
-        className="flex-1 p-4 sm:p-6 lg:p-8 pb-20 md:pb-6 lg:pb-8 overflow-auto animate-page-enter"
+        className="flex-1 min-h-0 p-4 sm:p-6 lg:p-8 pb-20 md:pb-6 lg:pb-8 overflow-auto animate-page-enter"
         tabIndex={0}
       >
         {children}

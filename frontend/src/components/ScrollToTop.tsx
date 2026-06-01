@@ -2,14 +2,16 @@ import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 
 // React Router preserves scroll position across navigations by default. The
-// app's layout uses window scroll (Layout's <main> has overflow-auto but no
-// constrained height, so content grows past the viewport and the body itself
-// scrolls). Without this component, navigating from a long page to a short
-// one leaves the new page scrolled halfway down. Reset on every pathname
-// change. Doesn't fire for hash-only changes (e.g. anchor links).
+// app shell is now fixed-height and the page's <main> owns scrolling (see
+// AppChrome/Layout), so reset THAT element — not the window — on every pathname
+// change. (Layout also remounts <main> via key={pathname}, which resets scroll;
+// this is a belt-and-braces reset that also covers any non-Layout scrollers.)
+// Falls back to window for safety. Doesn't fire for hash-only changes.
 export function ScrollToTop() {
   const { pathname } = useLocation();
   useEffect(() => {
+    const main = document.querySelector('main');
+    if (main) main.scrollTo({ top: 0, left: 0, behavior: 'auto' });
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
   }, [pathname]);
   return null;
