@@ -839,7 +839,9 @@ export function Messages() {
             (stacked above the chat pane); fixed 20rem rail on tablet+. */}
         <aside
           className={clsx(
-            'w-full sm:w-80 sm:flex shrink-0 border-b sm:border-b-0 sm:border-r border-border flex-col bg-surface sm:max-h-none',
+            // min-h-0 so the list scroll region below can shrink + scroll on
+            // mobile (column-in-column flex needs it — min-height:auto otherwise).
+            'w-full sm:w-80 sm:flex shrink-0 border-b sm:border-b-0 sm:border-r border-border flex-col bg-surface sm:max-h-none min-h-0',
             activePeer ? 'hidden' : 'flex',
           )}
         >
@@ -917,7 +919,7 @@ export function Messages() {
             ))}
           </div>
 
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 min-h-0 overflow-y-auto">
             {initialLoad && conversations.length === 0 && directory.length === 0 ? (
               <div className="px-3 py-2 space-y-2" aria-label="Loading conversations">
                 {[0, 1, 2, 3].map((i) => (
@@ -1123,7 +1125,14 @@ export function Messages() {
         </aside>
 
         {/* Right: active thread */}
-        <main className={clsx('flex-1 flex-col min-w-0', activePeer ? 'flex' : 'hidden sm:flex')}>
+        <main
+          className={clsx(
+            // min-h-0 so the message scroll region can shrink + scroll on mobile
+            // (the thread is a column inside the column-stacked pane).
+            'flex-1 flex-col min-w-0 min-h-0',
+            activePeer ? 'flex' : 'hidden sm:flex',
+          )}
+        >
           {!activePeer ? (
             // Design's `.cc-empty` shape: centered icon + headline + subtitle.
             // Previously just a single muted line — too easy to miss on first
@@ -1324,7 +1333,7 @@ export function Messages() {
                   <div
                     ref={scrollContainerRef}
                     onScroll={onScrollMessages}
-                    className="flex-1 overflow-y-auto px-5 py-4 space-y-3 bg-hover/30"
+                    className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-3 bg-hover/30"
                   >
                     {messages.length === 0 ? (
                       <p className="text-center text-sm text-muted italic mt-6">
