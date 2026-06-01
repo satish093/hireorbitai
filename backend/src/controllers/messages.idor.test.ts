@@ -294,6 +294,18 @@ describe('messages.markRead — authorization guard', () => {
     expect(err?.status).toBe(401);
   });
 
+  it('is a no-op for self (short-circuits before the permission engine, no 403)', async () => {
+    // canViewConversation(me, me) returns false (the self rule), so without the
+    // self short-circuit this would 403 + write a misleading denied-audit row.
+    mock.canView = false;
+    const { err, res } = await call(messages.markRead as Handler, ALICE, {
+      params: { userId: ALICE.id },
+    });
+    expect(err).toBeNull();
+    expect(res.body).toMatchObject({ ok: true, read: 0 });
+    expect(vi.mocked(publishToUser).mock.calls.length).toBe(0);
+  });
+
   it('succeeds (200) when canViewConversation grants access', async () => {
     mock.canView = true;
     const { err, res } = await call(messages.markRead as Handler, ALICE, {

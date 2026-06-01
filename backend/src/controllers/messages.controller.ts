@@ -416,6 +416,16 @@ export const markRead: RequestHandler = async (req, res) => {
   const me = req.user.id;
   const other = req.params.userId;
 
+  // A self-conversation can't exist (send blocks self), so marking your own
+  // thread read is a clean no-op. Short-circuit before the permission engine —
+  // canViewConversation returns false for self, which would otherwise yield a
+  // spurious 403 + a misleading messages_permission_denied audit row. Mirrors
+  // the self-guards in thread / typing / conversationContext.
+  if (other === me) {
+    res.json({ ok: true, read: 0 });
+    return;
+  }
+
   // Authorize. Closes the IDOR where any user could call this with any UUID
   // and silently mark the victim's outgoing messages as "read" on the
   // caller's inbox — a social-engineering vector even though the data
