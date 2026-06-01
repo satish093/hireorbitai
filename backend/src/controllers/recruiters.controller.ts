@@ -169,6 +169,111 @@ export const onboard: RequestHandler = async (req, res) => {
 };
 
 // ---------------------------------------------------------------------------
+// Moonlighting recruiters — give a manager-tier user a `recruiters` row so they
+// can ALSO work as a recruiter (be assigned consultants + appear in the
+// assign-recruiter picker) WITHOUT changing their role. The recruiter identity
+// is the row, not the role: assignRecruiter only checks for a recruiters row,
+// and a MANAGER/HR_MANAGER already inherits recruiter permissions via the tier
+// (OPERATOR_TIER). This is the cheap, reversible alternative to multi-role.
+// ---------------------------------------------------------------------------
+
+/** POST /recruiters/enroll — { user_id }. Admin-tier unscoped; a group lead may
+ *  only enroll a user in their own group. */
+export const enroll: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const parsed = z.object({ user_id: z.string().uuid() }).strict().safeParse(req.body);
+  if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
+  const { user_id } = parsed.data;
+
+  const { data: targetRow } = await db
+    .from('users')
+    .select('id, role, is_active')
+    .eq('id', user_id)
+    .maybeSingle();
+  const target = targetRow as { id: string; role: Role; is_active: boolean | null } | null;
+  if (!target || target.is_active === false) throw httpError(404, 'User not found');
+
+  // Only manager-tier staff can moonlight as a recruiter. A real RECRUITER
+  // already has a row (via onboarding); CONSULTANT/DEVELOPER are out of scope.
+  if (!(MANAGER_TIER as Role[]).includes(target.role)) {
+    throw httpError(400, 'Only manager-tier users can be enrolled as a recruiter.');
+  }
+
+  // Group lead → only within their own group; admin tier unscoped.
+  await assertRecruiterInScope(req.user, target.id);
+
+  // Idempotent. manager_id stays null — recruiter visibility is group-based, and
+  // manager edges are managed via the dedicated addManager path.
+  const { data, error } = await db
+    .from('recruiters')
+    .upsert({ user_id, manager_id: null }, { onConflict: 'user_id' })
+    .select(SELECT_WITH_JOINS)
+    .single();
+  if (error) throw httpError(500, 'Database error');
+  invalidatePermissionCache(user_id);
+  res.status(201).json(data);
+};
+
+/** DELETE /recruiters/:id/enrollment — remove a moonlighting recruiter row from
+ *  a manager-tier user. Refuses on a real RECRUITER account (use account
+ *  lifecycle for that) and when consultants are still assigned (reassign first,
+ *  so we never orphan a consultant's recruiter_id). */
+export const unenroll: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const { data: recRow } = await db
+    .from('recruiters')
+    .select('id, user_id')
+    .eq('id', req.params.id)
+    .maybeSingle();
+  const rec = recRow as { id: string; user_id: string | null } | null;
+  if (!rec) throw httpError(404, 'Recruiter not found');
+  await assertRecruiterInScope(req.user, rec.user_id);
+
+  const { data: userRow } = await db
+    .from('users')
+    .select('role')
+    .eq('id', rec.user_id ?? '')
+    .maybeSingle();
+  const role = (userRow as { role?: Role } | null)?.role;
+  if (role === 'RECRUITER') {
+    throw httpError(
+      400,
+      'This is a recruiter account — manage it from the user’s profile instead.',
+    );
+  }
+  if (!role || !(MANAGER_TIER as Role[]).includes(role)) {
+    throw httpError(400, 'Not an enrolled recruiter.');
+  }
+
+  // Never orphan assigned consultants.
+  const { data: assigned } = await db
+    .from('consultants')
+    .select('id')
+    .eq('recruiter_id', rec.id)
+    .limit(1);
+  if (assigned && assigned.length > 0) {
+    throw httpError(
+      409,
+      'Reassign this recruiter’s consultants before removing their recruiter role.',
+    );
+  }
+
+  // Best-effort: drop manager edges first (table may not exist on older DBs).
+  await db
+    .from('recruiter_managers')
+    .delete()
+    .eq('recruiter_id', rec.id)
+    .then(
+      () => undefined,
+      () => undefined,
+    );
+  const { error } = await db.from('recruiters').delete().eq('id', rec.id);
+  if (error) throw httpError(500, 'Database error');
+  if (rec.user_id) invalidatePermissionCache(rec.user_id);
+  res.json({ ok: true });
+};
+
+// ---------------------------------------------------------------------------
 // Manager assignments — many-to-many via recruiter_managers (with fallback)
 // ---------------------------------------------------------------------------
 

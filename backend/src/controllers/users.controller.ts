@@ -136,7 +136,11 @@ export const get: RequestHandler = async (req, res) => {
         context.recruiter = rec;
       }
     }
-  } else if (data.role === 'RECRUITER') {
+  } else {
+    // A RECRUITER always has a recruiters row; a manager-tier user ENROLLED as a
+    // moonlighting recruiter also has one (without role === 'RECRUITER'). Attach
+    // the recruiter context whenever a row exists so the profile reflects it
+    // (and the "Remove recruiter role" affordance shows).
     const { data: rec } = await db
       .from('recruiters')
       .select(
@@ -145,7 +149,7 @@ export const get: RequestHandler = async (req, res) => {
       )
       .eq('user_id', data.id)
       .maybeSingle();
-    context.recruiter = rec;
+    if (rec) context.recruiter = rec;
   }
 
   res.json({ ...data, context });

@@ -194,6 +194,51 @@ export function UserProfile() {
     }
   }
 
+  // Refetch the full profile (user + context) after a recruiter-enrollment change.
+  async function reloadProfile() {
+    if (!user) return;
+    const fresh = await api.get(`/users/${user.id}`);
+    setUser(fresh.data);
+    setForm(fresh.data);
+    seedConsForm(fresh.data.context?.consultant);
+  }
+
+  // "Moonlighting recruiter": give a manager-tier user a recruiters row so they
+  // can be assigned consultants + appear in the recruiter picker — no role change.
+  async function enrollRecruiter() {
+    if (!user || actBusy) return;
+    setActBusy(true);
+    try {
+      await api.post('/recruiters/enroll', { user_id: user.id });
+      await reloadProfile();
+      toast.success('Enrolled as recruiter — they can now be assigned consultants.');
+      invalidate('users');
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error ?? 'Failed to enroll as recruiter');
+    } finally {
+      setActBusy(false);
+    }
+  }
+
+  async function removeRecruiterRole() {
+    if (!user || actBusy) return;
+    const recId = user.context?.recruiter?.id;
+    if (!recId) return;
+    if (!confirm('Remove this user’s recruiter role? Reassign their consultants first if any.'))
+      return;
+    setActBusy(true);
+    try {
+      await api.delete(`/recruiters/${recId}/enrollment`);
+      await reloadProfile();
+      toast.success('Recruiter role removed.');
+      invalidate('users');
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error ?? 'Failed to remove recruiter role');
+    } finally {
+      setActBusy(false);
+    }
+  }
+
   async function remove() {
     if (!user || actBusy) return;
     if (deleteConfirmText.trim().toLowerCase() !== user.email.toLowerCase()) {
@@ -358,6 +403,29 @@ export function UserProfile() {
                   Replay tour
                 </Button>
               )}
+              {/* Moonlighting recruiter: a manager-tier user can ALSO be a
+                  recruiter (be assigned consultants) without a role change. */}
+              {isManagerTier &&
+                (MANAGER_TIER as string[]).includes(user.role) &&
+                (user.context?.recruiter ? (
+                  <Button
+                    variant="outline"
+                    onClick={removeRecruiterRole}
+                    disabled={actBusy}
+                    title="Remove this user's recruiter role"
+                  >
+                    Remove recruiter role
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outline"
+                    onClick={enrollRecruiter}
+                    disabled={actBusy}
+                    title="Let this user also work as a recruiter (be assigned consultants)"
+                  >
+                    Enroll as recruiter
+                  </Button>
+                ))}
               <Button variant="primary" onClick={() => setEditing(true)}>
                 Edit
               </Button>

@@ -13,6 +13,13 @@ recruitersRouter.get('/:id', requireRole(...MANAGER_TIER), c.get);
 // Recruiters onboard themselves; gate to the RECRUITER role only.
 recruitersRouter.post('/onboard', requireRole('RECRUITER'), c.onboard);
 
+// Moonlighting: enroll a manager-tier user as a recruiter (give them a
+// recruiters row) so they can be assigned consultants without a role change;
+// un-enroll removes it (guarded). Manager-tier and above; the controller
+// confines a group lead to their own group.
+recruitersRouter.post('/enroll', requireRole(...MANAGER_TIER), c.enroll);
+recruitersRouter.delete('/:id/enrollment', requireRole(...MANAGER_TIER), c.unenroll);
+
 // Many-to-many manager assignments — manager-tier and above can re-org.
 recruitersRouter.post('/:id/managers', requireRole(...MANAGER_TIER), c.addManager);
 recruitersRouter.delete('/:id/managers/:managerId', requireRole(...MANAGER_TIER), c.removeManager);
