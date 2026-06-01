@@ -110,7 +110,9 @@ export function Header({ title, crumbs, onMenuClick: _onMenuClick }: Props) {
         <kbd
           className="text-[10.5px] font-semibold px-1 py-px rounded"
           style={{
-            color: 'var(--faint)',
+            // --muted (≥4.5:1 in both themes); --faint failed WCAG AA on the
+            // light search surface (2.54:1).
+            color: 'var(--muted)',
             border: '1px solid var(--border)',
             lineHeight: 1.4,
           }}
@@ -161,8 +163,10 @@ export function Header({ title, crumbs, onMenuClick: _onMenuClick }: Props) {
             onClick={() => navigate(profile.id ? `/users/${profile.id}` : '#')}
             className="hidden md:flex w-8 h-8 ml-1 rounded-full items-center justify-center text-xs font-bold transition-opacity hover:opacity-80"
             style={{
-              background: `${bgColor}22`,
-              color: bgColor,
+              // Solid fill + white text. The previous tinted style (accent on
+              // 13%-accent bg) failed WCAG AA contrast in dark mode (~3:1).
+              background: bgColor,
+              color: '#fff',
             }}
             title={profile.full_name ?? profile.email}
           >

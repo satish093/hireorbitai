@@ -578,62 +578,62 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps = {}
         </nav>
 
         {/* ── Pinned user card ── */}
+        {/* The row is a plain container, NOT role="button": it holds two real
+            buttons (view-profile + sign-out). A button-wrapping-buttons is a
+            WCAG nested-interactive violation, so the profile area is its own
+            <button> sibling to the sign-out <button>. */}
         <div className="shrink-0 border-t border-border px-3 py-[10px]">
-          <div
-            className="flex items-center gap-2.5 px-2 py-2 rounded-[9px] cursor-pointer hover:bg-hover transition-colors"
-            onClick={() => navigate(profile?.id ? `/users/${profile.id}` : '#')}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ')
-                navigate(profile?.id ? `/users/${profile.id}` : '#');
-            }}
-            data-tour="nav-profile"
-            title="View your profile"
-          >
-            {/* Avatar with dynamic color */}
-            <div className="relative shrink-0">
-              <div
-                className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold"
-                style={{
-                  background: `${bgColor}22`,
-                  color: bgColor,
-                }}
-              >
-                {displayInitials}
-              </div>
-              {/* Online status dot */}
-              <span
-                className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2"
-                style={{
-                  background: 'var(--success)',
-                  borderColor: 'var(--surface)',
-                }}
-              >
+          <div className="flex items-center gap-2.5 px-2 py-2 rounded-[9px] hover:bg-hover transition-colors">
+            <button
+              type="button"
+              onClick={() => navigate(profile?.id ? `/users/${profile.id}` : '#')}
+              data-tour="nav-profile"
+              title="View your profile"
+              className="flex items-center gap-2.5 flex-1 min-w-0 text-left rounded-[9px] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            >
+              {/* Avatar with dynamic color */}
+              <div className="relative shrink-0">
+                <div
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold"
+                  style={{
+                    // Solid fill + white text — the tinted style failed WCAG AA
+                    // contrast in dark mode (~3:1).
+                    background: bgColor,
+                    color: '#fff',
+                  }}
+                >
+                  {displayInitials}
+                </div>
+                {/* Online status dot */}
                 <span
-                  className="absolute inset-0 rounded-full animate-ping opacity-60"
-                  style={{ background: 'var(--success)' }}
-                />
-              </span>
-            </div>
+                  className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2"
+                  style={{
+                    background: 'var(--success)',
+                    borderColor: 'var(--surface)',
+                  }}
+                >
+                  <span
+                    className="absolute inset-0 rounded-full animate-ping opacity-60"
+                    style={{ background: 'var(--success)' }}
+                  />
+                </span>
+              </div>
 
-            <div className="flex-1 min-w-0 leading-tight">
-              <div className="text-[13px] font-medium truncate" style={{ color: 'var(--ink)' }}>
-                {profile?.full_name ?? profile?.email}
+              <div className="flex-1 min-w-0 leading-tight">
+                <div className="text-[13px] font-medium truncate" style={{ color: 'var(--ink)' }}>
+                  {profile?.full_name ?? profile?.email}
+                </div>
+                <div
+                  className="text-[10px] uppercase tracking-[0.06em]"
+                  style={{ color: 'var(--muted)' }}
+                >
+                  {role && ROLE_LABEL[role]}
+                </div>
               </div>
-              <div
-                className="text-[10px] uppercase tracking-[0.06em]"
-                style={{ color: 'var(--muted)' }}
-              >
-                {role && ROLE_LABEL[role]}
-              </div>
-            </div>
+            </button>
 
             <button
-              onClick={(e) => {
-                e.stopPropagation();
-                void signOut();
-              }}
+              onClick={() => void signOut()}
               title="Sign out"
               aria-label="Sign out"
               className="shrink-0 p-1.5 rounded-md transition-colors hover:bg-hover"
