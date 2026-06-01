@@ -12,7 +12,12 @@ import {
   IconPaperclip,
   IconX,
   IconFile,
+  IconMaximize,
+  IconMinimize,
+  IconUserCircle,
+  IconBell,
 } from '../components/Icons';
+import { Brand } from '../components/Brand';
 import { NotificationToggle } from '../components/NotificationToggle';
 import { useMediaViewer } from '../hooks/useMediaViewer';
 
@@ -164,6 +169,98 @@ export function Messages() {
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [peerTyping, setPeerTyping] = useState(false);
   const [contactPanelOpen, setContactPanelOpen] = useState(false);
+  // Desktop-only: persistent collapse of the right contact panel. The
+  // mobile BottomSheet already has its own open/close state above; this
+  // covers the gap on lg+ where the panel was previously always visible.
+  // Persisted in localStorage so the user's preference survives reloads.
+  const [desktopContactCollapsed, setDesktopContactCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('hireorbit:inbox:desktop-context-collapsed') === '1';
+    } catch {
+      return false;
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        'hireorbit:inbox:desktop-context-collapsed',
+        desktopContactCollapsed ? '1' : '0',
+      );
+    } catch {
+      /* private-mode / quota — fall back to in-memory only */
+    }
+  }, [desktopContactCollapsed]);
+  // Fullscreen mode — drops the app shell (sidebar + page header) and
+  // renders just the 3-pane filling the viewport. WhatsApp-web style.
+  // Persisted so it survives reloads; Escape exits.
+  const [fullscreen, setFullscreen] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('hireorbit:inbox:fullscreen') === '1';
+    } catch {
+      return false;
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem('hireorbit:inbox:fullscreen', fullscreen ? '1' : '0');
+    } catch {
+      /* ignore */
+    }
+  }, [fullscreen]);
+  // Escape exits fullscreen — but only when fullscreen is actually on,
+  // so we don't intercept the key for unrelated UI (e.g. a focused modal
+  // inside the inbox).
+  useEffect(() => {
+    if (!fullscreen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setFullscreen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [fullscreen]);
+  // Missed-call acknowledgement set — call ids the user has dismissed
+  // from the inbox banner. Stored as a JSON array; load once on mount.
+  const [ackedMissedIds, setAckedMissedIds] = useState<Set<string>>(() => {
+    try {
+      const raw = localStorage.getItem('hireorbit:inbox:missed-acks');
+      const arr = raw ? (JSON.parse(raw) as string[]) : [];
+      return new Set(arr);
+    } catch {
+      return new Set();
+    }
+  });
+  // Recent missed calls (last 24 h, not yet acknowledged). Fetched once on
+  // mount + when the missed-call SSE event fires elsewhere — here we just
+  // poll lazily. The badge collapses gracefully when /calls/history isn't
+  // available (calls feature flag off / endpoint 404).
+  const [recentMissed, setRecentMissed] = useState<
+    Array<{ id: string; ended_at: string | null; started_at: string | null; from_name?: string }>
+  >([]);
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .get('/calls/history', { params: { outcome: 'missed', since_hours: 24, limit: 10 } })
+      .then((r) => {
+        if (!cancelled) setRecentMissed(r.data ?? []);
+      })
+      .catch(() => {
+        /* feature flag off / older backend — banner stays hidden */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  const unackedMissed = recentMissed.filter((m) => !ackedMissedIds.has(m.id));
+  function dismissMissed() {
+    const next = new Set(ackedMissedIds);
+    for (const m of recentMissed) next.add(m.id);
+    setAckedMissedIds(next);
+    try {
+      localStorage.setItem('hireorbit:inbox:missed-acks', JSON.stringify([...next]));
+    } catch {
+      /* ignore */
+    }
+  }
   const peerTypingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Local throttle so we don't POST /typing on every keystroke — once
   // every TYPING_PING_MS while text is being entered is plenty (server
@@ -721,17 +818,23 @@ export function Messages() {
           .filter((p) => !q || (p.full_name ?? p.email).toLowerCase().includes(q))
       : [];
 
-  return (
-    <Layout
-      title="Messages"
-      crumbs={[{ label: 'Workspace', to: '/dashboard' }, { label: 'Messages' }]}
-    >
+  // Container styling depends on shell. In Layout mode we keep the card
+  // chrome (bordered, rounded on sm+) and the height math that accounts
+  // for the global app header + bottom nav. In fullscreen mode the
+  // FullscreenShell already supplies a 44 px top bar, so we just fill
+  // the remaining viewport edge-to-edge.
+  const paneContainerClass = fullscreen
+    ? 'bg-surface overflow-hidden flex flex-col sm:flex-row h-[calc(100dvh-44px)] min-h-0'
+    : 'bg-surface overflow-hidden flex flex-col sm:flex-row -mx-4 sm:mx-0 border-y sm:border border-border rounded-none sm:rounded-xl h-[calc(100dvh-156px)] sm:h-[calc(100dvh-168px)] md:h-[calc(100dvh-140px)] sm:min-h-[480px]';
+
+  const inboxBody = (
+    <>
       {/* Full-bleed edge-to-edge on phones (escape the page padding), a bordered
           card on tablet+. Height fills the space between the sticky header and
           the bottom nav from the page chrome — NO forced min-height on mobile
           (that used to overflow short phones and make the whole page scroll
           instead of just the message list). */}
-      <div className="bg-surface overflow-hidden flex flex-col sm:flex-row -mx-4 sm:mx-0 border-y sm:border border-border rounded-none sm:rounded-xl h-[calc(100dvh-156px)] sm:h-[calc(100dvh-168px)] md:h-[calc(100dvh-140px)] sm:min-h-[480px]">
+      <div className={paneContainerClass}>
         {/* Left: conversation list. Becomes a full-width column on phones
             (stacked above the chat pane); fixed 20rem rail on tablet+. */}
         <aside
@@ -750,6 +853,32 @@ export function Messages() {
                 RealtimeNotifications. */}
             <NotificationToggle />
           </div>
+
+          {/* Inbox notifications banner — surfaces missed calls from the
+              last 24 h so the user doesn't have to dig into ContactPanel
+              to find them. Dismissal is local (localStorage); the entries
+              themselves stay in /calls/history. Hidden when no unacked
+              missed calls exist. */}
+          {unackedMissed.length > 0 && (
+            <div className="mx-3 mb-2 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-900 dark:border-amber-900/40 dark:bg-amber-900/20 dark:text-amber-200">
+              <IconBell size={16} className="shrink-0 mt-0.5" />
+              <div className="flex-1 text-[12.5px] leading-snug">
+                <span className="font-semibold">
+                  {unackedMissed.length} missed call{unackedMissed.length === 1 ? '' : 's'}
+                </span>{' '}
+                in the last 24 h. Open a conversation to see history.
+              </div>
+              <button
+                type="button"
+                onClick={dismissMissed}
+                aria-label="Dismiss missed-call notice"
+                className="shrink-0 -mr-1 -mt-0.5 p-1 rounded-md hover:bg-amber-100 dark:hover:bg-amber-900/40"
+                title="Dismiss"
+              >
+                <IconX size={13} />
+              </button>
+            </div>
+          )}
 
           {/* Persistent search bar — filters chats and, once you type, also
               surfaces matching people you haven't messaged yet. */}
@@ -997,7 +1126,7 @@ export function Messages() {
                     {activePeer.role && ROLE_LABEL[activePeer.role]} · {activePeer.email}
                   </div>
                 </div>
-                {/* Context panel toggle (mobile/tablet — hidden on lg where panel is always visible) */}
+                {/* Context panel toggle (mobile/tablet → opens BottomSheet) */}
                 <button
                   type="button"
                   aria-label="View contact info"
@@ -1005,19 +1134,39 @@ export function Messages() {
                   className="lg:hidden ml-auto p-2 rounded-lg hover:bg-hover text-muted"
                   title="Contact info"
                 >
-                  <svg
-                    width="18"
-                    height="18"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.75"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
+                  <IconUserCircle size={18} />
+                </button>
+                {/* Desktop: shown ONLY when the right panel is collapsed (X'd
+                    away) — gives the user a way to re-open it. Mirrors the
+                    mobile path above. The lg:ml-auto pushes it (and the
+                    fullscreen + call buttons) to the right of the title. */}
+                {desktopContactCollapsed && (
+                  <button
+                    type="button"
+                    aria-label="Show contact info"
+                    onClick={() => setDesktopContactCollapsed(false)}
+                    className="hidden lg:inline-flex ml-auto p-2 rounded-lg hover:bg-hover text-muted"
+                    title="Show contact info"
                   >
-                    <circle cx="12" cy="7" r="4" />
-                    <path d="M20 21a8 8 0 1 0-16 0" />
-                  </svg>
+                    <IconUserCircle size={18} />
+                  </button>
+                )}
+                {/* Fullscreen toggle — desktop only (mobile is already
+                    full-bleed). Click to enter the WhatsApp-web style
+                    immersive view; click again or press Escape to exit.
+                    The ml-auto only kicks in when the contact-info button
+                    isn't already there to claim it. */}
+                <button
+                  type="button"
+                  aria-label={fullscreen ? 'Exit fullscreen' : 'Fullscreen inbox'}
+                  onClick={() => setFullscreen((f) => !f)}
+                  className={clsx(
+                    'hidden lg:inline-flex p-2 rounded-lg hover:bg-hover text-muted',
+                    !desktopContactCollapsed && 'ml-auto',
+                  )}
+                  title={fullscreen ? 'Exit fullscreen (Esc)' : 'Fullscreen inbox'}
+                >
+                  {fullscreen ? <IconMinimize size={18} /> : <IconMaximize size={18} />}
                 </button>
                 {/* Voice call — disabled while already in a call */}
                 <div className="flex items-center gap-1 text-muted">
@@ -1388,14 +1537,18 @@ export function Messages() {
           )}
         </main>
 
-        {/* Right: context panel — desktop only (lg+). On mobile/tablet it's a BottomSheet. */}
-        {activePeer && (
+        {/* Right: context panel — desktop only (lg+). On mobile/tablet it's a BottomSheet.
+            Hidden when the user collapsed it via the X button in its header (state
+            persists across reloads via localStorage). Reopen from the "show contact info"
+            button added to the thread header. */}
+        {activePeer && !desktopContactCollapsed && (
           <aside
             className="hidden lg:flex lg:w-72 shrink-0 border-l border-border flex-col"
             style={{ background: 'var(--surface)' }}
           >
             <ContactPanel
               peer={activePeer}
+              onClose={() => setDesktopContactCollapsed(true)}
               onCall={
                 call.status === 'idle'
                   ? () => {
@@ -1460,6 +1613,45 @@ export function Messages() {
           <MediaViewerModal state={mediaViewer.state} onClose={mediaViewer.close} />
         </Suspense>
       )}
+    </>
+  );
+
+  // Fullscreen mode bypasses the standard <Layout> (no app sidebar, no
+  // page header) so the inbox feels like a WhatsApp-web-style standalone
+  // surface. Brand link in the top bar lets the user navigate back to
+  // the dashboard; Exit toggles fullscreen off so they're back in the
+  // normal app shell on the same /messages route.
+  if (fullscreen) {
+    return (
+      <div className="min-h-dvh w-screen flex flex-col bg-bg">
+        <header
+          className="shrink-0 h-11 flex items-center gap-3 px-3 border-b border-border bg-surface"
+          style={{ height: 44 }}
+        >
+          <Brand size="sm" />
+          <span className="text-sm font-semibold text-ink">Inbox</span>
+          <button
+            type="button"
+            onClick={() => setFullscreen(false)}
+            className="ml-auto inline-flex items-center gap-1.5 px-2.5 h-8 rounded-lg text-xs font-medium text-muted hover:bg-hover hover:text-ink transition-colors"
+            title="Exit fullscreen (Esc)"
+            aria-label="Exit fullscreen"
+          >
+            <IconMinimize size={14} />
+            Exit
+          </button>
+        </header>
+        {inboxBody}
+      </div>
+    );
+  }
+
+  return (
+    <Layout
+      title="Messages"
+      crumbs={[{ label: 'Workspace', to: '/dashboard' }, { label: 'Messages' }]}
+    >
+      {inboxBody}
     </Layout>
   );
 }
