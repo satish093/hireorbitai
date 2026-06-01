@@ -8,40 +8,13 @@ import {
   isAdminTier,
   isGroupLead,
   leadCanAccessUser,
+  groupUserIds,
+  userInGroup,
 } from '../services/groupScope';
 import { audit } from '../services/audit.service';
 
 function isManagerTier(role?: string): boolean {
   return !!role && (MANAGER_TIER as string[]).includes(role);
-}
-
-/**
- * Resolve the recruiter row id for the calling user (if they are a recruiter).
- *
- * Self-heals: if the user IS a RECRUITER (per req.user.role check at the call
- * site) but has NO row in the recruiters table — which happens to accounts
- * created by admins via /admin/users before wireHierarchy was wired into that
- * path, or to legacy invitations whose parent resolution returned null — we
- * upsert a row with manager_id = null. Without this self-heal the caller would
- * always see an empty consultants list (and an empty submissions list) until
- * an admin manually intervened.
- */
-async function getCallerRecruiterRowId(userId: string): Promise<string | null> {
-  const { data } = await db.from('recruiters').select('id').eq('user_id', userId).maybeSingle();
-  if (data?.id) return data.id;
-  // No row — create one. Best-effort: if the upsert errors (e.g. schema lag
-  // requires manager_id NOT NULL on an older DB), we surface null and the
-  // caller falls back to the empty-list response.
-  try {
-    const { data: created } = await db
-      .from('recruiters')
-      .upsert({ user_id: userId, manager_id: null }, { onConflict: 'user_id' })
-      .select('id')
-      .single();
-    return (created as { id?: string } | null)?.id ?? null;
-  } catch {
-    return null;
-  }
 }
 
 const onboardingSchema = z
@@ -75,26 +48,29 @@ export const list: RequestHandler = async (req, res) => {
 
   // Scope by caller's role:
   //   ADMIN_TIER / MANAGER: full visibility (optional ?recruiter_id filter)
-  //   RECRUITER: only consultants assigned to them
+  //   RECRUITER: every consultant in their own group/pod (not just assigned ones)
   //   CONSULTANT: only their own row
   if (isManagerTier(req.user.role)) {
     if (recruiter_id) q = q.eq('recruiter_id', recruiter_id);
     // A MANAGER is confined to their own group; HR_MANAGER + admin-tier are not.
-    const groupUserIds = await managerGroupUserIds(req.user);
-    if (groupUserIds !== null) {
-      if (groupUserIds.length === 0) {
+    const groupIds = await managerGroupUserIds(req.user);
+    if (groupIds !== null) {
+      if (groupIds.length === 0) {
         res.json([]);
         return;
       }
-      q = q.in('user_id', groupUserIds);
+      q = q.in('user_id', groupIds);
     }
   } else if (req.user.role === 'RECRUITER') {
-    const myRecId = await getCallerRecruiterRowId(req.user.id);
-    if (!myRecId) {
+    // Recruiters see every consultant in their own group/pod — not just the ones
+    // assigned to them — mirroring the group scoping a MANAGER gets. Fail-closed:
+    // a recruiter with no group, or an empty group, sees nobody.
+    const ids = await groupUserIds(req.user.group_id);
+    if (ids.length === 0) {
       res.json([]);
       return;
     }
-    q = q.eq('recruiter_id', myRecId);
+    q = q.in('user_id', ids);
   } else if (req.user.role === 'CONSULTANT') {
     q = q.eq('user_id', req.user.id);
   } else {
@@ -192,14 +168,15 @@ export const get: RequestHandler = async (req, res) => {
 
   // Scope: same rules as list. Return 404 (not 403) so the endpoint can't
   // be used to probe whether a consultant id exists. Admin tier is unscoped;
-  // group leads (HR_MANAGER/MANAGER) are confined to their own group.
+  // group leads (HR_MANAGER/MANAGER) and recruiters are confined to their own group.
   if (isAdminTier(req.user.role)) {
     // unscoped — full visibility
   } else if (isGroupLead(req.user.role)) {
     if (!(await leadCanAccessUser(req.user, row.user_id))) throw httpError(404, 'Not found');
   } else if (req.user.role === 'RECRUITER') {
-    const myRecId = await getCallerRecruiterRowId(req.user.id);
-    if (!myRecId || row.recruiter_id !== myRecId) throw httpError(404, 'Not found');
+    // Recruiters may read any consultant in their own group/pod.
+    if (!row.user_id || !(await userInGroup(req.user.group_id, row.user_id)))
+      throw httpError(404, 'Not found');
   } else if (req.user.role === 'CONSULTANT') {
     if (row.user_id !== req.user.id) throw httpError(404, 'Not found');
   } else {
@@ -260,8 +237,8 @@ export const update: RequestHandler = async (req, res) => {
   if (lookupErr) throw httpError(500, lookupErr.message);
   if (!row) throw httpError(404, 'Not found');
 
-  // Admin tier unscoped; group leads confined to their group; recruiter to
-  // their assigned consultants; consultant to their own row.
+  // Admin tier unscoped; group leads and recruiters confined to their group;
+  // consultant to their own row.
   // Out-of-scope responses use 404 (not 403) so the endpoint isn't an
   // existence oracle — drifted from `get` which already returns 404.
   if (isAdminTier(req.user.role)) {
@@ -271,8 +248,9 @@ export const update: RequestHandler = async (req, res) => {
       throw httpError(404, 'Not found');
     }
   } else if (req.user.role === 'RECRUITER') {
-    const myRecId = await getCallerRecruiterRowId(req.user.id);
-    if (!myRecId || (row as { recruiter_id: string | null }).recruiter_id !== myRecId) {
+    // Recruiters may edit any consultant in their own group/pod.
+    const ownerUserId = (row as { user_id: string | null }).user_id;
+    if (!ownerUserId || !(await userInGroup(req.user.group_id, ownerUserId))) {
       throw httpError(404, 'Not found');
     }
   } else if (req.user.role === 'CONSULTANT') {
@@ -389,9 +367,10 @@ export const setMarketingStatus: RequestHandler = async (req, res) => {
   if (!parsed.success) throw httpError(400, 'Invalid status');
 
   // Scope the write: admin-tier is unscoped; group leads (HR_MANAGER/MANAGER)
-  // only their own group; recruiters only their own consultants. Mirrors the
-  // ownership pattern in `get`/`update`/`assignRecruiter` above — a group lead
-  // must NOT be able to flip the marketing status of an out-of-group consultant.
+  // and recruiters are confined to their own group. Mirrors the ownership
+  // pattern in `get`/`update` above — a group lead or recruiter must NOT be able
+  // to flip the marketing status of an out-of-group consultant. The route is
+  // OPERATOR_TIER, so a CONSULTANT can't reach this handler.
   if (!isAdminTier(req.user.role)) {
     const { data: cons } = await db
       .from('consultants')
@@ -400,13 +379,8 @@ export const setMarketingStatus: RequestHandler = async (req, res) => {
       .maybeSingle();
     const row = cons as { recruiter_id: string | null; user_id: string | null } | null;
     if (!row) throw httpError(404, 'Not found');
-    if (isGroupLead(req.user.role)) {
-      if (!row.user_id || !(await leadCanAccessUser(req.user, row.user_id)))
-        throw httpError(404, 'Not found');
-    } else {
-      const myRecId = await getCallerRecruiterRowId(req.user.id);
-      if (row.recruiter_id !== myRecId) throw httpError(404, 'Not found');
-    }
+    if (!row.user_id || !(await userInGroup(req.user.group_id, row.user_id)))
+      throw httpError(404, 'Not found');
   }
 
   const { data, error } = await db

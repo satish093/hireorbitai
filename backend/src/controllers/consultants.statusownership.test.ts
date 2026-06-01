@@ -1,13 +1,13 @@
 /**
  * Ownership tests for consultants.setMarketingStatus.
  *
- * Before the fix, OPERATOR_TIER (which includes RECRUITER) could update the
- * marketing_status of ANY consultant — no recruiter→consultant ownership check
- * existed. The fix adds the same getCallerRecruiterRowId check used elsewhere.
+ * Recruiters are group-scoped (not assigned-only): a recruiter may flip the
+ * marketing status of any consultant in their own group/pod, and nobody else's.
+ * Group leads have the same group scoping; admin-tier is unscoped.
  *
  * Tests pin:
- *   - RECRUITER updating their own consultant → 200
- *   - RECRUITER blocked from updating another recruiter's consultant → 404
+ *   - RECRUITER updating an in-group consultant → 200
+ *   - RECRUITER blocked from an out-of-group consultant → 404 (fail-closed)
  *   - ADMIN_TIER (DIRECTOR) can update any consultant → 200 (unscoped)
  *   - GROUP LEAD (HR_MANAGER) only within their own group → 200 in-group, 404
  *     out-of-group (fail-closed) — a lead must not flip an out-of-group
@@ -136,7 +136,7 @@ const OTHER_CONS = {
   marketing_status: 'ACTIVE',
 };
 
-const RECRUITER = { id: 'u-recruiter', role: 'RECRUITER' };
+const RECRUITER = { id: 'u-recruiter', role: 'RECRUITER', group_id: 'g1' };
 const ADMIN_USER = { id: 'u-dir', role: 'DIRECTOR' };
 const LEAD = { id: 'u-lead', role: 'HR_MANAGER', group_id: 'g1' };
 
@@ -144,9 +144,9 @@ const LEAD = { id: 'u-lead', role: 'HR_MANAGER', group_id: 'g1' };
 // Tests
 // ---------------------------------------------------------------------------
 describe('consultants.setMarketingStatus — ownership', () => {
-  it('RECRUITER can set status on their own consultant', async () => {
-    mock.rows.recruiters = [MY_REC];
+  it('RECRUITER can set status on an in-group consultant', async () => {
     mock.rows.consultants = [MY_CONS];
+    mock.rows.users = [{ id: 'u-cons' }]; // consultant's owner is in the recruiter's group
     const { err } = await call(consultants.setMarketingStatus as Handler, RECRUITER, {
       body: { marketing_status: 'PAUSED' },
       params: { id: 'cons-mine' },
@@ -154,9 +154,9 @@ describe('consultants.setMarketingStatus — ownership', () => {
     expect(err).toBeNull();
   });
 
-  it("RECRUITER is blocked from setting status on another recruiter's consultant", async () => {
-    mock.rows.recruiters = [MY_REC];
+  it('RECRUITER is blocked from setting status on an out-of-group consultant', async () => {
     mock.rows.consultants = [OTHER_CONS];
+    mock.rows.users = []; // empty group — recruiter sees nobody (fail-closed)
     const { err } = await call(consultants.setMarketingStatus as Handler, RECRUITER, {
       body: { marketing_status: 'PLACED' },
       params: { id: 'cons-other' },

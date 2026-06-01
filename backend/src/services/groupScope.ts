@@ -55,6 +55,32 @@ export async function leadCanAccessConsultant(
 }
 
 /**
+ * User ids belonging to `groupId` (empty array when no group). Role-agnostic —
+ * the caller decides who gets group-scoped. Backs both the group-lead scoping
+ * (`managerGroupUserIds`) and the recruiter consultant-visibility scoping in
+ * `consultants.controller`.
+ */
+export async function groupUserIds(groupId?: string | null): Promise<string[]> {
+  if (!groupId) return [];
+  const { data } = await db.from('users').select('id').eq('group_id', groupId);
+  return (data ?? []).map((u: { id: string }) => u.id);
+}
+
+/**
+ * True when `ownerUserId` belongs to `groupId`. Role-agnostic sibling of
+ * `leadCanAccessUser`, so a RECRUITER caller (who is not a group LEAD) can still
+ * be confined to their own group for consultant view/edit. Fail-closed when the
+ * caller has no group.
+ */
+export async function userInGroup(
+  groupId: string | null | undefined,
+  ownerUserId: string,
+): Promise<boolean> {
+  if (!groupId) return false;
+  return (await groupUserIds(groupId)).includes(ownerUserId);
+}
+
+/**
  * User ids visible to the caller under group scoping.
  *   - `null`      → caller is not group-scoped (apply no extra filter).
  *   - `string[]`  → the user ids in the group lead's group (filter `user_id` IN …).
@@ -63,9 +89,7 @@ export async function leadCanAccessConsultant(
  */
 export async function managerGroupUserIds(caller: Caller): Promise<string[] | null> {
   if (!GROUP_LEAD_ROLES.includes(caller.role)) return null;
-  if (!caller.group_id) return [];
-  const { data } = await db.from('users').select('id').eq('group_id', caller.group_id);
-  return (data ?? []).map((u: { id: string }) => u.id);
+  return groupUserIds(caller.group_id);
 }
 
 /**

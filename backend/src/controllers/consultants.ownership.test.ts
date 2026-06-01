@@ -128,6 +128,9 @@ const ADMIN = { id: 'u-director', role: 'DIRECTOR' };
 // group_id — so seeding mock.rows.users controls whether the consultant's
 // owning user counts as in-group.
 const GROUP_LEAD = { id: 'u-lead', role: 'HR_MANAGER', group_id: 'g1' };
+// A RECRUITER is group-scoped like a group lead: sees/edits every consultant in
+// their own group, nobody else's. Membership resolves via mock.rows.users too.
+const RECRUITER = { id: 'u-recruiter', role: 'RECRUITER', group_id: 'g1' };
 
 // ---------------------------------------------------------------------------
 // get() — read ownership
@@ -183,6 +186,25 @@ describe('consultants.get — read ownership', () => {
     mock.rows.consultants = [CONSULTANT_ROW];
     mock.rows.users = []; // nobody in the lead's group → fail-closed
     const { err } = await call(consultants.get as Handler, GROUP_LEAD, {
+      params: { id: 'c-1' },
+    });
+    expect(err?.status).toBe(404);
+  });
+
+  it('allows a RECRUITER to read a consultant in their own group', async () => {
+    mock.rows.consultants = [CONSULTANT_ROW];
+    mock.rows.users = [{ id: OWNER_USER_ID }]; // owner is in the recruiter's group
+    const { err, res } = await call(consultants.get as Handler, RECRUITER, {
+      params: { id: 'c-1' },
+    });
+    expect(err).toBeNull();
+    expect(res.body).toMatchObject({ id: 'c-1' });
+  });
+
+  it('returns 404 when a RECRUITER reads a consultant outside their group', async () => {
+    mock.rows.consultants = [CONSULTANT_ROW];
+    mock.rows.users = []; // empty group → fail-closed, no org-wide leak
+    const { err } = await call(consultants.get as Handler, RECRUITER, {
       params: { id: 'c-1' },
     });
     expect(err?.status).toBe(404);
@@ -259,6 +281,30 @@ describe('consultants.update — write ownership', () => {
     expect(mock.updates.find((u) => u.table === 'consultants')).toBeUndefined();
   });
 
+  it('allows a RECRUITER to update a consultant in their own group', async () => {
+    mock.rows.consultants = [CONSULTANT_ROW];
+    mock.rows.users = [{ id: OWNER_USER_ID }]; // owner in the recruiter's group
+    const { err } = await call(consultants.update as Handler, RECRUITER, {
+      params: { id: 'c-1' },
+      body: { primary_skill: 'Kotlin' },
+    });
+    expect(err).toBeNull();
+    expect(mock.updates.find((u) => u.table === 'consultants')?.payload).toMatchObject({
+      primary_skill: 'Kotlin',
+    });
+  });
+
+  it('returns 404 when a RECRUITER updates a consultant outside their group (oracle hygiene)', async () => {
+    mock.rows.consultants = [CONSULTANT_ROW];
+    mock.rows.users = []; // not in the recruiter's group
+    const { err } = await call(consultants.update as Handler, RECRUITER, {
+      params: { id: 'c-1' },
+      body: { primary_skill: 'Java' },
+    });
+    expect(err?.status).toBe(404);
+    expect(mock.updates.find((u) => u.table === 'consultants')).toBeUndefined();
+  });
+
   it('returns 404 when the consultant row does not exist on update', async () => {
     mock.rows.consultants = [];
     const { err } = await call(consultants.update as Handler, ADMIN, {
@@ -305,5 +351,30 @@ describe('consultants.update — field allowlist (mass-assignment guard)', () =>
       body: { linkedin_url: 'not-a-url-or-empty' },
     });
     expect(err?.status).toBe(400);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// list() — recruiter group scoping (visibility, not just per-row ownership)
+// ---------------------------------------------------------------------------
+
+describe('consultants.list — recruiter group scoping', () => {
+  it('scopes a RECRUITER to the consultants in their own group', async () => {
+    mock.rows.consultants = [CONSULTANT_ROW];
+    mock.rows.users = [{ id: OWNER_USER_ID }]; // recruiter's group has this user
+    const { err, res } = await call(consultants.list as Handler, RECRUITER, {});
+    expect(err).toBeNull();
+    expect(res.body).toEqual([CONSULTANT_ROW]);
+  });
+
+  it('returns [] for a RECRUITER with no group (fail-closed, no org-wide leak)', async () => {
+    mock.rows.consultants = [CONSULTANT_ROW];
+    const { err, res } = await call(
+      consultants.list as Handler,
+      { id: 'u-recruiter', role: 'RECRUITER' }, // no group_id
+      {},
+    );
+    expect(err).toBeNull();
+    expect(res.body).toEqual([]);
   });
 });
