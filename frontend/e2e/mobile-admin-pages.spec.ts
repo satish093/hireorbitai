@@ -412,8 +412,12 @@ test.describe('Mobile — Invitations page', () => {
     await page.goto('/invitations');
     await page.waitForLoadState('networkidle');
 
-    await expect(page.getByText('newuser@example.com').last()).toBeVisible({ timeout: 8000 });
-    await expect(page.getByText('another@example.com').last()).toBeVisible({ timeout: 8000 });
+    await expect(
+      page.getByText('newuser@example.com').filter({ visible: true }).first(),
+    ).toBeVisible({ timeout: 8000 });
+    await expect(
+      page.getByText('another@example.com').filter({ visible: true }).first(),
+    ).toBeVisible({ timeout: 8000 });
     await expect(page.getByRole('button', { name: /revoke/i }).first()).toBeVisible({
       timeout: 8000,
     });
@@ -520,8 +524,12 @@ test.describe('Mobile — Deactivated Accounts page', () => {
     await expect(page.getByRole('heading', { name: 'Deactivated accounts' })).toBeVisible({
       timeout: 8000,
     });
-    await expect(page.getByText('Deactivated User').last()).toBeVisible({ timeout: 8000 });
-    await expect(page.getByText('Suspended User').last()).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('Deactivated User').filter({ visible: true }).first()).toBeVisible({
+      timeout: 8000,
+    });
+    await expect(page.getByText('Suspended User').filter({ visible: true }).first()).toBeVisible({
+      timeout: 8000,
+    });
     await expect(page.getByRole('button', { name: /reactivate/i }).first()).toBeVisible({
       timeout: 8000,
     });

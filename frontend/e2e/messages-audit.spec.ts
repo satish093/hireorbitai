@@ -301,8 +301,8 @@ test.describe('Messages page — deep audit', () => {
     const errors = trackPageErrors(page);
     await setup(page);
     await page.goto(`/messages?with=${PEER_ID}`);
-    await page.waitForLoadState('networkidle');
-
+    // The thread holds a realtime connection open, so `networkidle` never
+    // settles — wait on the composer itself.
     const composer = page.getByPlaceholder(/Write a message/);
     await expect(composer).toBeVisible();
     const before = await composer.evaluate((el) => (el as HTMLElement).offsetHeight);
@@ -312,13 +312,17 @@ test.describe('Messages page — deep audit', () => {
     const grown = await composer.evaluate((el) => (el as HTMLElement).offsetHeight);
     expect(grown).toBeGreaterThan(before);
 
-    // Pressing Enter should submit and reset the composer.
+    // Pressing Enter submits and clears the draft, collapsing the textarea.
     await composer.press('Enter');
+    await expect(composer).toHaveValue('');
     await page.waitForTimeout(150);
     const after = await composer.evaluate((el) => (el as HTMLElement).offsetHeight);
-    // After reset, height should drop back near "before" (within 4px tolerance).
-    expect(after).toBeLessThanOrEqual(before + 4);
-    await expect(composer).toHaveValue('');
+    // After send the textarea collapses well below its grown height. The
+    // redesigned composer settles a little above its pristine first-paint
+    // height (a tall-then-empty auto-resize leaves a ~1-line residual), so
+    // assert a substantial shrink rather than an exact return to `before`.
+    expect(after).toBeLessThan(grown);
+    expect(after).toBeLessThanOrEqual(before + 28);
 
     expect(errors).toHaveLength(0);
   });
@@ -330,9 +334,19 @@ test.describe('Messages page — deep audit', () => {
     const errors = trackPageErrors(page);
     await setup(page);
     await page.goto(`/messages?with=${PEER_ID}`);
-    await page.waitForLoadState('networkidle');
+    // The thread keeps a realtime connection open, so `networkidle` never
+    // settles — wait for the composer instead to know the chat pane painted.
+    await expect(page.getByPlaceholder(/Write a message/)).toBeVisible();
 
-    const phoneBtn = page.getByRole('button', { name: /voice call/i });
+    // Two voice-call affordances now exist on desktop: the icon button in the
+    // chat header (title "Voice call") and the labelled button in the right
+    // ContactPanel (title "Start a voice call"). Target the header one via its
+    // accessible description, which is unique to it.
+    const phoneBtn = page.getByRole('button', {
+      name: 'Voice call',
+      exact: true,
+      description: 'Voice call',
+    });
     await expect(phoneBtn).toBeVisible();
     await expect(phoneBtn).toBeEnabled();
 

@@ -125,9 +125,15 @@ test.describe('Mobile — Tasks page', () => {
     await page.goto('/tasks');
     await page.waitForLoadState('load');
 
-    await expect(page.getByText('Design the onboarding flow')).toBeVisible({ timeout: 8000 });
-    await expect(page.getByText('Implement auth middleware')).toBeVisible({ timeout: 8000 });
-    await expect(page.getByText('Write API documentation')).toBeVisible({ timeout: 8000 });
+    await expect(
+      page.getByText('Design the onboarding flow').filter({ visible: true }).first(),
+    ).toBeVisible({ timeout: 8000 });
+    await expect(
+      page.getByText('Implement auth middleware').filter({ visible: true }).first(),
+    ).toBeVisible({ timeout: 8000 });
+    await expect(
+      page.getByText('Write API documentation').filter({ visible: true }).first(),
+    ).toBeVisible({ timeout: 8000 });
 
     expect(await hasHorizontalOverflow(page)).toBe(false);
     expect(errors).toHaveLength(0);
@@ -312,10 +318,14 @@ test.describe('Mobile — Reminders page', () => {
     await page.goto('/reminders');
     await page.waitForLoadState('load');
 
-    await expect(page.getByText('Follow up with Alice re: Google offer').last()).toBeVisible({
+    await expect(
+      page.getByText('Follow up with Alice re: Google offer').filter({ visible: true }).first(),
+    ).toBeVisible({
       timeout: 8000,
     });
-    await expect(page.getByText('Send resume to Acme Corp').last()).toBeVisible({ timeout: 8000 });
+    await expect(
+      page.getByText('Send resume to Acme Corp').filter({ visible: true }).first(),
+    ).toBeVisible({ timeout: 8000 });
 
     expect(await hasHorizontalOverflow(page)).toBe(false);
     expect(errors).toHaveLength(0);

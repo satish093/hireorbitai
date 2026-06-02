@@ -97,9 +97,17 @@ test.describe('Tasks page', () => {
     await setupPage(page);
     await page.goto('/tasks');
 
-    await expect(page.getByText('Design the onboarding flow')).toBeVisible({ timeout: 8000 });
-    await expect(page.getByText('Implement auth middleware')).toBeVisible({ timeout: 8000 });
-    await expect(page.getByText('Write API documentation')).toBeVisible({ timeout: 8000 });
+    // Tasks render twice (mobile cards md:hidden + desktop list), so each title
+    // resolves to 2 elements; scope to the visible (desktop) occurrence.
+    await expect(
+      page.getByText('Design the onboarding flow').filter({ visible: true }).first(),
+    ).toBeVisible({ timeout: 8000 });
+    await expect(
+      page.getByText('Implement auth middleware').filter({ visible: true }).first(),
+    ).toBeVisible({ timeout: 8000 });
+    await expect(
+      page.getByText('Write API documentation').filter({ visible: true }).first(),
+    ).toBeVisible({ timeout: 8000 });
 
     expect(errors).toHaveLength(0);
   });
@@ -317,10 +325,16 @@ test.describe('Reminders page', () => {
     await page.goto('/reminders');
     await page.waitForLoadState('load');
 
-    await expect(page.getByText('Follow up with Alice re: Google offer').first()).toBeVisible({
+    // Reminders render twice (mobile cards md:hidden + desktop list), so each
+    // title resolves to 2 elements; scope to the visible (desktop) occurrence.
+    await expect(
+      page.getByText('Follow up with Alice re: Google offer').filter({ visible: true }).first(),
+    ).toBeVisible({
       timeout: 8000,
     });
-    await expect(page.getByText('Send resume to Acme Corp').first()).toBeVisible({ timeout: 8000 });
+    await expect(
+      page.getByText('Send resume to Acme Corp').filter({ visible: true }).first(),
+    ).toBeVisible({ timeout: 8000 });
 
     expect(errors).toHaveLength(0);
   });
@@ -380,7 +394,9 @@ test.describe('Applications page', () => {
     await page.goto('/applications');
     await page.waitForLoadState('load');
 
-    const newBtn = page.getByRole('button', { name: /new submission|submit/i });
+    // The redesign renamed the action to "Log submission" (header shows
+    // "+ Log submission", the empty-state CTA shows "Log submission").
+    const newBtn = page.getByRole('button', { name: /log submission/i }).first();
     await newBtn.waitFor({ timeout: 8000 });
     await newBtn.click();
 

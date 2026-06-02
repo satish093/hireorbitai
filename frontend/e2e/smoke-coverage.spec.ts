@@ -57,6 +57,9 @@ const MOCK_MANAGERS = [
   },
 ];
 
+// created_by matches MANAGER.id ('u-manager') so the ownership-gated Edit
+// affordance (Vendors/Clients canEditRow: admin-tier OR row owner) attaches
+// for the seeded manager — mirrors the backend loadAndAuthorize ownership rule.
 const MOCK_VENDORS = [
   {
     id: 'v-1',
@@ -65,6 +68,7 @@ const MOCK_VENDORS = [
     contact_email: 'jane@techstaff.com',
     tier: 'T1',
     website: 'https://techstaff.com',
+    created_by: 'u-manager',
   },
   {
     id: 'v-2',
@@ -73,6 +77,7 @@ const MOCK_VENDORS = [
     contact_email: 'john@databridge.com',
     tier: 'T2',
     website: '',
+    created_by: 'u-manager',
   },
 ];
 
@@ -84,6 +89,7 @@ const MOCK_CLIENTS = [
     contact_name: 'Alice Brown',
     contact_email: 'alice@acme.com',
     location: 'New York, NY',
+    created_by: 'u-manager',
   },
   {
     id: 'cl-2',
@@ -92,6 +98,7 @@ const MOCK_CLIENTS = [
     contact_name: 'Bob Green',
     contact_email: 'bob@beta.com',
     location: 'Austin, TX',
+    created_by: 'u-manager',
   },
 ];
 
@@ -226,7 +233,13 @@ test.describe('Dashboard', () => {
 
     // The page should not be the login page
     await expect(page).not.toHaveURL(/\/login/);
-    await expect(page.getByRole('heading', { name: /dashboard/i }).first()).toBeVisible({
+    // The redesigned manager dashboard leads with a time-of-day greeting <h1>
+    // ("Good morning/afternoon/evening, {firstName}.") rather than a literal
+    // "Dashboard" heading — assert the greeting heading to confirm the shell
+    // painted.
+    await expect(
+      page.getByRole('heading', { name: /good (morning|afternoon|evening)/i }).first(),
+    ).toBeVisible({
       timeout: 8000,
     });
 
@@ -467,8 +480,14 @@ test.describe('Managers page', () => {
     await expect(page.getByRole('heading', { name: /managers/i }).first()).toBeVisible({
       timeout: 8000,
     });
-    await expect(page.getByText('Morgan Manager').first()).toBeVisible({ timeout: 6000 });
-    await expect(page.getByText('Hunter HR').first()).toBeVisible({ timeout: 5000 });
+    // Mobile cards (md:hidden) render before the desktop table, so each manager
+    // name appears twice; scope to the visible (desktop) occurrence.
+    await expect(page.getByText('Morgan Manager').filter({ visible: true }).first()).toBeVisible({
+      timeout: 6000,
+    });
+    await expect(page.getByText('Hunter HR').filter({ visible: true }).first()).toBeVisible({
+      timeout: 5000,
+    });
 
     await page.screenshot({ path: 'e2e-results/smoke-managers.png' });
     expect(errors).toHaveLength(0);
@@ -501,7 +520,21 @@ test.describe('Jobs page', () => {
     await expect(page.getByRole('heading', { name: /jobs/i }).first()).toBeVisible({
       timeout: 8000,
     });
-    await expect(page.getByText('Senior Software Engineer').first()).toBeVisible({ timeout: 8000 });
+
+    // The recommended feed can come back empty on first mount (StrictMode
+    // double-mount races the abort-controller cleanup with the page reset).
+    // Cycle through the segmented tabs — "Saved" → "Top" — to force a clean
+    // reload of the recommended endpoint, mirroring forceRecommendedReload in
+    // full-ui-audit.spec.ts. Tabs are <button aria-pressed> ("Top"/"Saved"/
+    // "Applied"), not role="tab".
+    await page.getByRole('button', { name: 'Saved' }).click();
+    await page.waitForLoadState('networkidle');
+    await page.getByRole('button', { name: 'Top' }).click();
+    await page.waitForLoadState('networkidle');
+
+    await expect(
+      page.getByText('Senior Software Engineer').filter({ visible: true }).first(),
+    ).toBeVisible({ timeout: 8000 });
 
     await page.screenshot({ path: 'e2e-results/smoke-jobs.png' });
     expect(errors).toHaveLength(0);
@@ -513,10 +546,12 @@ test.describe('Jobs page', () => {
     await page.goto('/jobs');
     await page.waitForLoadState('networkidle');
 
-    await expect(page.getByRole('tab', { name: /recommended/i }).first()).toBeVisible({
+    // The segmented tab bar (ButtonGroup) renders <button aria-pressed> items
+    // labelled "Top" (recommended), "Saved", and "Applied" — not role="tab".
+    await expect(page.getByRole('button', { name: 'Top' }).first()).toBeVisible({
       timeout: 8000,
     });
-    await expect(page.getByRole('tab', { name: /saved|liked/i }).first()).toBeVisible({
+    await expect(page.getByRole('button', { name: 'Saved' }).first()).toBeVisible({
       timeout: 5000,
     });
 
@@ -551,8 +586,18 @@ test.describe('Vendors page', () => {
     await page.goto('/vendors');
     await page.waitForLoadState('networkidle');
 
-    const editBtns = page.getByRole('button', { name: /^edit$/i });
-    await expect(editBtns.first()).toBeVisible({ timeout: 8000 });
+    // The redesign moved Edit into the per-vendor detail modal: each DataTable
+    // row exposes a "View" action (mobile cards + desktop table render it twice,
+    // so scope to visible), and the detail modal carries the Edit affordance.
+    await page
+      .getByRole('button', { name: /^view$/i })
+      .filter({ visible: true })
+      .first()
+      .click();
+    await expect(page.getByRole('dialog')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('button', { name: /^edit$/i }).first()).toBeVisible({
+      timeout: 5000,
+    });
 
     expect(errors).toHaveLength(0);
   });
@@ -563,11 +608,17 @@ test.describe('Vendors page', () => {
     await page.goto('/vendors');
     await page.waitForLoadState('networkidle');
 
+    // Open the vendor detail modal, then click Edit to switch into the edit form.
+    await page
+      .getByRole('button', { name: /^view$/i })
+      .filter({ visible: true })
+      .first()
+      .click();
+    await expect(page.getByRole('dialog')).toBeVisible({ timeout: 5000 });
     await page
       .getByRole('button', { name: /^edit$/i })
       .first()
       .click();
-    await expect(page.getByRole('dialog')).toBeVisible({ timeout: 5000 });
     await expect(page.getByRole('button', { name: /save changes/i }).first()).toBeVisible({
       timeout: 5000,
     });
@@ -604,11 +655,18 @@ test.describe('Clients page', () => {
     await page.goto('/clients');
     await page.waitForLoadState('networkidle');
 
+    // As with Vendors, Edit now lives inside the per-client detail modal: open
+    // it via the row's "View" action (visible desktop occurrence), then Edit.
+    await page
+      .getByRole('button', { name: /^view$/i })
+      .filter({ visible: true })
+      .first()
+      .click();
+    await expect(page.getByRole('dialog')).toBeVisible({ timeout: 5000 });
     await page
       .getByRole('button', { name: /^edit$/i })
       .first()
       .click();
-    await expect(page.getByRole('dialog')).toBeVisible({ timeout: 5000 });
     await expect(page.getByRole('button', { name: /save changes/i }).first()).toBeVisible({
       timeout: 5000,
     });

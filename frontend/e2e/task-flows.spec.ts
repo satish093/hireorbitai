@@ -77,7 +77,9 @@ test.describe('Tasks page — task list rendering', () => {
 
     // Each task title should appear in the list.
     for (const task of MOCK_TASKS) {
-      await expect(page.getByText(task.title)).toBeVisible({ timeout: 8000 });
+      await expect(page.getByText(task.title).filter({ visible: true }).first()).toBeVisible({
+        timeout: 8000,
+      });
     }
     expect(errors).toHaveLength(0);
   });
@@ -94,11 +96,17 @@ test.describe('Tasks page — task list rendering', () => {
     await page.goto('/tasks');
 
     // Wait for the task list to be populated.
-    await expect(page.getByText('Design the onboarding flow')).toBeVisible({ timeout: 8000 });
+    await expect(
+      page.getByText('Design the onboarding flow').filter({ visible: true }).first(),
+    ).toBeVisible({ timeout: 8000 });
 
     // The UI should render visible status indicators. At least one must appear.
-    // These can be Pill components, badge spans, or column headers.
-    const statusIndicators = page.locator('text=/todo|in.progress|done/i');
+    // These can be Pill components, badge spans, or column headers. The status
+    // <select> options also match this text but live hidden in the (collapsed)
+    // desktop filter/dropdown markup, so scope to the visible occurrence.
+    const statusIndicators = page
+      .locator('text=/todo|in.progress|done/i')
+      .filter({ visible: true });
     await expect(statusIndicators.first()).toBeVisible({ timeout: 5000 });
 
     expect(errors).toHaveLength(0);

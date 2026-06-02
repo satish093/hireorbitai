@@ -27,8 +27,16 @@ const MOCK_PEER = {
   group_id: null,
 };
 
-const NOW = new Date('2026-05-28T15:00:00.000Z').toISOString();
-const YESTERDAY = new Date('2026-05-27T15:00:00.000Z').toISOString();
+// Dates must be RELATIVE to the real "now", not hard-coded — the page's
+// dayLabel() compares each message date against `new Date()` and only emits the
+// "Yesterday" pill when the date is the actual previous calendar day. Anchor
+// "yesterday" at noon (avoids a midnight-run landing two days back) and "now" a
+// few minutes ago so the most-recent bubble still groups under "Today".
+const NOW = new Date(Date.now() - 5 * 60_000).toISOString();
+const yest = new Date();
+yest.setDate(yest.getDate() - 1);
+yest.setHours(12, 0, 0, 0);
+const YESTERDAY = yest.toISOString();
 
 const MOCK_CONVERSATIONS = [
   {

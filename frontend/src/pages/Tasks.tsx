@@ -138,6 +138,7 @@ export function Tasks({ initialAssigneeMe = false }: { initialAssigneeMe?: boole
           )}
         </div>
         <SelectInput
+          aria-label="Filter tasks by status"
           value={filters.status ?? ''}
           onChange={(e) =>
             setFilters((f) => ({ ...f, status: (e.target.value || '') as TaskStatus | '' }))

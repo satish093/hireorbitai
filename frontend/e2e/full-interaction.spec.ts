@@ -495,8 +495,15 @@ test.describe('Tasks', () => {
     await snap(page, '01-tasks-list');
     await assertNoCrash(page);
 
-    // Open the create modal
-    await page.getByRole('button', { name: 'New task' }).click();
+    // Open the create modal. The trigger renders TWICE — a "+ New" button in
+    // the mobile header (flex md:hidden) and a "New task" button in the desktop
+    // TaskFilterBar (hidden md:block). Only the one for the active viewport is
+    // visible, so match either label and pick the visible instance.
+    await page
+      .getByRole('button', { name: /\+ New|New task/i })
+      .filter({ visible: true })
+      .first()
+      .click();
     await expect(page.getByRole('dialog')).toBeVisible();
     await snap(page, '02-tasks-modal-open');
 
@@ -602,20 +609,32 @@ test.describe('Applications', () => {
     await snap(page, '13-applications-loaded');
     await assertNoCrash(page);
 
-    // Open the create modal
-    await page.getByRole('button', { name: /new submission/i }).click();
+    // Open the create modal. The header CTA is now "+ Log submission" (the
+    // empty-state CTA reads "Log submission") — match either + take the visible.
+    await page
+      .getByRole('button', { name: /log submission/i })
+      .filter({ visible: true })
+      .first()
+      .click();
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
     await snap(page, '14-applications-modal-open');
 
-    // The modal now uses searchable pickers (SearchSelect), not native <select>s.
-    // Click the first result row in the Consultant and Job lists (mock data:
-    // "Casey Consultant" / "Senior Full-Stack Engineer").
+    // The modal is now a 3-step flow (Consultant → Job & vendor → Review) with
+    // searchable pickers (SearchSelect). Step 1: pick the consultant, then
+    // Continue. The picker rows are <button>s whose accessible name starts with
+    // the label ("Casey Consultant" + skill sublabel) — substring match.
     await dialog.getByRole('button', { name: 'Casey Consultant' }).click();
-    await dialog.getByRole('button', { name: 'Senior Full-Stack Engineer' }).click();
+    await dialog.getByRole('button', { name: 'Continue' }).click();
+
+    // Step 2: the job list debounces a /jobs search, so wait for the row.
+    const jobRow = dialog.getByRole('button', { name: 'Senior Full-Stack Engineer' });
+    await expect(jobRow).toBeVisible();
+    await jobRow.click();
+    await dialog.getByRole('button', { name: 'Continue' }).click();
     await snap(page, '15-applications-modal-filled');
 
-    // Submit
+    // Step 3: Review → Submit.
     await dialog.getByRole('button', { name: 'Submit' }).click();
     await page.waitForLoadState('networkidle');
     await snap(page, '16-applications-after-submit');
@@ -638,10 +657,21 @@ test.describe('Consultants', () => {
     await snap(page, '17-consultants-loaded');
     await assertNoCrash(page);
 
-    // Click first "Assign" or "Reassign" button in the table
-    const assignBtn = page.getByRole('button', { name: /assign|reassign/i }).first();
-    await assignBtn.click();
-    const dialog = page.getByRole('dialog');
+    // On mobile (< md) the desktop table — with its inline Assign/Reassign
+    // buttons — is hidden; consultants render as cards that open a detail
+    // Drawer. Tap Casey's card, then the drawer's Reassign action (Casey is
+    // assigned to rec-1, so the label is "Reassign recruiter"). Clicking it
+    // closes the drawer and opens the assign Modal.
+    await page.getByRole('button', { name: 'Casey Consultant' }).click();
+    const drawer = page.getByRole('dialog');
+    await expect(drawer).toBeVisible();
+    await drawer
+      .getByRole('button', { name: /reassign|assign recruiter/i })
+      .first()
+      .click();
+    // The assign Modal: titled "Reassign Casey Consultant". Anchor on it so we
+    // don't race the drawer's teardown.
+    const dialog = page.getByRole('dialog').filter({ has: page.getByText(/Reassign Casey/i) });
     await expect(dialog).toBeVisible();
     await snap(page, '18-consultants-assign-open');
 
@@ -745,8 +775,14 @@ test.describe('Invitations', () => {
     await snap(page, '29-invitations-loaded');
     await assertNoCrash(page);
 
-    // Open modal
-    await page.getByRole('button', { name: /invite user/i }).click();
+    // Open modal. "+ Invite user" renders twice when the list is empty (the
+    // header CTA + the empty-state CTA) — both open the same form, so take the
+    // first.
+    await page
+      .getByRole('button', { name: /invite user/i })
+      .filter({ visible: true })
+      .first()
+      .click();
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
     await snap(page, '30-invitations-modal-open');

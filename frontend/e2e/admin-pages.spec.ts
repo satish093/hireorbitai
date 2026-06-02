@@ -449,8 +449,12 @@ test.describe('Invitations page', () => {
     await page.goto('/invitations');
     await page.waitForLoadState('networkidle');
 
-    await expect(page.getByText('newuser@example.com').first()).toBeVisible({ timeout: 8000 });
-    await expect(page.getByText('another@example.com').first()).toBeVisible({ timeout: 8000 });
+    await expect(
+      page.getByText('newuser@example.com').filter({ visible: true }).first(),
+    ).toBeVisible({ timeout: 8000 });
+    await expect(
+      page.getByText('another@example.com').filter({ visible: true }).first(),
+    ).toBeVisible({ timeout: 8000 });
     // Pending invite should show Revoke button
     await expect(page.getByRole('button', { name: /revoke/i }).first()).toBeVisible({
       timeout: 8000,
@@ -597,8 +601,12 @@ test.describe('Deactivated Accounts page', () => {
     await expect(page.getByRole('heading', { name: 'Deactivated accounts' })).toBeVisible({
       timeout: 8000,
     });
-    await expect(page.getByText('Deactivated User').first()).toBeVisible({ timeout: 8000 });
-    await expect(page.getByText('Suspended User').first()).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('Deactivated User').filter({ visible: true }).first()).toBeVisible({
+      timeout: 8000,
+    });
+    await expect(page.getByText('Suspended User').filter({ visible: true }).first()).toBeVisible({
+      timeout: 8000,
+    });
     // Each row should have a Reactivate button
     await expect(page.getByRole('button', { name: /reactivate/i }).first()).toBeVisible({
       timeout: 8000,

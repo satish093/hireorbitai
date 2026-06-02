@@ -33,7 +33,6 @@ export function ReminderCard({ reminder: r, onComplete, onEdit, onDelete }: Prop
         background: 'var(--surface)',
         border: '1px solid var(--border)',
         boxShadow: 'var(--shadow-card)',
-        opacity: isDone ? 0.6 : 1,
       }}
     >
       {/* Bell icon */}

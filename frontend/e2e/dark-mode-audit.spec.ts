@@ -99,7 +99,9 @@ test.describe('Dark mode — Desktop', () => {
     await setupManagerPage(page);
     await page.goto('/tasks');
     await page.waitForLoadState('load');
-    await expect(page.getByText('Design the onboarding flow')).toBeVisible({ timeout: 8000 });
+    await expect(
+      page.getByText('Design the onboarding flow').filter({ visible: true }).first(),
+    ).toBeVisible({ timeout: 8000 });
     await enableDarkMode(page);
     const v = await auditPage(page, 'dark-desktop-tasks');
     expect(v, `${v.length} violation(s) on dark desktop /tasks`).toHaveLength(0);
@@ -169,7 +171,9 @@ test.describe('Dark mode — Desktop', () => {
     await setupManagerPage(page);
     await page.goto('/reminders');
     await page.waitForLoadState('load');
-    await expect(page.getByText('Follow up with Alice re: Google offer').first()).toBeVisible({
+    await expect(
+      page.getByText('Follow up with Alice re: Google offer').filter({ visible: true }).first(),
+    ).toBeVisible({
       timeout: 8000,
     });
     await enableDarkMode(page);
@@ -256,7 +260,9 @@ test.describe('Dark mode — Mobile', () => {
     await setupManagerPage(page);
     await page.goto('/tasks');
     await page.waitForLoadState('load');
-    await expect(page.getByText('Design the onboarding flow')).toBeVisible({ timeout: 8000 });
+    await expect(
+      page.getByText('Design the onboarding flow').filter({ visible: true }).first(),
+    ).toBeVisible({ timeout: 8000 });
     await enableDarkMode(page);
     const v = await auditPage(page, 'dark-mobile-tasks');
     expect(v, `${v.length} violation(s) on dark mobile /tasks`).toHaveLength(0);
@@ -319,7 +325,9 @@ test.describe('Dark mode — Mobile', () => {
     await setupManagerPage(page);
     await page.goto('/reminders');
     await page.waitForLoadState('load');
-    await expect(page.getByText('Follow up with Alice re: Google offer').last()).toBeVisible({
+    await expect(
+      page.getByText('Follow up with Alice re: Google offer').filter({ visible: true }).first(),
+    ).toBeVisible({
       timeout: 8000,
     });
     await enableDarkMode(page);

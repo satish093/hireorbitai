@@ -576,16 +576,29 @@ test.describe('Applications (desktop)', () => {
     await snap(page, '13-applications-loaded');
     await assertNoCrash(page);
 
-    await page.getByRole('button', { name: /new submission/i }).click();
+    // The header CTA is now "+ Log submission" — take the visible instance.
+    await page
+      .getByRole('button', { name: /log submission/i })
+      .filter({ visible: true })
+      .first()
+      .click();
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
     await snap(page, '14-applications-modal-open');
 
-    // The modal now uses searchable pickers (SearchSelect), not native <select>s.
+    // The modal is now a 3-step flow (Consultant → Job & vendor → Review) using
+    // searchable pickers (SearchSelect). Step 1: consultant → Continue.
     await dialog.getByRole('button', { name: 'Casey Consultant' }).click();
-    await dialog.getByRole('button', { name: 'Senior Full-Stack Engineer' }).click();
+    await dialog.getByRole('button', { name: 'Continue' }).click();
+
+    // Step 2: job (debounced /jobs search) → Continue.
+    const jobRow = dialog.getByRole('button', { name: 'Senior Full-Stack Engineer' });
+    await expect(jobRow).toBeVisible();
+    await jobRow.click();
+    await dialog.getByRole('button', { name: 'Continue' }).click();
     await snap(page, '15-applications-modal-filled');
 
+    // Step 3: Review → Submit.
     await dialog.getByRole('button', { name: 'Submit' }).click();
     await page.waitForLoadState('networkidle');
     await snap(page, '16-applications-after-submit');
