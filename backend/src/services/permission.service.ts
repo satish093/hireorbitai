@@ -127,6 +127,32 @@ export function clearPermissionCache(): void {
 }
 
 /**
+ * Manager ids who hold a co-management grant over `groupId` (manager_group_grants).
+ * Used to keep messaging bidirectional: a recruiter/consultant in a granted group
+ * can reach the granted lead, not just be reached by them. Degrades to `[]` if the
+ * table isn't migrated yet (backend deploys ahead of the migration).
+ */
+async function grantedManagerIdsForGroup(groupId: string): Promise<string[]> {
+  const { data, error } = await db
+    .from('manager_group_grants')
+    .select('manager_id')
+    .eq('group_id', groupId);
+  if (error) return [];
+  const ids = (data ?? [])
+    .map((g: { manager_id: string | null }) => g.manager_id)
+    .filter((id: string | null): id is string => !!id);
+  if (ids.length === 0) return [];
+  // Filter to active managers — mirror the .neq('is_active', false) every other
+  // branch applies, so a deactivated co-managing lead doesn't stay reachable.
+  const { data: active } = await db
+    .from('users')
+    .select('id')
+    .in('id', ids)
+    .neq('is_active', false);
+  return (active ?? []).map((u: { id: string }) => u.id);
+}
+
+/**
  * Returns the set of user ids the caller is permitted to message. Pure forward
  * lookup; canMessageUser does NOT do a reverse check.
  */
@@ -166,14 +192,26 @@ export async function getAccessibleUserIds(caller: PermissionCaller): Promise<Se
       .neq('is_active', false);
     for (const p of (peers ?? []) as Array<{ id: string }>) peerIds.add(p.id);
 
-    // 3. Group-scoped: recruiters + consultants in OWN GROUP.
-    //    A lead with no group_id is fail-closed here (peers + admins still
-    //    reachable above, but no group surface — matches groupScope semantics).
-    if (caller.group_id) {
+    // 3. Group-scoped: recruiters + consultants in the lead's OWN GROUP plus any
+    //    groups they've been granted co-management of (manager_group_grants).
+    //    A lead with no group_id and no grants is fail-closed here (peers +
+    //    admins still reachable above, but no group surface).
+    const scopedGroupIds = new Set<string>();
+    if (caller.group_id) scopedGroupIds.add(caller.group_id);
+    const { data: grants, error: grantErr } = await db
+      .from('manager_group_grants')
+      .select('group_id')
+      .eq('manager_id', caller.id);
+    if (!grantErr) {
+      for (const g of (grants ?? []) as Array<{ group_id: string | null }>) {
+        if (g.group_id) scopedGroupIds.add(g.group_id);
+      }
+    }
+    if (scopedGroupIds.size > 0) {
       const { data: groupMembers } = await db
         .from('users')
         .select('id')
-        .eq('group_id', caller.group_id)
+        .in('group_id', [...scopedGroupIds])
         .in('role', ['RECRUITER', 'CONSULTANT'])
         .neq('is_active', false);
       for (const u of (groupMembers ?? []) as Array<{ id: string }>) peerIds.add(u.id);
@@ -270,7 +308,8 @@ export async function getAccessibleUserIds(caller: PermissionCaller): Promise<Se
 
     // 4. In-group manager-tier — covers managers/HR who lead the recruiter's
     //    group but aren't named via recruiter_managers (the bidirectional
-    //    counterpart to "manager sees in-group recruiters").
+    //    counterpart to "manager sees in-group recruiters"), PLUS any manager
+    //    granted co-management of the recruiter's group (manager_group_grants).
     if (caller.group_id) {
       const { data: groupMgrs } = await db
         .from('users')
@@ -279,6 +318,7 @@ export async function getAccessibleUserIds(caller: PermissionCaller): Promise<Se
         .in('role', MANAGER_LIKE as unknown as string[])
         .neq('is_active', false);
       for (const m of (groupMgrs ?? []) as Array<{ id: string }>) peerIds.add(m.id);
+      for (const m of await grantedManagerIdsForGroup(caller.group_id)) peerIds.add(m);
     }
   }
 
@@ -316,6 +356,7 @@ export async function getAccessibleUserIds(caller: PermissionCaller): Promise<Se
     // Plus manager-tier users in the consultant's own group — covers the HR/
     // manager who leads the group even when not named via recruiter_managers.
     // By the Phase 14 invariant the consultant's group equals their recruiter's.
+    // Also any manager granted co-management of that group (manager_group_grants).
     if (caller.group_id) {
       const { data: groupMgrs } = await db
         .from('users')
@@ -324,6 +365,7 @@ export async function getAccessibleUserIds(caller: PermissionCaller): Promise<Se
         .in('role', MANAGER_LIKE as unknown as string[])
         .neq('is_active', false);
       for (const m of (groupMgrs ?? []) as Array<{ id: string }>) peerIds.add(m.id);
+      for (const m of await grantedManagerIdsForGroup(caller.group_id)) peerIds.add(m);
     }
   }
 

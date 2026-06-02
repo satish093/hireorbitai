@@ -19,6 +19,8 @@ interface Props {
   manager: ManagerCardRow;
   /** Mobile parity with the desktop "Move group" row action (manager-tier only). */
   onMoveGroup?: () => void;
+  /** Mobile parity with the desktop "Co-managed groups" action (admin-tier only). */
+  onManageGrants?: () => void;
 }
 
 /**
@@ -27,7 +29,7 @@ interface Props {
  * Tapping the header opens the profile; the "Move group" footer mirrors the
  * desktop row action (rendered only when the caller has the permission).
  */
-export function ManagerCard({ manager: m, onMoveGroup }: Props) {
+export function ManagerCard({ manager: m, onMoveGroup, onManageGrants }: Props) {
   const name = m.full_name ?? m.email;
   const roleLabel = ROLE_LABEL[m.role as keyof typeof ROLE_LABEL] ?? m.role;
 
@@ -72,11 +74,18 @@ export function ManagerCard({ manager: m, onMoveGroup }: Props) {
         </div>
       </Link>
 
-      {onMoveGroup && (
-        <div className="flex mt-3 pt-3 border-t" style={{ borderColor: 'var(--border)' }}>
-          <Button size="sm" variant="outline" className="flex-1" onClick={onMoveGroup}>
-            Move group
-          </Button>
+      {(onMoveGroup || onManageGrants) && (
+        <div className="flex gap-2 mt-3 pt-3 border-t" style={{ borderColor: 'var(--border)' }}>
+          {onManageGrants && (
+            <Button size="sm" variant="ghost" className="flex-1" onClick={onManageGrants}>
+              Co-managed groups
+            </Button>
+          )}
+          {onMoveGroup && (
+            <Button size="sm" variant="outline" className="flex-1" onClick={onMoveGroup}>
+              Move group
+            </Button>
+          )}
         </div>
       )}
     </div>

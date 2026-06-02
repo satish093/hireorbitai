@@ -65,10 +65,154 @@ function RolePill({ role }: { role: Role }) {
   );
 }
 
+interface GroupGrant {
+  id: string;
+  group_id: string;
+  created_at?: string;
+}
+
+/**
+ * Admin-only modal: grant a Manager / HR Manager full co-management (recruiters,
+ * consultants, pipeline, messaging) of ANOTHER group, alongside that group's own
+ * lead. Mirrors the ManageManagersModal pattern on the Recruiters page.
+ */
+function ManageGroupGrantsModal({
+  manager,
+  groups,
+  onClose,
+}: {
+  manager: ManagerRow;
+  groups: { id: string; name: string }[];
+  onClose: () => void;
+}) {
+  const [grants, setGrants] = useState<GroupGrant[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [picking, setPicking] = useState('');
+  const [busy, setBusy] = useState<string | null>(null);
+
+  function reload() {
+    setLoading(true);
+    api
+      .get(`/managers/${manager.id}/grants`)
+      .then((r) => setGrants(r.data ?? []))
+      .catch((e) => toast.error(e?.response?.data?.error ?? 'Failed to load grants'))
+      .finally(() => setLoading(false));
+  }
+  useEffect(reload, [manager.id]);
+
+  const grantedIds = new Set(grants.map((g) => g.group_id));
+  const available = groups.filter(
+    (g) => g.id !== (manager.group_id ?? '') && !grantedIds.has(g.id),
+  );
+
+  async function add() {
+    if (!picking) return;
+    setBusy('add');
+    try {
+      await api.post(`/managers/${manager.id}/grants`, { group_id: picking });
+      toast.success('Co-management granted');
+      setPicking('');
+      reload();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error ?? 'Failed to grant');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function remove(groupId: string) {
+    if (!confirm('Revoke co-management of this group?')) return;
+    setBusy('remove-' + groupId);
+    try {
+      await api.delete(`/managers/${manager.id}/grants/${groupId}`);
+      toast.success('Co-management revoked');
+      reload();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error ?? 'Failed to revoke');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <Modal
+      open={true}
+      onClose={onClose}
+      title={`Co-managed groups for ${manager.full_name ?? manager.email}`}
+    >
+      <div className="space-y-4">
+        <p className="text-sm text-muted">
+          Grant this lead full co-management — recruiters, consultants, pipeline and messaging — of
+          another group, alongside that group’s own manager. Their own group stays unchanged.
+        </p>
+
+        {/* Current grants */}
+        <div>
+          <h3 className="text-[10px] font-semibold uppercase tracking-widest text-muted mb-1.5">
+            Co-managed groups
+          </h3>
+          {loading ? (
+            <p className="text-sm italic text-muted">Loading…</p>
+          ) : grants.length === 0 ? (
+            <p className="text-sm italic text-muted">No co-managed groups yet</p>
+          ) : (
+            <div className="space-y-1.5">
+              {grants.map((g) => (
+                <div
+                  key={g.id}
+                  className="flex items-center gap-2 border border-border rounded-lg px-3 py-2"
+                >
+                  <div className="flex-1 min-w-0">
+                    <GroupBadge groupId={g.group_id} />
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="danger-ghost"
+                    onClick={() => remove(g.group_id)}
+                    disabled={busy === 'remove-' + g.group_id}
+                    loading={busy === 'remove-' + g.group_id}
+                  >
+                    Revoke
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Grant a new group */}
+        <div>
+          <h3 className="text-[10px] font-semibold uppercase tracking-widest text-muted mb-1.5">
+            Grant another group
+          </h3>
+          {available.length === 0 ? (
+            <p className="text-sm italic text-muted">No other groups available to grant.</p>
+          ) : (
+            <div className="flex items-end gap-2">
+              <div className="flex-1">
+                <SelectInput
+                  placeholder="Pick a group…"
+                  value={picking}
+                  onChange={(e) => setPicking(e.target.value)}
+                  options={available.map((g) => ({ value: g.id, label: g.name }))}
+                />
+              </div>
+              <Button onClick={add} disabled={!picking} loading={busy === 'add'}>
+                {busy === 'add' ? 'Granting' : '+ Grant'}
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 export function Managers() {
   const { profile } = useAuth();
   const { groups } = useUserGroups();
   const canEditGroup = !!profile && (ADMIN_TIER as readonly string[]).includes(profile.role);
+  const [grantsFor, setGrantsFor] = useState<ManagerRow | null>(null);
 
   const { query, setQuery } = useEntityList<Record<string, never>>({});
   const [rows, setRows] = useState<ManagerRow[]>([]);
@@ -176,6 +320,7 @@ export function Managers() {
               key={m.id}
               manager={m}
               onMoveGroup={canEditGroup ? () => openGroupEdit(m) : undefined}
+              onManageGrants={canEditGroup ? () => setGrantsFor(m) : undefined}
             />
           ))
         )}
@@ -253,9 +398,14 @@ export function Managers() {
                     header: '',
                     align: 'right' as const,
                     render: (m: ManagerRow) => (
-                      <Button size="sm" variant="outline" onClick={() => openGroupEdit(m)}>
-                        Move group
-                      </Button>
+                      <div className="flex justify-end gap-2">
+                        <Button size="sm" variant="ghost" onClick={() => setGrantsFor(m)}>
+                          Co-managed groups
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => openGroupEdit(m)}>
+                          Move group
+                        </Button>
+                      </div>
                     ),
                   },
                 ]
@@ -323,6 +473,14 @@ export function Managers() {
           </div>
         </div>
       </Modal>
+
+      {grantsFor && (
+        <ManageGroupGrantsModal
+          manager={grantsFor}
+          groups={groups}
+          onClose={() => setGrantsFor(null)}
+        />
+      )}
     </Layout>
   );
 }

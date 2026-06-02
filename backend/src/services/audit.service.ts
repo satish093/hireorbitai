@@ -33,6 +33,8 @@ export type AuditAction =
   | 'group_user_assigned'
   | 'group_user_removed'
   | 'group_user_moved'
+  | 'manager_group_grant_added'
+  | 'manager_group_grant_removed'
   | 'daily_digest_sent'
   | 'daily_digest_skipped'
   | 'messages_permission_denied'

@@ -20,6 +20,8 @@ import { db } from '../config/db';
 import { httpError, ADMIN_TIER, GROUP_LEAD_ROLES, type Role } from '../types';
 
 interface Caller {
+  /** Needed to resolve manager_group_grants (co-management of other groups). */
+  id?: string;
   role: Role;
   group_id?: string | null;
 }
@@ -81,15 +83,42 @@ export async function userInGroup(
 }
 
 /**
+ * Group ids a lead has been GRANTED co-management of, via manager_group_grants.
+ * Empty array when none / not applicable. Degrades to `[]` (home-group-only) if
+ * the grants table hasn't been migrated yet, so the backend can deploy ahead of
+ * the migration without 500s.
+ */
+async function grantedGroupIds(caller: Caller): Promise<string[]> {
+  if (!caller.id || !GROUP_LEAD_ROLES.includes(caller.role)) return [];
+  const { data, error } = await db
+    .from('manager_group_grants')
+    .select('group_id')
+    .eq('manager_id', caller.id);
+  if (error) return []; // schema-cache / table-missing → home group only
+  return (data ?? [])
+    .map((g: { group_id: string | null }) => g.group_id)
+    .filter((id: string | null): id is string => !!id);
+}
+
+/**
  * User ids visible to the caller under group scoping.
  *   - `null`      → caller is not group-scoped (apply no extra filter).
- *   - `string[]`  → the user ids in the group lead's group (filter `user_id` IN …).
- * A group lead with no group is scoped to an EMPTY set (sees nobody) —
- * fail-closed, never a silent org-wide leak.
+ *   - `string[]`  → the user ids in the lead's OWN group PLUS any groups they've
+ *                   been granted co-management of (manager_group_grants), de-duped.
+ * A group lead with no group AND no grants is scoped to an EMPTY set (sees
+ * nobody) — fail-closed, never a silent org-wide leak.
  */
 export async function managerGroupUserIds(caller: Caller): Promise<string[] | null> {
   if (!GROUP_LEAD_ROLES.includes(caller.role)) return null;
-  return groupUserIds(caller.group_id);
+  const groups = new Set<string>();
+  if (caller.group_id) groups.add(caller.group_id);
+  for (const g of await grantedGroupIds(caller)) groups.add(g);
+  if (groups.size === 0) return [];
+  const all = new Set<string>();
+  for (const gid of groups) {
+    for (const uid of await groupUserIds(gid)) all.add(uid);
+  }
+  return [...all];
 }
 
 /**
