@@ -325,7 +325,6 @@ export function ContactPanel({ peer, onCall, onClose }: Props) {
                 background: 'var(--surface-2)',
                 border: '1px solid var(--border)',
                 color: 'var(--ink)',
-                fontSize: 13,
               }}
             />
           </div>

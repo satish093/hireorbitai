@@ -23,7 +23,6 @@ const STAGES = [
   { key: 'SCREENING', label: 'Screening' },
   { key: 'INTERVIEW', label: 'Interview' },
   { key: 'OFFER', label: 'Offer' },
-  { key: 'PLACED', label: 'Placed' },
   { key: 'REJECTED', label: 'Rejected' },
 ] as const;
 
