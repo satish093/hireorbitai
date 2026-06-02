@@ -424,8 +424,8 @@ import('node:fs').then(({ promises: fs }) => {
 });
 
 // --- Listen + graceful shutdown ----------------------------------------------
-const server = app.listen(env.port, () => {
-  logger.info({ port: env.port, env: env.nodeEnv }, 'HireOrbit API listening');
+const server = app.listen(env.port, env.host, () => {
+  logger.info({ host: env.host, port: env.port, env: env.nodeEnv }, 'HireOrbit API listening');
   // Opt-in runtime admin bootstrap. Off by default — the canonical path is
   // the SQL seed in database/seed-default-admin.sql which runs once when you
   // apply migrations. Set ENABLE_DEFAULT_ADMIN=true if you'd rather provision

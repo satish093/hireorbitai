@@ -43,6 +43,10 @@ const hoursSchema = z.coerce
 const envSchema = z.object({
   // --- Server ---
   PORT: portSchema,
+  // Bind address. Defaults to loopback so the API is only reachable via the
+  // local nginx reverse proxy; set HOST=0.0.0.0 only if you must expose it
+  // directly (e.g. container networking) — never on a shared/multi-tenant box.
+  HOST: z.string().default('127.0.0.1'),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   APP_URL: z.string().url('APP_URL must be a fully-qualified URL'),
   CORS_ORIGIN: csvUrls,
@@ -315,6 +319,7 @@ if (e.DB_GUARD !== 'off' && e.NODE_ENV !== 'test') {
  */
 export const env = {
   port: e.PORT,
+  host: e.HOST,
   nodeEnv: e.NODE_ENV,
   isProd: e.NODE_ENV === 'production',
   // Dev tooling is ON only when explicitly enabled AND not in production.
