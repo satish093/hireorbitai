@@ -54,16 +54,30 @@ test.describe('Sidebar parity by role (matrix-driven)', () => {
       await page.goto('/dashboard');
       await expect(navLink(page, 'Dashboard')).toBeVisible();
 
-      const expected = new Set(expectedSidebarLabels(role));
+      const expectedLabels = expectedSidebarLabels(role);
+      const expected = new Set(expectedLabels);
+
+      // The sidebar renders its items (incl. collapsible-section children) only
+      // after an async feature-flags fetch + re-render, while the mocked SSE
+      // stream reconnect-loops and keeps the network busy. Under heavy CI load
+      // that pipeline can lag, so wait for the FULL expected set to be present
+      // once before the strict per-label assertions — otherwise the first
+      // still-rendering label flakes. Can't use waitForLoadState('networkidle')
+      // (the SSE stream never lets it settle).
+      await expect
+        .poll(
+          async () => {
+            const counts = await Promise.all(expectedLabels.map((l) => navLink(page, l).count()));
+            return counts.filter((c) => c >= 1).length;
+          },
+          { timeout: 20_000 },
+        )
+        .toBe(expectedLabels.length);
+
       for (const label of expected) {
         // Assert DOM presence (membership parity) rather than toBeVisible — a
         // collapsible section's open/close animation can momentarily zero an
         // item's height, which would flake a strict visibility check.
-        // Bump the timeout to 12s (Playwright default 5s) so slow CI
-        // runners have headroom for the post-feature-flag-fetch re-render
-        // pipeline. Can't use waitForLoadState('networkidle') because the
-        // SSE realtime stream keeps the network busy for the lifetime of
-        // the page (would never settle).
         await expect(navLink(page, label), `${role} should see "${label}"`).toHaveCount(1, {
           timeout: 12_000,
         });
