@@ -42,6 +42,7 @@ export type AuditAction =
   | 'calls_monthly_cap_reached'
   | 'work_auth_doc_uploaded'
   | 'work_auth_doc_deleted'
+  | 'upload_malware_detected'
   | 'resume_uploaded'
   | 'resume_downloaded'
   | 'resume_deleted'

@@ -236,6 +236,25 @@ const envSchema = z.object({
     .optional()
     .default('true')
     .transform((v) => v !== 'false' && v !== '0'),
+
+  // --- Antivirus (ClamAV) — scans uploaded files via clamd's INSTREAM ---
+  // Off by default so local dev / tests / hosts without clamd are unaffected.
+  // Turn on in production (CLAMAV_ENABLED=true) once clamd is reachable.
+  CLAMAV_ENABLED: z
+    .string()
+    .optional()
+    .default('false')
+    .transform((v) => v === 'true' || v === '1'),
+  CLAMAV_HOST: z.string().default('127.0.0.1'),
+  CLAMAV_PORT: z.coerce.number().int().min(1).max(65535).default(3310),
+  CLAMAV_TIMEOUT_MS: z.coerce.number().int().min(1000).max(120000).default(30000),
+  // When the scanner is enabled but unreachable, reject the upload
+  // (fail-closed) rather than storing an unscanned file. Default closed.
+  CLAMAV_FAIL_CLOSED: z
+    .string()
+    .optional()
+    .default('true')
+    .transform((v) => v !== 'false' && v !== '0'),
 });
 
 // Parse + fail-fast. `safeParse` lets us format every error in one shot
@@ -333,6 +352,13 @@ export const env = {
   rateLimit: {
     windowMs: e.RATE_LIMIT_WINDOW_MS,
     max: e.RATE_LIMIT_MAX,
+  },
+  clamav: {
+    enabled: e.CLAMAV_ENABLED,
+    host: e.CLAMAV_HOST,
+    port: e.CLAMAV_PORT,
+    timeoutMs: e.CLAMAV_TIMEOUT_MS,
+    failClosed: e.CLAMAV_FAIL_CLOSED,
   },
   aiRateLimitMax: e.AI_RATE_LIMIT_MAX,
   database: {

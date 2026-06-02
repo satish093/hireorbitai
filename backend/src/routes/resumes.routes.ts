@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { uploadResume, verifyUploadMagic } from '../middleware/upload';
+import { uploadResume, verifyUploadMagic, scanUpload } from '../middleware/upload';
 import * as c from '../controllers/resumes.controller';
 import { requireRole } from '../middleware/auth';
 import { OPERATOR_TIER } from '../types';
@@ -24,7 +24,7 @@ resumesRouter.use(selfOrOperator);
 resumesRouter.get('/consultant/:consultantId', c.listForConsultant);
 // PDF / JPG / PNG / WEBP / DOC / DOCX only, max 10 MB. Multer's fileFilter
 // rejects others before the controller sees them; the surfaced error becomes a 400.
-resumesRouter.post('/upload', uploadResume.single('file'), verifyUploadMagic, c.upload);
+resumesRouter.post('/upload', uploadResume.single('file'), verifyUploadMagic, scanUpload, c.upload);
 resumesRouter.get('/:id/download-url', c.downloadUrl);
 // Re-extract readable text from an already-uploaded file (for versions
 // uploaded before server-side extraction existed).

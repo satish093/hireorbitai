@@ -1,6 +1,9 @@
 import multer from 'multer';
 import type { Request, Response, NextFunction, RequestHandler } from 'express';
 import { httpError } from '../types';
+import { scanBuffer, isClamavEnabled, clamavFailClosed } from '../services/clamav.service';
+import { audit } from '../services/audit.service';
+import { logger } from '../config/logger';
 
 /**
  * Upload middleware factory + a magic-byte verifier.
@@ -195,4 +198,59 @@ export const verifyUploadMagic: RequestHandler = (
     );
   }
   return next();
+};
+
+// ---------------------------------------------------------------------------
+// Virus scanning (ClamAV)
+// ---------------------------------------------------------------------------
+//
+// Third-line check after MIME+extension (buildFilter) and magic bytes
+// (verifyUploadMagic): hand the buffered file to clamd and reject anything that
+// matches a virus signature. Wire AFTER verifyUploadMagic on every upload route:
+//
+//   router.post(path, uploadX.single('file'), verifyUploadMagic, scanUpload, ctrl)
+//
+// No-ops unless CLAMAV_ENABLED=true, so dev / test / hosts without clamd are
+// unaffected. A detected virus → 422 + audit log. A scanner transport failure →
+// 503 when CLAMAV_FAIL_CLOSED (default), so an unscanned file is never stored.
+
+export const scanUpload: RequestHandler = (req: Request, _res: Response, next: NextFunction) => {
+  if (!isClamavEnabled()) return next();
+  const file = (req as Request & { file?: Express.Multer.File }).file;
+  if (!file?.buffer) return next();
+
+  void (async () => {
+    try {
+      const result = await scanBuffer(file.buffer);
+      if (!result.clean) {
+        audit({
+          action: 'upload_malware_detected',
+          user_id: req.user?.id ?? null,
+          email: req.user?.email ?? null,
+          req,
+          metadata: {
+            filename: file.originalname,
+            mimetype: file.mimetype,
+            size: file.size,
+            virus: result.virus ?? 'unknown',
+          },
+        });
+        return next(
+          httpError(
+            422,
+            `Upload rejected: the file appears to contain malware (${result.virus ?? 'unknown'}).`,
+          ),
+        );
+      }
+      return next();
+    } catch (err) {
+      logger.error({ err }, 'clamav scan failed');
+      if (clamavFailClosed()) {
+        return next(
+          httpError(503, 'File scanning is temporarily unavailable — please try again shortly.'),
+        );
+      }
+      return next();
+    }
+  })();
 };

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import * as c from '../controllers/messages.controller';
 import * as att from '../controllers/messageAttachments.controller';
-import { uploadAttachment, verifyUploadMagic } from '../middleware/upload';
+import { uploadAttachment, verifyUploadMagic, scanUpload } from '../middleware/upload';
 
 export const messagesRouter = Router();
 
@@ -16,7 +16,13 @@ messagesRouter.get('/unread-count', c.unreadCount);
 // attachment_ids. uploadAttachment caps at 15 MB + MIME/ext allowlist;
 // verifyUploadMagic checks bytes match the declared MIME. Mounted BEFORE
 // /:id-style routes so the literal `/attachments` matches first.
-messagesRouter.post('/attachments', uploadAttachment.single('file'), verifyUploadMagic, att.upload);
+messagesRouter.post(
+  '/attachments',
+  uploadAttachment.single('file'),
+  verifyUploadMagic,
+  scanUpload,
+  att.upload,
+);
 messagesRouter.delete('/attachments/:id', att.remove);
 
 messagesRouter.post('/', c.send);

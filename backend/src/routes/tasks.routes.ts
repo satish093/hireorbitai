@@ -5,7 +5,7 @@ import * as ta from '../controllers/taskAttachments.controller';
 import * as tf from '../controllers/taskFilters.controller';
 import { requireRole } from '../middleware/auth';
 import { MANAGER_TIER } from '../types';
-import { uploadAttachment, verifyUploadMagic } from '../middleware/upload';
+import { uploadAttachment, verifyUploadMagic, scanUpload } from '../middleware/upload';
 
 export const tasksRouter = Router();
 
@@ -57,6 +57,7 @@ tasksRouter.post(
   '/:taskId/attachments',
   uploadAttachment.single('file'),
   verifyUploadMagic,
+  scanUpload,
   ta.upload,
 );
 tasksRouter.delete('/attachments/:id', ta.remove);
