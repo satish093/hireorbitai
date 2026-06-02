@@ -363,10 +363,14 @@ export const RBAC_MATRIX: RoutePolicy[] = [
     path: '/admin/ai-settings',
     sidebarLabel: 'AI Settings',
     section: 'Admin',
-    allow: ADMIN_TIER,
-    backendGate: 'requireRole(...ADMIN_TIER)',
+    // OWNER_TIER only: every action here (Claude auth refresh / re-login /
+    // check-token) is OWNER_TIER on the backend, so the route + sidebar hide it
+    // from CTO/DIRECTOR rather than show a page whose buttons 403. See the route
+    // guard in App.tsx (/admin/ai-settings).
+    allow: OWNER_TIER,
+    backendGate: 'requireRole(...OWNER_TIER)',
     scope: 'global',
-    primaryActions: ['manage AI provider settings'],
+    primaryActions: ['manage Claude auth + AI provider settings (OWNER_TIER)'],
   },
   {
     path: '/admin/audit-log',
@@ -387,7 +391,7 @@ export const RBAC_MATRIX: RoutePolicy[] = [
     scope: 'global',
     primaryActions: ['read org-wide monthly call-hour budget'],
     workspaceWideException:
-      'Call-usage dashboard is OWNER_TIER (SUPER_ADMIN + CEO) because the cap is a billing decision they own. CTO/DIRECTOR intentionally do NOT see this page (unlike Feature Flags / AI Settings where ADMIN_TIER gets read access).',
+      'Call-usage dashboard is OWNER_TIER (SUPER_ADMIN + CEO) because the cap is a billing decision they own. CTO/DIRECTOR intentionally do NOT see this page — same as AI Settings (unlike Feature Flags, where ADMIN_TIER gets read access).',
   },
 ];
 

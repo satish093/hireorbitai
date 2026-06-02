@@ -344,8 +344,14 @@ test.describe('Mobile — Recruiters page', () => {
     await page.goto('/recruiters');
     await page.waitForLoadState('networkidle');
 
-    await expect(page.getByText('Riley Recruiter').last()).toBeVisible({ timeout: 8000 });
-    await expect(page.getByText('Sam Recruiter').last()).toBeVisible({ timeout: 8000 });
+    // Name appears in both the mobile card and the (hidden) desktop table, which
+    // is last in the DOM — scope to the visible (mobile) occurrence.
+    await expect(page.getByText('Riley Recruiter').filter({ visible: true }).first()).toBeVisible({
+      timeout: 8000,
+    });
+    await expect(page.getByText('Sam Recruiter').filter({ visible: true }).first()).toBeVisible({
+      timeout: 8000,
+    });
     // 'team' column is hideOnMobile:true — only in desktop table, not in mobile card
 
     expect(await hasHorizontalOverflow(page)).toBe(false);

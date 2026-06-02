@@ -311,10 +311,20 @@ test.describe('Recruiters page', () => {
     await page.goto('/recruiters');
     await page.waitForLoadState('networkidle');
 
-    await expect(page.getByText('Riley Recruiter').first()).toBeVisible({ timeout: 8000 });
-    await expect(page.getByText('Sam Recruiter').first()).toBeVisible({ timeout: 8000 });
-    await expect(page.getByText('Team Alpha').first()).toBeVisible({ timeout: 8000 });
-    await expect(page.getByText('Team Beta').first()).toBeVisible({ timeout: 8000 });
+    // The page renders mobile cards (md:hidden) before the desktop table, so the
+    // recruiter name appears twice; scope to the visible (desktop) occurrence.
+    await expect(page.getByText('Riley Recruiter').filter({ visible: true }).first()).toBeVisible({
+      timeout: 8000,
+    });
+    await expect(page.getByText('Sam Recruiter').filter({ visible: true }).first()).toBeVisible({
+      timeout: 8000,
+    });
+    await expect(page.getByText('Team Alpha').filter({ visible: true }).first()).toBeVisible({
+      timeout: 8000,
+    });
+    await expect(page.getByText('Team Beta').filter({ visible: true }).first()).toBeVisible({
+      timeout: 8000,
+    });
 
     await page.screenshot({ path: 'e2e-results/audit-recruiters.png' });
     expect(errors).toHaveLength(0);
