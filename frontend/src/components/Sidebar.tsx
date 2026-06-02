@@ -500,6 +500,13 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps = {}
         {/* ── Nav ── */}
         <nav className="flex-1 overflow-y-auto px-3 py-[14px] space-y-4" aria-label="Sidebar">
           {(() => {
+            // Don't render the nav until the role is known. With role===undefined
+            // (profile still loading), filterNavSections keeps EVERY item (the
+            // `!role` short-circuit), which (a) briefly flashes admin-only items
+            // to every user and (b) re-renders the whole list down to the real
+            // set once the role resolves — a churn that momentarily unmounts
+            // items (jarring for users, and flaky for the sidebar-parity e2e).
+            if (!role) return null;
             const visibleSections = filterNavSections(role, profile, flags);
 
             const totalItems = visibleSections.reduce((n, s) => n + s.items.length, 0);
