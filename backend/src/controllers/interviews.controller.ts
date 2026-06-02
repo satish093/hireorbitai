@@ -307,17 +307,33 @@ export const list: RequestHandler = async (req, res) => {
   res.json(data);
 };
 
+/** True for the PostgREST "column not migrated yet" error. Used to strip a
+ *  late-arrival column (e.g. `notes`) and retry, so the backend can deploy
+ *  ahead of the interviews-notes migration without 500ing. */
+function isMissingColumnError(message: string | undefined): boolean {
+  if (!message) return false;
+  return /schema cache|column .* does not exist|could not find the .* column/i.test(message);
+}
+
+/** Insert into `interviews`, stripping `notes` and retrying once if that column
+ *  isn't migrated yet. Returns the PostgREST { data, error } result. */
+async function insertInterview(payload: Record<string, unknown>) {
+  let res = await db.from('interviews').insert(payload).select().single();
+  if (res.error && isMissingColumnError(res.error.message) && 'notes' in payload) {
+    const { notes: _drop, ...withoutNotes } = payload;
+    void _drop;
+    res = await db.from('interviews').insert(withoutNotes).select().single();
+  }
+  return res;
+}
+
 export const schedule: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   const parsed = scheduleSchema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
   await authorizeCreateForConsultant(req.user, parsed.data.consultant_id);
 
-  const { data, error } = await db
-    .from('interviews')
-    .insert({ ...parsed.data, created_by: req.user.id })
-    .select()
-    .single();
+  const { data, error } = await insertInterview({ ...parsed.data, created_by: req.user.id });
   if (error) throw httpError(500, 'Database error');
   await syncInterviewReminders(data as Parameters<typeof syncInterviewReminders>[0]);
   await publishInterviewChange(data as Record<string, unknown>, req.user.id);
@@ -330,11 +346,12 @@ export const scheduleMock: RequestHandler = async (req, res) => {
   if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
   await authorizeCreateForConsultant(req.user, parsed.data.consultant_id);
 
-  const { data, error } = await db
-    .from('interviews')
-    .insert({ ...parsed.data, type: 'MOCK', is_mock: true, created_by: req.user.id })
-    .select()
-    .single();
+  const { data, error } = await insertInterview({
+    ...parsed.data,
+    type: 'MOCK',
+    is_mock: true,
+    created_by: req.user.id,
+  });
   if (error) throw httpError(500, 'Database error');
   await syncInterviewReminders(data as Parameters<typeof syncInterviewReminders>[0]);
   await publishInterviewChange(data as Record<string, unknown>, req.user.id);
@@ -347,12 +364,23 @@ export const update: RequestHandler = async (req, res) => {
   const parsed = updateSchema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
 
-  const { data, error } = await db
+  const patch: Record<string, unknown> = { ...parsed.data };
+  let { data, error } = await db
     .from('interviews')
-    .update(parsed.data)
+    .update(patch)
     .eq('id', req.params.id)
     .select()
     .single();
+  if (error && isMissingColumnError(error.message) && 'notes' in patch) {
+    // `notes` column not migrated yet — strip and retry (deploy-ahead safe).
+    delete patch.notes;
+    ({ data, error } = await db
+      .from('interviews')
+      .update(patch)
+      .eq('id', req.params.id)
+      .select()
+      .single());
+  }
   if (error) throw httpError(500, 'Database error');
   // Reschedule / cancel: regenerate the lead-time reminders for the new
   // date (or clear them if the interview is no longer SCHEDULED).
