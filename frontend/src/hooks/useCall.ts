@@ -690,14 +690,35 @@ export function useCall(): UseCallReturn {
     // platform supports. Most browsers default these to true, but iOS
     // Safari and some Android Chromes need them explicit or they fall back
     // to raw mic input, which produces ear-piercing echo over speakerphone.
-    return navigator.mediaDevices.getUserMedia({
+    const full: MediaStreamConstraints = {
       audio: {
         echoCancellation: true,
         noiseSuppression: true,
         autoGainControl: true,
       },
       video: false,
-    });
+    };
+    try {
+      return await navigator.mediaDevices.getUserMedia(full);
+    } catch (err) {
+      const name = (err as { name?: string })?.name;
+      // A device-not-found / over-constrained miss can be a FALSE negative: the
+      // browser may throw before the permission prompt is answered, or when the
+      // quality constraints can't be met. Retry ONCE with a bare audio request —
+      // this forces the permission prompt if it's still pending and succeeds
+      // whenever a mic actually exists. Only if THIS also fails do we surface the
+      // "No microphone found" toast, so the warning is a last resort, not instant.
+      // NotAllowedError / NotReadableError are intentionally NOT retried —
+      // relaxing constraints can't fix a blocked permission or a busy device.
+      if (
+        name === 'NotFoundError' ||
+        name === 'DevicesNotFoundError' ||
+        name === 'OverconstrainedError'
+      ) {
+        return await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      }
+      throw err;
+    }
   }
 
   // -------------------------------------------------------------------------
