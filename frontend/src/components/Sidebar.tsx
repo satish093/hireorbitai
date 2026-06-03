@@ -118,6 +118,13 @@ export const NAV_SECTIONS: Section[] = [
       { to: '/vendors', label: 'Vendors', icon: IconBuilding, roles: OPERATOR_TIER },
       { to: '/clients', label: 'Clients', icon: IconBuilding2, roles: OPERATOR_TIER },
       {
+        to: '/invoices',
+        label: 'Invoices',
+        icon: IconFileText,
+        roles: MANAGER_TIER,
+        flagKey: 'invoices',
+      },
+      {
         to: '/reports',
         label: 'Analytics',
         icon: IconBarChart,

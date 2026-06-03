@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { requireAuth, blockIfMustChangePassword, requireRole } from '../middleware/auth';
 import { requireFeature } from '../middleware/featureFlag';
-import { OPERATOR_TIER, BUSINESS_ROLES, MESSAGING_ROLES } from '../types';
+import { OPERATOR_TIER, MANAGER_TIER, BUSINESS_ROLES, MESSAGING_ROLES } from '../types';
 import { authRouter } from './auth.routes';
 import { devAuthRouter } from './devAuth.routes';
 import { devToolsRouter } from './devTools.routes';
@@ -38,6 +38,7 @@ import { trainingRouter } from './training.routes';
 import { filesRouter } from './files.routes';
 import { aiUsageRouter } from './aiUsage.routes';
 import { workAuthDocsRouter } from './workAuthDocs.routes';
+import { invoicesRouter } from './invoices.routes';
 
 export const router = Router();
 
@@ -176,6 +177,8 @@ router.use(
 // Calls share the same permission model as messages (same hierarchy, same feature flag).
 router.use('/calls', requireRole(...MESSAGING_ROLES), requireFeature('messages'), callsRouter);
 router.use('/training', requireRole(...BUSINESS_ROLES), requireFeature('training'), trainingRouter);
+// Consultant invoice tracker — MANAGER_TIER-only back-office finance module.
+router.use('/invoices', requireRole(...MANAGER_TIER), requireFeature('invoices'), invoicesRouter);
 
 // Realtime SSE stream — generic push channel used by messages,
 // notifications, and any future feature that wants to push to a logged-in

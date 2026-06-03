@@ -88,6 +88,7 @@ const Resumes = lazy(() => import('./pages/Resumes').then((m) => ({ default: m.R
 const MyResume = lazy(() => import('./pages/MyResume').then((m) => ({ default: m.MyResume })));
 const Vendors = lazy(() => import('./pages/Vendors').then((m) => ({ default: m.Vendors })));
 const Clients = lazy(() => import('./pages/Clients').then((m) => ({ default: m.Clients })));
+const Invoices = lazy(() => import('./pages/Invoices').then((m) => ({ default: m.Invoices })));
 const Reminders = lazy(() => import('./pages/Reminders').then((m) => ({ default: m.Reminders })));
 const AIEmail = lazy(() => import('./pages/AIEmail').then((m) => ({ default: m.AIEmail })));
 const AIUsage = lazy(() => import('./pages/AIUsage').then((m) => ({ default: m.AIUsage })));
@@ -245,6 +246,7 @@ export default function App() {
     void import('./pages/MyResume');
     void import('./pages/Vendors');
     void import('./pages/Clients');
+    void import('./pages/Invoices');
     void import('./pages/Reminders');
     void import('./pages/AIEmail');
     void import('./pages/AIUsage');
@@ -415,6 +417,16 @@ export default function App() {
               element={
                 <ProtectedRoute allow={OPERATOR_TIER}>
                   <Clients />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/invoices"
+              element={
+                <ProtectedRoute allow={MANAGER_TIER}>
+                  <FeatureGuard feature="invoices">
+                    <Invoices />
+                  </FeatureGuard>
                 </ProtectedRoute>
               }
             />
