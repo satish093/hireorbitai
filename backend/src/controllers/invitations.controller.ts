@@ -314,6 +314,15 @@ export const setup: RequestHandler = async (req, res) => {
     throw httpError(400, 'Invitation expired');
   }
 
+  // Strong-password check BEFORE claiming the invitation. Validating AFTER the
+  // CAS claim (the old order) meant a rejected password left the invitation
+  // marked ACCEPTED with no account ever created: the invitee then hit
+  // "Invitation already accepted" on retry and "invalid credentials" at login
+  // (the account never existed). Checking first keeps the invite PENDING/usable
+  // until a valid password is supplied.
+  const strength = validatePasswordStrength(password, { email: invite.email });
+  if (!strength.ok) throw httpError(400, strength.problems.join(' '));
+
   // Atomically claim the invitation BEFORE creating the user. Without this
   // CAS, two concurrent requests with the same token both read status=PENDING
   // above and both proceed to createUser/upsert. The auth createUser would
@@ -344,9 +353,7 @@ export const setup: RequestHandler = async (req, res) => {
       .catch(() => {});
   };
 
-  // 2. Strong-password check matching the rest of the auth flows.
-  const strength = validatePasswordStrength(password, { email: invite.email });
-  if (!strength.ok) throw httpError(400, strength.problems.join(' '));
+  // (Password strength was validated above, before the claim.)
 
   // 3. Create the auth user. `email_confirm: true` is a no-op flag kept for
   //    API compatibility — all email runs through Brevo.

@@ -108,8 +108,18 @@ export function AcceptInvitation() {
       setSubmitErr('Please enter your full name.');
       return;
     }
-    if (password.length < 12) {
-      setSubmitErr('Password must be at least 12 characters.');
+    // Mirror the backend strength rules (validatePasswordStrength) so a weak
+    // password is caught here instead of being rejected server-side after the
+    // invitation is already in flight. The email-username / common-password
+    // checks stay backend-only (the page only has the masked email).
+    const pwMissing: string[] = [];
+    if (password.length < 12) pwMissing.push('at least 12 characters');
+    if (!/[A-Z]/.test(password)) pwMissing.push('an uppercase letter');
+    if (!/[a-z]/.test(password)) pwMissing.push('a lowercase letter');
+    if (!/[0-9]/.test(password)) pwMissing.push('a number');
+    if (!/[^A-Za-z0-9]/.test(password)) pwMissing.push('a special character');
+    if (pwMissing.length > 0) {
+      setSubmitErr(`Password must include ${pwMissing.join(', ')}.`);
       return;
     }
     if (password !== confirm) {
