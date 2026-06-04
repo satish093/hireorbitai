@@ -23,7 +23,7 @@ interface DocRow {
     recruiter: {
       id: string;
       user: { email: string; full_name: string | null } | null;
-      manager: { user: { email: string; full_name: string | null } | null } | null;
+      manager: { email: string; full_name: string | null } | null;
     } | null;
   } | null;
 }
@@ -53,7 +53,11 @@ export const workAuthExpiryJob = {
           '   recruiter:recruiters!recruiter_id(' +
           '     id,' +
           '     user:users!user_id(email, full_name),' +
-          '     manager:recruiter_managers!recruiter_id(user:users!manager_id(email, full_name))' +
+          // recruiters.manager_id → users directly. The old embed went through
+          // recruiter_managers, whose composite PK (recruiter_id, manager_id)
+          // has no `id` column the shim's embed assumes → "column
+          // recruiter_managers.id does not exist" every tick.
+          '     manager:users!manager_id(email, full_name)' +
           '   )' +
           ' )',
       )
@@ -104,10 +108,10 @@ export const workAuthExpiryJob = {
           name: consultant.recruiter.user.full_name ?? undefined,
         });
       }
-      if ((consultant.recruiter as any)?.manager?.user?.email) {
+      if (consultant.recruiter?.manager?.email) {
         recipients.push({
-          email: (consultant.recruiter as any).manager.user.email,
-          name: (consultant.recruiter as any).manager.user.full_name ?? undefined,
+          email: consultant.recruiter.manager.email,
+          name: consultant.recruiter.manager.full_name ?? undefined,
         });
       }
 
