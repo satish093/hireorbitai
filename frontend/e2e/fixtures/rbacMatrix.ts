@@ -199,6 +199,19 @@ export const RBAC_MATRIX: RoutePolicy[] = [
     primaryActions: ['manage clients'],
   },
   {
+    path: '/invoices',
+    sidebarLabel: 'Invoices',
+    section: 'Talent',
+    // Back-office consultant-invoice tracker — MANAGER_TIER only (recruiters +
+    // consultants excluded). Shared resource: every manager-tier user manages
+    // every row, so no per-row/group scope.
+    allow: MANAGER_TIER,
+    flagKey: 'invoices',
+    backendGate: 'requireRole(...MANAGER_TIER) + requireFeature(invoices)',
+    scope: 'global',
+    primaryActions: ['track consultant invoices (create / edit / delete)'],
+  },
+  {
     path: '/reports',
     sidebarLabel: 'Analytics',
     section: 'Talent',
