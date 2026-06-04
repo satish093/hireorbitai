@@ -124,6 +124,7 @@ export const parseProfile: RequestHandler = async (req, res) => {
 
   const profile = await parseResumeProfile(text, { bypassCache: true });
   await db.from('resumes').update({ parsed_profile: profile }).eq('id', id);
+  await syncConsultantSkills(resume.consultant_id, profile);
   res.json(profile);
 };
 
@@ -149,6 +150,29 @@ export const listForConsultant: RequestHandler = async (req, res) => {
   if (error) throw httpError(500, 'Database error');
   res.json(data);
 };
+
+/**
+ * Mirror a parsed resume's skills onto consultants.skills — the column the
+ * job-match engine reads. Parsed skills previously lived ONLY on
+ * resumes.parsed_profile, so every consultant had an empty skills[] and the
+ * deterministic skill-overlap match scored 0 (and the skill-gap UI had no
+ * consultant side). Best-effort + non-fatal — a failure here must never break
+ * an upload or re-parse.
+ */
+async function syncConsultantSkills(consultantId: string, parsedProfile: unknown): Promise<void> {
+  const raw = (parsedProfile as { skills?: unknown } | null)?.skills;
+  const skills = Array.isArray(raw)
+    ? raw.filter((s): s is string => typeof s === 'string' && s.trim().length > 0).slice(0, 50)
+    : [];
+  if (skills.length === 0) return;
+  const { error } = await db.from('consultants').update({ skills }).eq('id', consultantId);
+  if (error) {
+    logger.warn(
+      { err: error.message, consultantId },
+      'consultant skills sync from resume failed (non-fatal)',
+    );
+  }
+}
 
 /**
  * Upload a new resume version. multipart/form-data: { file, consultant_id, text? }
@@ -247,6 +271,10 @@ export const upload: RequestHandler = async (req, res) => {
     ({ data, error } = await db.from('resumes').insert(insertBody).select().single());
   }
   if (error) throw httpError(500, 'Database error');
+
+  // Sync the consultant's skill list from this (now-current) resume so the
+  // job-match engine — which reads consultants.skills — has signal. Non-fatal.
+  await syncConsultantSkills(consultant_id, parsedProfile);
 
   audit({
     action: 'resume_uploaded',
