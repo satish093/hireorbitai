@@ -185,15 +185,34 @@ export function useJobSearch() {
 
   async function enrichNow() {
     setSyncing(true);
+    let totalEnriched = 0;
+    let totalFailed = 0;
     try {
-      toast('Enriching jobs with AI… this may take a minute', { duration: 4000 });
-      const r = await api.post('/jobs/enrich-pending', null, {
-        params: { limit: 30, concurrency: 5 },
-      });
-      toast.success(`Enriched ${r.data.enriched} jobs (${r.data.failed} failed)`);
+      toast('Enriching all jobs… this runs locally and may take a minute', { duration: 4000 });
+      // /enrich-pending only processes a capped batch (jobs whose requirements
+      // are still null) per call, so loop until none remain. parseJobRequirements
+      // is a free LOCAL parser — no AI cost or rate limit — so it's safe to sweep
+      // the whole board. The cap (200 iters × 200) backstops a runaway.
+      for (let i = 0; i < 200; i++) {
+        const r = await api.post('/jobs/enrich-pending', null, {
+          params: { limit: 200, concurrency: 8 },
+        });
+        const processed = Number(r.data?.total_processed ?? 0);
+        totalEnriched += Number(r.data?.enriched ?? 0);
+        totalFailed += Number(r.data?.failed ?? 0);
+        if (processed === 0) break;
+      }
+      toast.success(
+        `Enriched ${totalEnriched} job${totalEnriched === 1 ? '' : 's'}${
+          totalFailed ? ` (${totalFailed} failed)` : ''
+        }`,
+      );
       await load(tab);
     } catch (e: any) {
-      toast.error(e?.response?.data?.error ?? 'Enrichment failed');
+      toast.error(
+        (e?.response?.data?.error ?? 'Enrichment failed') +
+          (totalEnriched ? ` — enriched ${totalEnriched} before the error` : ''),
+      );
     } finally {
       setSyncing(false);
     }

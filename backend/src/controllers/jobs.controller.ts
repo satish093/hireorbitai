@@ -529,11 +529,20 @@ export const recommended: RequestHandler = async (req, res) => {
         ? j.requirements.required_skills
         : (j.required_skills ?? []);
       if (need.length === 0) {
-        // No skill data at all — give a neutral 50 so the card shows something.
+        // No skills to match on. Distinguish "not enriched yet" from "enriched
+        // but the parser found no specific skills" so the blurb isn't misleading
+        // (a job with `requirements` set HAS been enriched).
+        const wasEnriched = !!j.requirements;
         baselineById.set(j.id, {
           score: 50,
-          reasons: ['No required-skills metadata yet — score is a placeholder.'],
-          why: 'We need this job enriched before we can explain the fit — try the AI match.',
+          reasons: [
+            wasEnriched
+              ? 'No specific skills are listed for this role.'
+              : 'Not enriched yet — run “✦ Enrich”.',
+          ],
+          why: wasEnriched
+            ? 'This role doesn’t list specific required skills, so there’s no skill fit to score.'
+            : 'Run “✦ Enrich” on the jobs page to pull this role’s skills and score the fit.',
           matched: [],
           missing: [],
         });
