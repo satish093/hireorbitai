@@ -6,6 +6,8 @@ import {
   atsScore,
   scoreResumeAgainstJob,
   jobCopilot,
+  generateCoverLetter,
+  type CoverLetterTone,
 } from '../services/ai.service';
 import { parseJobRequirements } from '../services/jobParser.service';
 import { tailorForJob as resumeTailorForJob } from './resumes.controller';
@@ -1025,6 +1027,72 @@ export const copilot: RequestHandler = async (req, res) => {
     res.json({ answer });
   } catch (e) {
     throw httpError(502, e instanceof Error ? e.message : 'Copilot request failed');
+  }
+};
+
+// ---------------------------------------------------------------------------
+// Cover-letter generator — first-person letter tailored to ONE job for the
+// calling consultant. Mirrors `copilot`: load job + caller's current resume,
+// hand to the AI service. Tone is the only client-controlled knob.
+// ---------------------------------------------------------------------------
+
+const coverLetterSchema = z
+  .object({ tone: z.enum(['professional', 'enthusiastic', 'concise']).optional() })
+  .strict();
+
+export const coverLetter: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  if (!ANTHROPIC_ENABLED) {
+    throw httpError(503, 'AI cover letters are not configured (set ANTHROPIC_API_KEY).');
+  }
+  const parsed = coverLetterSchema.safeParse(req.body ?? {});
+  if (!parsed.success) throw httpError(400, 'Invalid request', parsed.error.flatten());
+
+  const { data: job, error } = await db.from('jobs').select('*').eq('id', req.params.id).single();
+  if (error || !job) throw httpError(404, 'Job not found');
+
+  const consultant = await getConsultantForUser(req.user.id);
+  if (!consultant) throw httpError(400, 'Complete your consultant profile first');
+
+  // Caller's current resume text (same source the copilot uses).
+  const { data: resume } = await db
+    .from('resumes')
+    .select('body_text, ai_feedback')
+    .eq('consultant_id', consultant.id)
+    .eq('is_current', true)
+    .maybeSingle();
+  const resumeText = resume?.body_text || extractResumeText(resume?.ai_feedback) || null;
+
+  // Candidate name comes from the users row (not on the consultant record).
+  const { data: u } = await db
+    .from('users')
+    .select('full_name')
+    .eq('id', req.user.id)
+    .maybeSingle();
+  const name = (u as { full_name?: string } | null)?.full_name ?? null;
+
+  const reqs = job.requirements ?? {};
+  try {
+    const result = await generateCoverLetter({
+      job: {
+        title: job.title,
+        company: job.company_name,
+        location: job.location,
+        description: job.description,
+        required_skills: reqs.required_skills ?? job.required_skills,
+        seniority: reqs.job_seniority ?? job.level ?? null,
+      },
+      candidate: {
+        name,
+        skills: skillsForMatching(consultant),
+        experienceYears: consultant.total_experience_years ?? null,
+      },
+      resumeText,
+      tone: parsed.data.tone as CoverLetterTone | undefined,
+    });
+    res.json(result);
+  } catch (e) {
+    throw httpError(502, e instanceof Error ? e.message : 'Cover-letter request failed');
   }
 };
 

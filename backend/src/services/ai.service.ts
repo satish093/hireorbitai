@@ -35,6 +35,7 @@ import {
   jobRequirementsCache,
   skillMatchCache,
   jobMatchCache,
+  coverLetterCache,
 } from './aiCache';
 import { normalizeSkills } from './skillNorm';
 import { logger } from '../config/logger';
@@ -1035,6 +1036,97 @@ export async function jobCopilot(input: {
   const userContent = `${jobBlock}${resumeBlock}\n\n=== CANDIDATE QUESTION ===\n${input.question}`;
   const text = await callGroqTextWithFallback('jobCopilot', JOB_COPILOT_SYSTEM, userContent, 600);
   return text || 'Unable to generate an answer. Try rephrasing your question.';
+}
+
+// ---------------------------------------------------------------------------
+// Cover-letter writer — first-person, tailored to ONE job
+// ---------------------------------------------------------------------------
+
+export type CoverLetterTone = 'professional' | 'enthusiastic' | 'concise';
+
+const COVER_LETTER_SYSTEM = `You are an expert career writer composing a tailored cover letter FROM the candidate (first person) for ONE specific job. The letter must be truthful, specific, and ready to send.
+
+STRUCTURE (3–4 short paragraphs, 200–320 words):
+1. Opening: name the exact role and company, with a one-line hook on why the candidate is a strong match.
+2. Body (1–2 paragraphs): connect the candidate's REAL experience and skills to the job's key requirements. Cite 2–3 specific skills or achievements drawn from their resume. Concrete evidence, never generic filler.
+3. Closing: brief, genuine enthusiasm for the role + a confident call to action welcoming a conversation.
+4. Sign-off: "Sincerely," on its own line, then the candidate's name on the next line.
+
+RULES:
+- First person as the candidate ("I led…", "My experience in…").
+- NEVER invent employers, titles, degrees, certifications, or metrics that aren't in the resume. If the resume is thin, lean honestly on the listed skills.
+- No buzzwords ("rockstar", "ninja", "synergy"), no emojis, at most one exclamation mark.
+- Never output bracketed placeholders like "[Your Name]" or "[Company]" — use the provided values, and if a value is unknown, phrase around it gracefully.
+- Honour the requested TONE: professional = measured and formal; enthusiastic = warmer, more energetic (still professional); concise = tighter, ~180 words, every sentence earns its place.
+- Plain text only — no markdown headings or bullet characters.
+
+Return ONLY the cover letter body text.`;
+
+export async function generateCoverLetter(input: {
+  job: {
+    title: string;
+    company?: string | null;
+    location?: string | null;
+    description?: string | null;
+    required_skills?: string[] | null;
+    seniority?: string | null;
+  };
+  candidate: {
+    name?: string | null;
+    skills?: string[] | null;
+    experienceYears?: number | null;
+  };
+  resumeText?: string | null;
+  tone?: CoverLetterTone;
+}): Promise<{ cover_letter: string }> {
+  const tone: CoverLetterTone = input.tone ?? 'professional';
+  const jobBlock = [
+    `Role: ${input.job.title}`,
+    input.job.company ? `Company: ${input.job.company}` : '',
+    input.job.location ? `Location: ${input.job.location}` : '',
+    input.job.seniority ? `Seniority: ${input.job.seniority}` : '',
+    input.job.required_skills?.length
+      ? `Required skills: ${normalizeSkills(input.job.required_skills).join(', ')}`
+      : '',
+    input.job.description ? `\nJD:\n${clip(input.job.description)}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  const candidateBlock = [
+    `Candidate name: ${input.candidate.name?.trim() || 'the candidate'}`,
+    input.candidate.experienceYears
+      ? `Total experience: ${input.candidate.experienceYears} years`
+      : '',
+    input.candidate.skills?.length
+      ? `Skills: ${normalizeSkills(input.candidate.skills).slice(0, 20).join(', ')}`
+      : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  const resumeBlock = input.resumeText?.trim()
+    ? `\n\n=== CANDIDATE RESUME ===\n${clip(input.resumeText)}`
+    : '\n\n(No resume on file — write from the skills above and keep claims general but honest.)';
+
+  const userContent = `Requested tone: ${tone}\n\n=== JOB ===\n${jobBlock}\n\n=== CANDIDATE ===\n${candidateBlock}${resumeBlock}`;
+
+  return withCache(
+    coverLetterCache,
+    { job: jobBlock, cand: candidateBlock, resume: input.resumeText ?? '', tone },
+    async () => {
+      const text = await callGroqTextWithFallback(
+        'generateCoverLetter',
+        COVER_LETTER_SYSTEM,
+        userContent,
+        900,
+      );
+      return {
+        cover_letter:
+          text || 'Unable to generate a cover letter right now. Please try again in a moment.',
+      };
+    },
+  );
 }
 
 // ---------------------------------------------------------------------------

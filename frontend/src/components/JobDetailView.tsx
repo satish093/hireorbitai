@@ -1,5 +1,6 @@
 import { ReactNode, useEffect, useState } from 'react';
 import clsx from 'clsx';
+import toast from 'react-hot-toast';
 import { api } from '../services/api';
 import { Avatar } from './TaskBits';
 import {
@@ -240,6 +241,103 @@ function JobCopilot({ jobId, isConsultant }: { jobId: string; isConsultant: bool
   );
 }
 
+type CoverTone = 'professional' | 'enthusiastic' | 'concise';
+const COVER_TONES: { key: CoverTone; label: string }[] = [
+  { key: 'professional', label: 'Professional' },
+  { key: 'enthusiastic', label: 'Enthusiastic' },
+  { key: 'concise', label: 'Concise' },
+];
+
+/**
+ * AI cover-letter writer — first-person letter tailored to this job + the
+ * caller's current resume. Inline (no overlay), mirroring the JobCopilot
+ * Section. The result is editable so the consultant can tweak before sending.
+ */
+function CoverLetterPanel({ jobId }: { jobId: string }) {
+  const [tone, setTone] = useState<CoverTone>('professional');
+  const [letter, setLetter] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [generated, setGenerated] = useState(false);
+
+  async function generate() {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const { data } = await api.post(`/jobs/${jobId}/cover-letter`, { tone });
+      setLetter(data?.cover_letter ?? '');
+      setGenerated(true);
+    } catch (e) {
+      const msg =
+        (e as { response?: { data?: { error?: string } } })?.response?.data?.error ??
+        'Cover-letter generation is unavailable right now.';
+      toast.error(msg);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(letter);
+      toast.success('Cover letter copied');
+    } catch {
+      toast.error('Copy failed — select the text manually.');
+    }
+  }
+
+  return (
+    <Section title="AI Cover Letter">
+      <p className="text-sm text-muted mb-3">
+        Generate a first-person cover letter tailored to this role and your current resume.
+      </p>
+      <div className="flex flex-wrap items-center gap-1.5 mb-3">
+        {COVER_TONES.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setTone(t.key)}
+            disabled={busy}
+            className={clsx(
+              'text-[11px] px-2.5 py-1 rounded-full border transition disabled:opacity-50',
+              tone === t.key
+                ? 'bg-ink text-bg border-ink'
+                : 'border-border text-muted hover:bg-hover',
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
+        <button
+          onClick={generate}
+          disabled={busy}
+          className="h-8 px-3 ml-auto rounded-lg bg-ink text-bg text-sm font-medium hover:opacity-90 disabled:opacity-50 press"
+        >
+          {busy ? 'Writing…' : generated ? 'Regenerate' : 'Generate'}
+        </button>
+      </div>
+      {generated && (
+        <>
+          <textarea
+            value={letter}
+            onChange={(e) => setLetter(e.target.value)}
+            rows={14}
+            aria-label="Generated cover letter"
+            className="w-full text-sm rounded-lg border border-border p-3 leading-relaxed focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+          />
+          <div className="flex items-center gap-2 mt-2">
+            <button
+              onClick={copy}
+              className="h-8 px-3 rounded-lg border border-border text-sm hover:bg-hover press"
+            >
+              Copy
+            </button>
+            <span className="text-[11px] text-muted">Editable — tweak before you send.</span>
+          </div>
+        </>
+      )}
+    </Section>
+  );
+}
+
 export function JobDetailView({ job, isConsultant }: { job: Job; isConsultant: boolean }) {
   const [reqs, setReqs] = useState<JobRequirements | null | undefined>(job.requirements);
   const [enriching, setEnriching] = useState(false);
@@ -388,6 +486,8 @@ export function JobDetailView({ job, isConsultant }: { job: Job; isConsultant: b
         {/* Main column */}
         <div className="lg:col-span-2 space-y-4 min-w-0">
           <JobCopilot jobId={job.id} isConsultant={isConsultant} />
+
+          {isConsultant && <CoverLetterPanel jobId={job.id} />}
 
           {(reqs?.highlights ?? []).length > 0 && (
             <Section title="Highlights">

@@ -98,6 +98,13 @@ export const atsScoreCache = makeCache<object>({ max: 500, ttlMs: 60 * 60_000 })
  */
 export const jobMatchCache = makeCache<object>({ max: 200, ttlMs: 15 * 60_000 });
 
+/**
+ * Generated cover letters (resume + JD + tone → letter text).
+ * TTL 1 h — same inputs → same letter; the user can regenerate by editing tone.
+ * Stored as object ({ cover_letter }).
+ */
+export const coverLetterCache = makeCache<object>({ max: 200, ttlMs: 60 * 60_000 });
+
 // ---------------------------------------------------------------------------
 // Training AI caches
 // ---------------------------------------------------------------------------
