@@ -500,18 +500,21 @@ export function JobDetailView({
   const [resumePaste, setResumePaste] = useState('');
   const [needsResume, setNeedsResume] = useState(false);
 
-  // Enrich on open for ALL roles (free local parser). Best-effort.
+  // Enrich on open: AI-grade extraction for the job you're actually looking at.
+  // Show whatever's stored (heuristic or AI) immediately, then upgrade to AI
+  // unless it's already AI-enriched (the `_ai` sentinel set server-side). The
+  // bulk Enrich button stays the free heuristic for feed coverage; this gives
+  // the sharp result where it counts. Best-effort.
   useEffect(() => {
-    if (job.requirements) {
-      setReqs(job.requirements);
-      return;
-    }
+    const stored = job.requirements as (JobRequirements & { _ai?: boolean }) | null | undefined;
+    if (stored) setReqs(stored);
+    if (stored?._ai) return; // already AI-enriched — no model call needed
     let cancelled = false;
     setEnriching(true);
     api
       .post(`/jobs/${job.id}/enrich`)
       .then((r) => {
-        if (!cancelled) setReqs(r.data?.requirements ?? null);
+        if (!cancelled) setReqs(r.data?.requirements ?? stored ?? null);
       })
       .catch(() => {})
       .finally(() => {

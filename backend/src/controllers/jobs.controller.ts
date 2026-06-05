@@ -7,6 +7,7 @@ import {
   scoreResumeAgainstJob,
   jobCopilot,
   generateCoverLetter,
+  extractJobRequirements,
   type CoverLetterTone,
 } from '../services/ai.service';
 import { parseJobRequirements } from '../services/jobParser.service';
@@ -939,18 +940,25 @@ export const enrichPending: RequestHandler = async (req, res) => {
   res.json({ enriched, failed, total_processed: pending.length });
 };
 
-/** Enrich a single job on demand (used by detail page lazy-load). */
+/**
+ * Enrich a single job on demand (the detail page / preview drawer calls this on
+ * open). Uses the AI extractor for sharp, context-aware requirements — the user
+ * is looking at THIS job, so it's worth a model call. extractJobRequirements
+ * runs Groq → Gemini → Anthropic and falls back to the local heuristic
+ * internally when providers are down/rate-limited, so it never fails the
+ * request. The stored requirements carry an `_ai` sentinel so the detail view
+ * doesn't re-run the model every time the job is reopened.
+ */
 export const enrichOne: RequestHandler = async (req, res) => {
   const { data: job, error } = await db.from('jobs').select('*').eq('id', req.params.id).single();
   if (error || !job) throw httpError(404, 'Job not found');
-  const reqs = parseJobRequirements({
+  const reqs = await extractJobRequirements({
     title: job.title,
     description: job.description,
     required_skills: job.required_skills,
     location: job.location,
-    remote: job.remote,
   });
-  const patch: any = { requirements: reqs };
+  const patch: any = { requirements: { ...reqs, _ai: true } };
   if (reqs.job_seniority) patch.level = reqs.job_seniority;
   if (reqs.required_skills?.length) patch.required_skills = reqs.required_skills;
   await db.from('jobs').update(patch).eq('id', job.id);
