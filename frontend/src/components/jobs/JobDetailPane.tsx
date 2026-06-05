@@ -65,7 +65,7 @@ export function JobDetailPane({
             <SkeletonCard />
           </div>
         ) : (
-          <JobDetailView job={job} isConsultant={isConsultant} />
+          <JobDetailView job={job} isConsultant={isConsultant} embedded />
         )}
       </div>
 

@@ -485,11 +485,15 @@ export function JobDetailView({
   job,
   isConsultant,
   headlineScore,
+  embedded = false,
 }: {
   job: Job;
   isConsultant: boolean;
   /** AI match score from the feed — shown as a ring in the header when present. */
   headlineScore?: number | null;
+  /** Rendered inside the narrow master-detail pane / drawer → stack single-
+   *  column instead of the wide 3-column page grid (which would cramp). */
+  embedded?: boolean;
 }) {
   const [reqs, setReqs] = useState<JobRequirements | null | undefined>(job.requirements);
   const [enriching, setEnriching] = useState(false);
@@ -597,7 +601,7 @@ export function JobDetailView({
   );
 
   return (
-    <div className="max-w-5xl mx-auto w-full min-w-0">
+    <div className={clsx('w-full min-w-0', !embedded && 'max-w-5xl mx-auto')}>
       {/* Company-first header */}
       <div className="bg-surface border border-border rounded-2xl p-5 sm:p-6 shadow-sm min-w-0">
         <div className="flex items-start gap-4 min-w-0">
@@ -658,9 +662,11 @@ export function JobDetailView({
         </div>
       )}
 
-      <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
+      <div
+        className={clsx('mt-4 grid grid-cols-1 gap-4 items-start', !embedded && 'lg:grid-cols-3')}
+      >
         {/* Main column */}
-        <div className="lg:col-span-2 space-y-4 min-w-0">
+        <div className={clsx('space-y-4 min-w-0', !embedded && 'lg:col-span-2')}>
           <JobCopilot jobId={job.id} isConsultant={isConsultant} />
 
           {/* Recruiter/operator candidate tools (tailored resumes + cover
@@ -876,8 +882,8 @@ export function JobDetailView({
             )}
         </div>
 
-        {/* Right rail */}
-        <div className="space-y-4 min-w-0 lg:sticky lg:top-4">
+        {/* Right rail (becomes a stacked full-width section when embedded) */}
+        <div className={clsx('space-y-4 min-w-0', !embedded && 'lg:sticky lg:top-4')}>
           <Section title="Key facts">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               <FactTile label="Location" value={job.location ?? '—'} />
