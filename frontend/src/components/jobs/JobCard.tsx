@@ -2,6 +2,7 @@ import clsx from 'clsx';
 import { Button } from '../Button';
 import { useFeatureFlag } from '../../hooks/useFeatureFlags';
 import { MatchRing } from './MatchRing';
+import { cleanText } from '../../lib/jobFormat';
 import { relative, prettyRate } from './helpers';
 import { STATUS_LABEL } from './types';
 import type { AppStatus, JobRow } from './types';
@@ -54,8 +55,9 @@ function JobCard({
   onChangeStatus?: (next: AppStatus) => void;
 }) {
   const aiMatchEnabled = useFeatureFlag('ai_match');
-  const companyName =
-    job.company_name ?? job.client?.company_name ?? job.vendor?.company_name ?? 'Confidential';
+  const companyName = cleanText(
+    job.company_name ?? job.client?.company_name ?? job.vendor?.company_name ?? 'Confidential',
+  );
   const matchScore =
     aiMatchEnabled && typeof job.match_score === 'number' ? Math.round(job.match_score) : null;
 
@@ -70,7 +72,8 @@ function JobCard({
   const matchedSkills = job.match_matched_skills ?? [];
   const missingSkills = job.match_missing_skills ?? [];
   const hasSkillSplit = matchedSkills.length > 0 || missingSkills.length > 0;
-  const location = job.location ?? (job.remote ? 'Remote' : 'Location N/A');
+  const title = cleanText(job.title);
+  const location = job.location ? cleanText(job.location) : job.remote ? 'Remote' : 'Location N/A';
 
   return (
     // Wrapper establishes an isolated stacking context so the overlay button
@@ -97,7 +100,7 @@ function JobCard({
             onSelect();
           }
         }}
-        aria-label={`${job.title} at ${companyName}`}
+        aria-label={`${title} at ${companyName}`}
         className="absolute inset-0 z-0 rounded-xl cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
       />
 
@@ -111,7 +114,7 @@ function JobCard({
           {initials(companyName)}
         </span>
         <div className="flex-1 min-w-0">
-          <h3 className="text-[14px] font-semibold text-ink leading-tight truncate">{job.title}</h3>
+          <h3 className="text-[14px] font-semibold text-ink leading-tight truncate">{title}</h3>
           <div className="text-[12px] text-muted truncate mt-0.5">
             <span className="font-medium text-ink-2">{companyName}</span>
             <span> · {location}</span>

@@ -8,6 +8,7 @@ import { MatchRing } from './jobs/MatchRing';
 import {
   Job,
   JobRequirements,
+  cleanText,
   jdToSafeHtml,
   jdToText,
   looksLikeHtml,
@@ -553,7 +554,8 @@ export function JobDetailView({
     if (isConsultant) void run(); /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [job.id, isConsultant]);
 
-  const company = job.company_name ?? job.client?.company_name ?? 'Unknown company';
+  const company = cleanText(job.company_name ?? job.client?.company_name ?? 'Unknown company');
+  const title = cleanText(job.title);
   const overall = skillMatch?.overall_score != null ? Math.round(skillMatch.overall_score) : null;
   const atsScore = ats?.score != null ? Math.round(ats.score) : null;
   const seniority = reqs?.job_seniority ?? job.level ?? null;
@@ -608,9 +610,9 @@ export function JobDetailView({
               )}
             </div>
             <h1 className="text-2xl font-semibold text-ink leading-tight break-words">{company}</h1>
-            <div className="text-base text-ink mt-0.5 break-words">{job.title}</div>
+            <div className="text-base text-ink mt-0.5 break-words">{title}</div>
             <div className="text-sm text-muted mt-1 break-words">
-              {job.location ?? 'Location N/A'} · {workModel}
+              {job.location ? cleanText(job.location) : 'Location N/A'} · {workModel}
             </div>
             <div className="mt-3 hidden sm:block">
               {applyBtn()}

@@ -91,7 +91,7 @@ export function resolveApplyUrl(job: Job): string {
 }
 
 /** Convert a raw job description (possibly HTML) into clean readable text:
- *  block tags → line breaks, inline tags stripped, common entities decoded. */
+ *  block tags -> line breaks, inline tags stripped, common entities decoded. */
 export function jdToText(raw: string): string {
   return raw
     .replace(/<\s*(br|\/p|\/li|\/div|\/h[1-6])\s*\/?>/gi, '\n')
@@ -106,6 +106,71 @@ export function jdToText(raw: string): string {
     .replace(/\n{3,}/g, '\n\n')
     .replace(/[ \t]{2,}/g, ' ')
     .trim();
+}
+
+const NAMED_ENTITIES: Record<string, string> = {
+  amp: '&',
+  lt: '<',
+  gt: '>',
+  quot: '"',
+  apos: "'",
+  nbsp: ' ',
+  rsquo: '’',
+  lsquo: '‘',
+  ldquo: '“',
+  rdquo: '”',
+  ndash: '–',
+  mdash: '—',
+  hellip: '…',
+};
+
+/** Decode HTML entities (named + numeric/hex) in a short label. */
+function decodeEntities(s: string): string {
+  return s.replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (m, code: string) => {
+    if (code[0] === '#') {
+      const hex = code[1] === 'x' || code[1] === 'X';
+      const n = parseInt(code.slice(hex ? 2 : 1), hex ? 16 : 10);
+      return Number.isFinite(n) ? String.fromCodePoint(n) : m;
+    }
+    return NAMED_ENTITIES[code.toLowerCase()] ?? m;
+  });
+}
+
+/**
+ * Repair UTF-8 text that an ingestion feed mis-decoded as Latin-1
+ * ("Espa~na" -> "Espana" with the tilde restored, "Andaluc-a" -> "Andalucia").
+ * Only attempts the fix when the string both LOOKS mojibake'd (a 0xC2/0xC3 lead
+ * byte followed by a 0x80-0xBF continuation byte) AND is pure Latin-1, so
+ * legitimate multibyte text (real accents, CJK, emoji) is never corrupted; a
+ * failed UTF-8 decode also falls back to the original.
+ */
+function fixMojibake(s: string): string {
+  let looksMojibake = false;
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i);
+    if (c > 0xff) return s; // a real multibyte char is present — don't touch it
+    if ((c === 0xc2 || c === 0xc3) && i + 1 < s.length) {
+      const next = s.charCodeAt(i + 1);
+      if (next >= 0x80 && next <= 0xbf) looksMojibake = true;
+    }
+  }
+  if (!looksMojibake) return s;
+  try {
+    const bytes = Uint8Array.from(Array.from(s, (c) => c.charCodeAt(0)));
+    return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  } catch {
+    return s;
+  }
+}
+
+/**
+ * Clean a short label from an ingestion feed for display: decode HTML entities
+ * ("Johnson &amp; Johnson" -> "Johnson & Johnson") and repair UTF-8-as-Latin1
+ * mojibake. Safe to call on any string (incl. null/undefined -> '').
+ */
+export function cleanText(s?: string | null): string {
+  if (!s) return s ?? '';
+  return fixMojibake(decodeEntities(s));
 }
 
 const JD_KEEP_TAGS = new Set([
@@ -153,9 +218,9 @@ export function jdToSafeHtml(raw: string): string {
       const tag = el.tagName.toUpperCase();
       if (tag === 'SCRIPT' || tag === 'STYLE') return;
       if (JD_KEEP_TAGS.has(tag)) {
-        // createElement creates a bare element — no attributes are copied from el.
+        // createElement creates a bare element with no attributes copied from el.
         // If you ever add <a> or <img> to JD_KEEP_TAGS, allowlist specific safe
-        // attributes (href, src) explicitly here rather than copying all of el's attributes.
+        // attributes (href, src) explicitly here rather than copying all of el's.
         const clean = doc.createElement(tag.toLowerCase());
         walk(el, clean);
         dest.appendChild(clean);
