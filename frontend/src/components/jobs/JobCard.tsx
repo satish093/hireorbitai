@@ -1,6 +1,7 @@
 import clsx from 'clsx';
 import { Button } from '../Button';
 import { useFeatureFlag } from '../../hooks/useFeatureFlags';
+import { MatchRing } from './MatchRing';
 import { relative, prettyRate } from './helpers';
 import { STATUS_LABEL } from './types';
 import type { AppStatus, JobRow } from './types';
@@ -25,27 +26,6 @@ function CheckIcon() {
     >
       <path d="M20 6 9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
-  );
-}
-
-/** Compact match-score pill for the list card. Tone by band. */
-function MatchPill({ score }: { score: number }) {
-  const tone =
-    score >= 85
-      ? 'text-success border-success/40 bg-success-soft'
-      : score >= 75
-        ? 'text-accent border-accent/40 bg-accent-soft'
-        : 'text-muted border-border bg-bg-sunken';
-  return (
-    <span
-      className={clsx(
-        'shrink-0 inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-mono font-semibold tabular-nums',
-        tone,
-      )}
-      title={`AI match score: ${score}%`}
-    >
-      {score}%
-    </span>
   );
 }
 
@@ -131,7 +111,7 @@ function JobCard({
             <span> · {location}</span>
           </div>
         </div>
-        {matchScore != null && <MatchPill score={matchScore} />}
+        {matchScore != null && <MatchRing score={matchScore} size={46} />}
       </div>
 
       {/* "Why you're a great fit" — one-line AI blurb above the skill pills.

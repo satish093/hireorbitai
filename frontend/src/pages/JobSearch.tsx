@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Layout } from '../components/Layout';
 import { api } from '../services/api';
 import { invalidate } from '../hooks/useInvalidate';
@@ -16,6 +17,7 @@ import { JobSearchHero } from '../components/jobs/JobSearchHero';
 import { JobTabsBar } from '../components/jobs/JobTabsBar';
 import { JobFilterBar } from '../components/jobs/JobFilterBar';
 import { JobModals } from '../components/jobs/JobModals';
+import { JobPreviewDrawer } from '../components/jobs/JobPreviewDrawer';
 import { useJobSearch } from '../components/jobs/useJobSearch';
 
 export function JobSearch() {
@@ -69,13 +71,16 @@ export function JobSearch() {
     recordApplication,
     toggleLike,
     dismissJob,
-    openJob,
     patchFilters,
     resetFilters,
     visible,
     filterState,
     counts,
   } = useJobSearch();
+
+  // Jobright-style preview: clicking a card opens a right-edge drawer instead
+  // of navigating away, so the user keeps their scroll position in the feed.
+  const [preview, setPreview] = useState<{ id: string; score: number | null } | null>(null);
 
   const staffActions = isManager ? (
     <>
@@ -175,8 +180,8 @@ export function JobSearch() {
                 <JobCard
                   key={j.id}
                   job={j}
-                  selected={false}
-                  onSelect={() => openJob(j)}
+                  selected={preview?.id === j.id}
+                  onSelect={() => setPreview({ id: j.id, score: j.match_score ?? null })}
                   onToggleLike={() => toggleLike(j)}
                   onDismiss={tab === 'recommended' ? () => dismissJob(j) : undefined}
                   onApply={() => handleApplyClick(j)}
@@ -231,6 +236,13 @@ export function JobSearch() {
         handlePlainApply={handlePlainApply}
         proceedToApply={proceedToApply}
         recordApplication={recordApplication}
+      />
+
+      <JobPreviewDrawer
+        jobId={preview?.id ?? null}
+        matchScore={preview?.score ?? null}
+        isConsultant={isConsultant}
+        onClose={() => setPreview(null)}
       />
     </Layout>
   );

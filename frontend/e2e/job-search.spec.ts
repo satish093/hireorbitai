@@ -113,7 +113,7 @@ test.describe('Job search page — rendering', () => {
     await expect(page).toHaveURL(/\/jobs$/);
   });
 
-  test('RECRUITER clicking a job navigates to the job detail page', async ({ page }) => {
+  test('RECRUITER clicking a job opens the preview drawer (stays on /jobs)', async ({ page }) => {
     const errors = trackPageErrors(page);
 
     await seedSession(page, RECRUITER);
@@ -134,7 +134,13 @@ test.describe('Job search page — rendering', () => {
       .first()
       .click();
 
-    // Should navigate to job detail (/jobs/:id)
+    // Jobright-style: a right-edge preview drawer opens; the URL stays on the feed.
+    const drawer = page.getByRole('dialog', { name: 'Job preview' });
+    await expect(drawer).toBeVisible({ timeout: 8000 });
+    await expect(page).toHaveURL(/\/jobs$/);
+
+    // The "Open full page" escape hatch still navigates to the detail route.
+    await drawer.getByRole('link', { name: /Open full page/i }).click();
     await expect(page).toHaveURL(/\/jobs\/j-1/, { timeout: 8000 });
 
     expect(errors).toHaveLength(0);
