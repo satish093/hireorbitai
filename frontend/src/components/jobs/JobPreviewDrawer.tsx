@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../../services/api';
 import { JobDetailView } from '../JobDetailView';
 import { SkeletonCard } from '../Skeleton';
+import { MatchExplain } from './MatchExplain';
 import { resolveApplyUrl, type Job } from '../../lib/jobFormat';
 
 /**
@@ -20,11 +21,17 @@ import { resolveApplyUrl, type Job } from '../../lib/jobFormat';
 export function JobPreviewDrawer({
   jobId,
   matchScore,
+  matchWhy,
+  matchedSkills = [],
+  missingSkills = [],
   isConsultant,
   onClose,
 }: {
   jobId: string | null;
   matchScore?: number | null;
+  matchWhy?: string | null;
+  matchedSkills?: string[];
+  missingSkills?: string[];
   isConsultant: boolean;
   onClose: () => void;
 }) {
@@ -106,13 +113,26 @@ export function JobPreviewDrawer({
         </div>
 
         <div className="p-4 pb-24">
+          {/* Why this score — the card the user clicked carries the per-consultant
+              match context; the fetched job payload does not. Shown first so the
+              answer to "why this number?" is the top of the preview. */}
+          {typeof matchScore === 'number' && (
+            <MatchExplain
+              score={matchScore}
+              why={matchWhy ?? null}
+              matched={matchedSkills}
+              missing={missingSkills}
+              className="mb-4"
+            />
+          )}
           {loading || !job ? (
             <div className="space-y-4">
               <SkeletonCard />
               <SkeletonCard />
             </div>
           ) : (
-            <JobDetailView job={job} isConsultant={isConsultant} headlineScore={matchScore} />
+            // No headlineScore here — MatchExplain above already owns the ring.
+            <JobDetailView job={job} isConsultant={isConsultant} />
           )}
         </div>
 

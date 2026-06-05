@@ -80,7 +80,15 @@ export function JobSearch() {
 
   // Jobright-style preview: clicking a card opens a right-edge drawer instead
   // of navigating away, so the user keeps their scroll position in the feed.
-  const [preview, setPreview] = useState<{ id: string; score: number | null } | null>(null);
+  // Carries the feed-computed match context so the drawer can explain the score
+  // (the /jobs/:id payload the drawer fetches has no per-consultant match data).
+  const [preview, setPreview] = useState<{
+    id: string;
+    score: number | null;
+    why: string | null;
+    matched: string[];
+    missing: string[];
+  } | null>(null);
 
   const staffActions = isManager ? (
     <>
@@ -181,7 +189,15 @@ export function JobSearch() {
                   key={j.id}
                   job={j}
                   selected={preview?.id === j.id}
-                  onSelect={() => setPreview({ id: j.id, score: j.match_score ?? null })}
+                  onSelect={() =>
+                    setPreview({
+                      id: j.id,
+                      score: j.match_score ?? null,
+                      why: j.match_why ?? null,
+                      matched: j.match_matched_skills ?? [],
+                      missing: j.match_missing_skills ?? [],
+                    })
+                  }
                   onToggleLike={() => toggleLike(j)}
                   onDismiss={tab === 'recommended' ? () => dismissJob(j) : undefined}
                   onApply={() => handleApplyClick(j)}
@@ -241,6 +257,9 @@ export function JobSearch() {
       <JobPreviewDrawer
         jobId={preview?.id ?? null}
         matchScore={preview?.score ?? null}
+        matchWhy={preview?.why ?? null}
+        matchedSkills={preview?.matched ?? []}
+        missingSkills={preview?.missing ?? []}
         isConsultant={isConsultant}
         onClose={() => setPreview(null)}
       />

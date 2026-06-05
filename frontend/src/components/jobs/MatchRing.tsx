@@ -1,11 +1,25 @@
 import clsx from 'clsx';
 
 /**
- * Circular AI-match score ring (Jobright-style). Color bands mirror the old
- * MatchPill so the feed reads consistently:
- *   ≥85 strong (success) · ≥75 good (accent) · else neutral (muted).
- * Pure SVG, no deps. The track + progress arc both use currentColor via a tone
- * class so it themes correctly in light/dark.
+ * Color band for a match score — a distinct hue per range so the number reads
+ * at a glance: emerald (excellent) → sky (good) → amber (fair) → orange (weak)
+ * → rose (poor); muted when there's no signal (0). Shared by the ring + the
+ * "why this score" panel so the dot/label/arc all agree.
+ */
+export function matchTone(score: number): string {
+  const pct = Math.max(0, Math.min(100, Math.round(score)));
+  if (pct <= 0) return 'text-muted';
+  if (pct >= 85) return 'text-emerald-500';
+  if (pct >= 70) return 'text-sky-500';
+  if (pct >= 55) return 'text-amber-500';
+  if (pct >= 40) return 'text-orange-500';
+  return 'text-rose-500';
+}
+
+/**
+ * Circular AI-match score ring (Jobright-style). Pure SVG, no deps. The track +
+ * progress arc both use currentColor via {@link matchTone} so it themes
+ * correctly in light/dark and shifts hue across the score range.
  */
 export function MatchRing({
   score,
@@ -23,8 +37,7 @@ export function MatchRing({
   const r = (size - stroke) / 2;
   const circ = 2 * Math.PI * r;
   const dash = (pct / 100) * circ;
-  const tone =
-    pct >= 85 ? 'text-success' : pct >= 75 ? 'text-accent' : pct > 0 ? 'text-ink-2' : 'text-muted';
+  const tone = matchTone(pct);
 
   return (
     <div
