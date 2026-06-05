@@ -21,6 +21,9 @@ const EMPTY = {
   invoice_date: '',
   due_date: '',
   net_terms_days: '',
+  pay_rate: '',
+  billing_month: '',
+  invoice_amount: '',
   status: 'Submitted' as Status,
   notes: '',
 };
@@ -62,6 +65,29 @@ function formatDate(value?: string | null) {
   // `date` columns return 'YYYY-MM-DD'; timestamps include a 'T'.
   const d = value.includes('T') ? new Date(value) : new Date(`${value}T00:00:00`);
   return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString();
+}
+
+// USD currency for the money fields. Accepts a number or numeric string.
+function formatMoney(value?: number | string | null) {
+  if (value == null || value === '') return '—';
+  const n = Number(value);
+  if (Number.isNaN(n)) return String(value);
+  return n.toLocaleString(undefined, {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 2,
+  });
+}
+
+// 'YYYY-MM' (from <input type="month">) → 'Mon YYYY'.
+function formatMonth(value?: string | null) {
+  if (!value) return '—';
+  const m = /^(\d{4})-(\d{2})$/.exec(value);
+  if (!m) return value;
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, 1);
+  return Number.isNaN(d.getTime())
+    ? value
+    : d.toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
 }
 
 // due = invoice_date + net_terms_days, computed in UTC so it never drifts a day.
@@ -114,6 +140,9 @@ export function Invoices() {
       invoice_date: row.invoice_date ?? '',
       due_date: row.due_date ?? '',
       net_terms_days: row.net_terms_days ?? '',
+      pay_rate: row.pay_rate ?? '',
+      billing_month: row.billing_month ?? '',
+      invoice_amount: row.invoice_amount ?? '',
       status: (row.status as Status) ?? 'Submitted',
       notes: row.notes ?? '',
     });
@@ -148,6 +177,14 @@ export function Invoices() {
         form.net_terms_days === '' || form.net_terms_days == null
           ? null
           : Number(form.net_terms_days),
+      // Send null (not '') for empty money fields so the backend doesn't coerce
+      // a blank into 0.
+      pay_rate: form.pay_rate === '' || form.pay_rate == null ? null : Number(form.pay_rate),
+      invoice_amount:
+        form.invoice_amount === '' || form.invoice_amount == null
+          ? null
+          : Number(form.invoice_amount),
+      billing_month: form.billing_month || null,
       status: form.status,
       notes: form.notes?.trim() || null,
     };
@@ -201,6 +238,23 @@ export function Invoices() {
           },
           { key: 'consultant_name', header: 'Consultant' },
           { key: 'vendor_name', header: 'Vendor' },
+          {
+            key: 'billing_month',
+            header: 'Billing month',
+            render: (row: any) => formatMonth(row.billing_month),
+          },
+          {
+            key: 'pay_rate',
+            header: 'Pay rate',
+            align: 'right',
+            render: (row: any) => formatMoney(row.pay_rate),
+          },
+          {
+            key: 'invoice_amount',
+            header: 'Invoice amount',
+            align: 'right',
+            render: (row: any) => formatMoney(row.invoice_amount),
+          },
           {
             key: 'invoice_date',
             header: 'Invoice date',
@@ -296,6 +350,32 @@ export function Invoices() {
               onChange={(e) => setForm({ ...form, due_date: e.target.value })}
             />
           </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <FormInput
+              label="Pay rate ($)"
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="e.g. 65.00"
+              value={form.pay_rate}
+              onChange={(e) => setForm({ ...form, pay_rate: e.target.value })}
+            />
+            <FormInput
+              label="Invoice amount ($)"
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="e.g. 10400.00"
+              value={form.invoice_amount}
+              onChange={(e) => setForm({ ...form, invoice_amount: e.target.value })}
+            />
+          </div>
+          <FormInput
+            label="Billing month"
+            type="month"
+            value={form.billing_month}
+            onChange={(e) => setForm({ ...form, billing_month: e.target.value })}
+          />
           <SelectInput
             label="Status"
             value={form.status}
@@ -345,6 +425,9 @@ export function Invoices() {
               <Pill tone={statusTone(selected?.status)}>{selected?.status ?? '—'}</Pill>
             </div>
           </div>
+          <Detail label="Billing month" value={formatMonth(selected?.billing_month)} />
+          <Detail label="Pay rate" value={formatMoney(selected?.pay_rate)} />
+          <Detail label="Invoice amount" value={formatMoney(selected?.invoice_amount)} />
           <Detail label="Invoice date" value={formatDate(selected?.invoice_date)} />
           <Detail label="Due date" value={formatDate(selected?.due_date)} />
           <Detail

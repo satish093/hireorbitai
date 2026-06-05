@@ -21,17 +21,38 @@ const writable = {
   invoice_date: z.string().optional().nullable(),
   due_date: z.string().optional().nullable(),
   net_terms_days: z.coerce.number().int().min(0).max(3650).optional().nullable(),
+  // Finance fields (migration 1764000000000). Money is numeric; the frontend
+  // sends null (not '') for an empty amount so z.coerce never turns '' into 0.
+  // billing_month is free text — 'YYYY-MM' from an <input type="month">.
+  pay_rate: z.coerce.number().min(0).max(1_000_000_000).optional().nullable(),
+  invoice_amount: z.coerce.number().min(0).max(1_000_000_000).optional().nullable(),
+  billing_month: z.string().optional().nullable(),
   status: z.enum(INVOICE_STATUSES).optional(),
   notes: z.string().optional().nullable(),
 };
 export const createSchema = z.object(writable).strict();
 export const updateSchema = z.object(writable).partial().strict();
 
+// Columns from migration 1764000000000 that may not be applied in every
+// environment yet. We try the full write first, then strip these and retry on a
+// schema-cache / missing-column error so the backend can deploy ahead of the
+// migration. (Same retry-and-strip pattern used across the codebase.)
+const LATE_COLUMNS = ['pay_rate', 'invoice_amount', 'billing_month'] as const;
+function stripLateColumns(row: Record<string, unknown>): Record<string, unknown> {
+  const out = { ...row };
+  for (const k of LATE_COLUMNS) delete out[k];
+  return out;
+}
+function isMissingColumn(message?: string): boolean {
+  return !!message && /schema cache|column .* does not exist/i.test(message);
+}
+
 // Empty-string → null for the text/date columns (a blank date '' is not a valid
-// Postgres `date`; a blank invoice_number/notes should store as NULL not '').
+// Postgres `date`; a blank invoice_number/notes/billing_month should store as
+// NULL not '').
 function normalize(data: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = { ...data };
-  for (const k of ['invoice_date', 'due_date', 'invoice_number', 'notes']) {
+  for (const k of ['invoice_date', 'due_date', 'invoice_number', 'notes', 'billing_month']) {
     if (out[k] === '') out[k] = null;
   }
   return out;
@@ -65,11 +86,11 @@ export const create: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   const parsed = createSchema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
-  const { data, error } = await db
-    .from('invoices')
-    .insert({ ...normalize(parsed.data), created_by: req.user.id })
-    .select()
-    .single();
+  const row = { ...normalize(parsed.data), created_by: req.user.id };
+  let { data, error } = await db.from('invoices').insert(row).select().single();
+  if (error && isMissingColumn(error.message)) {
+    ({ data, error } = await db.from('invoices').insert(stripLateColumns(row)).select().single());
+  }
   if (error) throw httpError(500, 'Database error');
   res.status(201).json(data);
 };
@@ -79,12 +100,21 @@ export const update: RequestHandler = async (req, res) => {
   const parsed = updateSchema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
   await loadOr404(req.params.id);
-  const { data, error } = await db
+  const row = { ...normalize(parsed.data), updated_at: new Date().toISOString() };
+  let { data, error } = await db
     .from('invoices')
-    .update({ ...normalize(parsed.data), updated_at: new Date().toISOString() })
+    .update(row)
     .eq('id', req.params.id)
     .select()
     .single();
+  if (error && isMissingColumn(error.message)) {
+    ({ data, error } = await db
+      .from('invoices')
+      .update(stripLateColumns(row))
+      .eq('id', req.params.id)
+      .select()
+      .single());
+  }
   if (error) throw httpError(500, 'Database error');
   res.json(data);
 };

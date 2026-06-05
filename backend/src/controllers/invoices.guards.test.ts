@@ -57,6 +57,31 @@ describe('invoices createSchema (.strict mass-assignment guard)', () => {
   it('allows optional fields to be omitted (only consultant + vendor required)', () => {
     expect(createSchema.safeParse({ consultant_name: 'A', vendor_name: 'B' }).success).toBe(true);
   });
+
+  it('accepts the finance fields (pay_rate, invoice_amount, billing_month)', () => {
+    const r = createSchema.safeParse({
+      ...valid,
+      pay_rate: 65,
+      invoice_amount: 10400.5,
+      billing_month: '2026-05',
+    });
+    expect(r.success).toBe(true);
+    // numeric strings coerce to numbers (the form sends string inputs).
+    const s = createSchema.safeParse({ ...valid, pay_rate: '65', invoice_amount: '10400.50' });
+    expect(s.success).toBe(true);
+    if (s.success) {
+      expect(s.data.pay_rate).toBe(65);
+      expect(s.data.invoice_amount).toBe(10400.5);
+    }
+  });
+
+  it('rejects negative money and accepts null for empty money fields', () => {
+    expect(createSchema.safeParse({ ...valid, pay_rate: -1 }).success).toBe(false);
+    expect(createSchema.safeParse({ ...valid, invoice_amount: -0.01 }).success).toBe(false);
+    expect(createSchema.safeParse({ ...valid, pay_rate: null, invoice_amount: null }).success).toBe(
+      true,
+    );
+  });
 });
 
 describe('invoices updateSchema (partial + .strict)', () => {
