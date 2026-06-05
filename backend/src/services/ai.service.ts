@@ -31,7 +31,13 @@ import {
   GROQ_FAST_MODEL,
   GROQ_ENABLED,
 } from '../config/groq';
-import { geminiClient, GEMINI_ENABLED, GEMINI_MODEL, withGeminiRetry } from '../config/gemini';
+import {
+  geminiClient,
+  GEMINI_ENABLED,
+  GEMINI_FALLBACK_ENABLED,
+  GEMINI_MODEL,
+  withGeminiRetry,
+} from '../config/gemini';
 import { logAiUsage } from './aiUsage';
 import {
   withCache,
@@ -497,7 +503,9 @@ async function callGroqStructuredWithFallback<T extends z.ZodType>(
     ...(GROQ_ENABLED
       ? [() => callGroqStructured(callName, systemPrompt, userContent, schema, maxTokens, model)]
       : []),
-    ...(GEMINI_ENABLED
+    // Gemini is opt-in (AI_ALLOW_GEMINI) — a billing-enabled Google key is
+    // charged per call, so by default the free path is Groq → rule-based.
+    ...(GEMINI_FALLBACK_ENABLED
       ? [() => callGeminiStructured(callName, systemPrompt, userContent, schema, maxTokens)]
       : []),
     // Paid Anthropic is opt-in (AI_ALLOW_ANTHROPIC). Off by default — callers
@@ -508,7 +516,7 @@ async function callGroqStructuredWithFallback<T extends z.ZodType>(
   ]);
 }
 
-/** Groq-primary text: Groq → Gemini → (Anthropic only if opted in). */
+/** Groq-primary text: Groq → (Gemini only if opted in) → (Anthropic only if opted in). */
 async function callGroqTextWithFallback(
   callName: string,
   systemPrompt: string,
@@ -517,7 +525,7 @@ async function callGroqTextWithFallback(
 ): Promise<string> {
   return callWithProviders(callName, [
     ...(GROQ_ENABLED ? [() => callGroqText(callName, systemPrompt, userContent, maxTokens)] : []),
-    ...(GEMINI_ENABLED
+    ...(GEMINI_FALLBACK_ENABLED
       ? [() => callGeminiText(callName, systemPrompt, userContent, maxTokens)]
       : []),
     ...(ANTHROPIC_FALLBACK_ENABLED

@@ -4,6 +4,12 @@ import { env } from './env';
 export const GEMINI_ENABLED = Boolean(env.gemini?.apiKey);
 export const GEMINI_MODEL = env.gemini?.model ?? 'gemini-2.5-flash';
 
+// Free-only policy: Gemini is opt-in (like the paid Anthropic fallback) because
+// a billing-enabled Google key is charged per call. The generation fallback
+// chains include Gemini ONLY when AI_ALLOW_GEMINI is true; default keeps the app
+// on Groq → rule-based with no Gemini billing.
+export const GEMINI_FALLBACK_ENABLED = GEMINI_ENABLED && Boolean(env.gemini?.allowFallback);
+
 export const geminiClient = GEMINI_ENABLED ? new GoogleGenerativeAI(env.gemini!.apiKey!) : null;
 
 const GEMINI_RETRY_DELAYS_MS = [1_000, 2_000, 4_000];

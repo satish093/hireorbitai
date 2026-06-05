@@ -104,9 +104,19 @@ const envSchema = z.object({
   TRAINING_AI_PROVIDER: z.enum(['api', 'oauth', 'stub']).default('api'),
   // Free-only policy: the Groq → Gemini → Anthropic generation fallback skips
   // the PAID Anthropic API unless this is explicitly true. Default false keeps
-  // the app on free providers (Groq + Gemini) + the rule-based heuristics, even
-  // if a Claude credential happens to be present (e.g. a CLI login on the box).
+  // the app on Groq + the rule-based heuristics, even if a Claude credential
+  // happens to be present (e.g. a CLI login on the box).
   AI_ALLOW_ANTHROPIC: z
+    .string()
+    .optional()
+    .default('false')
+    .transform((v) => v === 'true' || v === '1'),
+  // Gemini is opt-in for the same reason: a *billing-enabled* Google key is
+  // charged per call (the AI-Studio free-tier key is free, but you can't tell
+  // them apart at runtime). Default false keeps Gemini OUT of the fallback
+  // chain, so the free-by-default path is Groq → rule-based. Set true only with
+  // a free-tier key, or to accept Gemini's per-call cost.
+  AI_ALLOW_GEMINI: z
     .string()
     .optional()
     .default('false')
@@ -393,6 +403,7 @@ export const env = {
     apiKey: e.GEMINI_API_KEY || undefined,
     model: e.GEMINI_MODEL,
     dailyTokenLimit: e.GEMINI_DAILY_TOKEN_LIMIT,
+    allowFallback: e.AI_ALLOW_GEMINI,
   },
   anthropic: {
     apiKey: e.ANTHROPIC_API_KEY,
