@@ -167,10 +167,11 @@ export function JobSearch() {
           <AppliedSubTabs rows={rows} active={appliedSub} onChange={setAppliedSub} />
         )}
 
-        {/* Job grid — each card links to its own detail page at /jobs/:id. */}
+        {/* Single-column job list (Jobright-style) — cards stack top-to-bottom;
+            clicking one opens the side preview drawer. */}
         {loading && page === 1 ? (
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" aria-label="Loading jobs">
-            {Array.from({ length: 6 }).map((_, i) => (
+          <div className="flex flex-col gap-3 max-w-3xl" aria-label="Loading jobs">
+            {Array.from({ length: 4 }).map((_, i) => (
               <SkeletonCard key={i} lines={3} />
             ))}
           </div>
@@ -183,7 +184,7 @@ export function JobSearch() {
                 Showing {visible.length} of {totalRows.toLocaleString()} jobs
               </div>
             )}
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 items-start">
+            <div className="flex flex-col gap-3 max-w-3xl">
               {visible.map((j) => (
                 <JobCard
                   key={j.id}
