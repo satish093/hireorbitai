@@ -5,6 +5,7 @@ import { PageHeader } from '../components/PageHeader';
 import { SkeletonCard } from '../components/Skeleton';
 import { EmptyState } from '../components/EmptyState';
 import { MyResumeCard } from '../components/resumes/MyResumeCard';
+import { AlertFilters } from '../components/jobs/AlertFilters';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
 
@@ -61,7 +62,12 @@ export function MyResume() {
           description="Your recruiter needs to finish setting you up before you can upload a resume."
         />
       ) : (
-        <MyResumeCard consultantId={consultantId} />
+        <div className="space-y-4">
+          <MyResumeCard consultantId={consultantId} />
+          {/* Daily match-email controls — the consultant-reachable home for
+              job alerts (the /jobs page is operator-tier only). */}
+          <AlertFilters />
+        </div>
       )}
     </Layout>
   );

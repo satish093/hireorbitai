@@ -112,6 +112,16 @@ describe('jobs.coverLetter — input + profile guards', () => {
     }
   });
 
+  it('404s when a CONSULTANT requests a cover letter for another consultant_id', async () => {
+    // assertConsultantAccess: a CONSULTANT may only reference their own row
+    // (the mock resolves the caller to consultant id "mine").
+    const { err } = await call({
+      body: { consultant_id: '11111111-1111-1111-1111-111111111111' },
+      user: CONSULTANT,
+    });
+    expect(err?.status).toBe(404);
+  });
+
   it('returns the generated letter on the happy path', async () => {
     const { err, res } = await call({ body: { tone: 'enthusiastic' }, user: CONSULTANT });
     expect(err).toBeNull();

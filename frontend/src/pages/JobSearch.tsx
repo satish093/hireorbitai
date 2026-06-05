@@ -9,7 +9,6 @@ import { EmptyState } from '../components/jobs/EmptyState';
 import { MatchModeChip } from '../components/jobs/MatchModeChip';
 import { AppliedSubTabs } from '../components/jobs/AppliedSubTabs';
 import { AlertsToggle } from '../components/jobs/AlertsToggle';
-import { AlertFilters } from '../components/jobs/AlertFilters';
 import { SkillsPicker } from '../components/jobs/SkillsPicker';
 import { SourceBreakdown } from '../components/jobs/SourceBreakdown';
 import { RecruiterTargetingBar } from '../components/jobs/RecruiterTargetingBar';
@@ -129,7 +128,6 @@ export function JobSearch() {
           <SkillsPicker skills={skills} onChange={saveSkills} onRecompute={() => load()} />
         )}
         {isConsultant && tab === 'recommended' && <AlertsToggle />}
-        {isConsultant && tab === 'recommended' && <AlertFilters />}
 
         <JobTabsBar tab={tab} counts={counts} onTab={setTab} sort={sort} onSort={setSort} />
 

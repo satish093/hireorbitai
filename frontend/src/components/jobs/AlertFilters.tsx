@@ -1,13 +1,16 @@
 import { useEffect, useState, type KeyboardEvent } from 'react';
+import clsx from 'clsx';
 import toast from 'react-hot-toast';
 import { api } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 import { Button } from '../Button';
 import { SelectInput } from '../SelectInput';
 
-// Criteria-based daily-alert filters for consultants. Loads the caller's prefs
-// from /auth/job-alert-prefs, edits locally, and PUTs them back. Self-contained
-// bordered card so it reads correctly on any surface. The on/off switch stays
-// in <AlertsToggle>; this narrows WHAT the daily email contains.
+// Daily job-alert controls for consultants: the master on/off (users.job_alerts
+// via /auth/job-alerts) plus the criteria-based filters (user_job_alert_prefs
+// via /auth/job-alert-prefs) that narrow WHAT the email contains. Self-contained
+// token-styled card so it reads correctly on any surface (it lives on the
+// consultant-reachable /my-resume page).
 
 interface Prefs {
   keywords: string[];
@@ -93,10 +96,29 @@ function ChipInput({
 }
 
 export function AlertFilters() {
+  const { profile } = useAuth();
+  const [enabled, setEnabled] = useState(profile?.job_alerts !== false);
+  const [togglingMaster, setTogglingMaster] = useState(false);
   const [open, setOpen] = useState(false);
   const [prefs, setPrefs] = useState<Prefs>(DEFAULTS);
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  async function toggleEnabled() {
+    if (togglingMaster) return;
+    const next = !enabled;
+    setEnabled(next);
+    setTogglingMaster(true);
+    try {
+      await api.post('/auth/job-alerts', { enabled: next });
+      toast.success(next ? 'Daily job alerts on' : 'Daily job alerts off');
+    } catch {
+      setEnabled(!next);
+      toast.error('Could not update alerts');
+    } finally {
+      setTogglingMaster(false);
+    }
+  }
 
   useEffect(() => {
     let alive = true;
@@ -144,20 +166,55 @@ export function AlertFilters() {
   })();
 
   return (
-    <div className="rounded-xl border border-border bg-surface p-3">
+    <div className="rounded-xl border border-border bg-surface p-4">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-[13px] font-semibold text-ink">🔔 Daily alert filters</div>
-          {loaded && !open && (
-            <div className="text-[12px] text-muted truncate mt-0.5">{summary}</div>
-          )}
+          <div className="text-[14px] font-semibold text-ink">Daily job alerts</div>
+          <div className="text-[12px] text-muted mt-0.5">
+            {enabled
+              ? loaded && !open
+                ? summary
+                : 'Get matched roles emailed to you each day.'
+              : 'Turn on to get matched roles emailed to you each day.'}
+          </div>
         </div>
-        <Button variant="outline" size="sm" onClick={() => setOpen((o) => !o)} disabled={!loaded}>
-          {open ? 'Close' : 'Customize'}
-        </Button>
+        <div className="flex items-center gap-2 shrink-0">
+          {enabled && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setOpen((o) => !o)}
+              disabled={!loaded}
+            >
+              {open ? 'Close' : 'Customize'}
+            </Button>
+          )}
+          <button
+            onClick={toggleEnabled}
+            disabled={togglingMaster}
+            aria-pressed={enabled}
+            aria-label="Toggle daily job alerts"
+            title={enabled ? 'Daily job alerts on' : 'Daily job alerts off'}
+            className="inline-flex items-center disabled:opacity-60"
+          >
+            <span
+              className={clsx(
+                'w-10 h-6 rounded-full p-0.5 transition-colors',
+                enabled ? 'bg-accent' : 'bg-border-strong',
+              )}
+            >
+              <span
+                className={clsx(
+                  'block w-5 h-5 rounded-full bg-white shadow transition-transform',
+                  enabled ? 'translate-x-4' : '',
+                )}
+              />
+            </span>
+          </button>
+        </div>
       </div>
 
-      {open && (
+      {enabled && open && (
         <div className="mt-3 space-y-3">
           <ChipInput
             label="Keywords (title / skills)"

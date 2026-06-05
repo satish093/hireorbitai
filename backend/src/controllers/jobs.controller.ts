@@ -1037,7 +1037,12 @@ export const copilot: RequestHandler = async (req, res) => {
 // ---------------------------------------------------------------------------
 
 const coverLetterSchema = z
-  .object({ tone: z.enum(['professional', 'enthusiastic', 'concise']).optional() })
+  .object({
+    tone: z.enum(['professional', 'enthusiastic', 'concise']).optional(),
+    // On-behalf-of: an operator generates a letter for a consultant they
+    // represent. Omitted = the caller's own consultant profile (rare path).
+    consultant_id: z.string().uuid().optional(),
+  })
   .strict();
 
 export const coverLetter: RequestHandler = async (req, res) => {
@@ -1051,10 +1056,32 @@ export const coverLetter: RequestHandler = async (req, res) => {
   const { data: job, error } = await db.from('jobs').select('*').eq('id', req.params.id).single();
   if (error || !job) throw httpError(404, 'Job not found');
 
-  const consultant = await getConsultantForUser(req.user.id);
-  if (!consultant) throw httpError(400, 'Complete your consultant profile first');
+  // Resolve the target consultant. An explicit consultant_id (operator acting
+  // for a consultant they represent) is ownership-checked via
+  // assertConsultantAccess — a mismatch 404s, same as the rest of this
+  // controller. No id falls back to the caller's own consultant profile.
+  let consultant: {
+    id: string;
+    user_id?: string | null;
+    primary_skill?: string | null;
+    skills?: string[] | null;
+    total_experience_years?: number | null;
+  } | null = null;
+  const explicitId = parsed.data.consultant_id;
+  if (explicitId) {
+    await assertConsultantAccess(req.user, explicitId);
+    const { data } = await db
+      .from('consultants')
+      .select('id, user_id, primary_skill, skills, total_experience_years')
+      .eq('id', explicitId)
+      .maybeSingle();
+    consultant = data ?? null;
+  } else {
+    consultant = await getConsultantForUser(req.user.id);
+  }
+  if (!consultant) throw httpError(400, 'Select a consultant first');
 
-  // Caller's current resume text (same source the copilot uses).
+  // Target consultant's current resume (same source the copilot uses).
   const { data: resume } = await db
     .from('resumes')
     .select('body_text, ai_feedback')
@@ -1063,12 +1090,10 @@ export const coverLetter: RequestHandler = async (req, res) => {
     .maybeSingle();
   const resumeText = resume?.body_text || extractResumeText(resume?.ai_feedback) || null;
 
-  // Candidate name comes from the users row (not on the consultant record).
-  const { data: u } = await db
-    .from('users')
-    .select('full_name')
-    .eq('id', req.user.id)
-    .maybeSingle();
+  // Candidate name comes from the consultant's owning user (or the caller when
+  // generating for their own profile).
+  const nameUserId = consultant.user_id ?? req.user.id;
+  const { data: u } = await db.from('users').select('full_name').eq('id', nameUserId).maybeSingle();
   const name = (u as { full_name?: string } | null)?.full_name ?? null;
 
   const reqs = job.requirements ?? {};

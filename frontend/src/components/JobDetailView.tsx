@@ -3,6 +3,7 @@ import clsx from 'clsx';
 import toast from 'react-hot-toast';
 import { api } from '../services/api';
 import { Avatar } from './TaskBits';
+import { SelectInput } from './SelectInput';
 import {
   Job,
   JobRequirements,
@@ -248,22 +249,84 @@ const COVER_TONES: { key: CoverTone; label: string }[] = [
   { key: 'concise', label: 'Concise' },
 ];
 
+interface ConsultantOption {
+  id: string;
+  user?: { full_name?: string | null; email?: string | null } | null;
+}
+interface ResumeVersion {
+  id: string;
+  version?: number;
+  file_name?: string | null;
+  ai_score?: number | null;
+  is_current?: boolean;
+  created_at?: string;
+  tailored_for_job_id?: string | null;
+}
+
 /**
- * AI cover-letter writer — first-person letter tailored to this job + the
- * caller's current resume. Inline (no overlay), mirroring the JobCopilot
- * Section. The result is editable so the consultant can tweak before sending.
+ * Candidate tools for the recruiter/operator viewing a job: pick a consultant
+ * they represent, then (a) see the resumes already tailored for THIS role and
+ * (b) generate a tailored cover letter on the consultant's behalf. Inline (no
+ * overlay), mirroring the JobCopilot Section. Everything is on-behalf-of, so
+ * the consultant_id flows to ownership-checked endpoints.
  */
-function CoverLetterPanel({ jobId }: { jobId: string }) {
+function CandidateToolsPanel({ job }: { job: Job }) {
+  const [consultants, setConsultants] = useState<ConsultantOption[]>([]);
+  const [consultantId, setConsultantId] = useState('');
+  const [resumes, setResumes] = useState<ResumeVersion[]>([]);
+  const [resumesLoaded, setResumesLoaded] = useState(false);
+
   const [tone, setTone] = useState<CoverTone>('professional');
   const [letter, setLetter] = useState('');
   const [busy, setBusy] = useState(false);
   const [generated, setGenerated] = useState(false);
 
+  useEffect(() => {
+    let alive = true;
+    api
+      .get('/consultants')
+      .then(({ data }) => alive && setConsultants(Array.isArray(data) ? data : []))
+      .catch(() => {
+        /* silent — picker stays empty */
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // Reset + load tailored resumes whenever the selected consultant changes.
+  useEffect(() => {
+    setLetter('');
+    setGenerated(false);
+    if (!consultantId) {
+      setResumes([]);
+      setResumesLoaded(false);
+      return;
+    }
+    let alive = true;
+    setResumesLoaded(false);
+    api
+      .get(`/resumes/consultant/${consultantId}`)
+      .then(({ data }) => {
+        if (!alive) return;
+        const all: ResumeVersion[] = Array.isArray(data) ? data : [];
+        setResumes(all.filter((r) => r.tailored_for_job_id === job.id));
+      })
+      .catch(() => alive && setResumes([]))
+      .finally(() => alive && setResumesLoaded(true));
+    return () => {
+      alive = false;
+    };
+  }, [consultantId, job.id]);
+
   async function generate() {
-    if (busy) return;
+    if (busy || !consultantId) return;
     setBusy(true);
     try {
-      const { data } = await api.post(`/jobs/${jobId}/cover-letter`, { tone });
+      const { data } = await api.post(`/jobs/${job.id}/cover-letter`, {
+        tone,
+        consultant_id: consultantId,
+      });
       setLetter(data?.cover_letter ?? '');
       setGenerated(true);
     } catch (e) {
@@ -285,54 +348,131 @@ function CoverLetterPanel({ jobId }: { jobId: string }) {
     }
   }
 
+  async function download(resumeId: string) {
+    try {
+      const { data } = await api.get(`/resumes/${resumeId}/download-url`);
+      if (data?.url) window.open(data.url, '_blank', 'noopener,noreferrer');
+      else toast.error('No download available for this version.');
+    } catch {
+      toast.error('Could not open that resume.');
+    }
+  }
+
+  const consultantOptions = consultants.map((c) => ({
+    value: c.id,
+    label: c.user?.full_name ?? c.user?.email ?? 'Consultant',
+  }));
+
   return (
-    <Section title="AI Cover Letter">
-      <p className="text-sm text-muted mb-3">
-        Generate a first-person cover letter tailored to this role and your current resume.
-      </p>
-      <div className="flex flex-wrap items-center gap-1.5 mb-3">
-        {COVER_TONES.map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setTone(t.key)}
-            disabled={busy}
-            className={clsx(
-              'text-[11px] px-2.5 py-1 rounded-full border transition disabled:opacity-50',
-              tone === t.key
-                ? 'bg-ink text-bg border-ink'
-                : 'border-border text-muted hover:bg-hover',
+    <Section title="Candidate tools">
+      <SelectInput
+        label="Consultant"
+        value={consultantId}
+        placeholder="— Select a consultant —"
+        options={consultantOptions}
+        onChange={(e) => setConsultantId(e.target.value)}
+      />
+
+      {!consultantId ? (
+        <p className="text-sm text-muted mt-3">
+          Pick a consultant to see resumes already tailored for this role and draft a cover letter
+          for them.
+        </p>
+      ) : (
+        <div className="mt-4 space-y-5">
+          {/* Tailored resumes for THIS role */}
+          <div>
+            <div className="text-[12px] font-semibold text-ink mb-1.5">
+              Tailored resumes for this role
+            </div>
+            {!resumesLoaded ? (
+              <p className="text-sm text-muted">Loading…</p>
+            ) : resumes.length === 0 ? (
+              <p className="text-sm text-muted">
+                None yet — use “Customize &amp; Apply” on the jobs feed to create one.
+              </p>
+            ) : (
+              <ul className="space-y-1.5">
+                {resumes.map((r) => (
+                  <li
+                    key={r.id}
+                    className="flex items-center justify-between gap-3 rounded-lg border border-border bg-hover px-3 py-2"
+                  >
+                    <div className="min-w-0">
+                      <div className="text-[13px] text-ink truncate">
+                        {r.file_name ?? `Version ${r.version ?? '—'}`}
+                        {r.is_current && (
+                          <span className="ml-2 text-[10px] uppercase tracking-wide text-success">
+                            Current
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[11px] text-muted">
+                        {r.ai_score != null ? `ATS ${Math.round(r.ai_score)} · ` : ''}
+                        {r.created_at ? relative(r.created_at) : ''}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => download(r.id)}
+                      className="shrink-0 h-8 px-3 rounded-lg border border-border text-sm hover:bg-surface press"
+                    >
+                      Download
+                    </button>
+                  </li>
+                ))}
+              </ul>
             )}
-          >
-            {t.label}
-          </button>
-        ))}
-        <button
-          onClick={generate}
-          disabled={busy}
-          className="h-8 px-3 ml-auto rounded-lg bg-ink text-bg text-sm font-medium hover:opacity-90 disabled:opacity-50 press"
-        >
-          {busy ? 'Writing…' : generated ? 'Regenerate' : 'Generate'}
-        </button>
-      </div>
-      {generated && (
-        <>
-          <textarea
-            value={letter}
-            onChange={(e) => setLetter(e.target.value)}
-            rows={14}
-            aria-label="Generated cover letter"
-            className="w-full text-sm rounded-lg border border-border p-3 leading-relaxed focus:outline-none focus:ring-2 focus:ring-brand-500/40"
-          />
-          <div className="flex items-center gap-2 mt-2">
-            <button
-              onClick={copy}
-              className="h-8 px-3 rounded-lg border border-border text-sm hover:bg-hover press"
-            >
-              Copy
-            </button>
-            <span className="text-[11px] text-muted">Editable — tweak before you send.</span>
           </div>
-        </>
+
+          {/* Cover letter generator */}
+          <div>
+            <div className="text-[12px] font-semibold text-ink mb-1.5">Cover letter</div>
+            <div className="flex flex-wrap items-center gap-1.5 mb-3">
+              {COVER_TONES.map((t) => (
+                <button
+                  key={t.key}
+                  onClick={() => setTone(t.key)}
+                  disabled={busy}
+                  className={clsx(
+                    'text-[11px] px-2.5 py-1 rounded-full border transition disabled:opacity-50',
+                    tone === t.key
+                      ? 'bg-ink text-bg border-ink'
+                      : 'border-border text-muted hover:bg-hover',
+                  )}
+                >
+                  {t.label}
+                </button>
+              ))}
+              <button
+                onClick={generate}
+                disabled={busy}
+                className="h-8 px-3 ml-auto rounded-lg bg-ink text-bg text-sm font-medium hover:opacity-90 disabled:opacity-50 press"
+              >
+                {busy ? 'Writing…' : generated ? 'Regenerate' : 'Generate'}
+              </button>
+            </div>
+            {generated && (
+              <>
+                <textarea
+                  value={letter}
+                  onChange={(e) => setLetter(e.target.value)}
+                  rows={14}
+                  aria-label="Generated cover letter"
+                  className="w-full text-sm rounded-lg border border-border p-3 leading-relaxed focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+                />
+                <div className="flex items-center gap-2 mt-2">
+                  <button
+                    onClick={copy}
+                    className="h-8 px-3 rounded-lg border border-border text-sm hover:bg-hover press"
+                  >
+                    Copy
+                  </button>
+                  <span className="text-[11px] text-muted">Editable — tweak before you send.</span>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       )}
     </Section>
   );
@@ -487,7 +627,10 @@ export function JobDetailView({ job, isConsultant }: { job: Job; isConsultant: b
         <div className="lg:col-span-2 space-y-4 min-w-0">
           <JobCopilot jobId={job.id} isConsultant={isConsultant} />
 
-          {isConsultant && <CoverLetterPanel jobId={job.id} />}
+          {/* Recruiter/operator candidate tools (tailored resumes + cover
+              letter on behalf of a selected consultant). Consultants don't
+              reach this OPERATOR_TIER page, so this is the real audience. */}
+          {!isConsultant && <CandidateToolsPanel job={job} />}
 
           {(reqs?.highlights ?? []).length > 0 && (
             <Section title="Highlights">
