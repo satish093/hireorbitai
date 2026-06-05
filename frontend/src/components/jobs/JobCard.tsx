@@ -1,19 +1,13 @@
 import clsx from 'clsx';
 import { Button } from '../Button';
 import { useFeatureFlag } from '../../hooks/useFeatureFlags';
-import { MatchRing } from './MatchRing';
+import { MatchRing, matchTone, matchBand } from './MatchRing';
+import { CompanyLogo } from './CompanyLogo';
+import { jobTags, TAG_TONE } from './jobTags';
 import { cleanText } from '../../lib/jobFormat';
-import { relative, prettyRate } from './helpers';
+import { relative } from './helpers';
 import { STATUS_LABEL } from './types';
 import type { AppStatus, JobRow } from './types';
-
-/** Company initials for the avatar block (max 2 chars). */
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return '—';
-  if (parts.length === 1) return parts[0]!.slice(0, 2).toUpperCase();
-  return (parts[0]![0]! + parts[1]![0]!).toUpperCase();
-}
 
 function CheckIcon() {
   return (
@@ -74,6 +68,7 @@ function JobCard({
   const hasSkillSplit = matchedSkills.length > 0 || missingSkills.length > 0;
   const title = cleanText(job.title);
   const location = job.location ? cleanText(job.location) : job.remote ? 'Remote' : 'Location N/A';
+  const tags = jobTags(job);
 
   return (
     // Wrapper establishes an isolated stacking context so the overlay button
@@ -104,15 +99,9 @@ function JobCard({
         className="absolute inset-0 z-0 rounded-xl cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
       />
 
-      {/* Top: initials + title/company + match pill */}
+      {/* Top: logo + title/company + match ring with band label */}
       <div className="flex items-start gap-3">
-        <span
-          className="shrink-0 grid place-items-center rounded-[7px] bg-accent-soft text-accent text-[12px] font-semibold"
-          style={{ width: 34, height: 34 }}
-          aria-hidden="true"
-        >
-          {initials(companyName)}
-        </span>
+        <CompanyLogo name={companyName} applyUrl={job.apply_url} size={40} />
         <div className="flex-1 min-w-0">
           <h3 className="text-[14px] font-semibold text-ink leading-tight truncate">{title}</h3>
           <div className="text-[12px] text-muted truncate mt-0.5">
@@ -120,8 +109,37 @@ function JobCard({
             <span> · {location}</span>
           </div>
         </div>
-        {matchScore != null && <MatchRing score={matchScore} size={46} />}
+        {matchScore != null && (
+          <div className="flex flex-col items-center gap-0.5 shrink-0">
+            <MatchRing score={matchScore} size={46} label="" />
+            <span
+              className={clsx(
+                'text-[9px] font-semibold uppercase tracking-wide leading-none',
+                matchTone(matchScore),
+              )}
+            >
+              {matchBand(matchScore).split(' ')[0]}
+            </span>
+          </div>
+        )}
       </div>
+
+      {/* Tag row — salary, work model, seniority, visa (Jobright-style) */}
+      {tags.length > 0 && (
+        <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+          {tags.map((t) => (
+            <span
+              key={t.label}
+              className={clsx(
+                'inline-flex max-w-[180px] items-center truncate rounded-full border px-2 py-0.5 text-[11px]',
+                TAG_TONE[t.tone],
+              )}
+            >
+              {t.label}
+            </span>
+          ))}
+        </div>
+      )}
 
       {/* "Why you're a great fit" — one-line AI blurb above the skill pills.
           No positioning: stays under the full-card select overlay so a click
@@ -187,10 +205,7 @@ function JobCard({
           relative z-10 ensures action buttons sit above the overlay button. */}
       <div className="relative z-10 mt-3 flex items-center justify-between gap-2">
         <div className="font-mono text-[11px] text-muted truncate">
-          {job.rate_min != null || job.rate_max != null
-            ? prettyRate(job.rate_min, job.rate_max)
-            : '—'}
-          <span className="text-faint"> · {relative(job.posted_at ?? job.created_at)}</span>
+          {relative(job.posted_at ?? job.created_at)}
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
           {onDismiss && (

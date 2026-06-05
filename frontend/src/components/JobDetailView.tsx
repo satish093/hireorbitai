@@ -2,9 +2,10 @@ import { ReactNode, useEffect, useState } from 'react';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
 import { api } from '../services/api';
-import { Avatar } from './TaskBits';
 import { SelectInput } from './SelectInput';
 import { MatchRing } from './jobs/MatchRing';
+import { CompanyLogo } from './jobs/CompanyLogo';
+import { jobTags, TAG_TONE } from './jobs/jobTags';
 import {
   Job,
   JobRequirements,
@@ -600,7 +601,7 @@ export function JobDetailView({
       {/* Company-first header */}
       <div className="bg-surface border border-border rounded-2xl p-5 sm:p-6 shadow-sm min-w-0">
         <div className="flex items-start gap-4 min-w-0">
-          <Avatar name={company} size={56} />
+          <CompanyLogo name={company} applyUrl={job.apply_url} size={56} rounded="rounded-xl" />
           <div className="flex-1 min-w-0">
             <div className="flex items-center flex-wrap gap-2 mb-1">
               <span className="text-xs text-muted">
@@ -617,6 +618,25 @@ export function JobDetailView({
             <div className="text-sm text-muted mt-1 break-words">
               {job.location ? cleanText(job.location) : 'Location N/A'} · {workModel}
             </div>
+            {/* Jobright-style tag chips. */}
+            {(() => {
+              const tags = jobTags(job);
+              return tags.length > 0 ? (
+                <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+                  {tags.map((t) => (
+                    <span
+                      key={t.label}
+                      className={clsx(
+                        'inline-flex items-center rounded-full border px-2 py-0.5 text-[11px]',
+                        TAG_TONE[t.tone],
+                      )}
+                    >
+                      {t.label}
+                    </span>
+                  ))}
+                </div>
+              ) : null;
+            })()}
             <div className="mt-3 hidden sm:block">
               {applyBtn()}
               {googleFallback}

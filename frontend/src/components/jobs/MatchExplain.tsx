@@ -1,5 +1,5 @@
 import clsx from 'clsx';
-import { MatchRing, matchTone } from './MatchRing';
+import { MatchRing, matchTone, matchBand } from './MatchRing';
 
 /** Small check glyph for matched-skill chips. */
 function Check() {
@@ -17,13 +17,13 @@ function Check() {
   );
 }
 
-function band(pct: number): string {
-  if (pct <= 0) return 'Not scored yet';
-  if (pct >= 85) return 'Excellent match';
-  if (pct >= 70) return 'Strong match';
-  if (pct >= 55) return 'Fair match';
-  if (pct >= 40) return 'Partial match';
-  return 'Weak match';
+/** Bar-fill color by band (mirrors matchTone, as a bg-* class). */
+function barFill(pct: number): string {
+  if (pct >= 85) return 'bg-emerald-500';
+  if (pct >= 70) return 'bg-sky-500';
+  if (pct >= 55) return 'bg-amber-500';
+  if (pct >= 40) return 'bg-orange-500';
+  return 'bg-rose-500';
 }
 
 /**
@@ -49,6 +49,7 @@ export function MatchExplain({
   const pct = Math.max(0, Math.min(100, Math.round(score)));
   const tone = matchTone(pct);
   const total = matched.length + missing.length;
+  const skillPct = total > 0 ? Math.round((matched.length / total) * 100) : 0;
 
   return (
     <div className={clsx('rounded-2xl border border-border bg-surface p-4 shadow-sm', className)}>
@@ -56,7 +57,7 @@ export function MatchExplain({
         <MatchRing score={pct} size={56} label="" />
         <div className="min-w-0">
           <div className={clsx('text-sm font-semibold', tone)}>
-            {band(pct)} · {pct}%
+            {matchBand(pct)} · {pct}%
           </div>
           <div className="text-[12px] text-muted">
             {total > 0
@@ -67,6 +68,24 @@ export function MatchExplain({
       </div>
 
       {why && <p className="mt-2.5 text-[13px] leading-snug text-ink-2">{why}</p>}
+
+      {/* Skill-match breakdown bar (Jobright-style). */}
+      {total > 0 && (
+        <div className="mt-3">
+          <div className="mb-1 flex items-center justify-between text-[11px]">
+            <span className="text-muted">Skill match</span>
+            <span className="font-mono tabular-nums text-ink-2">
+              {matched.length}/{total}
+            </span>
+          </div>
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-bg-sunken">
+            <div
+              className={clsx('h-full rounded-full transition-all duration-500', barFill(skillPct))}
+              style={{ width: `${skillPct}%` }}
+            />
+          </div>
+        </div>
+      )}
 
       {total > 0 && (
         <div className="mt-3 flex flex-wrap gap-1.5">

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Layout } from '../components/Layout';
 import { api } from '../services/api';
 import { invalidate } from '../hooks/useInvalidate';
@@ -18,9 +18,25 @@ import { JobTabsBar } from '../components/jobs/JobTabsBar';
 import { JobFilterBar } from '../components/jobs/JobFilterBar';
 import { JobModals } from '../components/jobs/JobModals';
 import { JobPreviewDrawer } from '../components/jobs/JobPreviewDrawer';
+import { JobDetailPane } from '../components/jobs/JobDetailPane';
 import { useJobSearch } from '../components/jobs/useJobSearch';
 
+/** lg+ → desktop master-detail split; below → mobile overlay drawer. */
+function useIsDesktop(): boolean {
+  const [desktop, setDesktop] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches,
+  );
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const onChange = () => setDesktop(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  return desktop;
+}
+
 export function JobSearch() {
+  const isDesktop = useIsDesktop();
   const {
     isManager,
     isConsultant,
@@ -167,69 +183,102 @@ export function JobSearch() {
           <AppliedSubTabs rows={rows} active={appliedSub} onChange={setAppliedSub} />
         )}
 
-        {/* Single-column job list (Jobright-style) — cards stack top-to-bottom;
-            clicking one opens the side preview drawer. */}
-        {loading && page === 1 ? (
-          <div className="flex flex-col gap-3 max-w-3xl" aria-label="Loading jobs">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <SkeletonCard key={i} lines={3} />
-            ))}
+        {/* Master-detail (Jobright-style): scrollable job list on the left, a
+            persistent detail pane on the right (lg+). Below lg the list is
+            full-width and a tapped card opens the overlay drawer instead. */}
+        <div className="lg:grid lg:grid-cols-[minmax(330px,390px)_1fr] lg:gap-4 lg:items-start">
+          {/* LEFT — job list */}
+          <div className="min-w-0">
+            {loading && page === 1 ? (
+              <div className="flex flex-col gap-3" aria-label="Loading jobs">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <SkeletonCard key={i} lines={3} />
+                ))}
+              </div>
+            ) : visible.length === 0 ? (
+              <EmptyState tab={tab} onSync={isManager ? syncNow : undefined} />
+            ) : (
+              <>
+                {tab === 'recommended' && totalRows > 0 && (
+                  <div className="text-xs text-muted px-1 mb-3">
+                    Showing {visible.length} of {totalRows.toLocaleString()} jobs
+                  </div>
+                )}
+                <div className="flex flex-col gap-3">
+                  {visible.map((j) => (
+                    <JobCard
+                      key={j.id}
+                      job={j}
+                      selected={preview?.id === j.id}
+                      onSelect={() =>
+                        setPreview({
+                          id: j.id,
+                          score: j.match_score ?? null,
+                          why: j.match_why ?? null,
+                          matched: j.match_matched_skills ?? [],
+                          missing: j.match_missing_skills ?? [],
+                        })
+                      }
+                      onToggleLike={() => toggleLike(j)}
+                      onDismiss={tab === 'recommended' ? () => dismissJob(j) : undefined}
+                      onApply={() => handleApplyClick(j)}
+                      onChangeStatus={
+                        j.application_id
+                          ? async (next) => {
+                              const appId = j.application_id;
+                              if (!appId) return;
+                              setRows((rs) =>
+                                rs.map((r) =>
+                                  r.id === j.id ? { ...r, application_status: next } : r,
+                                ),
+                              );
+                              try {
+                                await api.patch(`/applications/${appId}`, { status: next });
+                                invalidate('applications');
+                              } catch (e: any) {
+                                toast.error(e?.response?.data?.error ?? 'Failed to update status');
+                                load(tab);
+                              }
+                            }
+                          : undefined
+                      }
+                    />
+                  ))}
+                </div>
+                {tab === 'recommended' && page < totalPages && (
+                  <div ref={loadMoreRef} className="py-6 text-center text-xs text-muted">
+                    {loading ? 'Loading more…' : 'Scroll for more'}
+                  </div>
+                )}
+              </>
+            )}
           </div>
-        ) : visible.length === 0 ? (
-          <EmptyState tab={tab} onSync={isManager ? syncNow : undefined} />
-        ) : (
-          <>
-            {tab === 'recommended' && totalRows > 0 && (
-              <div className="text-xs text-muted px-1 mb-3">
-                Showing {visible.length} of {totalRows.toLocaleString()} jobs
-              </div>
-            )}
-            <div className="flex flex-col gap-3 max-w-3xl">
-              {visible.map((j) => (
-                <JobCard
-                  key={j.id}
-                  job={j}
-                  selected={preview?.id === j.id}
-                  onSelect={() =>
-                    setPreview({
-                      id: j.id,
-                      score: j.match_score ?? null,
-                      why: j.match_why ?? null,
-                      matched: j.match_matched_skills ?? [],
-                      missing: j.match_missing_skills ?? [],
-                    })
-                  }
-                  onToggleLike={() => toggleLike(j)}
-                  onDismiss={tab === 'recommended' ? () => dismissJob(j) : undefined}
-                  onApply={() => handleApplyClick(j)}
-                  onChangeStatus={
-                    j.application_id
-                      ? async (next) => {
-                          const appId = j.application_id;
-                          if (!appId) return;
-                          setRows((rs) =>
-                            rs.map((r) => (r.id === j.id ? { ...r, application_status: next } : r)),
-                          );
-                          try {
-                            await api.patch(`/applications/${appId}`, { status: next });
-                            invalidate('applications');
-                          } catch (e: any) {
-                            toast.error(e?.response?.data?.error ?? 'Failed to update status');
-                            load(tab);
-                          }
-                        }
-                      : undefined
-                  }
+
+          {/* RIGHT — persistent detail pane (desktop only) */}
+          {isDesktop && (
+            <div className="sticky top-4 hidden h-[calc(100dvh-6.5rem)] overflow-hidden rounded-2xl border border-border bg-surface shadow-sm lg:block">
+              {preview ? (
+                <JobDetailPane
+                  key={preview.id}
+                  jobId={preview.id}
+                  matchScore={preview.score}
+                  matchWhy={preview.why}
+                  matchedSkills={preview.matched}
+                  missingSkills={preview.missing}
+                  isConsultant={isConsultant}
+                  className="h-full"
                 />
-              ))}
+              ) : (
+                <div className="grid h-full place-items-center p-8 text-center">
+                  <p className="max-w-[220px] text-sm text-muted">
+                    Select a job on the left to preview its match, requirements, and apply — all
+                    without leaving the list.
+                  </p>
+                </div>
+              )}
             </div>
-            {tab === 'recommended' && page < totalPages && (
-              <div ref={loadMoreRef} className="py-6 text-center text-xs text-muted">
-                {loading ? 'Loading more…' : 'Scroll for more'}
-              </div>
-            )}
-          </>
-        )}
+          )}
+        </div>
       </div>
 
       <JobModals
@@ -255,15 +304,18 @@ export function JobSearch() {
         recordApplication={recordApplication}
       />
 
-      <JobPreviewDrawer
-        jobId={preview?.id ?? null}
-        matchScore={preview?.score ?? null}
-        matchWhy={preview?.why ?? null}
-        matchedSkills={preview?.matched ?? []}
-        missingSkills={preview?.missing ?? []}
-        isConsultant={isConsultant}
-        onClose={() => setPreview(null)}
-      />
+      {/* Mobile/tablet only — on desktop the detail lives in the split pane. */}
+      {!isDesktop && (
+        <JobPreviewDrawer
+          jobId={preview?.id ?? null}
+          matchScore={preview?.score ?? null}
+          matchWhy={preview?.why ?? null}
+          matchedSkills={preview?.matched ?? []}
+          missingSkills={preview?.missing ?? []}
+          isConsultant={isConsultant}
+          onClose={() => setPreview(null)}
+        />
+      )}
     </Layout>
   );
 }

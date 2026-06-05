@@ -16,6 +16,17 @@ export function matchTone(score: number): string {
   return 'text-rose-500';
 }
 
+/** Jobright-style word band for a match score, paired with {@link matchTone}. */
+export function matchBand(score: number): string {
+  const pct = Math.max(0, Math.min(100, Math.round(score)));
+  if (pct <= 0) return 'Not scored';
+  if (pct >= 85) return 'Strong match';
+  if (pct >= 70) return 'Good match';
+  if (pct >= 55) return 'Fair match';
+  if (pct >= 40) return 'Partial match';
+  return 'Weak match';
+}
+
 /**
  * Circular AI-match score ring (Jobright-style). Pure SVG, no deps. The track +
  * progress arc both use currentColor via {@link matchTone} so it themes

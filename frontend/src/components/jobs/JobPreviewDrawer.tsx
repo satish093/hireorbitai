@@ -1,22 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
-import { api } from '../../services/api';
-import { JobDetailView } from '../JobDetailView';
-import { SkeletonCard } from '../Skeleton';
-import { MatchExplain } from './MatchExplain';
-import { resolveApplyUrl, type Job } from '../../lib/jobFormat';
+import { JobDetailPane } from './JobDetailPane';
 
 /**
- * Jobright-style right-edge preview drawer. Clicking a card in the feed opens
- * this instead of navigating to /jobs/:id, so the user keeps their place in the
- * list. It fetches the full job (same payload as the detail page) and reuses
- * <JobDetailView> verbatim — including the recruiter "Candidate tools" panel.
- *
- * Follows the shared modal rules: portaled to <body> (so the fixed overlay
- * anchors to the viewport, not the transformed <main>), full-screen blurred
- * backdrop, Escape-to-close, body scroll lock. The panel anchors to the right
- * edge (flex justify-end) and slides in via animate-slide-in-panel.
+ * Mobile/tablet preview: a right-edge drawer that renders <JobDetailPane>.
+ * (On desktop the same pane lives inline in the master-detail split, so the
+ * drawer is only mounted below lg.) Follows the shared modal rules: portaled to
+ * <body>, full-screen blurred backdrop, Escape-to-close, body scroll lock.
  */
 export function JobPreviewDrawer({
   jobId,
@@ -35,27 +26,7 @@ export function JobPreviewDrawer({
   isConsultant: boolean;
   onClose: () => void;
 }) {
-  const [job, setJob] = useState<Job | null>(null);
-  const [loading, setLoading] = useState(false);
   const open = jobId != null;
-
-  useEffect(() => {
-    if (!jobId) {
-      setJob(null);
-      return;
-    }
-    let alive = true;
-    setLoading(true);
-    setJob(null);
-    api
-      .get(`/jobs/${jobId}`)
-      .then((r) => alive && setJob(r.data as Job))
-      .catch(() => alive && setJob(null))
-      .finally(() => alive && setLoading(false));
-    return () => {
-      alive = false;
-    };
-  }, [jobId]);
 
   useEffect(() => {
     if (!open) return;
@@ -85,70 +56,38 @@ export function JobPreviewDrawer({
       aria-label="Job preview"
     >
       <div
-        className="relative h-dvh w-full max-w-3xl bg-bg shadow-2xl overflow-y-auto animate-slide-in-panel safe-pb"
+        className="relative flex h-dvh w-full max-w-3xl flex-col bg-bg shadow-2xl animate-slide-in-panel"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Sticky header: title + close + full-page escape hatch. The focal
-            match ring lives in the JobDetailView header just below. */}
-        <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-border bg-bg/95 backdrop-blur px-4 py-3 safe-pt">
-          <span className="text-sm font-semibold text-ink truncate min-w-0">Job preview</span>
-          <div className="flex items-center gap-3 shrink-0">
-            {jobId && (
-              <Link
-                to={`/jobs/${jobId}`}
-                onClick={onClose}
-                className="text-xs text-muted hover:text-ink whitespace-nowrap"
-              >
-                Open full page ↗
-              </Link>
-            )}
+        <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-border bg-bg/95 px-4 py-3 backdrop-blur safe-pt">
+          <span className="min-w-0 truncate text-sm font-semibold text-ink">Job preview</span>
+          <div className="flex shrink-0 items-center gap-3">
+            <Link
+              to={`/jobs/${jobId}`}
+              onClick={onClose}
+              className="whitespace-nowrap text-xs text-muted hover:text-ink"
+            >
+              Open full page ↗
+            </Link>
             <button
               onClick={onClose}
               aria-label="Close preview"
-              className="w-8 h-8 inline-flex items-center justify-center rounded-lg text-muted hover:text-ink hover:bg-hover transition press"
+              className="press inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted transition hover:bg-hover hover:text-ink"
             >
               ✕
             </button>
           </div>
         </div>
 
-        <div className="p-4 pb-24">
-          {/* Why this score — the card the user clicked carries the per-consultant
-              match context; the fetched job payload does not. Shown first so the
-              answer to "why this number?" is the top of the preview. */}
-          {typeof matchScore === 'number' && (
-            <MatchExplain
-              score={matchScore}
-              why={matchWhy ?? null}
-              matched={matchedSkills}
-              missing={missingSkills}
-              className="mb-4"
-            />
-          )}
-          {loading || !job ? (
-            <div className="space-y-4">
-              <SkeletonCard />
-              <SkeletonCard />
-            </div>
-          ) : (
-            // No headlineScore here — MatchExplain above already owns the ring.
-            <JobDetailView job={job} isConsultant={isConsultant} />
-          )}
-        </div>
-
-        {/* Sticky apply bar — always reachable while scrolling the long detail. */}
-        {job && (
-          <div className="sticky bottom-0 z-10 border-t border-border bg-bg/95 backdrop-blur px-4 py-3 safe-pb">
-            <a
-              href={resolveApplyUrl(job)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-center gap-1.5 w-full bg-ink text-bg text-sm font-medium px-4 py-2.5 rounded-lg hover:opacity-90 press"
-            >
-              Apply on company site <span aria-hidden="true">↗</span>
-            </a>
-          </div>
-        )}
+        <JobDetailPane
+          jobId={jobId}
+          matchScore={matchScore}
+          matchWhy={matchWhy}
+          matchedSkills={matchedSkills}
+          missingSkills={missingSkills}
+          isConsultant={isConsultant}
+          className="flex-1"
+        />
       </div>
     </div>,
     document.body,
