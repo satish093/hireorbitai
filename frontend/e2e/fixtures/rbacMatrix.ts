@@ -363,12 +363,20 @@ export const RBAC_MATRIX: RoutePolicy[] = [
   {
     path: '/admin/features',
     sidebarLabel: 'Feature Flags',
+    // Page (and sidebar link) READ access is ADMIN_TIER — CTO + Director need
+    // visibility into flag state — matching the route guard (App.tsx:
+    // allow={ADMIN_TIER} capability="feature_flags") and the backend read gate
+    // (requireRoleOrCapability(ADMIN_TIER, 'feature_flags')). WRITES are
+    // OWNER_TIER only, enforced server-side; this `allow` governs visibility,
+    // not mutation. (Was OWNER_TIER, which contradicted all three and only
+    // surfaced once the ManagerDashboard crash stopped masking the sidebar.)
     section: 'Admin',
-    allow: OWNER_TIER,
+    allow: ADMIN_TIER,
     capability: 'feature_flags',
-    backendGate: 'read: ADMIN_TIER; write: requireRoleOrCapability(OWNER_TIER, feature_flags)',
+    backendGate:
+      'read: requireRoleOrCapability(ADMIN_TIER, feature_flags); write: requireRole(OWNER_TIER)',
     scope: 'global',
-    primaryActions: ['toggle flags + group overrides (OWNER_TIER: SUPER_ADMIN + CEO)'],
+    primaryActions: ['read flag state (ADMIN_TIER); toggle flags + group overrides (OWNER_TIER)'],
     workspaceWideException:
       'Feature-flag writes are OWNER_TIER (SUPER_ADMIN + CEO) — CEO owner power is intentional. CTO/DIRECTOR can read but not write. See capability.guard.test.ts feature-flag gate test.',
   },
