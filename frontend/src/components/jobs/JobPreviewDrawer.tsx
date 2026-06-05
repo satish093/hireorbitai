@@ -4,8 +4,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../../services/api';
 import { JobDetailView } from '../JobDetailView';
 import { SkeletonCard } from '../Skeleton';
-import { MatchRing } from './MatchRing';
-import type { Job } from '../../lib/jobFormat';
+import { resolveApplyUrl, type Job } from '../../lib/jobFormat';
 
 /**
  * Jobright-style right-edge preview drawer. Clicking a card in the feed opens
@@ -82,12 +81,10 @@ export function JobPreviewDrawer({
         className="relative h-dvh w-full max-w-3xl bg-bg shadow-2xl overflow-y-auto animate-slide-in-panel safe-pb"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Sticky header: match ring + close + full-page escape hatch. */}
+        {/* Sticky header: title + close + full-page escape hatch. The focal
+            match ring lives in the JobDetailView header just below. */}
         <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-border bg-bg/95 backdrop-blur px-4 py-3 safe-pt">
-          <div className="flex items-center gap-3 min-w-0">
-            {typeof matchScore === 'number' && <MatchRing score={matchScore} size={40} label="" />}
-            <span className="text-sm font-semibold text-ink truncate">Job preview</span>
-          </div>
+          <span className="text-sm font-semibold text-ink truncate min-w-0">Job preview</span>
           <div className="flex items-center gap-3 shrink-0">
             {jobId && (
               <Link
@@ -108,16 +105,30 @@ export function JobPreviewDrawer({
           </div>
         </div>
 
-        <div className="p-4">
+        <div className="p-4 pb-24">
           {loading || !job ? (
             <div className="space-y-4">
               <SkeletonCard />
               <SkeletonCard />
             </div>
           ) : (
-            <JobDetailView job={job} isConsultant={isConsultant} />
+            <JobDetailView job={job} isConsultant={isConsultant} headlineScore={matchScore} />
           )}
         </div>
+
+        {/* Sticky apply bar — always reachable while scrolling the long detail. */}
+        {job && (
+          <div className="sticky bottom-0 z-10 border-t border-border bg-bg/95 backdrop-blur px-4 py-3 safe-pb">
+            <a
+              href={resolveApplyUrl(job)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-1.5 w-full bg-ink text-bg text-sm font-medium px-4 py-2.5 rounded-lg hover:opacity-90 press"
+            >
+              Apply on company site <span aria-hidden="true">↗</span>
+            </a>
+          </div>
+        )}
       </div>
     </div>,
     document.body,

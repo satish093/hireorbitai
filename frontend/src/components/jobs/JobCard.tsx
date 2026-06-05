@@ -64,6 +64,12 @@ function JobCard({
     (job.match_reasons?.length ? job.match_reasons : null) ??
     (reqs.required_skills?.length ? reqs.required_skills : job.required_skills) ??
     [];
+  // Structured matched/missing skills (recommended feed, when a consultant is
+  // in context). When present we render green/muted chips instead of the
+  // free-text reasons; otherwise fall back to the reasons pills.
+  const matchedSkills = job.match_matched_skills ?? [];
+  const missingSkills = job.match_missing_skills ?? [];
+  const hasSkillSplit = matchedSkills.length > 0 || missingSkills.length > 0;
   const location = job.location ?? (job.remote ? 'Remote' : 'Location N/A');
 
   return (
@@ -124,8 +130,38 @@ function JobCard({
         </p>
       )}
 
-      {/* Match reasons — top 3 as check-pills with +N overflow */}
-      {reasons.length > 0 && (
+      {/* Skills: matched (green ✓) + missing (muted) chips when we have the
+          structured split; otherwise the free-text reasons as check-pills. */}
+      {hasSkillSplit ? (
+        <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+          {matchedSkills.slice(0, 4).map((s) => (
+            <span
+              key={`m-${s}`}
+              className="inline-flex items-center gap-1 rounded-full bg-success-soft border border-success/30 px-1.5 py-0.5 text-[11px] text-success max-w-[140px]"
+              title={`You have: ${s}`}
+            >
+              <span className="shrink-0">
+                <CheckIcon />
+              </span>
+              <span className="truncate">{s}</span>
+            </span>
+          ))}
+          {missingSkills.slice(0, 3).map((s) => (
+            <span
+              key={`x-${s}`}
+              className="inline-flex items-center rounded-full bg-bg-sunken border border-border px-1.5 py-0.5 text-[11px] text-muted max-w-[140px]"
+              title={`Not on the profile yet: ${s}`}
+            >
+              <span className="truncate">{s}</span>
+            </span>
+          ))}
+          {matchedSkills.length + missingSkills.length > 7 && (
+            <span className="text-[11px] font-mono text-faint">
+              +{matchedSkills.length + missingSkills.length - 7}
+            </span>
+          )}
+        </div>
+      ) : reasons.length > 0 ? (
         <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
           {reasons.slice(0, 3).map((r) => (
             <span
@@ -142,7 +178,7 @@ function JobCard({
             <span className="text-[11px] font-mono text-faint">+{reasons.length - 3}</span>
           )}
         </div>
-      )}
+      ) : null}
 
       {/* Footer: comp + posted (mono) · save + apply.
           relative z-10 ensures action buttons sit above the overlay button. */}

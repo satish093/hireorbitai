@@ -60,6 +60,10 @@ export interface JobRow {
   match_reasons?: string[];
   /** One-sentence "Why you're a great fit" blurb from the match engine. */
   match_why?: string | null;
+  /** Consultant skills that overlap the job's required skills (recommended feed). */
+  match_matched_skills?: string[];
+  /** Required skills the consultant is missing (recommended feed). */
+  match_missing_skills?: string[];
   application_id?: string;
   application_status?: AppStatus | string;
   applied_at?: string;

@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { api } from '../services/api';
 import { Avatar } from './TaskBits';
 import { SelectInput } from './SelectInput';
+import { MatchRing } from './jobs/MatchRing';
 import {
   Job,
   JobRequirements,
@@ -478,7 +479,16 @@ function CandidateToolsPanel({ job }: { job: Job }) {
   );
 }
 
-export function JobDetailView({ job, isConsultant }: { job: Job; isConsultant: boolean }) {
+export function JobDetailView({
+  job,
+  isConsultant,
+  headlineScore,
+}: {
+  job: Job;
+  isConsultant: boolean;
+  /** AI match score from the feed — shown as a ring in the header when present. */
+  headlineScore?: number | null;
+}) {
   const [reqs, setReqs] = useState<JobRequirements | null | undefined>(job.requirements);
   const [enriching, setEnriching] = useState(false);
 
@@ -607,6 +617,7 @@ export function JobDetailView({ job, isConsultant }: { job: Job; isConsultant: b
               {googleFallback}
             </div>
           </div>
+          {typeof headlineScore === 'number' && <MatchRing score={headlineScore} size={64} />}
         </div>
         {/* Apply is full-width under the header on mobile. */}
         <div className="mt-3 sm:hidden">

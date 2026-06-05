@@ -518,7 +518,10 @@ export const recommended: RequestHandler = async (req, res) => {
   // every card even when the AI ranker is unreachable / rate-limited. The
   // AI score, when it returns, overrides this baseline.
   const consultantSkills = skillsForMatching(consultant ?? {});
-  const baselineById = new Map<string, { score: number; reasons: string[]; why: string }>();
+  const baselineById = new Map<
+    string,
+    { score: number; reasons: string[]; why: string; matched: string[]; missing: string[] }
+  >();
   if (consultant && consultantSkills.length > 0) {
     const mine = new Set(consultantSkills.map((s) => s.toLowerCase()));
     for (const j of ranked) {
@@ -531,6 +534,8 @@ export const recommended: RequestHandler = async (req, res) => {
           score: 50,
           reasons: ['No required-skills metadata yet — score is a placeholder.'],
           why: 'We need this job enriched before we can explain the fit — try the AI match.',
+          matched: [],
+          missing: [],
         });
         continue;
       }
@@ -554,7 +559,13 @@ export const recommended: RequestHandler = async (req, res) => {
           : score >= 75
             ? `You're a strong fit — you've got ${overlap.slice(0, 3).join(', ')} from their must-haves.`
             : `Decent fit on ${overlap.slice(0, 2).join(', ')}${missing.length ? `, but they also want ${missing.slice(0, 2).join(', ')}` : ''}.`;
-      baselineById.set(j.id, { score, reasons, why });
+      baselineById.set(j.id, {
+        score,
+        reasons,
+        why,
+        matched: overlap.slice(0, 8),
+        missing: missing.slice(0, 8),
+      });
     }
   } else if (consultant) {
     // No skills on the consultant — every job gets a 0 with a hint.
@@ -563,6 +574,8 @@ export const recommended: RequestHandler = async (req, res) => {
         score: 0,
         reasons: ['Add skills to your profile to get matched.'],
         why: 'Add skills or upload a resume on your profile and we’ll explain why each job fits.',
+        matched: [],
+        missing: [],
       });
     }
   }
@@ -587,12 +600,21 @@ export const recommended: RequestHandler = async (req, res) => {
   ranked = ranked.map((j: any) => {
     const base = baselineById.get(j.id);
     return base
-      ? { ...j, match_score: base.score, match_reasons: base.reasons, match_why: base.why }
+      ? {
+          ...j,
+          match_score: base.score,
+          match_reasons: base.reasons,
+          match_why: base.why,
+          match_matched_skills: base.matched,
+          match_missing_skills: base.missing,
+        }
       : {
           ...j,
           match_score: j.match_score ?? null,
           match_reasons: j.match_reasons ?? [],
           match_why: j.match_why ?? null,
+          match_matched_skills: j.match_matched_skills ?? [],
+          match_missing_skills: j.match_missing_skills ?? [],
         };
   });
 

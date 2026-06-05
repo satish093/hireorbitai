@@ -92,14 +92,8 @@ export function JobDetail() {
           ← Back to jobs
         </Link>
 
-        {/* AI match pill — desktop only (mobile sees it inline) */}
-        {matchScore != null && (
-          <div className="hidden md:flex items-center gap-1.5">
-            <MatchPill score={matchScore} />
-          </div>
-        )}
-
-        {/* Desktop submit CTA */}
+        {/* Desktop submit CTA. The AI match score now lives as a ring in the
+            JobDetailView header (no separate breadcrumb pill). */}
         {isRecruiterMode && job && (
           <Button
             variant="accent"
@@ -110,13 +104,6 @@ export function JobDetail() {
           </Button>
         )}
       </div>
-
-      {/* Mobile: AI match pill inline */}
-      {matchScore != null && (
-        <div className="md:hidden flex items-center gap-2 mb-3">
-          <MatchPill score={matchScore} />
-        </div>
-      )}
 
       {loading ? (
         <div className="max-w-5xl mx-auto space-y-4">
@@ -141,7 +128,7 @@ export function JobDetail() {
       ) : (
         /* Extra padding on mobile so the StickyActionBar doesn't overlap content */
         <div className={clsx('space-y-5', isRecruiterMode && 'pb-20 md:pb-0')}>
-          <JobDetailView job={job} isConsultant={isConsultant} />
+          <JobDetailView job={job} isConsultant={isConsultant} headlineScore={matchScore} />
           {isRecruiterMode && (
             <div className="grid gap-4 lg:grid-cols-2 items-start">
               <BenchMatchesCard
@@ -191,22 +178,5 @@ export function JobDetail() {
         />
       )}
     </Layout>
-  );
-}
-
-// ── AI match pill ─────────────────────────────────────────────────────────
-
-function MatchPill({ score }: { score: number }) {
-  const color = score >= 88 ? 'var(--emerald)' : score >= 75 ? 'var(--blue)' : 'var(--amber)';
-  return (
-    <span
-      className="inline-flex items-center gap-1 text-[12px] font-bold px-2 py-0.5 rounded-lg"
-      style={{
-        color,
-        background: `color-mix(in srgb, ${color} 12%, transparent)`,
-      }}
-    >
-      ✦ {score}% match
-    </span>
   );
 }
