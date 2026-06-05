@@ -24,6 +24,27 @@ interface Summary {
   applications_by_status: Record<string, number>;
 }
 
+/**
+ * Coerce a possibly-partial /reports/manager-summary payload into a fully
+ * shaped Summary. The render is gated by `summary &&`, but a truthy-but-partial
+ * body (empty {} or a missing map) slipped past that guard and crashed on
+ * `summary.consultants_by_status.ACTIVE` — white-screening the whole dashboard.
+ * Normalising on set defends every downstream field access at once.
+ */
+function normalizeSummary(d: unknown): Summary {
+  const o = (d ?? {}) as Partial<Summary>;
+  const rec = (v: unknown): Record<string, number> =>
+    v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, number>) : {};
+  const num = (v: unknown): number => (typeof v === 'number' ? v : 0);
+  return {
+    consultants_by_status: rec(o.consultants_by_status),
+    recruiters_count: num(o.recruiters_count),
+    active_jobs: num(o.active_jobs),
+    last_7_day_applications: num(o.last_7_day_applications),
+    applications_by_status: rec(o.applications_by_status),
+  };
+}
+
 interface TaskMetrics {
   total: number;
   open: number;
@@ -82,7 +103,7 @@ export function ManagerDashboard() {
   useEffect(() => {
     api
       .get('/reports/manager-summary')
-      .then((r) => setSummary(r.data))
+      .then((r) => setSummary(normalizeSummary(r.data)))
       .catch((e) =>
         pushError('summary', e?.response?.data?.error ?? 'reports/manager-summary failed'),
       );
