@@ -41,4 +41,7 @@ authRouter.post('/sync', requireAuth, auth.syncProfile);
 authRouter.post('/change-password', requireAuth, auth.changePassword);
 authRouter.post('/complete-tour', requireAuth, auth.completeTour);
 authRouter.post('/job-alerts', requireAuth, auth.setJobAlerts);
+// Criteria-based alert filters (keywords / locations / remote / min match).
+authRouter.get('/job-alert-prefs', requireAuth, auth.getJobAlertPrefs);
+authRouter.put('/job-alert-prefs', requireAuth, auth.setJobAlertPrefs);
 authRouter.post('/logout', requireAuth, auth.logout);

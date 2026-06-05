@@ -46,6 +46,15 @@ interface JobCandidate {
   description: string | null;
   required_skills: string[] | null;
   source: string | null;
+  remote: boolean | null;
+}
+
+/** Per-user criteria-based alert filters (table: user_job_alert_prefs). */
+interface AlertPrefs {
+  keywords: string[];
+  locations: string[];
+  remote_only: boolean;
+  min_match: number;
 }
 
 export interface DigestReport {
@@ -87,6 +96,32 @@ function plausibleJobs(consultantSkills: string[], jobs: JobCandidate[]): JobCan
     .map((s) => s.j);
 }
 
+/** True when a job clears the user's criteria-based alert filters (if any). */
+function isRemoteJob(j: JobCandidate): boolean {
+  return j.remote === true || /\bremote\b/i.test(j.location ?? '');
+}
+
+function matchesAlertPrefs(job: JobCandidate, prefs: AlertPrefs): boolean {
+  if (prefs.remote_only && !isRemoteJob(job)) return false;
+  if (prefs.locations.length > 0) {
+    const loc = (job.location ?? '').toLowerCase();
+    const hit = isRemoteJob(job) || prefs.locations.some((l) => loc.includes(l.toLowerCase()));
+    if (!hit) return false;
+  }
+  if (prefs.keywords.length > 0) {
+    const hay = (
+      (job.title ?? '') +
+      ' ' +
+      (job.required_skills ?? []).join(' ') +
+      ' ' +
+      (job.description ?? '').slice(0, 500)
+    ).toLowerCase();
+    const hit = prefs.keywords.some((k) => hay.includes(k.toLowerCase()));
+    if (!hit) return false;
+  }
+  return true;
+}
+
 export async function runDailyDigest(): Promise<DigestReport> {
   const report: DigestReport = {
     consultants_scanned: 0,
@@ -102,7 +137,7 @@ export async function runDailyDigest(): Promise<DigestReport> {
   const since = new Date(Date.now() - WINDOW_HOURS * 60 * 60 * 1000).toISOString();
   const { data: jobsData, error: jobsErr } = await db
     .from('jobs')
-    .select('id, title, company_name, location, description, required_skills, source')
+    .select('id, title, company_name, location, description, required_skills, source, remote')
     .gte('created_at', since)
     .order('created_at', { ascending: false });
   if (jobsErr) {
@@ -156,6 +191,37 @@ export async function runDailyDigest(): Promise<DigestReport> {
     }
   }
 
+  // 3b. Criteria-based alert prefs (keywords / locations / remote / min match).
+  //     One round-trip. Fail-open: if the table isn't migrated yet, or a user
+  //     never set prefs, they simply get the unfiltered global behaviour.
+  const prefsByUser = new Map<string, AlertPrefs>();
+  if (userIds.length > 0) {
+    const { data: prefRows, error: prefErr } = await db
+      .from('user_job_alert_prefs')
+      .select('user_id, keywords, locations, remote_only, min_match')
+      .in('user_id', userIds);
+    if (prefErr) {
+      if (!/schema cache|does not exist/i.test(prefErr.message)) {
+        logger.warn({ err: prefErr }, 'daily-digest: alert prefs unavailable; using defaults');
+      }
+    } else {
+      for (const p of (prefRows ?? []) as Array<{
+        user_id: string;
+        keywords: string[] | null;
+        locations: string[] | null;
+        remote_only: boolean | null;
+        min_match: number | null;
+      }>) {
+        prefsByUser.set(p.user_id, {
+          keywords: p.keywords ?? [],
+          locations: p.locations ?? [],
+          remote_only: !!p.remote_only,
+          min_match: typeof p.min_match === 'number' ? p.min_match : MIN_SCORE,
+        });
+      }
+    }
+  }
+
   // 4. Per-consultant: pre-filter → AI score → send Brevo email if any
   //    match clears the floor.
   for (const c of consultantRows) {
@@ -174,7 +240,10 @@ export async function runDailyDigest(): Promise<DigestReport> {
         Array.isArray(c.skills) && c.skills.length > 0
           ? c.skills
           : splitSkillsString(c.primary_skill);
-      const candidates = plausibleJobs(skills, jobs);
+      const prefs = prefsByUser.get(c.user_id) ?? null;
+      let candidates = plausibleJobs(skills, jobs);
+      // Layer the user's explicit criteria on top of the skill pre-filter.
+      if (prefs) candidates = candidates.filter((j) => matchesAlertPrefs(j, prefs));
       if (candidates.length === 0) {
         report.digests_skipped_no_match++;
         continue;
@@ -197,8 +266,10 @@ export async function runDailyDigest(): Promise<DigestReport> {
         })),
       );
 
+      // Per-user minimum match score (falls back to the global floor).
+      const floor = prefs ? prefs.min_match : MIN_SCORE;
       const top = matches
-        .filter((m) => m.match_score >= MIN_SCORE)
+        .filter((m) => m.match_score >= floor)
         .sort((a, b) => b.match_score - a.match_score)
         .slice(0, TOP_N);
       if (top.length === 0) {

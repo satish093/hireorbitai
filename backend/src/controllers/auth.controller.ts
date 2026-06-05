@@ -171,6 +171,69 @@ export const setJobAlerts: RequestHandler = async (req, res) => {
 };
 
 // ---------------------------------------------------------------------------
+// /job-alert-prefs — criteria-based filters layered on the on/off toggle.
+// The daily digest narrows what it emails using these. A missing row means
+// "no extra criteria"; reads/writes are fail-open if the table isn't migrated.
+// ---------------------------------------------------------------------------
+
+const DEFAULT_ALERT_PREFS = {
+  keywords: [] as string[],
+  locations: [] as string[],
+  remote_only: false,
+  min_match: 60,
+  job_function: null as string | null,
+};
+
+const jobAlertPrefsSchema = z
+  .object({
+    keywords: z.array(z.string().trim().min(1).max(40)).max(20).optional(),
+    locations: z.array(z.string().trim().min(1).max(80)).max(10).optional(),
+    remote_only: z.boolean().optional(),
+    min_match: z.number().int().min(0).max(100).optional(),
+    job_function: z.string().trim().max(60).nullable().optional(),
+  })
+  .strict();
+
+export const getJobAlertPrefs: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const { data, error } = await db
+    .from('user_job_alert_prefs')
+    .select('keywords, locations, remote_only, min_match, job_function')
+    .eq('user_id', req.user.id)
+    .maybeSingle();
+  if (error) {
+    // Table not migrated yet → behave as "no criteria set".
+    if (/schema cache|does not exist/i.test(error.message)) {
+      res.json(DEFAULT_ALERT_PREFS);
+      return;
+    }
+    throw httpError(500, 'Database error');
+  }
+  res.json(data ?? DEFAULT_ALERT_PREFS);
+};
+
+export const setJobAlertPrefs: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const parsed = jobAlertPrefsSchema.safeParse(req.body);
+  if (!parsed.success) throw httpError(400, 'Invalid alert preferences', parsed.error.flatten());
+  // user_id is server-set from the session — never trust a body value.
+  const row = {
+    user_id: req.user.id,
+    ...parsed.data,
+    updated_at: new Date().toISOString(),
+  };
+  const { error } = await db.from('user_job_alert_prefs').upsert(row, { onConflict: 'user_id' });
+  if (error) {
+    if (/schema cache|does not exist/i.test(error.message)) {
+      res.json({ ok: true, persisted: false });
+      return;
+    }
+    throw httpError(500, 'Database error');
+  }
+  res.json({ ok: true, persisted: true });
+};
+
+// ---------------------------------------------------------------------------
 // /login
 // ---------------------------------------------------------------------------
 const loginSchema = z
