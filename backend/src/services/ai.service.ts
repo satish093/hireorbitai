@@ -17,7 +17,13 @@
 
 import { z } from 'zod/v4';
 import type { MessageParam, TextBlockParam } from '@anthropic-ai/sdk/resources/messages';
-import { anthropic, ANTHROPIC_MODEL, AI_MAX_INPUT_CHARS } from '../config/anthropic';
+import {
+  anthropic,
+  ANTHROPIC_MODEL,
+  ANTHROPIC_ENABLED,
+  ANTHROPIC_FALLBACK_ENABLED,
+  AI_MAX_INPUT_CHARS,
+} from '../config/anthropic';
 import {
   groqClient,
   GROQ_MODEL,
@@ -51,6 +57,15 @@ import {
 // rule-based service (which also needs atsScore as a scoring primitive).
 export { atsScore, AtsScoreSchema } from './atsScore.service';
 export type { AtsScoreResult } from './atsScore.service';
+
+/**
+ * True when at least one generation provider is configured — a free provider
+ * (Groq / Gemini) or an Anthropic credential. Endpoints gate on THIS rather than
+ * ANTHROPIC_ENABLED alone, so AI features run on the free providers even without
+ * a Claude credential. (Whether Anthropic is actually *called* is a separate,
+ * opt-out decision — see ANTHROPIC_FALLBACK_ENABLED in the provider chains.)
+ */
+export const AI_GENERATION_AVAILABLE = GROQ_ENABLED || GEMINI_ENABLED || ANTHROPIC_ENABLED;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -452,6 +467,11 @@ async function callGeminiText(
 /** Try each provider in order; log on failure and advance to next. Throws the
  *  last error only when all providers are exhausted. */
 async function callWithProviders<T>(label: string, providers: Array<() => Promise<T>>): Promise<T> {
+  // No enabled providers (e.g. free providers down + Anthropic opted out) — throw
+  // a clear error so callers hit their rule-based fallback instead of `undefined`.
+  if (providers.length === 0) {
+    throw new Error(`ai: no providers available for ${label}`);
+  }
   let lastErr: unknown;
   for (const [i, call] of providers.entries()) {
     try {
@@ -464,7 +484,7 @@ async function callWithProviders<T>(label: string, providers: Array<() => Promis
   throw lastErr;
 }
 
-/** Groq-primary structured: Groq → Gemini → Anthropic */
+/** Groq-primary structured: Groq → Gemini → (Anthropic only if opted in). */
 async function callGroqStructuredWithFallback<T extends z.ZodType>(
   callName: string,
   systemPrompt: string,
@@ -480,11 +500,15 @@ async function callGroqStructuredWithFallback<T extends z.ZodType>(
     ...(GEMINI_ENABLED
       ? [() => callGeminiStructured(callName, systemPrompt, userContent, schema, maxTokens)]
       : []),
-    () => callStructured(callName, systemPrompt, userContent, schema, maxTokens),
+    // Paid Anthropic is opt-in (AI_ALLOW_ANTHROPIC). Off by default — callers
+    // fall back to their rule-based heuristic when the free providers fail.
+    ...(ANTHROPIC_FALLBACK_ENABLED
+      ? [() => callStructured(callName, systemPrompt, userContent, schema, maxTokens)]
+      : []),
   ]);
 }
 
-/** Groq-primary text: Groq → Gemini → Anthropic */
+/** Groq-primary text: Groq → Gemini → (Anthropic only if opted in). */
 async function callGroqTextWithFallback(
   callName: string,
   systemPrompt: string,
@@ -496,11 +520,13 @@ async function callGroqTextWithFallback(
     ...(GEMINI_ENABLED
       ? [() => callGeminiText(callName, systemPrompt, userContent, maxTokens)]
       : []),
-    () => callText(callName, systemPrompt, userContent, maxTokens),
+    ...(ANTHROPIC_FALLBACK_ENABLED
+      ? [() => callText(callName, systemPrompt, userContent, maxTokens)]
+      : []),
   ]);
 }
 
-/** Gemini-primary structured: Gemini → Groq → Anthropic
+/** Gemini-primary structured: Gemini → Groq → (Anthropic only if opted in).
  *  Use for analysis/scoring tasks where reasoning over context beats raw speed.
  *  Currently unused — kept for a planned rescore path; the underscore prefix
  *  silences the unused-name lint until it gets wired up. */
@@ -518,7 +544,9 @@ async function _callGeminiStructuredWithFallback<T extends z.ZodType>(
     ...(GROQ_ENABLED
       ? [() => callGroqStructured(callName, systemPrompt, userContent, schema, maxTokens)]
       : []),
-    () => callStructured(callName, systemPrompt, userContent, schema, maxTokens),
+    ...(ANTHROPIC_FALLBACK_ENABLED
+      ? [() => callStructured(callName, systemPrompt, userContent, schema, maxTokens)]
+      : []),
   ]);
 }
 

@@ -8,13 +8,13 @@ import {
   jobCopilot,
   generateCoverLetter,
   extractJobRequirements,
+  AI_GENERATION_AVAILABLE,
   type CoverLetterTone,
 } from '../services/ai.service';
 import { parseJobRequirements } from '../services/jobParser.service';
 import { tailorForJob as resumeTailorForJob } from './resumes.controller';
 import { fromJob as applicationsFromJob } from './applications.controller';
 import { httpError, ADMIN_TIER, GROUP_LEAD_ROLES } from '../types';
-import { ANTHROPIC_ENABLED } from '../config/anthropic';
 import { leadCanAccessUser, isAdminTier } from '../services/groupScope';
 
 // Light user join helper — explicit FK hint so the embed never collides.
@@ -1027,8 +1027,8 @@ const copilotSchema = z.object({ question: z.string().trim().min(1).max(500) }).
 
 export const copilot: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
-  if (!ANTHROPIC_ENABLED) {
-    throw httpError(503, 'AI copilot is not configured (set ANTHROPIC_API_KEY).');
+  if (!AI_GENERATION_AVAILABLE) {
+    throw httpError(503, 'AI copilot is not configured — no AI provider is set up.');
   }
   const parsed = copilotSchema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'A question is required', parsed.error.flatten());
@@ -1086,8 +1086,8 @@ const coverLetterSchema = z
 
 export const coverLetter: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
-  if (!ANTHROPIC_ENABLED) {
-    throw httpError(503, 'AI cover letters are not configured (set ANTHROPIC_API_KEY).');
+  if (!AI_GENERATION_AVAILABLE) {
+    throw httpError(503, 'AI cover letters are not configured — no AI provider is set up.');
   }
   const parsed = coverLetterSchema.safeParse(req.body ?? {});
   if (!parsed.success) throw httpError(400, 'Invalid request', parsed.error.flatten());

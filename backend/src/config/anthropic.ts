@@ -82,5 +82,13 @@ export const AI_MAX_JOB_DESC_CHARS = env.anthropic.maxJobDescChars;
 export const ANTHROPIC_ENABLED =
   AI_PROVIDER === 'oauth' ? effectiveOAuthToken.length > 0 : env.anthropic.apiKey.length > 0;
 
+/**
+ * Whether the PAID Anthropic API may be used as a generation fallback. Off by
+ * default (free-only policy) — the AI helpers fall back Groq → Gemini → rule-
+ * based heuristic and never touch Anthropic unless AI_ALLOW_ANTHROPIC=true AND
+ * a credential is configured.
+ */
+export const ANTHROPIC_FALLBACK_ENABLED = ANTHROPIC_ENABLED && env.anthropic.allowFallback;
+
 /** Whether a real model is reachable for generation. */
 export const AI_AVAILABLE = AI_PROVIDER !== 'stub' && ANTHROPIC_ENABLED;

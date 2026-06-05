@@ -102,6 +102,15 @@ const envSchema = z.object({
   // 'oauth' — use a Claude.ai subscription OAuth token (ANTHROPIC_OAUTH_TOKEN).
   // 'stub'  — never call a model; always return editable stubs.
   TRAINING_AI_PROVIDER: z.enum(['api', 'oauth', 'stub']).default('api'),
+  // Free-only policy: the Groq → Gemini → Anthropic generation fallback skips
+  // the PAID Anthropic API unless this is explicitly true. Default false keeps
+  // the app on free providers (Groq + Gemini) + the rule-based heuristics, even
+  // if a Claude credential happens to be present (e.g. a CLI login on the box).
+  AI_ALLOW_ANTHROPIC: z
+    .string()
+    .optional()
+    .default('false')
+    .transform((v) => v === 'true' || v === '1'),
   // --- Token-cost controls (API provider) ---
   // Free-text inputs (resume bodies, job descriptions) are clipped to this many
   // characters before being sent to the model — input tokens are the dominant
@@ -393,6 +402,7 @@ export const env = {
     provider: e.TRAINING_AI_PROVIDER,
     maxInputChars: e.AI_MAX_INPUT_CHARS,
     maxJobDescChars: e.AI_MAX_JOB_DESC_CHARS,
+    allowFallback: e.AI_ALLOW_ANTHROPIC,
   },
   email: {
     // Single provider — Brevo. Kept under env.email.* so callers in

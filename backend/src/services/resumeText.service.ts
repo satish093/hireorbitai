@@ -1,6 +1,6 @@
 import { extractText, getDocumentProxy } from 'unpdf';
 import { geminiClient, GEMINI_ENABLED, GEMINI_MODEL, withGeminiRetry } from '../config/gemini';
-import { anthropic, ANTHROPIC_ENABLED } from '../config/anthropic';
+import { anthropic, ANTHROPIC_FALLBACK_ENABLED } from '../config/anthropic';
 import { LLAMAPARSE_ENABLED, LLAMAPARSE_API_KEY, LLAMAPARSE_BASE_URL } from '../config/llamaparse';
 import { logLlamaParseUsage } from './aiUsage';
 import { logger } from '../config/logger';
@@ -254,7 +254,7 @@ Output only the Markdown. No commentary, no code fences.`,
  * Use Claude vision to extract resume text from an image file (paid fallback).
  */
 async function extractImageWithClaude(buffer: Buffer, mimetype: string): Promise<string | null> {
-  if (!ANTHROPIC_ENABLED) return null;
+  if (!ANTHROPIC_FALLBACK_ENABLED) return null;
   try {
     const base64 = buffer.toString('base64');
     const resp = await anthropic.messages.create({
@@ -300,7 +300,7 @@ Output only the Markdown. No commentary, no code fences.`,
  * Returns null on any failure so the caller can fall back to unpdf.
  */
 async function extractPdfWithClaude(buffer: Buffer): Promise<string | null> {
-  if (!ANTHROPIC_ENABLED) return null;
+  if (!ANTHROPIC_FALLBACK_ENABLED) return null;
   try {
     const base64 = buffer.toString('base64');
     const resp = await anthropic.messages.create({

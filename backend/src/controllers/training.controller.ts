@@ -3,8 +3,7 @@ import { z } from 'zod';
 import * as repo from '../repositories/training.repository';
 import * as svc from '../services/training.service';
 import * as ai from '../services/trainingAI.service';
-import { lessonCoach as runLessonCoach } from '../services/ai.service';
-import { ANTHROPIC_ENABLED } from '../config/anthropic';
+import { lessonCoach as runLessonCoach, AI_GENERATION_AVAILABLE } from '../services/ai.service';
 import { httpError, MANAGER_TIER, ADMIN_TIER, OWNER_TIER, type Role } from '../types';
 import { audit } from '../services/audit.service';
 import { logger } from '../config/logger';
@@ -686,7 +685,7 @@ const coachSchema = z
   .strict();
 export const lessonCoach: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
-  if (!ANTHROPIC_ENABLED) throw httpError(503, 'AI coach is not configured.');
+  if (!AI_GENERATION_AVAILABLE) throw httpError(503, 'AI coach is not configured.');
 
   const parsed = coachSchema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'A question is required', parsed.error.flatten());

@@ -41,7 +41,15 @@ vi.mock('../config/anthropic', () => ({
 }));
 
 const lessonCoachMock = vi.hoisted(() => vi.fn(async () => 'A grounded answer.'));
-vi.mock('../services/ai.service', () => ({ lessonCoach: lessonCoachMock }));
+vi.mock('../services/ai.service', () => ({
+  lessonCoach: lessonCoachMock,
+  // The coach gate now checks AI_GENERATION_AVAILABLE (any provider) instead of
+  // ANTHROPIC_ENABLED. Drive it from the same flag so "503 when not configured"
+  // still exercises the no-provider path.
+  get AI_GENERATION_AVAILABLE() {
+    return mockFlags.anthropicEnabled;
+  },
+}));
 
 vi.mock('../repositories/training.repository', () => ({
   assignments: {

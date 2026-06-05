@@ -53,6 +53,8 @@ vi.mock('../services/ai.service', () => ({
   scoreResumeAgainstJob: vi.fn(),
   jobCopilot: vi.fn(),
   generateCoverLetter: aiMocks.generateCoverLetter,
+  extractJobRequirements: vi.fn(),
+  AI_GENERATION_AVAILABLE: true,
 }));
 vi.mock('../services/jobParser.service', () => ({ parseJobRequirements: vi.fn() }));
 vi.mock('./resumes.controller', () => ({ tailorForJob: vi.fn() }));
