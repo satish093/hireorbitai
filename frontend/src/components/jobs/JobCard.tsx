@@ -59,6 +59,7 @@ function JobCard({
   selected,
   onSelect,
   onToggleLike,
+  onDismiss,
   onApply,
   onChangeStatus,
 }: {
@@ -66,6 +67,8 @@ function JobCard({
   selected?: boolean;
   onSelect: () => void;
   onToggleLike: () => void;
+  /** Optional — "Not interested". Supplied on the Recommended feed only. */
+  onDismiss?: () => void;
   onApply: () => void;
   /** Optional — only supplied on the Applied tab when the row has an application_id. */
   onChangeStatus?: (next: AppStatus) => void;
@@ -161,6 +164,31 @@ function JobCard({
           <span className="text-faint"> · {relative(job.posted_at ?? job.created_at)}</span>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
+          {onDismiss && (
+            <Button
+              variant="ghost"
+              size="sm"
+              iconOnly
+              onClick={(e) => {
+                e.stopPropagation();
+                onDismiss();
+              }}
+              aria-label="Not interested — hide this job"
+              title="Not interested"
+              leftIcon={
+                <svg
+                  width="15"
+                  height="15"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path d="M18 6 6 18M6 6l12 12" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              }
+            />
+          )}
           <Button
             variant="ghost"
             size="sm"

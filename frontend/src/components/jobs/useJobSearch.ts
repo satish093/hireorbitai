@@ -436,6 +436,21 @@ export function useJobSearch() {
     }
   }
 
+  // "Not interested" — optimistically drop the job from the feed; restore on
+  // error. The backend records the dismissal so it won't resurface on reload.
+  async function dismissJob(job: JobRow) {
+    const prev = rows;
+    setRows((rs) => rs.filter((r) => r.id !== job.id));
+    if (selectedId === job.id) setSelectedId(null);
+    try {
+      await api.post(`/jobs/${job.id}/dismiss`);
+      toast.success('Not interested — hidden from your feed');
+    } catch (e: any) {
+      setRows(prev);
+      toast.error(e?.response?.data?.error ?? 'Failed to dismiss');
+    }
+  }
+
   // The list the user actually sees: source/sub-tab filtered, then sorted.
   const visible = sortRows(filteredRows(rows, tab, sourceFilter, appliedSub), sort);
   const selectedJob = visible.find((j) => j.id === selectedId) ?? null;
@@ -575,6 +590,7 @@ export function useJobSearch() {
     handlePlainApply,
     recordApplication,
     toggleLike,
+    dismissJob,
     openJob,
     patchFilters,
     resetFilters,

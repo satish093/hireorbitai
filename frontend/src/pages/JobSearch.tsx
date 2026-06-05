@@ -68,6 +68,7 @@ export function JobSearch() {
     handlePlainApply,
     recordApplication,
     toggleLike,
+    dismissJob,
     openJob,
     patchFilters,
     resetFilters,
@@ -177,6 +178,7 @@ export function JobSearch() {
                   selected={false}
                   onSelect={() => openJob(j)}
                   onToggleLike={() => toggleLike(j)}
+                  onDismiss={tab === 'recommended' ? () => dismissJob(j) : undefined}
                   onApply={() => handleApplyClick(j)}
                   onChangeStatus={
                     j.application_id

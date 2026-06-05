@@ -195,6 +195,15 @@ async function annotateLiked<T extends { id: string }>(
   return rows.map((r) => ({ ...r, liked: likedIds.has(r.id) }));
 }
 
+// The set of job ids this user has dismissed ("Not interested"). Used to drop
+// them from the recommended feed. Fail-open: if dismissed_jobs isn't migrated
+// yet the query errors and we return an empty set (feed shows everything).
+async function dismissedJobIds(userId: string): Promise<Set<string>> {
+  const { data, error } = await db.from('dismissed_jobs').select('job_id').eq('user_id', userId);
+  if (error) return new Set();
+  return new Set((data ?? []).map((d: any) => String(d.job_id)));
+}
+
 // ---------------------------------------------------------------------------
 // CRUD + filters
 // ---------------------------------------------------------------------------
@@ -497,6 +506,11 @@ export const recommended: RequestHandler = async (req, res) => {
   let ranked = jobs ?? [];
   if (fnMatcher) ranked = ranked.filter((j: any) => fnMatcher(j.title ?? ''));
 
+  // Drop jobs this user dismissed ("Not interested") so they don't resurface
+  // in the recommended feed (Jobright-style swipe-away). Mirrors liked_jobs.
+  const dismissed = await dismissedJobIds(req.user.id);
+  if (dismissed.size > 0) ranked = ranked.filter((j: any) => !dismissed.has(j.id));
+
   // Compute a deterministic baseline score for every job from skill overlap
   // (consultant skills ∩ job.required_skills). This guarantees a score on
   // every card even when the AI ranker is unreachable / rate-limited. The
@@ -731,6 +745,30 @@ export const unlike: RequestHandler = async (req, res) => {
     .eq('job_id', req.params.id);
   if (error) throw httpError(500, 'Database error');
   res.json({ ok: true, liked: false });
+};
+
+// ---------------------------------------------------------------------------
+// Dismiss / "Not interested" — drops the job from the user's recommended feed
+// ---------------------------------------------------------------------------
+
+export const dismiss: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const { error } = await db
+    .from('dismissed_jobs')
+    .upsert({ user_id: req.user.id, job_id: req.params.id });
+  if (error) throw httpError(500, 'Database error');
+  res.json({ ok: true, dismissed: true });
+};
+
+export const undismiss: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const { error } = await db
+    .from('dismissed_jobs')
+    .delete()
+    .eq('user_id', req.user.id)
+    .eq('job_id', req.params.id);
+  if (error) throw httpError(500, 'Database error');
+  res.json({ ok: true, dismissed: false });
 };
 
 // ---------------------------------------------------------------------------

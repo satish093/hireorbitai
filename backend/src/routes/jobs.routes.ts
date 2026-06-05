@@ -47,6 +47,10 @@ jobsRouter.delete('/:id', requireRole(...MANAGER_TIER), c.remove);
 jobsRouter.post('/:id/like', c.like);
 jobsRouter.delete('/:id/like', c.unlike);
 
+// Dismiss / "Not interested" — removes the job from the caller's recommended feed.
+jobsRouter.post('/:id/dismiss', c.dismiss);
+jobsRouter.delete('/:id/dismiss', c.undismiss);
+
 // Recruiter note — internal, operator-tier and above (consultants must not see
 // or edit it). GET is gated too so the note stays staff-only.
 jobsRouter.get('/:id/note', requireRole(...OPERATOR_TIER), c.getNote);
