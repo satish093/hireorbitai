@@ -58,6 +58,8 @@ export interface JobRow {
   liked?: boolean;
   match_score?: number | null;
   match_reasons?: string[];
+  /** One-sentence "Why you're a great fit" blurb from the match engine. */
+  match_why?: string | null;
   application_id?: string;
   application_status?: AppStatus | string;
   applied_at?: string;

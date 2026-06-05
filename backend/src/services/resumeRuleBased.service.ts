@@ -754,9 +754,19 @@ export async function matchJobsForConsultantRuleBased(
     const { score, matched_keywords, missing_keywords } = await atsScore(profileText, jdText);
     const adjusted = hasResume ? score : Math.min(score, 79);
 
+    // Deterministic "why you fit" blurb — no model call, mirrors the band the
+    // AI ranker would land on. Kept honest for weak overlaps.
+    const why =
+      matched_keywords.length === 0
+        ? `Light overlap with your profile${missing_keywords.length ? ` — they're after ${missing_keywords.slice(0, 2).join(', ')}` : ''}.`
+        : adjusted >= 75
+          ? `You're a strong fit — your ${matched_keywords.slice(0, 3).join(', ')} line up with what they need.`
+          : `Decent fit on ${matched_keywords.slice(0, 2).join(', ')}${missing_keywords.length ? `, but they also want ${missing_keywords.slice(0, 2).join(', ')}` : ''}.`;
+
     results.push({
       job_id: job.id,
       match_score: adjusted,
+      why,
       reasons: [
         matched_keywords.length > 0
           ? `Matched: ${matched_keywords.slice(0, 3).join(', ')}${matched_keywords.length > 3 ? ` +${matched_keywords.length - 3} more` : ''}`

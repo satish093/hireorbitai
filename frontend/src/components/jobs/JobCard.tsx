@@ -134,6 +134,16 @@ function JobCard({
         {matchScore != null && <MatchPill score={matchScore} />}
       </div>
 
+      {/* "Why you're a great fit" — one-line AI blurb above the skill pills.
+          No positioning: stays under the full-card select overlay so a click
+          here still opens the job (matches the header + reasons rows). */}
+      {aiMatchEnabled && job.match_why && (
+        <p className="mt-2 text-[12px] leading-snug text-ink-2 line-clamp-2">
+          <span className="font-medium text-accent">✦ Why you fit · </span>
+          {job.match_why}
+        </p>
+      )}
+
       {/* Match reasons — top 3 as check-pills with +N overflow */}
       {reasons.length > 0 && (
         <div className="mt-2.5 flex flex-wrap items-center gap-1.5">

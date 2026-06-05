@@ -516,7 +516,7 @@ export const recommended: RequestHandler = async (req, res) => {
   // every card even when the AI ranker is unreachable / rate-limited. The
   // AI score, when it returns, overrides this baseline.
   const consultantSkills = skillsForMatching(consultant ?? {});
-  const baselineById = new Map<string, { score: number; reasons: string[] }>();
+  const baselineById = new Map<string, { score: number; reasons: string[]; why: string }>();
   if (consultant && consultantSkills.length > 0) {
     const mine = new Set(consultantSkills.map((s) => s.toLowerCase()));
     for (const j of ranked) {
@@ -528,6 +528,7 @@ export const recommended: RequestHandler = async (req, res) => {
         baselineById.set(j.id, {
           score: 50,
           reasons: ['No required-skills metadata yet — score is a placeholder.'],
+          why: 'We need this job enriched before we can explain the fit — try the AI match.',
         });
         continue;
       }
@@ -543,12 +544,24 @@ export const recommended: RequestHandler = async (req, res) => {
       if (missing.length > 0) {
         reasons.push(`Missing: ${missing.slice(0, 4).join(', ')}${missing.length > 4 ? '…' : ''}`);
       }
-      baselineById.set(j.id, { score, reasons });
+      // One-line "why you fit" blurb derived from the same overlap. The AI
+      // ranker below overrides this with a warmer sentence when it returns.
+      const why =
+        overlap.length === 0
+          ? `Light overlap so far — they're after ${missing.slice(0, 2).join(', ')}.`
+          : score >= 75
+            ? `You're a strong fit — you've got ${overlap.slice(0, 3).join(', ')} from their must-haves.`
+            : `Decent fit on ${overlap.slice(0, 2).join(', ')}${missing.length ? `, but they also want ${missing.slice(0, 2).join(', ')}` : ''}.`;
+      baselineById.set(j.id, { score, reasons, why });
     }
   } else if (consultant) {
     // No skills on the consultant — every job gets a 0 with a hint.
     for (const j of ranked) {
-      baselineById.set(j.id, { score: 0, reasons: ['Add skills to your profile to get matched.'] });
+      baselineById.set(j.id, {
+        score: 0,
+        reasons: ['Add skills to your profile to get matched.'],
+        why: 'Add skills or upload a resume on your profile and we’ll explain why each job fits.',
+      });
     }
   }
 
@@ -572,8 +585,13 @@ export const recommended: RequestHandler = async (req, res) => {
   ranked = ranked.map((j: any) => {
     const base = baselineById.get(j.id);
     return base
-      ? { ...j, match_score: base.score, match_reasons: base.reasons }
-      : { ...j, match_score: j.match_score ?? null, match_reasons: j.match_reasons ?? [] };
+      ? { ...j, match_score: base.score, match_reasons: base.reasons, match_why: base.why }
+      : {
+          ...j,
+          match_score: j.match_score ?? null,
+          match_reasons: j.match_reasons ?? [],
+          match_why: j.match_why ?? null,
+        };
   });
 
   if (consultant && ranked.length > 0) {
@@ -611,7 +629,12 @@ export const recommended: RequestHandler = async (req, res) => {
       ranked = ranked.map((j: any) => {
         const ai = byId.get(j.id);
         if (!ai || typeof ai.match_score !== 'number') return j;
-        return { ...j, match_score: ai.match_score, match_reasons: ai.reasons ?? j.match_reasons };
+        return {
+          ...j,
+          match_score: ai.match_score,
+          match_reasons: ai.reasons ?? j.match_reasons,
+          match_why: ai.why ?? j.match_why,
+        };
       });
       res.setHeader('x-match-ai', 'ok');
     } catch (e: any) {

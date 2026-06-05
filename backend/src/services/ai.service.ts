@@ -1262,6 +1262,10 @@ export const JobMatchListSchema = z.object({
       job_id: z.string(),
       match_score: z.number(),
       reasons: z.array(z.string()),
+      // One warm second-person sentence ("You're a strong fit because …") shown
+      // as the headline blurb on the recommended-feed card. Optional so older
+      // model responses / the rule-based fallback still validate.
+      why: z.string().optional(),
     }),
   ),
 });
@@ -1281,8 +1285,9 @@ SCORING RULES:
 3. Partial credit: adjacent skills (Vue.js when React is required) are worth 40 % of a full match.
 4. With no resume on file, score conservatively — cap at 79 and note the uncertainty.
 5. reasons: 2–3 bullets citing SPECIFIC evidence ("Led Kubernetes migration at Acme Corp" not "has DevOps skills").
+6. why: ONE warm, second-person sentence (≤ 22 words) the consultant reads first ("You're a strong fit — your 5 years on React and AWS line up with the core stack here."). Address them as "you", never name them. Be honest: for weak matches, say what's missing ("This is a stretch — they want senior Go experience you don't show yet.").
 
-Return JSON only: { "matches": [{ "job_id": "...", "match_score": 0–100, "reasons": [...] }] }
+Return JSON only: { "matches": [{ "job_id": "...", "match_score": 0–100, "reasons": [...], "why": "..." }] }
 Sort by match_score descending.`;
 
 export async function matchJobsForConsultant(
