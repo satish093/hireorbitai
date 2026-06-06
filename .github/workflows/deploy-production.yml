@@ -1,7 +1,10 @@
 name: Deploy to production
 
-# Push-to-deploy. Every commit on `main` SSHes into the production VPS and runs
-# `scripts/update.sh`, which:
+# DEPLOY MECHANISM: VPS-side cron pull (scripts/auto-pull.sh), NOT this workflow.
+# GitHub's runners can't SSH into the hardened VPS (firewall drops their IPs), so
+# push-to-deploy is disabled below — see the `on:` note. This file is retained
+# only for an optional manual SSH deploy. The cron runs `scripts/update.sh`,
+# which:
 #   1. git fetch + git pull --ff-only
 #   2. npm install + build (only if relevant files changed)
 #   3. pm2 restart hireorbitai-api --update-env
@@ -22,8 +25,12 @@ name: Deploy to production
 # Deployments tab on the repo shows a history with success/failure status.
 
 on:
-  push:
-    branches: [main]
+  # Push-to-deploy via SSH is DISABLED: GitHub's runners can't reach the hardened
+  # VPS — its firewall drops their rotating IPs (6500+ CIDR blocks) so the SSH
+  # connection times out (`dial tcp … i/o timeout`). Rather than reopen SSH to
+  # the world, deploys now run VPS-side via cron pull (scripts/auto-pull.sh →
+  # scripts/update.sh when origin/main advances). This workflow is kept for an
+  # optional manual SSH deploy attempt (works only from an allow-listed IP).
   workflow_dispatch: {} # manual trigger button in the Actions UI
 
 # Never run two deploys at the same time. If a second push arrives while the
