@@ -54,13 +54,15 @@ function Section({ title, children }: { title?: string; children: ReactNode }) {
   );
 }
 
-function FactTile({ label, value }: { label: string; value: string }) {
+function FactRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-0 bg-hover border border-border rounded-xl px-3 py-2.5">
-      <div className="text-[10px] font-semibold tracking-widest text-muted uppercase">{label}</div>
-      <div className="text-sm font-medium text-ink mt-0.5 break-words" title={value}>
+    <div className="flex items-baseline justify-between gap-4 py-2.5 border-b border-border first:pt-0 last:border-0 last:pb-0">
+      <span className="text-[11px] font-medium uppercase tracking-wide text-muted shrink-0">
+        {label}
+      </span>
+      <span className="text-sm font-medium text-ink text-right min-w-0 break-words" title={value}>
         {value}
-      </div>
+      </span>
     </div>
   );
 }
@@ -663,16 +665,11 @@ export function JobDetailView({
       )}
 
       <div
-        className={clsx('mt-4 grid grid-cols-1 gap-4 items-start', !embedded && 'lg:grid-cols-3')}
+        className={clsx('mt-4 grid grid-cols-1 gap-5 items-start', !embedded && 'lg:grid-cols-5')}
       >
         {/* Main column */}
-        <div className={clsx('space-y-4 min-w-0', !embedded && 'lg:col-span-2')}>
+        <div className={clsx('space-y-4 min-w-0', !embedded && 'lg:col-span-3')}>
           <JobCopilot jobId={job.id} isConsultant={isConsultant} />
-
-          {/* Recruiter/operator candidate tools (tailored resumes + cover
-              letter on behalf of a selected consultant). Consultants don't
-              reach this OPERATOR_TIER page, so this is the real audience. */}
-          {!isConsultant && <CandidateToolsPanel job={job} />}
 
           {(reqs?.highlights ?? []).length > 0 && (
             <Section title="Highlights">
@@ -880,20 +877,27 @@ export function JobDetailView({
                 </p>
               </Section>
             )}
+
+          {/* Recruiter/operator candidate tools (tailored resumes + cover letter
+              for a selected consultant). Placed at the end so the recruiter
+              reads the role first, then acts — not crowding the top under the
+              copilot. Consultants don't reach this OPERATOR_TIER page. */}
+          {!isConsultant && <CandidateToolsPanel job={job} />}
         </div>
 
         {/* Right rail (becomes a stacked full-width section when embedded) */}
-        <div className={clsx('space-y-4 min-w-0', !embedded && 'lg:sticky lg:top-4')}>
+        <div className={clsx('space-y-4 min-w-0', !embedded && 'lg:col-span-2 lg:sticky lg:top-4')}>
           <Section title="Key facts">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              <FactTile label="Location" value={job.location ?? '—'} />
-              <FactTile label="Work model" value={workModel} />
-              <FactTile label="Type" value={prettyType(job.job_type)} />
-              {hasRate && (
-                <FactTile label="Salary" value={prettyRate(job.rate_min, job.rate_max)} />
-              )}
-              {seniority && <FactTile label="Level" value={seniority} />}
-              {minYears != null && <FactTile label="Experience" value={`${minYears}+ years`} />}
+            {/* Clean divided list (label : value) instead of boxed tiles — the
+                tiles were boxes-in-a-box and a 2-col grid here cramped values
+                like "San Francisco Bay Area" and broke them mid-word. */}
+            <div>
+              <FactRow label="Location" value={job.location ?? '—'} />
+              <FactRow label="Work model" value={workModel} />
+              <FactRow label="Type" value={prettyType(job.job_type)} />
+              {hasRate && <FactRow label="Salary" value={prettyRate(job.rate_min, job.rate_max)} />}
+              {seniority && <FactRow label="Level" value={seniority} />}
+              {minYears != null && <FactRow label="Experience" value={`${minYears}+ years`} />}
             </div>
           </Section>
 
