@@ -46,7 +46,11 @@ export interface InvoiceBrand {
   /** 6-digit hex brand color (from the company / logo analysis) used to theme
    *  the accent bar, Amount Due block, company name, and mark. */
   color?: string | null;
+  /** Raw logo bytes — embedded in the PDF letterhead. */
   logo?: Buffer | null;
+  /** Signed logo URL — used to brand the invoice EMAIL header (the PDF uses the
+   *  raw bytes; an email needs a hosted URL). */
+  logoUrl?: string | null;
 }
 
 // Palette — mirrors the app brand (indigo-600) + slate scale.
@@ -211,8 +215,9 @@ export function renderInvoicePdf(invoice: InvoiceRow, brand?: InvoiceBrand): Pro
         // and DON'T repeat the name as text. The company name + email still
         // appear in the FROM block on the right.
         try {
-          // With `fit`, the image scales to fit the box anchored at (x, y) top-left.
-          doc.image(brandLogo, LEFT, 48, { fit: [200, 58] });
+          // Logo-driven header: render the logo large + prominent (its natural
+          // aspect, anchored top-left). `fit` scales it within the box.
+          doc.image(brandLogo, LEFT, 44, { fit: [250, 82] });
         } catch {
           // Corrupt/unsupported image bytes → fall back to the initials mark + name.
           drawCompanyMark(doc, brandName || 'Company', themeColor, LEFT, 50, 46);

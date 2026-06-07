@@ -140,17 +140,25 @@ export function GroupBadge({ groupId, compact, hideEmpty, className }: GroupBadg
       />
     );
   }
+  // With a logo, show the logo ONLY (no company-name text) — the name is on hover.
+  if (g.logo_url) {
+    return (
+      <img
+        src={g.logo_url}
+        alt={g.name}
+        title={title}
+        className={`inline-block h-4 w-auto max-w-[96px] object-contain align-middle animate-fade-in ${className ?? ''}`.trim()}
+      />
+    );
+  }
+  // No logo → colored chip with the dot + name.
   return (
     <span
       className={`inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded text-[11px] font-medium animate-fade-in ${className ?? ''}`.trim()}
       style={{ background: `${color}1A`, color }}
       title={g.unique_group_id ?? undefined}
     >
-      {g.logo_url ? (
-        <img src={g.logo_url} alt="" className="w-3.5 h-3.5 rounded object-cover" />
-      ) : (
-        <span className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />
-      )}
+      <span className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />
       {g.name}
     </span>
   );

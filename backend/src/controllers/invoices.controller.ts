@@ -208,14 +208,26 @@ async function resolveInvoiceBrand(invoice: InvoiceRow): Promise<InvoiceBrand | 
     logo_path?: string | null;
   };
   let logo: Buffer | null = null;
+  let logoUrl: string | null = null;
   if (row.logo_path) {
     try {
       logo = await fs.readFile(resolveOnDisk(GROUP_LOGO_BUCKET, row.logo_path));
     } catch {
       logo = null; // logo file gone / unreadable → placeholder mark
     }
+    // Signed URL for the email header (read days later → long TTL). Best-effort.
+    const { data: signed } = await db.storage
+      .from(GROUP_LOGO_BUCKET)
+      .createSignedUrl(row.logo_path, 30 * 24 * 60 * 60);
+    logoUrl = signed?.signedUrl ?? null;
   }
-  return { name: row.name ?? null, email: row.email ?? null, color: row.color ?? null, logo };
+  return {
+    name: row.name ?? null,
+    email: row.email ?? null,
+    color: row.color ?? null,
+    logo,
+    logoUrl,
+  };
 }
 
 /** GET /invoices/:id/document — stream a freshly-rendered invoice PDF for
@@ -249,12 +261,14 @@ export const send: RequestHandler = async (req, res) => {
     throw httpError(400, 'No recipient email — add a Bill-to email or pass recipient_email.');
   }
 
-  const pdf = await renderInvoicePdf(invoice, await resolveInvoiceBrand(invoice));
+  const brand = await resolveInvoiceBrand(invoice);
+  const pdf = await renderInvoicePdf(invoice, brand);
   await sendInvoiceEmail({
     to: { email: recipient },
     invoice,
     pdf,
     fileName: `${invoiceFileBase(invoice)}.pdf`,
+    company: brand ? { name: brand.name, logoUrl: brand.logoUrl } : undefined,
   });
 
   // Stamp last_emailed_at — best-effort. The email already went out, so a missing

@@ -110,8 +110,16 @@ function shell(args: {
   body: string; // raw HTML — block-level allowed
   cta?: { label: string; href: string };
   footerNote?: string;
+  /** Optional company branding for the header (invoice emails). When a logoUrl
+   *  is given the header shows the company logo image; else the company name;
+   *  else the default product wordmark. */
+  headerBrand?: { logoUrl?: string | null; name?: string | null };
 }): string {
   const { preheader, heading, body, cta, footerNote } = args;
+  const hb = args.headerBrand;
+  const headerInner = hb?.logoUrl
+    ? `<img src="${hb.logoUrl}" alt="${escapeHtml(hb.name || 'Company')}" style="max-height:36px;max-width:220px;vertical-align:middle;" />`
+    : `<span style="font-weight:700;letter-spacing:-0.01em;font-size:16px;color:${brand.textColor};">${escapeHtml(hb?.name || brand.productName)}</span>`;
   const ctaHtml = cta
     ? `<tr><td style="padding: 8px 0 24px 0;"><a href="${cta.href}"
          style="display:inline-block;background:${brand.primaryColor};color:#ffffff;text-decoration:none;
@@ -134,9 +142,7 @@ function shell(args: {
     <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border:1px solid ${brand.borderColor};border-radius:16px;overflow:hidden;">
       <tr>
         <td style="padding:24px 28px 16px 28px;border-bottom:1px solid ${brand.borderColor};">
-          <span style="font-weight:700;letter-spacing:-0.01em;font-size:16px;color:${brand.textColor};">
-            ${escapeHtml(brand.productName)}
-          </span>
+          ${headerInner}
         </td>
       </tr>
       <tr>
@@ -332,8 +338,13 @@ export async function sendInvoiceEmail(args: {
   invoice: InvoiceRow;
   pdf: Buffer;
   fileName: string;
+  /** Issuing company branding — its logo + name head the email (not "HireOrbit AI"). */
+  company?: { name?: string | null; logoUrl?: string | null };
 }): Promise<void> {
   const inv = args.invoice;
+  // The issuing company brands the email; fall back to the platform name only
+  // when the invoice isn't linked to a company.
+  const companyName = args.company?.name?.trim() || brand.productName;
   const number = inv.invoice_number ? `#${inv.invoice_number}` : '';
   const amount =
     inv.invoice_amount != null && inv.invoice_amount !== ''
@@ -363,22 +374,21 @@ export async function sendInvoiceEmail(args: {
     .join('');
   const body = `
     <p>Hi${args.to.name ? ` ${escapeHtml(args.to.name)}` : ''},</p>
-    <p>Please find attached the invoice ${escapeHtml(number)} from ${escapeHtml(brand.productName)}. The full document is attached to this email as a PDF.</p>
+    <p>Please find attached the invoice ${escapeHtml(number)} from ${escapeHtml(companyName)}. The full document is attached to this email as a PDF.</p>
     <div style="margin:16px 0 4px 0;padding:14px 16px;background:${brand.bgColor};border:1px solid ${brand.borderColor};border-radius:10px;font-size:13px;color:${brand.textColor};">
       ${detailHtml || `<div style="color:${brand.mutedColor};">See the attached PDF for details.</div>`}
     </div>
   `;
   await sendViaBrevo({
     to: args.to,
-    subject: `Invoice ${number ? number + ' ' : ''}from ${brand.productName}`
-      .replace(/\s+/g, ' ')
-      .trim(),
+    subject: `Invoice ${number ? number + ' ' : ''}from ${companyName}`.replace(/\s+/g, ' ').trim(),
     html: shell({
       preheader: `Invoice ${number} attached.`.trim(),
       heading: `Invoice ${number}`.trim(),
       body,
+      headerBrand: { logoUrl: args.company?.logoUrl, name: args.company?.name },
     }),
-    text: `Please find attached the invoice ${number} from ${brand.productName}.${amount ? `\nAmount: ${amount}` : ''}${dueStr ? `\nDue date: ${dueStr}` : ''}\nThe invoice PDF is attached to this email.`,
+    text: `Please find attached the invoice ${number} from ${companyName}.${amount ? `\nAmount: ${amount}` : ''}${dueStr ? `\nDue date: ${dueStr}` : ''}\nThe invoice PDF is attached to this email.`,
     tag: 'invoice',
     attachment: [{ name: args.fileName, content: args.pdf }],
   });
