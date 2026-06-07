@@ -162,29 +162,16 @@ function initialsOf(name: string): string {
   return letters || 'CO';
 }
 
-/** The square company mark at the top-left: the uploaded logo (fit into the box)
- *  or, when there's none, a brand-tinted rounded square with the initials. */
+/** A brand-tinted rounded square with the company initials — the fallback mark
+ *  when a company has no uploaded logo (logos render at natural aspect instead). */
 function drawCompanyMark(
   doc: Doc,
   name: string,
-  logo: Buffer | null,
   color: string,
   x: number,
   y: number,
   s: number,
 ): void {
-  if (logo) {
-    try {
-      doc.save();
-      doc.roundedRect(x, y, s, s, 8).clip();
-      doc.image(logo, x, y, { fit: [s, s], align: 'center', valign: 'center' });
-      doc.restore();
-      return;
-    } catch {
-      // Corrupt/unsupported image bytes → fall through to the initials mark.
-    }
-  }
-  // Tinted square (brand color at low opacity) with brand-colored initials.
   doc.save();
   doc.roundedRect(x, y, s, s, 8).fillOpacity(0.12).fill(color);
   doc.restore();
@@ -216,25 +203,47 @@ export function renderInvoicePdf(invoice: InvoiceRow, brand?: InvoiceBrand): Pro
     // --- Top accent bar (full bleed, themed) -------------------------------
     doc.rect(0, 0, PAGE_W, 5).fill(themeColor);
 
-    // --- Letterhead (left): company mark + name + email --------------------
+    // --- Letterhead (left) -------------------------------------------------
     if (hasBrand) {
-      const markS = 46;
-      const markY = 50;
-      drawCompanyMark(doc, brandName || 'Company', brandLogo, themeColor, LEFT, markY, markS);
-      const txtX = LEFT + markS + 12;
-      if (brandName) {
-        doc
-          .fillColor(themeColor)
-          .font('Helvetica-Bold')
-          .fontSize(17)
-          .text(brandName, txtX, markY + 5, { width: 270 });
-      }
-      if (brandEmail) {
-        doc
-          .fillColor(MUTED)
-          .font('Helvetica')
-          .fontSize(9)
-          .text(brandEmail, txtX, markY + (brandName ? 28 : 14), { width: 270 });
+      if (brandLogo) {
+        // A company logo is usually a wordmark that already contains the name —
+        // render it at its natural aspect ratio (not squished into a tiny square)
+        // and DON'T repeat the name as text. The company name + email still
+        // appear in the FROM block on the right.
+        try {
+          // With `fit`, the image scales to fit the box anchored at (x, y) top-left.
+          doc.image(brandLogo, LEFT, 48, { fit: [200, 58] });
+        } catch {
+          // Corrupt/unsupported image bytes → fall back to the initials mark + name.
+          drawCompanyMark(doc, brandName || 'Company', themeColor, LEFT, 50, 46);
+          if (brandName) {
+            doc
+              .fillColor(themeColor)
+              .font('Helvetica-Bold')
+              .fontSize(17)
+              .text(brandName, LEFT + 58, 55, { width: 270 });
+          }
+        }
+      } else {
+        // No logo → brand-tinted initials mark + the company name + email.
+        const markS = 46;
+        const markY = 50;
+        drawCompanyMark(doc, brandName || 'Company', themeColor, LEFT, markY, markS);
+        const txtX = LEFT + markS + 12;
+        if (brandName) {
+          doc
+            .fillColor(themeColor)
+            .font('Helvetica-Bold')
+            .fontSize(17)
+            .text(brandName, txtX, markY + 5, { width: 270 });
+        }
+        if (brandEmail) {
+          doc
+            .fillColor(MUTED)
+            .font('Helvetica')
+            .fontSize(9)
+            .text(brandEmail, txtX, markY + 28, { width: 270 });
+        }
       }
     }
 
