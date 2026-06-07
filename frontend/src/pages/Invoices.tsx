@@ -8,6 +8,8 @@ import { PageHeader } from '../components/PageHeader';
 import { Button } from '../components/Button';
 import { Pill, PillTone } from '../components/Pill';
 import { useUserGroups } from '../components/GroupBadge';
+import { useAuth } from '../context/AuthContext';
+import { isAdmin } from '../types';
 import { api } from '../services/api';
 import { invalidate, useInvalidationListener } from '../hooks/useInvalidate';
 import toast from 'react-hot-toast';
@@ -119,6 +121,10 @@ export function Invoices() {
   const [docBusy, setDocBusy] = useState(false);
   // Companies (user groups) — used as the invoice issuer whose logo brands the PDF.
   const { groups, byId } = useUserGroups();
+  // Only admin-tier may choose the issuing company. For everyone else it's
+  // auto-set server-side to their own group, so the dropdown is hidden.
+  const { profile } = useAuth();
+  const canChooseCompany = isAdmin(profile?.role);
 
   // Reset the Document controls whenever a different invoice is opened.
   useEffect(() => {
@@ -457,15 +463,17 @@ export function Invoices() {
               onChange={(e) => setForm({ ...form, bill_to_email: e.target.value })}
             />
           </div>
-          <SelectInput
-            label="Company (invoice issuer)"
-            value={form.company_group_id}
-            onChange={(e) => setForm({ ...form, company_group_id: e.target.value })}
-            options={[
-              { value: '', label: '— None (default branding) —' },
-              ...groups.map((g) => ({ value: g.id, label: g.name })),
-            ]}
-          />
+          {canChooseCompany && (
+            <SelectInput
+              label="Company (invoice issuer)"
+              value={form.company_group_id}
+              onChange={(e) => setForm({ ...form, company_group_id: e.target.value })}
+              options={[
+                { value: '', label: '— None (default branding) —' },
+                ...groups.map((g) => ({ value: g.id, label: g.name })),
+              ]}
+            />
+          )}
           <SelectInput
             label="Status"
             value={form.status}

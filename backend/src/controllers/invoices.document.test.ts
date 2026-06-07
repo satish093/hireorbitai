@@ -59,7 +59,10 @@ import { renderInvoicePdf } from '../services/invoicePdf.service';
 import { sendInvoiceEmail } from '../services/brevo.service';
 import { audit } from '../services/audit.service';
 
-const USER = { id: 'u-mgr', role: 'MANAGER', email: 'm@x.test' };
+// Admin-tier (CTO) → unscoped, so these document/send/create tests exercise the
+// handlers without the per-company scoping (covered separately in
+// invoices.scope.test.ts).
+const USER = { id: 'u-cto', role: 'CTO', email: 'c@x.test' };
 
 function mkRes() {
   const res: any = {

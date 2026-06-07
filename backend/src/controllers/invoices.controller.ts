@@ -1,7 +1,7 @@
 import { RequestHandler } from 'express';
 import { z } from 'zod';
 import { db } from '../config/db';
-import { httpError } from '../types';
+import { httpError, type Role } from '../types';
 import { promises as fs } from 'node:fs';
 import {
   renderInvoicePdf,
@@ -11,6 +11,7 @@ import {
 } from '../services/invoicePdf.service';
 import { resolveOnDisk } from '../config/storage.local';
 import { sendInvoiceEmail } from '../services/brevo.service';
+import { callerScopeGroupIds } from '../services/groupScope';
 import { audit } from '../services/audit.service';
 import { logger } from '../config/logger';
 
@@ -100,35 +101,59 @@ function normalize(data: Record<string, unknown>): Record<string, unknown> {
   return out;
 }
 
-// Existence check for mutation/read-by-id paths. Authorization is the route-level
-// MANAGER_TIER gate (this is a shared back-office tracker — every manager-tier
-// user manages every row), so there is no per-row ownership check; we only 404
-// on a missing id.
-async function loadOr404(id: string): Promise<void> {
-  const { data } = await db.from('invoices').select('id').eq('id', id).maybeSingle();
-  if (!data) throw httpError(404, 'Invoice not found');
+// Role-based per-company scoping. Invoices are keyed to an issuing company
+// (company_group_id = a user group). Admin-tier sees every company; everyone
+// else (MANAGER/HR_MANAGER/DEVELOPER) is confined to their own group(s).
+type ScopeCaller = { id: string; role: Role; group_id?: string | null };
+
+// Load the row by id, enforcing company scope. 404s (never 403) when the
+// invoice is outside the caller's company scope, so the endpoint can't be used
+// as an existence oracle (mirrors applications.controller `loadAndAuthorize`).
+async function loadInvoiceScopedOr404(id: string, caller: ScopeCaller): Promise<InvoiceRow> {
+  const { data, error } = await db.from('invoices').select('*').eq('id', id).maybeSingle();
+  if (error || !data) throw httpError(404, 'Invoice not found');
+  const inv = data as InvoiceRow;
+  const scope = await callerScopeGroupIds(caller);
+  if (scope !== null && (!inv.company_group_id || !scope.includes(inv.company_group_id))) {
+    throw httpError(404, 'Invoice not found');
+  }
+  return inv;
 }
 
 export const list: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
   const status = (req.query.status as string) ?? '';
   let qb = db.from('invoices').select('*');
   if (status) qb = qb.eq('status', status);
+  // Company scope: admin-tier → all; otherwise only the caller's own group(s).
+  const scope = await callerScopeGroupIds(req.user);
+  if (scope !== null) {
+    if (scope.length === 0) {
+      res.json([]); // scoped caller with no group → sees nothing (fail-closed)
+      return;
+    }
+    qb = qb.in('company_group_id', scope);
+  }
   const { data, error } = await qb.order('due_date', { ascending: true });
   if (error) throw httpError(500, 'Database error');
   res.json(data);
 };
 
 export const get: RequestHandler = async (req, res) => {
-  const { data, error } = await db.from('invoices').select('*').eq('id', req.params.id).single();
-  if (error) throw httpError(404, 'Invoice not found');
-  res.json(data);
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const inv = await loadInvoiceScopedOr404(req.params.id, req.user);
+  res.json(inv);
 };
 
 export const create: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   const parsed = createSchema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
-  const row = { ...normalize(parsed.data), created_by: req.user.id };
+  const row: Record<string, unknown> = { ...normalize(parsed.data), created_by: req.user.id };
+  // Scoped (non-admin) callers can't choose the company — the invoice is
+  // auto-issued by their OWN company (group). Admins keep the chosen value.
+  const scope = await callerScopeGroupIds(req.user);
+  if (scope !== null) row.company_group_id = req.user.group_id ?? null;
   let { data, error } = await db.from('invoices').insert(row).select().single();
   if (error && isMissingColumn(error.message)) {
     ({ data, error } = await db.from('invoices').insert(stripLateColumns(row)).select().single());
@@ -141,8 +166,13 @@ export const update: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   const parsed = updateSchema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
-  await loadOr404(req.params.id);
-  const row = { ...normalize(parsed.data), updated_at: new Date().toISOString() };
+  await loadInvoiceScopedOr404(req.params.id, req.user); // 404 if out of company scope
+  const row: Record<string, unknown> = {
+    ...normalize(parsed.data),
+    updated_at: new Date().toISOString(),
+  };
+  // Scoped callers can't reassign an invoice to another company.
+  if ((await callerScopeGroupIds(req.user)) !== null) delete row.company_group_id;
   let { data, error } = await db
     .from('invoices')
     .update(row)
@@ -163,19 +193,11 @@ export const update: RequestHandler = async (req, res) => {
 
 export const remove: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
-  await loadOr404(req.params.id);
+  await loadInvoiceScopedOr404(req.params.id, req.user); // 404 if out of company scope
   const { error } = await db.from('invoices').delete().eq('id', req.params.id);
   if (error) throw httpError(500, 'Database error');
   res.json({ ok: true });
 };
-
-/** Load the full invoice row or 404. Authorization is the route-level
- *  MANAGER_TIER gate (shared back-office tracker — no per-row ownership). */
-async function loadInvoiceOr404(id: string): Promise<InvoiceRow> {
-  const { data, error } = await db.from('invoices').select('*').eq('id', id).maybeSingle();
-  if (error || !data) throw httpError(404, 'Invoice not found');
-  return data as InvoiceRow;
-}
 
 const GROUP_LOGO_BUCKET = 'group-logos';
 
@@ -235,7 +257,7 @@ async function resolveInvoiceBrand(invoice: InvoiceRow): Promise<InvoiceBrand | 
  *  current row. */
 export const document: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
-  const invoice = await loadInvoiceOr404(req.params.id);
+  const invoice = await loadInvoiceScopedOr404(req.params.id, req.user);
   const pdf = await renderInvoicePdf(invoice, await resolveInvoiceBrand(invoice));
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="${invoiceFileBase(invoice)}.pdf"`);
@@ -255,7 +277,7 @@ export const send: RequestHandler = async (req, res) => {
   const parsed = sendSchema.safeParse(req.body ?? {});
   if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
 
-  const invoice = await loadInvoiceOr404(req.params.id);
+  const invoice = await loadInvoiceScopedOr404(req.params.id, req.user);
   const recipient = (parsed.data.recipient_email ?? invoice.bill_to_email ?? '').trim();
   if (!recipient) {
     throw httpError(400, 'No recipient email — add a Bill-to email or pass recipient_email.');

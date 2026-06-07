@@ -122,6 +122,27 @@ export async function managerGroupUserIds(caller: Caller): Promise<string[] | nu
 }
 
 /**
+ * Group ids whose COMPANY-scoped records (e.g. invoices keyed by
+ * company_group_id) the caller may see.
+ *   - `null`     → admin-tier: unscoped, sees every company's records.
+ *   - `string[]` → the caller's own group PLUS any groups they lead via
+ *                  manager_group_grants (de-duped). EMPTY when the caller has no
+ *                  group → fail-closed (sees nothing), never an org-wide leak.
+ * Unlike managerGroupUserIds (keyed by member user ids), this returns the GROUP
+ * ids themselves, for filtering a `company_group_id` column.
+ */
+export async function callerScopeGroupIds(caller: Caller): Promise<string[] | null> {
+  if (isAdminTier(caller.role)) return null;
+  const groups = new Set<string>();
+  if (caller.group_id) groups.add(caller.group_id);
+  // Group leads (HR_MANAGER/MANAGER) also cover any granted co-managed groups.
+  if (isGroupLead(caller.role)) {
+    for (const g of await grantedGroupIds(caller)) groups.add(g);
+  }
+  return [...groups];
+}
+
+/**
  * Consultant ids whose owning user is in the HR_MANAGER's group — for scoping
  * pipeline lists (applications, interviews) that reference `consultant_id`.
  *   - `null`     → not group-scoped.
