@@ -4,6 +4,7 @@ import { Layout } from '../components/Layout';
 import { SkeletonCard } from '../components/Skeleton';
 import { Button } from '../components/Button';
 import { invalidateUserGroupsCache } from '../components/GroupBadge';
+import { invalidate } from '../hooks/useInvalidate';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { canAssignRole, Role, ROLE_LABEL } from '../types';
@@ -16,6 +17,8 @@ interface UserGroup {
   is_active: boolean;
   member_count: number;
   color: string | null;
+  // Company billing email — shown on branded invoices.
+  email?: string | null;
   // Signed URL for the company logo (minted server-side); null when unset.
   logo_url?: string | null;
 }
@@ -44,6 +47,11 @@ export function UserGroups() {
   // New-group color (the backend accepts an optional 7-char hex; GroupBadge
   // renders it everywhere a group appears). Default = the brand indigo.
   const [color, setColor] = useState('#6366F1');
+  // New-group company billing email (optional).
+  const [email, setEmail] = useState('');
+  // Per-card billing-email drafts (edit existing companies). Keyed by group id.
+  const [emailDrafts, setEmailDrafts] = useState<Record<string, string>>({});
+  const [emailBusyId, setEmailBusyId] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
@@ -124,11 +132,13 @@ export function UserGroups() {
         name: name.trim(),
         slug: slug.trim().toLowerCase().replace(/\s+/g, '-'),
         color,
+        email: email.trim() || undefined,
       });
       setName('');
       setSlug('');
       setSlugEdited(false);
       setColor('#6366F1');
+      setEmail('');
       toast.success('Group created');
       load();
     } catch (e: any) {
@@ -165,6 +175,23 @@ export function UserGroups() {
     }
   }
 
+  // Save a company's billing email (shown on its branded invoices).
+  async function saveEmail(g: UserGroup) {
+    const next = (emailDrafts[g.id] ?? g.email ?? '').trim();
+    if (next === (g.email ?? '')) return; // no change
+    setEmailBusyId(g.id);
+    try {
+      await api.patch(`/user-groups/${g.id}`, { email: next });
+      invalidateUserGroupsCache();
+      toast.success('Billing email saved');
+      await load();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error ?? 'Failed to save email');
+    } finally {
+      setEmailBusyId(null);
+    }
+  }
+
   // --- Company logo upload/remove -----------------------------------------
   // A single hidden <input type="file"> drives every card; pickLogo() points it
   // at a group, then onLogoFile() POSTs the multipart upload. The GroupBadge
@@ -193,7 +220,8 @@ export function UserGroups() {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       invalidateUserGroupsCache();
-      toast.success('Logo updated');
+      invalidate('invoices'); // a branded Draft invoice is seeded server-side
+      toast.success('Logo uploaded — branded draft invoice created');
       await load();
     } catch (err: any) {
       toast.error(err?.response?.data?.error ?? 'Failed to upload logo');
@@ -261,6 +289,13 @@ export function UserGroups() {
           aria-label="Group color"
           title="Group color"
           className="h-9 w-10 rounded-lg border border-border cursor-pointer bg-surface p-0.5 shrink-0"
+        />
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="Billing email (for invoices)"
+          className="border border-border rounded-lg px-3 py-1.5 text-sm flex-1 min-w-[180px]"
         />
         <Button variant="primary" onClick={create}>
           + Create group
@@ -366,6 +401,27 @@ export function UserGroups() {
                 </div>
 
                 <div className="px-5 py-3 max-h-64 overflow-y-auto">
+                  {/* Company billing email — shown on this company's branded invoices. */}
+                  <div className="mb-3 flex items-center gap-2">
+                    <input
+                      type="email"
+                      value={emailDrafts[g.id] ?? g.email ?? ''}
+                      onChange={(e) => setEmailDrafts((d) => ({ ...d, [g.id]: e.target.value }))}
+                      placeholder="Billing email (for invoices)"
+                      className="border border-border rounded-lg px-2.5 py-1.5 text-sm flex-1 min-w-0"
+                    />
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => saveEmail(g)}
+                      disabled={
+                        emailBusyId === g.id ||
+                        (emailDrafts[g.id] ?? g.email ?? '').trim() === (g.email ?? '')
+                      }
+                    >
+                      Save
+                    </Button>
+                  </div>
                   {members.length === 0 ? (
                     <p className="text-xs italic text-muted mb-2">No members yet.</p>
                   ) : (

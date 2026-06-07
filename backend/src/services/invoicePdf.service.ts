@@ -43,6 +43,9 @@ export interface InvoiceRow {
 export interface InvoiceBrand {
   name?: string | null;
   email?: string | null;
+  /** 6-digit hex brand color (from the company / logo analysis) used to theme
+   *  the accent bar, Amount Due block, company name, and mark. */
+  color?: string | null;
   logo?: Buffer | null;
 }
 
@@ -53,10 +56,10 @@ const SUB = '#334155'; // slate-700
 const MUTED = '#64748b'; // slate-500
 const LINE = '#e2e8f0'; // slate-200
 const HEADBG = '#f1f5f9'; // slate-100
-const SOFT = '#f8fafc'; // slate-50
 
 // Status pill tones — mirror the frontend <Pill> tones on the Invoices page.
 const STATUS_TONE: Record<string, { bg: string; text: string }> = {
+  Draft: { bg: '#f1f5f9', text: '#64748b' },
   Submitted: { bg: '#dbeafe', text: '#1d4ed8' },
   Approved: { bg: '#ede9fe', text: '#6d28d9' },
   Paid: { bg: '#dcfce7', text: '#15803d' },
@@ -64,18 +67,12 @@ const STATUS_TONE: Record<string, { bg: string; text: string }> = {
   Cancelled: { bg: '#e2e8f0', text: '#475569' },
 };
 
-// Brand "from" details surfaced on the letterhead.
-const COMPANY = {
-  name: 'HireOrbit AI',
-  tagline: 'Consultant invoicing',
-  email: 'support@hireorbitai.com',
-  site: 'hireorbitai.com',
-};
-
 const PAGE_W = 595.28; // A4
+const PAGE_H = 841.89;
 const LEFT = 50;
 const RIGHT = 545;
 const CW = RIGHT - LEFT; // 495
+const HEX_RE = /^#[0-9A-Fa-f]{6}$/;
 
 function fmtMoney(value?: number | string | null): string {
   if (value == null || value === '') return '—';
@@ -166,11 +163,12 @@ function initialsOf(name: string): string {
 }
 
 /** The square company mark at the top-left: the uploaded logo (fit into the box)
- *  or, when there's none, an indigo-tinted rounded square with the initials. */
+ *  or, when there's none, a brand-tinted rounded square with the initials. */
 function drawCompanyMark(
   doc: Doc,
   name: string,
   logo: Buffer | null,
+  color: string,
   x: number,
   y: number,
   s: number,
@@ -186,9 +184,13 @@ function drawCompanyMark(
       // Corrupt/unsupported image bytes → fall through to the initials mark.
     }
   }
-  doc.roundedRect(x, y, s, s, 8).fill('#eef2ff'); // indigo-50
+  // Tinted square (brand color at low opacity) with brand-colored initials.
+  doc.save();
+  doc.roundedRect(x, y, s, s, 8).fillOpacity(0.12).fill(color);
+  doc.restore();
   doc
-    .fillColor(BRAND)
+    .fillColor(color)
+    .fillOpacity(1)
     .font('Helvetica-Bold')
     .fontSize(s * 0.36)
     .text(initialsOf(name), x, y + s / 2 - s * 0.22, { width: s, align: 'center' });
@@ -203,36 +205,38 @@ export function renderInvoicePdf(invoice: InvoiceRow, brand?: InvoiceBrand): Pro
     doc.on('error', reject);
 
     const amount = fmtMoney(invoice.invoice_amount);
-    // The issuing company brands the letterhead; fall back to the platform brand
-    // when the invoice isn't linked to a company/group.
-    const brandName = brand?.name?.trim() || COMPANY.name;
-    const brandEmail = brand?.email?.trim() || COMPANY.email;
+    // The issuing company (a user group) brands the invoice. No fake platform
+    // issuer: when no company is linked, the letterhead/From are simply omitted.
+    const themeColor = brand?.color && HEX_RE.test(brand.color) ? brand.color : BRAND;
+    const brandName = brand?.name?.trim() || '';
+    const brandEmail = brand?.email?.trim() || '';
     const brandLogo = brand?.logo ?? null;
+    const hasBrand = !!(brandName || brandLogo);
 
-    // --- Top accent bar (full bleed) ---------------------------------------
-    doc.rect(0, 0, PAGE_W, 5).fill(BRAND);
+    // --- Top accent bar (full bleed, themed) -------------------------------
+    doc.rect(0, 0, PAGE_W, 5).fill(themeColor);
 
-    // --- Letterhead (left): company mark + name + contact ------------------
-    const markS = 46;
-    const markY = 50;
-    drawCompanyMark(doc, brandName, brandLogo, LEFT, markY, markS);
-    const txtX = LEFT + markS + 12;
-    doc
-      .fillColor(BRAND)
-      .font('Helvetica-Bold')
-      .fontSize(17)
-      .text(brandName, txtX, markY + 2, { width: 270 });
-    doc
-      .fillColor(MUTED)
-      .font('Helvetica')
-      .fontSize(9)
-      .text(COMPANY.tagline, txtX, markY + 25, {
-        width: 270,
-      });
-    doc
-      .fillColor(MUTED)
-      .fontSize(8.5)
-      .text(brandEmail, txtX, markY + 37, { width: 270 });
+    // --- Letterhead (left): company mark + name + email --------------------
+    if (hasBrand) {
+      const markS = 46;
+      const markY = 50;
+      drawCompanyMark(doc, brandName || 'Company', brandLogo, themeColor, LEFT, markY, markS);
+      const txtX = LEFT + markS + 12;
+      if (brandName) {
+        doc
+          .fillColor(themeColor)
+          .font('Helvetica-Bold')
+          .fontSize(17)
+          .text(brandName, txtX, markY + 5, { width: 270 });
+      }
+      if (brandEmail) {
+        doc
+          .fillColor(MUTED)
+          .font('Helvetica')
+          .fontSize(9)
+          .text(brandEmail, txtX, markY + (brandName ? 28 : 14), { width: 270 });
+      }
+    }
 
     // --- INVOICE title + number + status (right) ---------------------------
     doc
@@ -295,22 +299,26 @@ export function renderInvoicePdf(invoice: InvoiceRow, brand?: InvoiceBrand): Pro
         .text(invoice.bill_to_email, LEFT, partyY + 31, { width: CW / 2 - 10 });
     }
 
-    const fromX = LEFT + CW / 2;
-    doc
-      .fillColor(MUTED)
-      .font('Helvetica-Bold')
-      .fontSize(7.5)
-      .text('FROM', fromX, partyY, { width: CW / 2, align: 'right', characterSpacing: 0.4 });
-    doc
-      .fillColor(INK)
-      .font('Helvetica-Bold')
-      .fontSize(12.5)
-      .text(brandName, fromX, partyY + 13, { width: CW / 2, align: 'right' });
-    doc
-      .fillColor(MUTED)
-      .font('Helvetica')
-      .fontSize(9.5)
-      .text(brandEmail, fromX, partyY + 31, { width: CW / 2, align: 'right' });
+    if (hasBrand && brandName) {
+      const fromX = LEFT + CW / 2;
+      doc
+        .fillColor(MUTED)
+        .font('Helvetica-Bold')
+        .fontSize(7.5)
+        .text('FROM', fromX, partyY, { width: CW / 2, align: 'right', characterSpacing: 0.4 });
+      doc
+        .fillColor(INK)
+        .font('Helvetica-Bold')
+        .fontSize(12.5)
+        .text(brandName, fromX, partyY + 13, { width: CW / 2, align: 'right' });
+      if (brandEmail) {
+        doc
+          .fillColor(MUTED)
+          .font('Helvetica')
+          .fontSize(9.5)
+          .text(brandEmail, fromX, partyY + 31, { width: CW / 2, align: 'right' });
+      }
+    }
 
     // --- Line-items table --------------------------------------------------
     const cols = {
@@ -381,26 +389,33 @@ export function renderInvoicePdf(invoice: InvoiceRow, brand?: InvoiceBrand): Pro
     const dueW = 250;
     const dueX = RIGHT - dueW;
     const dueH = 44;
-    doc.roundedRect(dueX, y, dueW, dueH, 8).fill(BRAND);
+    doc.roundedRect(dueX, y, dueW, dueH, 8).fill(themeColor);
+    doc.save();
     doc
-      .fillColor('#e0e7ff')
+      .fillColor('#ffffff')
+      .fillOpacity(0.85)
       .font('Helvetica-Bold')
       .fontSize(9)
       .text('AMOUNT DUE', dueX + 16, y + 11, { characterSpacing: 0.6 });
+    doc.restore();
     doc
       .fillColor('#ffffff')
+      .fillOpacity(1)
       .font('Helvetica-Bold')
       .fontSize(18)
       .text(amount, dueX + 16, y + 9, { width: dueW - 32, align: 'right' });
     if (invoice.due_date) {
+      doc.save();
       doc
-        .fillColor('#c7d2fe')
+        .fillColor('#ffffff')
+        .fillOpacity(0.75)
         .font('Helvetica')
         .fontSize(7.5)
         .text(`Due ${fmtDate(invoice.due_date)}`, dueX + 16, y + 30, {
           width: dueW - 32,
           align: 'right',
         });
+      doc.restore();
     }
     y += dueH + 26;
 
@@ -443,9 +458,10 @@ export function renderInvoicePdf(invoice: InvoiceRow, brand?: InvoiceBrand): Pro
         .text(termsText, LEFT, y + 13, { width: CW });
     }
 
-    // --- Footer (pinned near the bottom) -----------------------------------
-    const footY = 792;
-    doc.rect(0, footY - 14, PAGE_W, 0.75).fill(SOFT);
+    // --- Footer ------------------------------------------------------------
+    // Pinned ABOVE the A4 bottom margin (PAGE_H − 50 ≈ 792). Drawing at/below
+    // that boundary makes pdfkit auto-add blank pages — the prior 4-page bug.
+    const footY = PAGE_H - 94; // ≈ 748; lowest line (footY+13) ends ~771
     doc
       .moveTo(LEFT, footY - 12)
       .lineTo(RIGHT, footY - 12)
@@ -457,11 +473,14 @@ export function renderInvoicePdf(invoice: InvoiceRow, brand?: InvoiceBrand): Pro
       .font('Helvetica-Bold')
       .fontSize(9)
       .text('Thank you for your business.', LEFT, footY, { width: CW / 2 });
-    doc
-      .fillColor(MUTED)
-      .font('Helvetica')
-      .fontSize(8)
-      .text(`${brandName} · ${brandEmail}`, LEFT, footY + 13, { width: CW / 2 });
+    const footerBrand = [brandName, brandEmail].filter(Boolean).join(' · ');
+    if (footerBrand) {
+      doc
+        .fillColor(MUTED)
+        .font('Helvetica')
+        .fontSize(8)
+        .text(footerBrand, LEFT, footY + 13, { width: CW / 2 });
+    }
     doc
       .fillColor(MUTED)
       .font('Helvetica')

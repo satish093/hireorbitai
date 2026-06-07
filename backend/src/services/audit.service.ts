@@ -34,6 +34,7 @@ export type AuditAction =
   | 'group_user_removed'
   | 'group_user_moved'
   | 'group_logo_updated'
+  | 'ai_logo_analyzed'
   | 'invoice_emailed'
   | 'manager_group_grant_added'
   | 'manager_group_grant_removed'

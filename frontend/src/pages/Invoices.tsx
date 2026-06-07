@@ -12,7 +12,7 @@ import { api } from '../services/api';
 import { invalidate, useInvalidationListener } from '../hooks/useInvalidate';
 import toast from 'react-hot-toast';
 
-const STATUSES = ['Submitted', 'Approved', 'Paid', 'Overdue', 'Cancelled'] as const;
+const STATUSES = ['Draft', 'Submitted', 'Approved', 'Paid', 'Overdue', 'Cancelled'] as const;
 type Status = (typeof STATUSES)[number];
 
 const EMPTY = {
@@ -34,6 +34,10 @@ const EMPTY = {
 // Per-status Pill tone — mirrors the shared <Pill> tone-object shape used across
 // the app (StatusBadge / PriorityBadge).
 const STATUS_TONES: Record<Status, PillTone> = {
+  Draft: {
+    bg: 'bg-slate-100 dark:bg-slate-800',
+    text: 'text-slate-500 dark:text-slate-400',
+  },
   Submitted: {
     bg: 'bg-blue-100 dark:bg-blue-900/40',
     text: 'text-blue-700 dark:text-blue-300',

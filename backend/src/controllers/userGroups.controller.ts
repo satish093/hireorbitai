@@ -1,9 +1,10 @@
-import { RequestHandler } from 'express';
+import { RequestHandler, type Request } from 'express';
 import { z } from 'zod';
 import { db } from '../config/db';
 import { httpError, ADMIN_TIER, canAssignRole, type Role } from '../types';
 import { logger } from '../config/logger';
 import { audit } from '../services/audit.service';
+import { analyzeCompanyLogo } from '../services/aiLogo.service';
 
 /**
  * Can the caller move/alter the target user's group?
@@ -134,6 +135,8 @@ export const create: RequestHandler = async (req, res) => {
       .max(64),
     description: z.string().max(500).optional(),
     color: HEX_COLOR.optional(),
+    // Company billing email shown on branded invoices. Accept a valid email or ''.
+    email: z.string().email().or(z.literal('')).optional(),
   });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
@@ -151,7 +154,12 @@ export const create: RequestHandler = async (req, res) => {
 
   const { data, error } = await db
     .from('user_groups')
-    .insert({ ...parsed.data, slug: parsed.data.slug.toLowerCase(), created_by: req.user.id })
+    .insert({
+      ...parsed.data,
+      slug: parsed.data.slug.toLowerCase(),
+      email: parsed.data.email?.trim() || null,
+      created_by: req.user.id,
+    })
     .select()
     .single();
   if (error) {
@@ -194,12 +202,17 @@ export const update: RequestHandler = async (req, res) => {
     description: z.string().max(500).optional(),
     color: HEX_COLOR.optional(),
     is_active: z.boolean().optional(),
+    email: z.string().email().or(z.literal('')).optional(),
   });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
+  // Partial update: only touch `email` when it's actually present in the body
+  // (so an unrelated PATCH doesn't wipe it). '' → NULL.
+  const patch: Record<string, unknown> = { ...parsed.data, updated_at: new Date().toISOString() };
+  if (parsed.data.email !== undefined) patch.email = parsed.data.email.trim() || null;
   const { data, error } = await db
     .from('user_groups')
-    .update({ ...parsed.data, updated_at: new Date().toISOString() })
+    .update(patch)
     .eq('id', req.params.id)
     .select()
     .single();
@@ -386,6 +399,91 @@ export const setMembers: RequestHandler = async (req, res) => {
   res.json({ updated: count ?? parsed.data.user_ids.length });
 };
 
+/**
+ * After a logo upload: (best-effort) analyze it with Claude vision to brand the
+ * company (color, and name when confident), then seed a blank branded Draft
+ * invoice for the company. Never throws — a failure here must not fail the
+ * upload. Returns the (possibly re-branded) group row so the response is fresh.
+ */
+async function brandAndDraftFromLogo(args: {
+  group: Record<string, any>;
+  file: Express.Multer.File;
+  user: { id: string; email?: string | null };
+  req: Request;
+}): Promise<Record<string, any>> {
+  const { group, file, user, req } = args;
+  let updated = group;
+
+  // 1) AI brand extraction → recolor / rename the company.
+  try {
+    const analysis = await analyzeCompanyLogo(file.buffer, file.mimetype);
+    if (analysis) {
+      const patch: Record<string, unknown> = {};
+      if (analysis.brand_color && /^#[0-9A-Fa-f]{6}$/.test(analysis.brand_color)) {
+        patch.color = analysis.brand_color;
+      }
+      // Only rename on a confident read so a deliberately-named group isn't clobbered.
+      if (analysis.confidence >= 0.7 && analysis.company_name) {
+        patch.name = analysis.company_name;
+      }
+      if (Object.keys(patch).length > 0) {
+        const { data: g2 } = await db
+          .from('user_groups')
+          .update({ ...patch, updated_at: new Date().toISOString() })
+          .eq('id', group.id)
+          .select()
+          .maybeSingle();
+        if (g2) updated = g2 as Record<string, any>;
+      }
+      audit({
+        action: 'ai_logo_analyzed',
+        user_id: user.id,
+        email: user.email ?? null,
+        req,
+        metadata: {
+          group_id: group.id,
+          company_name: analysis.company_name,
+          brand_color: analysis.brand_color,
+          confidence: analysis.confidence,
+        },
+      });
+    }
+  } catch (err) {
+    logger.warn({ err: (err as Error).message, groupId: group.id }, 'logo branding failed');
+  }
+
+  // 2) Seed a Draft invoice for this company — idempotent (skip if one exists).
+  try {
+    const { data: existing } = await db
+      .from('invoices')
+      .select('id')
+      .eq('company_group_id', group.id)
+      .eq('status', 'Draft')
+      .maybeSingle();
+    if (!existing) {
+      const today = new Date().toISOString().slice(0, 10);
+      const due = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
+      await db.from('invoices').insert({
+        company_group_id: group.id,
+        consultant_name: '',
+        vendor_name: '',
+        status: 'Draft',
+        invoice_date: today,
+        net_terms_days: 30,
+        due_date: due,
+        created_by: user.id,
+      });
+    }
+  } catch (err) {
+    logger.warn(
+      { err: (err as Error).message, groupId: group.id },
+      'draft invoice creation failed',
+    );
+  }
+
+  return updated;
+}
+
 /** POST /user-groups/:id/logo — multipart { file }. Replaces any existing logo.
  *  Same admin gate as the other mutations (applied at the route). */
 export const uploadLogo: RequestHandler = async (req, res) => {
@@ -446,7 +544,15 @@ export const uploadLogo: RequestHandler = async (req, res) => {
     req,
     metadata: { group_id: groupId, op: 'set', file: file.originalname, size: file.buffer.length },
   });
-  res.json(await withLogoUrl(data));
+
+  // Best-effort: AI-brand the company from the logo + seed a Draft invoice.
+  const branded = await brandAndDraftFromLogo({
+    group: data,
+    file,
+    user: req.user,
+    req,
+  });
+  res.json(await withLogoUrl(branded));
 };
 
 /** DELETE /user-groups/:id/logo — clears the logo (group reverts to its color dot). */

@@ -16,7 +16,14 @@ import { logger } from '../config/logger';
 
 // Allowed status values — kept in sync with the CHECK constraint in
 // migrations/1760000000000_invoices.sql and the frontend SelectInput options.
-export const INVOICE_STATUSES = ['Submitted', 'Approved', 'Paid', 'Overdue', 'Cancelled'] as const;
+export const INVOICE_STATUSES = [
+  'Draft',
+  'Submitted',
+  'Approved',
+  'Paid',
+  'Overdue',
+  'Cancelled',
+] as const;
 
 // Mass-assignment guard. Only these columns are client-writable; server-owned
 // fields (id, created_by, created_at, updated_at) are set server-side and must
@@ -179,13 +186,27 @@ const GROUP_LOGO_BUCKET = 'group-logos';
 async function resolveInvoiceBrand(invoice: InvoiceRow): Promise<InvoiceBrand | undefined> {
   const gid = invoice.company_group_id;
   if (!gid) return undefined;
-  const { data: grp } = await db
+  // Select the brand columns; on a schema-cache error (email/color not migrated)
+  // fall back to the minimal name+logo set so branding still works.
+  let { data: grp } = await db
     .from('user_groups')
-    .select('name, logo_path')
+    .select('name, email, color, logo_path')
     .eq('id', gid)
     .maybeSingle();
+  if (!grp) {
+    ({ data: grp } = await db
+      .from('user_groups')
+      .select('name, logo_path')
+      .eq('id', gid)
+      .maybeSingle());
+  }
   if (!grp) return undefined;
-  const row = grp as { name?: string | null; logo_path?: string | null };
+  const row = grp as {
+    name?: string | null;
+    email?: string | null;
+    color?: string | null;
+    logo_path?: string | null;
+  };
   let logo: Buffer | null = null;
   if (row.logo_path) {
     try {
@@ -194,7 +215,7 @@ async function resolveInvoiceBrand(invoice: InvoiceRow): Promise<InvoiceBrand | 
       logo = null; // logo file gone / unreadable → placeholder mark
     }
   }
-  return { name: row.name ?? null, logo };
+  return { name: row.name ?? null, email: row.email ?? null, color: row.color ?? null, logo };
 }
 
 /** GET /invoices/:id/document — stream a freshly-rendered invoice PDF for
