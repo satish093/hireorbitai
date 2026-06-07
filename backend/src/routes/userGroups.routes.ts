@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { requireRoleOrCapability } from '../middleware/auth';
 import { ADMIN_TIER, OPERATOR_TIER } from '../types';
+import { uploadImage, verifyUploadMagic, scanUpload } from '../middleware/upload';
 import * as c from '../controllers/userGroups.controller';
 
 export const userGroupsRouter = Router();
@@ -24,3 +25,15 @@ userGroupsRouter.patch('/:id', gate, c.update);
 userGroupsRouter.delete('/:id', gate, c.remove);
 userGroupsRouter.put('/assign', gate, c.assignOne);
 userGroupsRouter.patch('/:id/members', gate, c.setMembers);
+
+// Per-group company logo. Image-only upload (PNG/JPEG/WebP, 2 MB), magic-byte +
+// virus checked like every other upload route. Same admin gate as the mutations.
+userGroupsRouter.post(
+  '/:id/logo',
+  gate,
+  uploadImage.single('file'),
+  verifyUploadMagic,
+  scanUpload,
+  c.uploadLogo,
+);
+userGroupsRouter.delete('/:id/logo', gate, c.removeLogo);

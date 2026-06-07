@@ -10,6 +10,7 @@ import { logger } from '../config/logger';
  *
  *   uploadResume     — for /resumes/upload (PDF / image / DOC / DOCX), 10 MB
  *   uploadAttachment — for /tasks/:id/attachments + work-auth docs, 15 MB
+ *   uploadImage      — for group logos (PNG / JPEG / WebP), 2 MB
  *   verifyUploadMagic — post-multer middleware that re-checks the file's
  *                       first bytes match the claimed extension. Defends
  *                       against rename attacks (eg. "resume.pdf" whose body
@@ -49,6 +50,14 @@ const ATTACHMENT_MIME = new Set([
 ]);
 const ATTACHMENT_EXT = /\.(pdf|doc|docx|xls|xlsx|png|jpe?g|webp|gif|txt|csv)$/i;
 
+// Image-only — for logos / avatars. SVG is intentionally excluded: it can carry
+// inline <script>, and we render these via <img src> where that would not
+// execute, but keeping it out avoids storing active content at all. PNG/JPEG/WebP
+// all have magic-byte signatures in SIGNATURES below, so verifyUploadMagic adds a
+// real second-line check.
+const IMAGE_MIME = new Set(['image/png', 'image/jpeg', 'image/webp']);
+const IMAGE_EXT = /\.(png|jpe?g|webp)$/i;
+
 function buildFilter(mimes: Set<string>, extRegex: RegExp): multer.Options['fileFilter'] {
   return (_req: Request, file, cb) => {
     const mimeOk = mimes.has(file.mimetype);
@@ -72,6 +81,13 @@ export const uploadAttachment = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 15 * MB, files: 1 },
   fileFilter: buildFilter(ATTACHMENT_MIME, ATTACHMENT_EXT),
+});
+
+/** Image uploader — PNG / JPEG / WebP only, 2 MB max. Used for group logos. */
+export const uploadImage = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 2 * MB, files: 1 },
+  fileFilter: buildFilter(IMAGE_MIME, IMAGE_EXT),
 });
 
 /** Permissive fallback — kept for any legacy route that imports it.

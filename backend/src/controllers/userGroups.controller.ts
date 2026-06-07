@@ -31,6 +31,31 @@ function canMoveUser(caller: { role: Role }, target: { role: Role }): boolean {
 // back to the column's server-side default at insert time.
 const HEX_COLOR = z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Use a 6-digit hex like #6366F1');
 
+// Group logos live on the filesystem (storage shim). We persist only the storage
+// PATH in user_groups.logo_path; the signed download URL is short-lived and
+// minted per response by withLogoUrl. 24h TTL comfortably outlives any session
+// (the frontend useUserGroups cache is per-session and the <img src> uses the
+// URL for the life of the page).
+const GROUP_LOGO_BUCKET = 'group-logos';
+const LOGO_URL_TTL_SECONDS = 24 * 60 * 60;
+
+/** True when a Postgres error means the logo_path column isn't migrated yet. */
+function isLogoColumnMissing(message?: string): boolean {
+  return !!message && /logo_path|schema cache|column .* does not exist/i.test(message);
+}
+
+/** Attach a fresh signed `logo_url` to a group row (null when it has no logo or
+ *  signing fails). Mirrors messageAttachments' withSignedUrl. */
+async function withLogoUrl<T extends { logo_path?: string | null }>(
+  row: T,
+): Promise<T & { logo_url: string | null }> {
+  if (!row?.logo_path) return { ...row, logo_url: null };
+  const { data } = await db.storage
+    .from(GROUP_LOGO_BUCKET)
+    .createSignedUrl(row.logo_path, LOGO_URL_TTL_SECONDS);
+  return { ...row, logo_url: data?.signedUrl ?? null };
+}
+
 /** Translate Postgres errors that hint the migration is missing into a clear
  *  4xx instead of a bare 500 message. */
 function migrationHint(err: { message?: string } | null | undefined) {
@@ -88,7 +113,13 @@ export const list: RequestHandler = async (_req, res) => {
   if (!uErr) {
     for (const u of users ?? []) counts.set(u.group_id, (counts.get(u.group_id) ?? 0) + 1);
   }
-  res.json((groups ?? []).map((g: any) => ({ ...g, member_count: counts.get(g.id) ?? 0 })));
+  // Mint a signed logo_url per group (parallel; best-effort). Groups without a
+  // logo_path get logo_url: null and the badge falls back to the color dot.
+  const withCounts = (groups ?? []).map((g: any) => ({
+    ...g,
+    member_count: counts.get(g.id) ?? 0,
+  }));
+  res.json(await Promise.all(withCounts.map((g: { logo_path?: string | null }) => withLogoUrl(g))));
 };
 
 /** POST /user-groups — manager+ only. */
@@ -152,7 +183,7 @@ export const create: RequestHandler = async (req, res) => {
       slug: data.slug,
     },
   });
-  res.status(201).json(data);
+  res.status(201).json(await withLogoUrl(data));
 };
 
 /** PATCH /user-groups/:id — rename / recolor / toggle. */
@@ -185,7 +216,7 @@ export const update: RequestHandler = async (req, res) => {
     req,
     metadata: { group_id: data.id, changes: parsed.data },
   });
-  res.json(data);
+  res.json(await withLogoUrl(data));
 };
 
 /** DELETE /user-groups/:id — members fall back to null group via ON DELETE SET NULL. */
@@ -353,4 +384,113 @@ export const setMembers: RequestHandler = async (req, res) => {
     });
   }
   res.json({ updated: count ?? parsed.data.user_ids.length });
+};
+
+/** POST /user-groups/:id/logo — multipart { file }. Replaces any existing logo.
+ *  Same admin gate as the other mutations (applied at the route). */
+export const uploadLogo: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const groupId = req.params.id;
+
+  const { data: grp, error: readErr } = await db
+    .from('user_groups')
+    .select('id, logo_path')
+    .eq('id', groupId)
+    .maybeSingle();
+  if (readErr && isLogoColumnMissing(readErr.message)) {
+    throw httpError(503, 'Logo storage not migrated yet — apply the user_groups_logo migration.');
+  }
+  if (!grp) throw httpError(404, 'Group not found');
+
+  const file = (req as unknown as { file?: Express.Multer.File }).file;
+  if (!file) throw httpError(400, 'Missing file');
+
+  // Remove the previous logo first (best-effort) so disk doesn't accumulate orphans.
+  const prevPath = (grp as { logo_path?: string | null }).logo_path;
+  if (prevPath) {
+    await db.storage
+      .from(GROUP_LOGO_BUCKET)
+      .remove([prevPath])
+      .catch(() => {});
+  }
+
+  const safeName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const path = `${groupId}/${Date.now()}-${safeName}`;
+  const { error: upErr } = await db.storage
+    .from(GROUP_LOGO_BUCKET)
+    .upload(path, file.buffer, { contentType: file.mimetype, upsert: true });
+  if (upErr) throw httpError(500, `Storage upload failed: ${upErr.message}`);
+
+  const { data, error } = await db
+    .from('user_groups')
+    .update({ logo_path: path, updated_at: new Date().toISOString() })
+    .eq('id', groupId)
+    .select()
+    .single();
+  if (error || !data) {
+    // Don't leave the just-uploaded file orphaned if the DB write failed.
+    await db.storage
+      .from(GROUP_LOGO_BUCKET)
+      .remove([path])
+      .catch(() => {});
+    if (error && isLogoColumnMissing(error.message)) {
+      throw httpError(503, 'Logo storage not migrated yet — apply the user_groups_logo migration.');
+    }
+    throw httpError(500, 'Database error');
+  }
+
+  audit({
+    action: 'group_logo_updated',
+    user_id: req.user.id,
+    email: req.user.email ?? null,
+    req,
+    metadata: { group_id: groupId, op: 'set', file: file.originalname, size: file.buffer.length },
+  });
+  res.json(await withLogoUrl(data));
+};
+
+/** DELETE /user-groups/:id/logo — clears the logo (group reverts to its color dot). */
+export const removeLogo: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const groupId = req.params.id;
+
+  const { data: grp, error: readErr } = await db
+    .from('user_groups')
+    .select('id, logo_path')
+    .eq('id', groupId)
+    .maybeSingle();
+  if (readErr && isLogoColumnMissing(readErr.message)) {
+    throw httpError(503, 'Logo storage not migrated yet — apply the user_groups_logo migration.');
+  }
+  if (!grp) throw httpError(404, 'Group not found');
+
+  const prevPath = (grp as { logo_path?: string | null }).logo_path;
+  if (prevPath) {
+    await db.storage
+      .from(GROUP_LOGO_BUCKET)
+      .remove([prevPath])
+      .catch(() => {});
+  }
+
+  const { data, error } = await db
+    .from('user_groups')
+    .update({ logo_path: null, updated_at: new Date().toISOString() })
+    .eq('id', groupId)
+    .select()
+    .single();
+  if (error) {
+    if (isLogoColumnMissing(error.message)) {
+      throw httpError(503, 'Logo storage not migrated yet — apply the user_groups_logo migration.');
+    }
+    throw httpError(500, 'Database error');
+  }
+
+  audit({
+    action: 'group_logo_updated',
+    user_id: req.user.id,
+    email: req.user.email ?? null,
+    req,
+    metadata: { group_id: groupId, op: 'remove' },
+  });
+  res.json(await withLogoUrl(data));
 };

@@ -7,6 +7,9 @@ export interface GroupLite {
   name: string;
   color?: string | null;
   unique_group_id?: string | null;
+  // Short-lived signed URL for the group's company logo (minted server-side per
+  // /user-groups response). Null/absent → fall back to the color dot.
+  logo_url?: string | null;
 }
 
 // Module-level cache. The first component that mounts kicks off the fetch;
@@ -116,12 +119,24 @@ export function GroupBadge({ groupId, compact, hideEmpty, className }: GroupBadg
     return <span className={`text-[11px] text-muted ${className ?? ''}`.trim()}>—</span>;
   }
   const color = g.color ?? '#6366F1';
+  const title = `${g.name}${g.unique_group_id ? ` (${g.unique_group_id})` : ''}`;
   if (compact) {
+    // A logo, when present, replaces the colored dot in dense cells.
+    if (g.logo_url) {
+      return (
+        <img
+          src={g.logo_url}
+          alt=""
+          className={`inline-block w-4 h-4 rounded object-cover ring-1 ring-border animate-fade-in ${className ?? ''}`.trim()}
+          title={title}
+        />
+      );
+    }
     return (
       <span
         className={`inline-block w-2 h-2 rounded-full animate-fade-in ${className ?? ''}`.trim()}
         style={{ background: color }}
-        title={`${g.name}${g.unique_group_id ? ` (${g.unique_group_id})` : ''}`}
+        title={title}
       />
     );
   }
@@ -131,7 +146,11 @@ export function GroupBadge({ groupId, compact, hideEmpty, className }: GroupBadg
       style={{ background: `${color}1A`, color }}
       title={g.unique_group_id ?? undefined}
     >
-      <span className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />
+      {g.logo_url ? (
+        <img src={g.logo_url} alt="" className="w-3.5 h-3.5 rounded object-cover" />
+      ) : (
+        <span className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />
+      )}
       {g.name}
     </span>
   );

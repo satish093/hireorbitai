@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import toast from 'react-hot-toast';
 import { Layout } from '../components/Layout';
 import { SkeletonCard } from '../components/Skeleton';
 import { Button } from '../components/Button';
+import { invalidateUserGroupsCache } from '../components/GroupBadge';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { canAssignRole, Role, ROLE_LABEL } from '../types';
@@ -15,6 +16,8 @@ interface UserGroup {
   is_active: boolean;
   member_count: number;
   color: string | null;
+  // Signed URL for the company logo (minted server-side); null when unset.
+  logo_url?: string | null;
 }
 
 interface UserLite {
@@ -162,12 +165,73 @@ export function UserGroups() {
     }
   }
 
+  // --- Company logo upload/remove -----------------------------------------
+  // A single hidden <input type="file"> drives every card; pickLogo() points it
+  // at a group, then onLogoFile() POSTs the multipart upload. The GroupBadge
+  // cache is flushed afterwards so the new logo shows everywhere a group renders.
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const [logoTargetId, setLogoTargetId] = useState<string | null>(null);
+  const [logoBusyId, setLogoBusyId] = useState<string | null>(null);
+
+  function pickLogo(groupId: string) {
+    setLogoTargetId(groupId);
+    if (logoInputRef.current) {
+      logoInputRef.current.value = ''; // allow re-selecting the same file
+      logoInputRef.current.click();
+    }
+  }
+
+  async function onLogoFile(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    const groupId = logoTargetId;
+    if (!file || !groupId) return;
+    setLogoBusyId(groupId);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      await api.post(`/user-groups/${groupId}/logo`, fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      invalidateUserGroupsCache();
+      toast.success('Logo updated');
+      await load();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error ?? 'Failed to upload logo');
+    } finally {
+      setLogoBusyId(null);
+      setLogoTargetId(null);
+    }
+  }
+
+  async function removeLogo(g: UserGroup) {
+    setLogoBusyId(g.id);
+    try {
+      await api.delete(`/user-groups/${g.id}/logo`);
+      invalidateUserGroupsCache();
+      toast.success('Logo removed');
+      await load();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error ?? 'Failed to remove logo');
+    } finally {
+      setLogoBusyId(null);
+    }
+  }
+
   return (
     <Layout
       title="User groups"
       crumbs={[{ label: 'Workspace', to: '/dashboard' }, { label: 'Admin' }, { label: 'Groups' }]}
     >
       <h1 className="text-2xl font-semibold tracking-tight text-ink mb-5">User groups</h1>
+
+      {/* Shared hidden picker — pickLogo() targets a specific group before click. */}
+      <input
+        ref={logoInputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp"
+        className="hidden"
+        onChange={onLogoFile}
+      />
 
       {/* Create */}
       <div className="bg-surface border border-border rounded-xl p-4 mb-6 flex items-center gap-2 flex-wrap">
@@ -231,13 +295,36 @@ export function UserGroups() {
                 className="bg-surface border border-border rounded-xl overflow-hidden"
               >
                 <div className="px-5 py-3 border-b border-border flex items-center gap-3">
+                  {/* Company logo — click to upload/replace. Falls back to a
+                      color chip when the group has no logo yet. */}
+                  <button
+                    type="button"
+                    onClick={() => pickLogo(g.id)}
+                    disabled={logoBusyId === g.id}
+                    title={g.logo_url ? 'Replace company logo' : 'Upload company logo'}
+                    className="shrink-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-50"
+                  >
+                    {g.logo_url ? (
+                      <img
+                        src={g.logo_url}
+                        alt=""
+                        className="w-9 h-9 rounded-md object-cover ring-1 ring-border"
+                      />
+                    ) : (
+                      <span
+                        className="grid h-9 w-9 place-items-center rounded-md ring-1 ring-border"
+                        style={{ background: `${g.color ?? '#6366F1'}1A` }}
+                        aria-hidden="true"
+                      >
+                        <span
+                          className="w-2.5 h-2.5 rounded-full"
+                          style={{ background: g.color ?? '#6366F1' }}
+                        />
+                      </span>
+                    )}
+                  </button>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span
-                        className="w-2.5 h-2.5 rounded-full shrink-0"
-                        style={{ background: g.color ?? '#6366F1' }}
-                        aria-hidden="true"
-                      />
                       <h3 className="text-sm font-semibold text-ink">{g.name}</h3>
                       <span className="text-[10px] font-mono text-muted bg-hover px-1.5 py-0.5 rounded">
                         {g.slug}
@@ -260,6 +347,16 @@ export function UserGroups() {
                       )}
                     </p>
                   </div>
+                  {g.logo_url && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeLogo(g)}
+                      disabled={logoBusyId === g.id}
+                    >
+                      Remove logo
+                    </Button>
+                  )}
                   <Button variant="ghost" size="sm" onClick={() => toggle(g)}>
                     {g.is_active ? 'Pause' : 'Resume'}
                   </Button>
