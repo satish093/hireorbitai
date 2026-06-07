@@ -79,6 +79,51 @@ test.describe('Invoice document + email toggle', () => {
 
     expect(errors).toHaveLength(0);
   });
+
+  test('New-invoice form: "Email on save" creates then sends', async ({ page }) => {
+    test.setTimeout(90000);
+    const errors = trackPageErrors(page);
+    await seedSession(page, MANAGER);
+    await mockApi(page, {
+      profile: MANAGER,
+      flags: { invoices: true },
+      handlers: {
+        '/invoices': { json: [] },
+        'POST /invoices': {
+          json: {
+            id: 'inv-new',
+            invoice_number: 'NEW-1',
+            consultant_name: 'Jane',
+            vendor_name: 'Acme',
+            bill_to_email: 'pay@acme.test',
+          },
+        },
+        'POST /invoices/inv-new/send': { json: { ok: true, emailed_to: 'pay@acme.test' } },
+      },
+    });
+
+    await page.goto('/invoices');
+    await expect(page.getByRole('heading', { name: 'Invoices' })).toBeVisible({ timeout: 60000 });
+
+    await page.getByRole('button', { name: '+ New invoice' }).click();
+    await page.getByLabel('Consultant name *').fill('Jane');
+    await page.getByLabel('Vendor *').fill('Acme');
+    await page.getByLabel('Bill-to email').fill('pay@acme.test');
+    await page.getByRole('switch', { name: 'Email this invoice on save' }).click();
+
+    const createReq = page.waitForRequest(
+      (r) => r.url().endsWith('/api/invoices') && r.method() === 'POST',
+    );
+    const sendReq = page.waitForRequest(
+      (r) => r.url().includes('/api/invoices/inv-new/send') && r.method() === 'POST',
+    );
+    await page.getByRole('button', { name: 'Save invoice' }).click();
+    await createReq;
+    await sendReq;
+    await expect(page.getByText(/emailed to/i)).toBeVisible({ timeout: 8000 });
+
+    expect(errors).toHaveLength(0);
+  });
 });
 
 test.describe('Group company logo', () => {
