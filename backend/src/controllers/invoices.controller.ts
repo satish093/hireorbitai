@@ -2,6 +2,17 @@ import { RequestHandler } from 'express';
 import { z } from 'zod';
 import { db } from '../config/db';
 import { httpError } from '../types';
+import { promises as fs } from 'node:fs';
+import {
+  renderInvoicePdf,
+  invoiceFileBase,
+  type InvoiceRow,
+  type InvoiceBrand,
+} from '../services/invoicePdf.service';
+import { resolveOnDisk } from '../config/storage.local';
+import { sendInvoiceEmail } from '../services/brevo.service';
+import { audit } from '../services/audit.service';
+import { logger } from '../config/logger';
 
 // Allowed status values — kept in sync with the CHECK constraint in
 // migrations/1760000000000_invoices.sql and the frontend SelectInput options.
@@ -29,6 +40,15 @@ const writable = {
   billing_month: z.string().optional().nullable(),
   status: z.enum(INVOICE_STATUSES).optional(),
   notes: z.string().optional().nullable(),
+  // Where the generated invoice PDF is emailed when the user toggles "Email this
+  // invoice" on. Optional contact field — accepts a valid email or '' (the blank
+  // is normalized to NULL below so the column stores NULL, not ''). Mirrors the
+  // `httpUrl.or(z.literal(''))` pattern used elsewhere. `last_emailed_at` is NOT
+  // here: it is server-set only (see /invoices/:id/send).
+  bill_to_email: z.string().email().or(z.literal('')).optional().nullable(),
+  // The issuing company (a user group). Its name + logo brand the generated PDF.
+  // Accepts a uuid or '' (normalized to NULL below).
+  company_group_id: z.string().uuid().or(z.literal('')).optional().nullable(),
 };
 export const createSchema = z.object(writable).strict();
 export const updateSchema = z.object(writable).partial().strict();
@@ -37,7 +57,14 @@ export const updateSchema = z.object(writable).partial().strict();
 // environment yet. We try the full write first, then strip these and retry on a
 // schema-cache / missing-column error so the backend can deploy ahead of the
 // migration. (Same retry-and-strip pattern used across the codebase.)
-const LATE_COLUMNS = ['pay_rate', 'invoice_amount', 'billing_month'] as const;
+const LATE_COLUMNS = [
+  'pay_rate',
+  'invoice_amount',
+  'billing_month',
+  'bill_to_email',
+  'last_emailed_at',
+  'company_group_id',
+] as const;
 function stripLateColumns(row: Record<string, unknown>): Record<string, unknown> {
   const out = { ...row };
   for (const k of LATE_COLUMNS) delete out[k];
@@ -52,7 +79,15 @@ function isMissingColumn(message?: string): boolean {
 // NULL not '').
 function normalize(data: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = { ...data };
-  for (const k of ['invoice_date', 'due_date', 'invoice_number', 'notes', 'billing_month']) {
+  for (const k of [
+    'invoice_date',
+    'due_date',
+    'invoice_number',
+    'notes',
+    'billing_month',
+    'bill_to_email',
+    'company_group_id',
+  ]) {
     if (out[k] === '') out[k] = null;
   }
   return out;
@@ -125,4 +160,107 @@ export const remove: RequestHandler = async (req, res) => {
   const { error } = await db.from('invoices').delete().eq('id', req.params.id);
   if (error) throw httpError(500, 'Database error');
   res.json({ ok: true });
+};
+
+/** Load the full invoice row or 404. Authorization is the route-level
+ *  MANAGER_TIER gate (shared back-office tracker — no per-row ownership). */
+async function loadInvoiceOr404(id: string): Promise<InvoiceRow> {
+  const { data, error } = await db.from('invoices').select('*').eq('id', id).maybeSingle();
+  if (error || !data) throw httpError(404, 'Invoice not found');
+  return data as InvoiceRow;
+}
+
+const GROUP_LOGO_BUCKET = 'group-logos';
+
+/** Resolve the issuing-company branding for an invoice from its company_group_id:
+ *  the group's name + the bytes of its uploaded logo (read off the filesystem
+ *  bucket). All best-effort — a missing group/logo just falls back to the default
+ *  brand in the PDF, never an error. */
+async function resolveInvoiceBrand(invoice: InvoiceRow): Promise<InvoiceBrand | undefined> {
+  const gid = invoice.company_group_id;
+  if (!gid) return undefined;
+  const { data: grp } = await db
+    .from('user_groups')
+    .select('name, logo_path')
+    .eq('id', gid)
+    .maybeSingle();
+  if (!grp) return undefined;
+  const row = grp as { name?: string | null; logo_path?: string | null };
+  let logo: Buffer | null = null;
+  if (row.logo_path) {
+    try {
+      logo = await fs.readFile(resolveOnDisk(GROUP_LOGO_BUCKET, row.logo_path));
+    } catch {
+      logo = null; // logo file gone / unreadable → placeholder mark
+    }
+  }
+  return { name: row.name ?? null, logo };
+}
+
+/** GET /invoices/:id/document — stream a freshly-rendered invoice PDF for
+ *  download. Generated on demand (never persisted) so it always reflects the
+ *  current row. */
+export const document: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const invoice = await loadInvoiceOr404(req.params.id);
+  const pdf = await renderInvoicePdf(invoice, await resolveInvoiceBrand(invoice));
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="${invoiceFileBase(invoice)}.pdf"`);
+  res.setHeader('Content-Length', String(pdf.length));
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.send(pdf);
+};
+
+// Body is `.strict()` — only an optional recipient override is accepted; the
+// invoice's stored bill_to_email is the default.
+const sendSchema = z.object({ recipient_email: z.string().email().optional() }).strict();
+
+/** POST /invoices/:id/send — email the invoice PDF to the bill-to address (or an
+ *  explicit recipient_email override). This is the "Email this invoice" toggle. */
+export const send: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const parsed = sendSchema.safeParse(req.body ?? {});
+  if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
+
+  const invoice = await loadInvoiceOr404(req.params.id);
+  const recipient = (parsed.data.recipient_email ?? invoice.bill_to_email ?? '').trim();
+  if (!recipient) {
+    throw httpError(400, 'No recipient email — add a Bill-to email or pass recipient_email.');
+  }
+
+  const pdf = await renderInvoicePdf(invoice, await resolveInvoiceBrand(invoice));
+  await sendInvoiceEmail({
+    to: { email: recipient },
+    invoice,
+    pdf,
+    fileName: `${invoiceFileBase(invoice)}.pdf`,
+  });
+
+  // Stamp last_emailed_at — best-effort. The email already went out, so a missing
+  // column (pre-migration) or a write error must not fail the request.
+  const stamp = new Date().toISOString();
+  const { error: updErr } = await db
+    .from('invoices')
+    .update({ last_emailed_at: stamp })
+    .eq('id', invoice.id);
+  if (updErr && !isMissingColumn(updErr.message)) {
+    logger.warn(
+      { err: updErr, invoiceId: invoice.id },
+      'invoice send: failed to stamp last_emailed_at',
+    );
+  }
+
+  audit({
+    action: 'invoice_emailed',
+    user_id: req.user.id,
+    email: req.user.email ?? null,
+    req,
+    metadata: {
+      invoice_id: invoice.id,
+      invoice_number: invoice.invoice_number ?? null,
+      to: recipient,
+    },
+  });
+
+  res.json({ ok: true, emailed_to: recipient, last_emailed_at: stamp });
 };

@@ -11,6 +11,10 @@ export const invoicesRouter = Router();
 
 invoicesRouter.get('/', requireRole(...MANAGER_TIER), c.list);
 invoicesRouter.get('/:id', requireRole(...MANAGER_TIER), c.get);
+// Document generation (download) + email-send. Distinct suffixes, so order vs
+// the bare /:id routes doesn't matter; grouped here for clarity.
+invoicesRouter.get('/:id/document', requireRole(...MANAGER_TIER), c.document);
+invoicesRouter.post('/:id/send', requireRole(...MANAGER_TIER), c.send);
 invoicesRouter.post('/', requireRole(...MANAGER_TIER), c.create);
 invoicesRouter.patch('/:id', requireRole(...MANAGER_TIER), c.update);
 invoicesRouter.delete('/:id', requireRole(...MANAGER_TIER), c.remove);

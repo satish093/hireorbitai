@@ -7,6 +7,7 @@ import { SelectInput } from '../components/SelectInput';
 import { PageHeader } from '../components/PageHeader';
 import { Button } from '../components/Button';
 import { Pill, PillTone } from '../components/Pill';
+import { useUserGroups } from '../components/GroupBadge';
 import { api } from '../services/api';
 import { invalidate, useInvalidationListener } from '../hooks/useInvalidate';
 import toast from 'react-hot-toast';
@@ -24,6 +25,8 @@ const EMPTY = {
   pay_rate: '',
   billing_month: '',
   invoice_amount: '',
+  bill_to_email: '',
+  company_group_id: '',
   status: 'Submitted' as Status,
   notes: '',
 };
@@ -105,6 +108,19 @@ export function Invoices() {
   const [form, setForm] = useState<any>(EMPTY);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  // Document section (in the detail modal): the email toggle, the recipient
+  // override, and a busy flag shared by Download + Send.
+  const [emailOn, setEmailOn] = useState(false);
+  const [recipient, setRecipient] = useState('');
+  const [docBusy, setDocBusy] = useState(false);
+  // Companies (user groups) — used as the invoice issuer whose logo brands the PDF.
+  const { groups, byId } = useUserGroups();
+
+  // Reset the Document controls whenever a different invoice is opened.
+  useEffect(() => {
+    setEmailOn(false);
+    setRecipient(selected?.bill_to_email ?? '');
+  }, [selected?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function load() {
     setLoading(true);
@@ -143,6 +159,8 @@ export function Invoices() {
       pay_rate: row.pay_rate ?? '',
       billing_month: row.billing_month ?? '',
       invoice_amount: row.invoice_amount ?? '',
+      bill_to_email: row.bill_to_email ?? '',
+      company_group_id: row.company_group_id ?? '',
       status: (row.status as Status) ?? 'Submitted',
       notes: row.notes ?? '',
     });
@@ -185,6 +203,8 @@ export function Invoices() {
           ? null
           : Number(form.invoice_amount),
       billing_month: form.billing_month || null,
+      bill_to_email: form.bill_to_email?.trim() || null,
+      company_group_id: form.company_group_id || null,
       status: form.status,
       notes: form.notes?.trim() || null,
     };
@@ -217,6 +237,54 @@ export function Invoices() {
       toast.success('Invoice deleted');
     } catch (e: any) {
       toast.error(e?.response?.data?.error ?? 'Delete failed');
+    }
+  }
+
+  // Generate + download the invoice PDF. Authenticated blob fetch through the
+  // bearer-injecting api client (the endpoint is not a public signed URL).
+  async function downloadDoc(row: any) {
+    setDocBusy(true);
+    try {
+      const res = await api.get(`/invoices/${row.id}/document`, { responseType: 'blob' });
+      const url = URL.createObjectURL(res.data as Blob);
+      const a = window.document.createElement('a');
+      a.href = url;
+      const base = row.invoice_number
+        ? String(row.invoice_number).replace(/[^a-zA-Z0-9._-]+/g, '-')
+        : row.id;
+      a.download = `invoice-${base}.pdf`;
+      window.document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error('Failed to generate the invoice document');
+    } finally {
+      setDocBusy(false);
+    }
+  }
+
+  // Email the invoice PDF to the recipient (the "Email this invoice" toggle).
+  async function sendDoc(row: any) {
+    const to = recipient.trim();
+    if (!to) {
+      toast.error('Enter a recipient email');
+      return;
+    }
+    setDocBusy(true);
+    try {
+      const res = await api.post(`/invoices/${row.id}/send`, { recipient_email: to });
+      toast.success(`Invoice emailed to ${to}`);
+      const stamp = res.data?.last_emailed_at ?? new Date().toISOString();
+      setSelected((prev: any) =>
+        prev ? { ...prev, last_emailed_at: stamp, bill_to_email: prev.bill_to_email || to } : prev,
+      );
+      invalidate('invoices');
+      load();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error ?? 'Failed to send the invoice');
+    } finally {
+      setDocBusy(false);
     }
   }
 
@@ -370,11 +438,29 @@ export function Invoices() {
               onChange={(e) => setForm({ ...form, invoice_amount: e.target.value })}
             />
           </div>
-          <FormInput
-            label="Billing month"
-            type="month"
-            value={form.billing_month}
-            onChange={(e) => setForm({ ...form, billing_month: e.target.value })}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <FormInput
+              label="Billing month"
+              type="month"
+              value={form.billing_month}
+              onChange={(e) => setForm({ ...form, billing_month: e.target.value })}
+            />
+            <FormInput
+              label="Bill-to email"
+              type="email"
+              placeholder="vendor@example.com"
+              value={form.bill_to_email}
+              onChange={(e) => setForm({ ...form, bill_to_email: e.target.value })}
+            />
+          </div>
+          <SelectInput
+            label="Company (invoice issuer)"
+            value={form.company_group_id}
+            onChange={(e) => setForm({ ...form, company_group_id: e.target.value })}
+            options={[
+              { value: '', label: '— None (default branding) —' },
+              ...groups.map((g) => ({ value: g.id, label: g.name })),
+            ]}
           />
           <SelectInput
             label="Status"
@@ -434,9 +520,82 @@ export function Invoices() {
             label="Net terms"
             value={selected?.net_terms_days != null ? `${selected.net_terms_days} days` : '—'}
           />
+          <Detail
+            label="Company (issuer)"
+            value={selected?.company_group_id ? byId[selected.company_group_id]?.name : null}
+          />
+          <Detail label="Bill-to email" value={selected?.bill_to_email} />
+          <Detail
+            label="Last emailed"
+            value={selected?.last_emailed_at ? formatDate(selected.last_emailed_at) : 'Never'}
+          />
           <Detail label="Created" value={formatDate(selected?.created_at)} />
           <div className="sm:col-span-2">
             <Detail label="Notes" value={selected?.notes} />
+          </div>
+        </div>
+
+        {/* Document — generate a downloadable PDF, with an opt-in email toggle. */}
+        <div className="mt-4 rounded-xl border border-border bg-hover/30 p-3.5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-ink">Document</div>
+              <div className="text-xs text-muted">
+                Generate a PDF of this invoice — download it, or email it to the bill-to address.
+              </div>
+            </div>
+            <label className="flex shrink-0 cursor-pointer select-none items-center gap-2">
+              <span className="text-xs text-muted">Email it</span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={emailOn}
+                aria-label="Email this invoice"
+                onClick={() => setEmailOn((v) => !v)}
+                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                  emailOn ? 'bg-primary' : 'bg-border'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                    emailOn ? 'translate-x-4' : 'translate-x-0.5'
+                  }`}
+                />
+              </button>
+            </label>
+          </div>
+
+          <div className="mt-3 flex flex-wrap items-end gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => downloadDoc(selected)}
+              loading={docBusy && !emailOn}
+              disabled={docBusy}
+            >
+              Download PDF
+            </Button>
+            {emailOn && (
+              <>
+                <div className="min-w-[180px] flex-1">
+                  <FormInput
+                    label="Recipient email"
+                    type="email"
+                    placeholder="vendor@example.com"
+                    value={recipient}
+                    onChange={(e) => setRecipient(e.target.value)}
+                  />
+                </div>
+                <Button
+                  size="sm"
+                  onClick={() => sendDoc(selected)}
+                  loading={docBusy}
+                  disabled={docBusy || !recipient.trim()}
+                >
+                  Send
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </Modal>

@@ -1,5 +1,6 @@
 import { env } from '../config/env';
 import { logger } from '../config/logger';
+import type { InvoiceRow } from './invoicePdf.service';
 
 // ---------------------------------------------------------------------------
 // Brevo (formerly Sendinblue) transactional email client.
@@ -19,6 +20,9 @@ interface SendArgs {
   text?: string;
   /** Optional Brevo "tag" used for grouping in the Brevo dashboard. */
   tag?: string;
+  /** Optional file attachments. `content` is the raw bytes — base64-encoded for
+   *  the Brevo v3 `attachment[]` field at send time. */
+  attachment?: Array<{ name: string; content: Buffer }>;
 }
 
 async function sendViaBrevo(args: SendArgs): Promise<void> {
@@ -39,6 +43,14 @@ async function sendViaBrevo(args: SendArgs): Promise<void> {
     htmlContent: args.html,
     ...(args.text ? { textContent: args.text } : {}),
     ...(args.tag ? { tags: [args.tag] } : {}),
+    ...(args.attachment && args.attachment.length
+      ? {
+          attachment: args.attachment.map((a) => ({
+            name: a.name,
+            content: a.content.toString('base64'),
+          })),
+        }
+      : {}),
   };
   const res = await fetch('https://api.brevo.com/v3/smtp/email', {
     method: 'POST',
@@ -305,6 +317,59 @@ When: ${whenStr}
 IP: ${ip}
 If this wasn't you, reset immediately and email ${brand.supportEmail}.`,
     tag: 'password-changed',
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Invoice email — sends the generated invoice PDF as an attachment.
+//
+// Triggered from POST /invoices/:id/send when the user flips the "Email this
+// invoice" toggle on. The PDF buffer is rendered by invoicePdf.service and
+// passed in; this just wraps it in the branded shell + attaches it.
+// ---------------------------------------------------------------------------
+export async function sendInvoiceEmail(args: {
+  to: { email: string; name?: string };
+  invoice: InvoiceRow;
+  pdf: Buffer;
+  fileName: string;
+}): Promise<void> {
+  const inv = args.invoice;
+  const number = inv.invoice_number ? `#${inv.invoice_number}` : '';
+  const amount =
+    inv.invoice_amount != null && inv.invoice_amount !== ''
+      ? Number(inv.invoice_amount).toLocaleString('en-US', { style: 'currency', currency: 'USD' })
+      : null;
+  const detailRows: Array<[string, string]> = [];
+  if (inv.consultant_name) detailRows.push(['Consultant', inv.consultant_name]);
+  if (inv.vendor_name) detailRows.push(['Vendor', inv.vendor_name]);
+  if (amount) detailRows.push(['Amount', amount]);
+  if (inv.due_date) detailRows.push(['Due date', inv.due_date]);
+  const detailHtml = detailRows
+    .map(
+      ([k, v]) =>
+        `<div><span style="color:${brand.mutedColor};">${escapeHtml(k)}:</span> ${escapeHtml(v)}</div>`,
+    )
+    .join('');
+  const body = `
+    <p>Hi${args.to.name ? ` ${escapeHtml(args.to.name)}` : ''},</p>
+    <p>Please find attached the invoice ${escapeHtml(number)} from ${escapeHtml(brand.productName)}. The full document is attached to this email as a PDF.</p>
+    <div style="margin:16px 0 4px 0;padding:14px 16px;background:${brand.bgColor};border:1px solid ${brand.borderColor};border-radius:10px;font-size:13px;color:${brand.textColor};">
+      ${detailHtml || `<div style="color:${brand.mutedColor};">See the attached PDF for details.</div>`}
+    </div>
+  `;
+  await sendViaBrevo({
+    to: args.to,
+    subject: `Invoice ${number ? number + ' ' : ''}from ${brand.productName}`
+      .replace(/\s+/g, ' ')
+      .trim(),
+    html: shell({
+      preheader: `Invoice ${number} attached.`.trim(),
+      heading: `Invoice ${number}`.trim(),
+      body,
+    }),
+    text: `Please find attached the invoice ${number} from ${brand.productName}.${amount ? `\nAmount: ${amount}` : ''}${inv.due_date ? `\nDue date: ${inv.due_date}` : ''}\nThe invoice PDF is attached to this email.`,
+    tag: 'invoice',
+    attachment: [{ name: args.fileName, content: args.pdf }],
   });
 }
 
