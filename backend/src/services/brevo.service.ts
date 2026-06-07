@@ -339,11 +339,22 @@ export async function sendInvoiceEmail(args: {
     inv.invoice_amount != null && inv.invoice_amount !== ''
       ? Number(inv.invoice_amount).toLocaleString('en-US', { style: 'currency', currency: 'USD' })
       : null;
+  // `due_date` arrives as a JS Date from the DB shim (pg parsers) — coerce to a
+  // friendly string; passing a Date through escapeHtml would throw.
+  const dueStr = inv.due_date
+    ? inv.due_date instanceof Date
+      ? inv.due_date.toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+        })
+      : String(inv.due_date)
+    : '';
   const detailRows: Array<[string, string]> = [];
   if (inv.consultant_name) detailRows.push(['Consultant', inv.consultant_name]);
   if (inv.vendor_name) detailRows.push(['Vendor', inv.vendor_name]);
   if (amount) detailRows.push(['Amount', amount]);
-  if (inv.due_date) detailRows.push(['Due date', inv.due_date]);
+  if (dueStr) detailRows.push(['Due date', dueStr]);
   const detailHtml = detailRows
     .map(
       ([k, v]) =>
@@ -367,7 +378,7 @@ export async function sendInvoiceEmail(args: {
       heading: `Invoice ${number}`.trim(),
       body,
     }),
-    text: `Please find attached the invoice ${number} from ${brand.productName}.${amount ? `\nAmount: ${amount}` : ''}${inv.due_date ? `\nDue date: ${inv.due_date}` : ''}\nThe invoice PDF is attached to this email.`,
+    text: `Please find attached the invoice ${number} from ${brand.productName}.${amount ? `\nAmount: ${amount}` : ''}${dueStr ? `\nDue date: ${dueStr}` : ''}\nThe invoice PDF is attached to this email.`,
     tag: 'invoice',
     attachment: [{ name: args.fileName, content: args.pdf }],
   });

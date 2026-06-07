@@ -25,13 +25,15 @@ export interface InvoiceRow {
   billing_month?: string | null;
   pay_rate?: number | string | null;
   invoice_amount?: number | string | null;
-  invoice_date?: string | null;
-  due_date?: string | null;
+  // `date` / `timestamptz` columns arrive as JS Date objects from the DB shim
+  // (pg's default parsers); fmtDate handles both Date and string.
+  invoice_date?: string | Date | null;
+  due_date?: string | Date | null;
   net_terms_days?: number | null;
   status?: string | null;
   bill_to_email?: string | null;
   notes?: string | null;
-  created_at?: string | null;
+  created_at?: string | Date | null;
   company_group_id?: string | null;
 }
 
@@ -86,21 +88,30 @@ function fmtMoney(value?: number | string | null): string {
   });
 }
 
-function fmtDate(value?: string | null): string {
+function fmtDate(value?: string | Date | null): string {
   if (!value) return '—';
-  const d = value.includes('T') ? new Date(value) : new Date(`${value}T00:00:00`);
+  // The DB shim returns `date` / `timestamptz` columns as JS Date objects (pg's
+  // default type parsers), but callers may also pass ISO strings. Handle both —
+  // calling .includes() on a Date is what produced a 500 in production.
+  const d =
+    value instanceof Date
+      ? value
+      : String(value).includes('T')
+        ? new Date(String(value))
+        : new Date(`${String(value)}T00:00:00`);
   return Number.isNaN(d.getTime())
-    ? value
+    ? String(value)
     : d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 function fmtMonth(value?: string | null): string {
   if (!value) return '—';
-  const m = /^(\d{4})-(\d{2})$/.exec(value);
-  if (!m) return value;
+  const s = String(value);
+  const m = /^(\d{4})-(\d{2})$/.exec(s);
+  if (!m) return s;
   const d = new Date(Number(m[1]), Number(m[2]) - 1, 1);
   return Number.isNaN(d.getTime())
-    ? value
+    ? s
     : d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 }
 

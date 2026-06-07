@@ -155,6 +155,21 @@ describe('renderInvoicePdf — company branding', () => {
     expect(buf.subarray(0, 5).toString('latin1')).toBe('%PDF-');
     expect(buf.length).toBeGreaterThan(800);
   });
+
+  it('renders when date columns are JS Date objects (the real DB shape)', async () => {
+    // The DB shim returns date / timestamptz columns as Date objects — fmtDate
+    // must not assume strings (regression: prod 500 "value.includes is not a function").
+    const buf = await renderInvoicePdf({
+      id: 'x',
+      invoice_number: 'INV-1',
+      vendor_name: 'Acme',
+      invoice_amount: 1000,
+      invoice_date: new Date('2026-05-01T00:00:00Z'),
+      due_date: new Date('2026-05-31T00:00:00Z'),
+      created_at: new Date('2026-05-01T00:00:00Z'),
+    });
+    expect(buf.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+  });
 });
 
 describe('invoices.document — PDF download', () => {
