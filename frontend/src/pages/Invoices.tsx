@@ -119,8 +119,6 @@ export function Invoices() {
   const [emailOn, setEmailOn] = useState(false);
   const [recipient, setRecipient] = useState('');
   const [docBusy, setDocBusy] = useState(false);
-  // "Email on save" toggle for the New-invoice form (create + email in one step).
-  const [emailOnSave, setEmailOnSave] = useState(false);
   // Companies (user groups) — used as the invoice issuer whose logo brands the PDF.
   const { groups, byId } = useUserGroups();
   // Only admin-tier may choose the issuing company. For everyone else it's
@@ -150,7 +148,6 @@ export function Invoices() {
   function openCreate() {
     setForm(EMPTY);
     setEditingId(null);
-    setEmailOnSave(false);
     setOpen(true);
   }
 
@@ -158,7 +155,6 @@ export function Invoices() {
     setOpen(false);
     setEditingId(null);
     setForm(EMPTY);
-    setEmailOnSave(false);
   }
 
   // Prefill with ONLY writable fields — the update schema is `.strict()`.
@@ -198,9 +194,6 @@ export function Invoices() {
     if (saving) return;
     if (!form.consultant_name?.trim()) return toast.error('Consultant name is required');
     if (!form.vendor_name?.trim()) return toast.error('Vendor is required');
-    if (!editingId && emailOnSave && !form.bill_to_email?.trim()) {
-      return toast.error('Add a bill-to email to email this invoice on save');
-    }
     setSaving(true);
     const payload = {
       consultant_name: form.consultant_name.trim(),
@@ -226,27 +219,21 @@ export function Invoices() {
       notes: form.notes?.trim() || null,
     };
     try {
+      let created: any = null;
       if (editingId) {
         await api.patch(`/invoices/${editingId}`, payload);
         toast.success('Invoice updated');
       } else {
         const res = await api.post('/invoices', payload);
+        created = res.data;
         toast.success('Invoice added');
-        // Optionally email the freshly-created invoice to its bill-to address.
-        const newId = res.data?.id;
-        const to = form.bill_to_email?.trim();
-        if (emailOnSave && newId && to) {
-          try {
-            await api.post(`/invoices/${newId}/send`, { recipient_email: to });
-            toast.success(`Invoice emailed to ${to}`);
-          } catch (err: any) {
-            toast.error(err?.response?.data?.error ?? 'Saved, but the email failed to send');
-          }
-        }
       }
       closeForm();
       invalidate('invoices');
       load();
+      // For a NEW invoice, open its detail — the "Document" panel — so the user
+      // can download or email the PDF right after creating it.
+      if (created) setSelected(created);
     } catch (e: any) {
       toast.error(e?.response?.data?.error ?? 'Something went wrong. Please try again.');
     } finally {
@@ -503,32 +490,10 @@ export function Invoices() {
             value={form.notes}
             onChange={(e) => setForm({ ...form, notes: e.target.value })}
           />
-          {/* New invoices can be emailed to the bill-to address on save. */}
           {!editingId && (
-            <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-hover/30 p-3">
-              <div className="min-w-0">
-                <div className="text-sm font-medium text-ink">Email this invoice on save</div>
-                <div className="text-xs text-muted">
-                  After saving, send the PDF to the bill-to address.
-                </div>
-              </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={emailOnSave}
-                aria-label="Email this invoice on save"
-                onClick={() => setEmailOnSave((v) => !v)}
-                className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
-                  emailOnSave ? 'bg-primary' : 'bg-border'
-                }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
-                    emailOnSave ? 'translate-x-4' : 'translate-x-0.5'
-                  }`}
-                />
-              </button>
-            </div>
+            <p className="text-xs text-muted">
+              After saving, the invoice opens with a Document panel to download or email the PDF.
+            </p>
           )}
         </div>
       </Modal>
