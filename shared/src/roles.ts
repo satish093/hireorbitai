@@ -70,7 +70,27 @@ export const DEVELOPER_CAPABILITIES = [
   'calls_usage', // /admin/calls-usage — monthly call-hour budget dashboard
 ] as const;
 
-export type DeveloperCapability = (typeof DEVELOPER_CAPABILITIES)[number];
+/**
+ * Page-access capabilities — UNLIKE DEVELOPER_CAPABILITIES (admin powers, only
+ * granted to DEVELOPER accounts), these grant a specific PAGE to ANY user
+ * regardless of role. An ADMIN_TIER user toggles them per-account, and
+ * `hasCapability` honours them for EVERY role (not just DEVELOPER).
+ */
+export const PAGE_ACCESS_CAPABILITIES = ['invoices'] as const;
+export type PageAccessCapability = (typeof PAGE_ACCESS_CAPABILITIES)[number];
+
+/** Every grantable capability — admin powers + page access. Stored in users.capabilities. */
+export const ALL_CAPABILITIES = [...DEVELOPER_CAPABILITIES, ...PAGE_ACCESS_CAPABILITIES] as const;
+
+/** The capability type (admin power OR page access). */
+export type Capability = (typeof DEVELOPER_CAPABILITIES)[number] | PageAccessCapability;
+/** @deprecated kept for back-compat — alias of {@link Capability}. */
+export type DeveloperCapability = Capability;
+
+/** True when a capability grants PAGE access to any role (vs a DEVELOPER-only admin power). */
+export function isPageAccessCapability(cap: string): cap is PageAccessCapability {
+  return (PAGE_ACCESS_CAPABILITIES as readonly string[]).includes(cap);
+}
 
 export function isAdmin(role: Role | undefined): boolean {
   return !!role && ADMIN_TIER.includes(role);

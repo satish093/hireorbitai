@@ -10,7 +10,7 @@ vi.mock('../config/db', () => ({ db: {}, pool: {} }));
 vi.mock('../config/env', () => ({ env: {} }));
 
 import { requireRole, requireRoleOrCapability, hasCapability } from './auth';
-import { OWNER_TIER } from '../types';
+import { OWNER_TIER, MANAGER_TIER } from '../types';
 import type { Role } from '../types';
 
 const TIER: Role[] = ['SUPER_ADMIN', 'CEO', 'CTO', 'DIRECTOR', 'MANAGER', 'HR_MANAGER'];
@@ -35,6 +35,53 @@ describe('hasCapability', () => {
     // A non-DEVELOPER never gets capabilities, even if the array is present.
     expect(hasCapability({ role: 'MANAGER', capabilities: ['reports'] }, 'reports')).toBe(false);
     expect(hasCapability(undefined, 'reports')).toBe(false);
+  });
+});
+
+describe('hasCapability — PAGE-ACCESS caps apply to ANY role', () => {
+  it('invoices grant unlocks for every role, not just DEVELOPER', () => {
+    for (const role of ['RECRUITER', 'CONSULTANT', 'MANAGER', 'DEVELOPER'] as Role[]) {
+      expect(hasCapability({ role, capabilities: ['invoices'] }, 'invoices')).toBe(true);
+    }
+    // Without the grant → false, regardless of role.
+    expect(hasCapability({ role: 'RECRUITER', capabilities: [] }, 'invoices')).toBe(false);
+    expect(hasCapability({ role: 'CONSULTANT', capabilities: ['reports'] }, 'invoices')).toBe(
+      false,
+    );
+  });
+
+  it('a DEVELOPER admin-cap (reports) still does NOT leak to non-developers', () => {
+    // Page-access widening must not weaken the DEVELOPER-only admin caps.
+    expect(hasCapability({ role: 'RECRUITER', capabilities: ['reports'] }, 'reports')).toBe(false);
+    expect(hasCapability({ role: 'MANAGER', capabilities: ['users'] }, 'users')).toBe(false);
+    expect(hasCapability({ role: 'DEVELOPER', capabilities: ['reports'] }, 'reports')).toBe(true);
+  });
+});
+
+describe('requireRoleOrCapability(MANAGER_TIER, invoices) — the invoices gate', () => {
+  const gate = (user: any): number => {
+    let passed = false;
+    try {
+      requireRoleOrCapability(MANAGER_TIER, 'invoices')({ user } as any, {} as any, () => {
+        passed = true;
+      });
+    } catch (e) {
+      return (e as { status?: number }).status ?? 0;
+    }
+    return passed ? 200 : 0;
+  };
+
+  it('admits MANAGER_TIER by role with no grant', () => {
+    expect(gate({ role: 'MANAGER' })).toBe(200);
+    expect(gate({ role: 'DIRECTOR' })).toBe(200);
+  });
+
+  it('admits a RECRUITER / CONSULTANT / DEVELOPER ONLY with the invoices grant', () => {
+    expect(gate({ role: 'RECRUITER', capabilities: [] })).toBe(403);
+    expect(gate({ role: 'RECRUITER', capabilities: ['invoices'] })).toBe(200);
+    expect(gate({ role: 'CONSULTANT', capabilities: ['invoices'] })).toBe(200);
+    expect(gate({ role: 'DEVELOPER', capabilities: ['invoices'] })).toBe(200);
+    expect(gate({ role: 'CONSULTANT', capabilities: [] })).toBe(403);
   });
 });
 

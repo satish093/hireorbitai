@@ -4,10 +4,14 @@ import { db, pool } from '../config/db';
 import {
   httpError,
   ALL_ROLES,
+  ADMIN_TIER,
   GROUP_LEAD_ROLES,
   DEVELOPER_CAPABILITIES,
+  PAGE_ACCESS_CAPABILITIES,
+  isPageAccessCapability,
   canAssignRole,
   Role,
+  DeveloperCapability,
 } from '../types';
 import { audit } from '../services/audit.service';
 import { requestPasswordReset } from '../services/auth.service';
@@ -504,6 +508,60 @@ export const setCapabilities: RequestHandler = async (req, res) => {
     email: t.email,
     req,
     metadata: { capabilities: caps, by: req.user.id },
+  });
+  res.json({ ok: true, capabilities: caps });
+};
+
+// ---------------------------------------------------------------------------
+// PATCH /admin/users/:id/page-access
+//
+// ADMIN_TIER-only. Grants/revokes PAGE-ACCESS capabilities (e.g. 'invoices')
+// for ANY user, of any role. Unlike setCapabilities above (SUPER_ADMIN-only,
+// DEVELOPER-only targets, the powerful admin-page catalog), page-access caps
+// only unlock a single feature page and carry no admin power — so a DIRECTOR /
+// CTO / CEO may hand them out freely.
+//
+// The merge preserves the target's existing NON-page capabilities (the
+// DEVELOPER admin grants), so an admin toggling someone's invoices access can
+// never accidentally strip a DEVELOPER's `users`/`feature_flags` grants.
+const pageAccessSchema = z
+  .object({ capabilities: z.array(z.enum(PAGE_ACCESS_CAPABILITIES)) })
+  .strict();
+
+export const setPageAccess: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  // Re-check the tier here even though the router already gates the surface:
+  // the router admits a DEVELOPER holding the `users` capability, but handing
+  // out page access is an admin-only act — a scoped DEVELOPER must not.
+  if (!ADMIN_TIER.includes(req.user.role)) {
+    throw httpError(403, 'Only an admin can set page access.');
+  }
+  const parsed = pageAccessSchema.safeParse(req.body);
+  if (!parsed.success) throw httpError(400, 'Invalid page access', parsed.error.flatten());
+
+  const { data: target } = await db
+    .from('users')
+    .select('id, email, role, capabilities')
+    .eq('id', req.params.id)
+    .maybeSingle();
+  if (!target) throw httpError(404, 'User not found');
+  const t = target as { id: string; email: string; role: Role; capabilities?: string[] | null };
+
+  // Preserve every existing non-page capability; replace the page-access set
+  // wholesale with what the admin submitted.
+  const existingNonPage = (t.capabilities ?? []).filter((c) => !isPageAccessCapability(c));
+  const pageCaps = [...new Set(parsed.data.capabilities)];
+  const caps = [...new Set([...existingNonPage, ...pageCaps])] as DeveloperCapability[];
+
+  const { error } = await db.from('users').update({ capabilities: caps }).eq('id', t.id);
+  if (error) throw httpError(500, error.message);
+
+  audit({
+    action: 'user_page_access_set',
+    user_id: t.id,
+    email: t.email,
+    req,
+    metadata: { page_access: pageCaps, capabilities: caps, by: req.user.id },
   });
   res.json({ ok: true, capabilities: caps });
 };

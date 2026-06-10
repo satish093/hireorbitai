@@ -27,6 +27,9 @@ export {
   MESSAGING_ROLES,
   SUPER_ADMIN_ONLY_ROLES,
   DEVELOPER_CAPABILITIES,
+  PAGE_ACCESS_CAPABILITIES,
+  ALL_CAPABILITIES,
+  isPageAccessCapability,
   TASK_STATUSES,
   TASK_PRIORITIES,
   isAdmin,
@@ -36,7 +39,14 @@ export {
   canAssignRole,
   assignableRolesFor,
 } from '@hireorbitai/shared';
-export type { Role, DeveloperCapability, TaskStatus, TaskPriority } from '@hireorbitai/shared';
+export type {
+  Role,
+  DeveloperCapability,
+  PageAccessCapability,
+  Capability,
+  TaskStatus,
+  TaskPriority,
+} from '@hireorbitai/shared';
 
 import type { Role, DeveloperCapability } from '@hireorbitai/shared';
 

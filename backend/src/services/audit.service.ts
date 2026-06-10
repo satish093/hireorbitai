@@ -62,6 +62,7 @@ export type AuditAction =
   | 'ai_feature_error'
   | 'dev_login'
   | 'developer_capabilities_set'
+  | 'user_page_access_set'
   | 'feature_flag_changed'
   | 'feature_flag_group_override_changed';
 

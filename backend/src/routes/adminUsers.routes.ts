@@ -27,6 +27,9 @@ adminUsersRouter.patch('/:id/status', c.setStatus);
 adminUsersRouter.patch('/:id/group', c.setGroup);
 // DEVELOPER capability grants — handler hard-requires SUPER_ADMIN.
 adminUsersRouter.patch('/:id/capabilities', c.setCapabilities);
+// Page-access grants (e.g. invoices) for ANY user — handler re-checks ADMIN_TIER
+// so a DEVELOPER holding the `users` capability can't hand out page access.
+adminUsersRouter.patch('/:id/page-access', c.setPageAccess);
 adminUsersRouter.patch('/:id/notes', c.setNotes);
 adminUsersRouter.post('/:id/send-password-reset', c.sendPasswordReset);
 adminUsersRouter.post('/:id/force-password-change', c.forcePasswordChange);

@@ -423,7 +423,7 @@ export default function App() {
             <Route
               path="/invoices"
               element={
-                <ProtectedRoute allow={MANAGER_TIER}>
+                <ProtectedRoute allow={MANAGER_TIER} capability="invoices">
                   <FeatureGuard feature="invoices">
                     <Invoices />
                   </FeatureGuard>

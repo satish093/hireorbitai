@@ -1,7 +1,8 @@
 import { RequestHandler, type Request } from 'express';
 import { z } from 'zod';
 import { db } from '../config/db';
-import { httpError, ADMIN_TIER, canAssignRole, type Role } from '../types';
+import { httpError, ADMIN_TIER, OPERATOR_TIER, canAssignRole, type Role } from '../types';
+import { hasCapability } from '../middleware/auth';
 import { logger } from '../config/logger';
 import { audit } from '../services/audit.service';
 import { analyzeCompanyLogo } from '../services/aiLogo.service';
@@ -92,9 +93,32 @@ export const diag: RequestHandler = async (_req, res) => {
   });
 };
 
-/** GET /user-groups — list, with member count. Available to any signed-in user. */
-export const list: RequestHandler = async (_req, res) => {
-  const { data: groups, error } = await db.from('user_groups').select('*').order('name');
+/**
+ * GET /user-groups — list, with member count.
+ *
+ * SCOPED by caller: OPERATOR_TIER+ (and a DEVELOPER granted `user_groups`) get
+ * every group — they back the org-wide selectors (invite form, group badges).
+ * Everyone else — incl. a CONSULTANT — gets only their OWN group, so a member
+ * can see their group's branding/logo without enumerating the whole org. A
+ * groupless non-operator user gets an empty list.
+ */
+export const list: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const seesAll =
+    (OPERATOR_TIER as Role[]).includes(req.user.role) || hasCapability(req.user, 'user_groups');
+
+  let query = db.from('user_groups').select('*').order('name');
+  if (!seesAll) {
+    // Non-operator: only their own group. No group → empty list (the .eq on a
+    // null id matches nothing, but short-circuit to avoid a pointless query).
+    if (!req.user.group_id) {
+      res.json([]);
+      return;
+    }
+    query = query.eq('id', req.user.group_id);
+  }
+
+  const { data: groups, error } = await query;
   if (error) {
     // Migration not applied yet — return empty list rather than 500 so the
     // admin page can show a "run the migration" hint instead of a hard error.

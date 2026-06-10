@@ -25,6 +25,9 @@ export {
   MESSAGING_ROLES,
   SUPER_ADMIN_ONLY_ROLES,
   DEVELOPER_CAPABILITIES,
+  PAGE_ACCESS_CAPABILITIES,
+  ALL_CAPABILITIES,
+  isPageAccessCapability,
   TASK_STATUSES,
   TASK_PRIORITIES,
   isAdmin,
@@ -34,9 +37,17 @@ export {
   canAssignRole,
   assignableRolesFor,
 } from '@hireorbitai/shared';
-export type { Role, DeveloperCapability, TaskStatus, TaskPriority } from '@hireorbitai/shared';
+export type {
+  Role,
+  DeveloperCapability,
+  PageAccessCapability,
+  Capability,
+  TaskStatus,
+  TaskPriority,
+} from '@hireorbitai/shared';
 
 import type { Role, DeveloperCapability, TaskStatus, TaskPriority } from '@hireorbitai/shared';
+import { isPageAccessCapability as _isPageAccessCap } from '@hireorbitai/shared';
 
 /** UI label for a role — display capitalisation lives with the UI. */
 export const ROLE_LABEL: Record<Role, string> = {
@@ -88,12 +99,17 @@ export interface UserProfile {
   capabilities?: DeveloperCapability[];
 }
 
-/** True only for a DEVELOPER profile that holds the given capability grant. */
+/**
+ * True when the profile holds the given capability grant.
+ *   - PAGE_ACCESS capabilities (e.g. 'invoices') apply to ANY role.
+ *   - DEVELOPER admin capabilities apply ONLY to a DEVELOPER account.
+ */
 export function hasCapability(
   profile: Pick<UserProfile, 'role' | 'capabilities'> | null | undefined,
   cap: DeveloperCapability,
 ): boolean {
-  return !!profile && profile.role === 'DEVELOPER' && (profile.capabilities ?? []).includes(cap);
+  if (!profile || !(profile.capabilities ?? []).includes(cap)) return false;
+  return _isPageAccessCap(cap) || profile.role === 'DEVELOPER';
 }
 
 export type MarketingStatus = 'ACTIVE' | 'PAUSED' | 'PLACED';

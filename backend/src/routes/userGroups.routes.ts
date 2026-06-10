@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { requireRoleOrCapability } from '../middleware/auth';
-import { ADMIN_TIER, OPERATOR_TIER } from '../types';
+import { ADMIN_TIER } from '../types';
 import { uploadImage, verifyUploadMagic, scanUpload } from '../middleware/upload';
 import * as c from '../controllers/userGroups.controller';
 
@@ -15,9 +15,11 @@ const gate = requireRoleOrCapability(ADMIN_TIER, 'user_groups');
 // `user_groups`) only.
 userGroupsRouter.get('/diag', gate, c.diag);
 // The group list backs selectors (invite form, group badges) used across the
-// operator surface, so it is OPERATOR_TIER+ — consultants never need it and
-// shouldn't be able to enumerate the org's group structure.
-userGroupsRouter.get('/', requireRoleOrCapability(OPERATOR_TIER, 'user_groups'), c.list);
+// operator surface. Open to ANY authenticated user, but SCOPED inside the
+// controller: OPERATOR_TIER+ (and DEVELOPER-with-`user_groups`) see every
+// group; everyone else — incl. a CONSULTANT — sees only their OWN group, so a
+// member can see their group's uploaded logo without enumerating the whole org.
+userGroupsRouter.get('/', c.list);
 
 // Mutations: manager-tier and above (or a DEVELOPER granted user_groups).
 userGroupsRouter.post('/', gate, c.create);

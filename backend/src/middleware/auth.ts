@@ -1,7 +1,7 @@
 import { RequestHandler } from 'express';
 import { db } from '../config/db';
 import { env } from '../config/env';
-import { httpError, Role, DeveloperCapability } from '../types';
+import { httpError, Role, DeveloperCapability, isPageAccessCapability } from '../types';
 
 // Light-weight presence heartbeat. We bump last_seen_at at most once every
 // HEARTBEAT_MIN_MS per user so we don't write to Postgres on every API call —
@@ -132,12 +132,17 @@ export const requireRole =
     next();
   };
 
-/** True only for a DEVELOPER that holds the given capability grant. */
+/**
+ * True when the user holds the given capability grant.
+ *   - PAGE_ACCESS capabilities (e.g. 'invoices') apply to ANY role.
+ *   - DEVELOPER admin capabilities apply ONLY to a DEVELOPER account.
+ */
 export function hasCapability(
   user: { role: Role; capabilities?: DeveloperCapability[] } | undefined,
   cap: DeveloperCapability,
 ): boolean {
-  return !!user && user.role === 'DEVELOPER' && (user.capabilities ?? []).includes(cap);
+  if (!user || !(user.capabilities ?? []).includes(cap)) return false;
+  return isPageAccessCapability(cap) || user.role === 'DEVELOPER';
 }
 
 /**

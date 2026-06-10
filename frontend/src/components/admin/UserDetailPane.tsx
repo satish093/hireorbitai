@@ -15,9 +15,13 @@ import { useUserDetail } from './useUserDetail';
 import { useAuth } from '../../context/AuthContext';
 import {
   DEVELOPER_CAPABILITIES,
+  PAGE_ACCESS_CAPABILITIES,
+  isAdmin,
+  isPageAccessCapability,
   assignableRolesFor,
   type Role,
   type DeveloperCapability,
+  type PageAccessCapability,
 } from '@hireorbitai/shared';
 import {
   AUDIT_DOT,
@@ -72,6 +76,7 @@ const CAP_LABEL: Record<DeveloperCapability, string> = {
   reports: 'Analytics / reports',
   ai_usage: 'AI usage dashboard',
   calls_usage: 'Call usage dashboard',
+  invoices: 'Invoices page',
 };
 
 /**
@@ -145,6 +150,79 @@ function DeveloperCapabilitiesSection({
 }
 
 /**
+ * Page-access grants for ANY user, of any role. Distinct from the DEVELOPER
+ * capabilities above: these only unlock a single feature page (e.g. Invoices)
+ * and carry no admin power, so any ADMIN_TIER viewer may hand them out — to a
+ * RECRUITER, CONSULTANT, anyone. Backed by PATCH /admin/users/:id/page-access,
+ * which preserves the target's other (DEVELOPER) capabilities server-side.
+ */
+function PageAccessSection({
+  userId,
+  current,
+  onSaved,
+}: {
+  userId: string;
+  current: PageAccessCapability[];
+  onSaved: () => void;
+}) {
+  const [sel, setSel] = useState<Set<PageAccessCapability>>(new Set(current));
+  const [saving, setSaving] = useState(false);
+  useEffect(() => {
+    setSel(new Set(current));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
+
+  function toggle(c: PageAccessCapability) {
+    setSel((prev) => {
+      const n = new Set(prev);
+      if (n.has(c)) n.delete(c);
+      else n.add(c);
+      return n;
+    });
+  }
+
+  async function save() {
+    setSaving(true);
+    try {
+      await api.patch(`/admin/users/${userId}/page-access`, { capabilities: [...sel] });
+      toast.success('Page access updated');
+      onSaved();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error ?? 'Failed to save page access');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="p-4 border-t border-border">
+      <SectionLabel>Page access</SectionLabel>
+      <p className="text-xs text-muted mb-2">
+        Grant this user pages they wouldn’t normally reach by role. Applies to any role.
+      </p>
+      <div className="space-y-1.5">
+        {PAGE_ACCESS_CAPABILITIES.map((c) => (
+          <label key={c} className="flex items-center gap-2 text-sm text-ink cursor-pointer">
+            <input
+              type="checkbox"
+              checked={sel.has(c)}
+              onChange={() => toggle(c)}
+              className="accent-[var(--accent)]"
+            />
+            {CAP_LABEL[c] ?? c}
+          </label>
+        ))}
+      </div>
+      <div className="mt-2 flex justify-end">
+        <Button size="sm" variant="secondary" onClick={save} loading={saving}>
+          Save page access
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/**
  * Right-side slide-in detail pane for one user. Pinned header + destructive
  * footer, scrolling body. Every mutating action is confirmed via ConfirmDialog
  * (named explicitly). All lifecycle changes funnel through the existing
@@ -166,6 +244,7 @@ export function UserDetailPane({
   const { user, audit, sessions, loading, error, reload, setUser } = useUserDetail(userId);
   const { profile } = useAuth();
   const viewerIsSuperAdmin = profile?.role === 'SUPER_ADMIN';
+  const viewerIsAdmin = isAdmin(profile?.role);
   const [confirm, setConfirm] = useState<ConfirmSpec | null>(null);
 
   const groupsById = useMemo(() => {
@@ -538,6 +617,19 @@ export function UserDetailPane({
               <DeveloperCapabilitiesSection
                 userId={user.id}
                 current={(user as { capabilities?: DeveloperCapability[] }).capabilities ?? []}
+                onSaved={afterMutation}
+              />
+            )}
+
+            {/* Page access — any ADMIN_TIER viewer, any target user (incl. a
+                CONSULTANT/RECRUITER). Not for self — an admin already has these
+                pages by role. */}
+            {viewerIsAdmin && !isSelf && (
+              <PageAccessSection
+                userId={user.id}
+                current={((user as { capabilities?: string[] }).capabilities ?? []).filter(
+                  isPageAccessCapability,
+                )}
                 onSaved={afterMutation}
               />
             )}
