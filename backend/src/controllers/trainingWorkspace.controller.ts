@@ -298,6 +298,7 @@ export const generatePlan: RequestHandler = async (req, res) => {
     res.status(201).json({ id: planId });
   } catch (e) {
     if ((e as { status?: number }).status) throw e;
+    req.log.error({ err: e }, '[generatePlan] failed');
     throw httpError(500, 'Could not generate a plan. The training tables may not be migrated yet.');
   }
 };
