@@ -103,6 +103,7 @@ describe('invoice PDF rendering', () => {
     const buffer = await renderInvoicePdf({ ...invoice(), line_items: mock.lineItems });
     expect(buffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
     expect(buffer.length).toBeGreaterThan(1000);
+    expect(buffer.toString('latin1')).toContain('/MediaBox [0 0 612 792]');
   });
 
   it('continues a long line-item table across multiple pages', async () => {
