@@ -76,7 +76,6 @@ const CAP_LABEL: Record<DeveloperCapability, string> = {
   reports: 'Analytics / reports',
   ai_usage: 'AI usage dashboard',
   calls_usage: 'Call usage dashboard',
-  invoices: 'Invoices page',
 };
 
 /**
@@ -151,7 +150,7 @@ function DeveloperCapabilitiesSection({
 
 /**
  * Page-access grants for ANY user, of any role. Distinct from the DEVELOPER
- * capabilities above: these only unlock a single feature page (e.g. Invoices)
+ * capabilities above: these only unlock a configured feature page
  * and carry no admin power, so any ADMIN_TIER viewer may hand them out — to a
  * RECRUITER, CONSULTANT, anyone. Backed by PATCH /admin/users/:id/page-access,
  * which preserves the target's other (DEVELOPER) capabilities server-side.
@@ -624,7 +623,7 @@ export function UserDetailPane({
             {/* Page access — any ADMIN_TIER viewer, any target user (incl. a
                 CONSULTANT/RECRUITER). Not for self — an admin already has these
                 pages by role. */}
-            {viewerIsAdmin && !isSelf && (
+            {PAGE_ACCESS_CAPABILITIES.length > 0 && viewerIsAdmin && !isSelf && (
               <PageAccessSection
                 userId={user.id}
                 current={((user as { capabilities?: string[] }).capabilities ?? []).filter(

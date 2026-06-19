@@ -1,10 +1,5 @@
 import { Router } from 'express';
-import {
-  requireAuth,
-  blockIfMustChangePassword,
-  requireRole,
-  requireRoleOrCapability,
-} from '../middleware/auth';
+import { requireAuth, blockIfMustChangePassword, requireRole } from '../middleware/auth';
 import { requireFeature } from '../middleware/featureFlag';
 import { OPERATOR_TIER, MANAGER_TIER, BUSINESS_ROLES, MESSAGING_ROLES } from '../types';
 import { authRouter } from './auth.routes';
@@ -182,14 +177,8 @@ router.use(
 // Calls share the same permission model as messages (same hierarchy, same feature flag).
 router.use('/calls', requireRole(...MESSAGING_ROLES), requireFeature('messages'), callsRouter);
 router.use('/training', requireRole(...BUSINESS_ROLES), requireFeature('training'), trainingRouter);
-// Consultant invoice tracker — MANAGER_TIER by default, OR any user an admin has
-// granted the 'invoices' page-access capability (requireRoleOrCapability).
-router.use(
-  '/invoices',
-  requireRoleOrCapability(MANAGER_TIER, 'invoices'),
-  requireFeature('invoices'),
-  invoicesRouter,
-);
+// Company invoice accounting — strictly MANAGER_TIER, never capability-widened.
+router.use('/invoices', requireRole(...MANAGER_TIER), requireFeature('invoices'), invoicesRouter);
 
 // Realtime SSE stream — generic push channel used by messages,
 // notifications, and any future feature that wants to push to a logged-in

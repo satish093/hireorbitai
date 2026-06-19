@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Layout } from '../components/Layout';
 import { DataTable } from '../components/DataTable';
 import { Modal } from '../components/Modal';
@@ -7,39 +7,147 @@ import { SelectInput } from '../components/SelectInput';
 import { PageHeader } from '../components/PageHeader';
 import { Button } from '../components/Button';
 import { Pill, PillTone } from '../components/Pill';
-import { useUserGroups } from '../components/GroupBadge';
-import { useAuth } from '../context/AuthContext';
-import { isAdmin } from '../types';
+import { ConfirmDialog, type ConfirmSpec } from '../components/admin/ConfirmDialog';
 import { api } from '../services/api';
 import { invalidate, useInvalidationListener } from '../hooks/useInvalidate';
 import toast from 'react-hot-toast';
 
-const STATUSES = ['Draft', 'Submitted', 'Approved', 'Paid', 'Overdue', 'Cancelled'] as const;
-type Status = (typeof STATUSES)[number];
+type LifecycleStatus = 'Draft' | 'Submitted' | 'Approved' | 'Paid' | 'Cancelled';
+type DisplayStatus = LifecycleStatus | 'Overdue';
 
-const EMPTY = {
-  consultant_name: '',
-  vendor_name: '',
-  invoice_number: '',
-  invoice_date: '',
-  due_date: '',
-  net_terms_days: '',
-  pay_rate: '',
-  billing_month: '',
-  invoice_amount: '',
-  bill_to_email: '',
-  company_group_id: '',
-  status: 'Submitted' as Status,
-  notes: '',
+interface Party {
+  name: string;
+  address: string;
+  email: string;
+  phone: string;
+  website: string;
+  country: string;
+  tax_id: string;
+}
+
+interface LineItem {
+  description: string;
+  service_period: string;
+  quantity: string | number;
+  unit: string;
+  unit_rate: string | number;
+  amount?: string | number;
+}
+
+interface Actions {
+  edit?: boolean;
+  submit?: boolean;
+  approve?: boolean;
+  mark_paid?: boolean;
+  cancel?: boolean;
+  email?: boolean;
+  download?: boolean;
+  delete?: boolean;
+  archive?: boolean;
+  restore?: boolean;
+}
+
+interface Invoice {
+  id: string;
+  company_group_id: string;
+  invoice_number: string;
+  invoice_date?: string | null;
+  due_date?: string | null;
+  net_terms_days?: number | null;
+  currency: string;
+  discount_amount: number | string;
+  tax_percent: number | string;
+  subtotal: number | string;
+  tax_amount: number | string;
+  total_amount: number | string;
+  status: LifecycleStatus;
+  display_status: DisplayStatus;
+  notes?: string | null;
+  issuer_snapshot: Party;
+  bill_to_snapshot: Party;
+  line_items?: LineItem[];
+  status_history?: Array<{
+    id: string;
+    from_status?: string | null;
+    to_status: string;
+    changed_at: string;
+    note?: string | null;
+  }>;
+  archived_at?: string | null;
+  last_emailed_at?: string | null;
+  created_at?: string | null;
+  permitted_actions?: Actions;
+}
+
+interface Company {
+  id: string;
+  name: string;
+  email?: string | null;
+  color?: string | null;
+}
+
+interface InvoiceListResponse {
+  items: Invoice[];
+  total: number;
+  page: number;
+  page_size: number;
+  summary: {
+    outstanding_by_currency: Record<string, string | number>;
+    overdue_count: number;
+    draft_count: number;
+  };
+}
+
+interface InvoiceForm {
+  company_group_id: string;
+  invoice_number: string;
+  invoice_date: string;
+  due_date: string;
+  net_terms_days: string;
+  currency: string;
+  discount_amount: string;
+  tax_percent: string;
+  notes: string;
+  issuer_snapshot: Party;
+  bill_to_snapshot: Party;
+  line_items: LineItem[];
+}
+
+const EMPTY_PARTY: Party = {
+  name: '',
+  address: '',
+  email: '',
+  phone: '',
+  website: '',
+  country: '',
+  tax_id: '',
 };
 
-// Per-status Pill tone — mirrors the shared <Pill> tone-object shape used across
-// the app (StatusBadge / PriorityBadge).
-const STATUS_TONES: Record<Status, PillTone> = {
-  Draft: {
-    bg: 'bg-slate-100 dark:bg-slate-800',
-    text: 'text-slate-500 dark:text-slate-400',
-  },
+const EMPTY_FORM: InvoiceForm = {
+  company_group_id: '',
+  invoice_number: '',
+  invoice_date: new Date().toISOString().slice(0, 10),
+  due_date: '',
+  net_terms_days: '30',
+  currency: 'USD',
+  discount_amount: '0',
+  tax_percent: '0',
+  notes: '',
+  issuer_snapshot: { ...EMPTY_PARTY },
+  bill_to_snapshot: { ...EMPTY_PARTY },
+  line_items: [
+    {
+      description: 'Professional consulting services',
+      service_period: '',
+      quantity: '1',
+      unit: 'hours',
+      unit_rate: '0',
+    },
+  ],
+};
+
+const STATUS_TONES: Record<DisplayStatus, PillTone> = {
+  Draft: { bg: 'bg-slate-100 dark:bg-slate-800', text: 'text-slate-600 dark:text-slate-300' },
   Submitted: {
     bg: 'bg-blue-100 dark:bg-blue-900/40',
     text: 'text-blue-700 dark:text-blue-300',
@@ -60,577 +168,1020 @@ const STATUS_TONES: Record<Status, PillTone> = {
     text: 'text-red-700 dark:text-red-300',
     dot: 'bg-red-500',
   },
-  Cancelled: {
-    bg: 'bg-slate-100 dark:bg-slate-800',
-    text: 'text-slate-600 dark:text-slate-300',
-  },
+  Cancelled: { bg: 'bg-slate-100 dark:bg-slate-800', text: 'text-slate-500' },
 };
-function statusTone(status?: string): PillTone {
-  return STATUS_TONES[status as Status] ?? STATUS_TONES.Submitted;
+
+function fmtMoney(value: unknown, currency = 'USD') {
+  const number = Number(value ?? 0);
+  try {
+    return number.toLocaleString(undefined, { style: 'currency', currency });
+  } catch {
+    return `${currency} ${number.toFixed(2)}`;
+  }
 }
 
-function formatDate(value?: string | null) {
+function fmtDate(value?: string | null) {
   if (!value) return '—';
-  // `date` columns return 'YYYY-MM-DD'; timestamps include a 'T'.
-  const d = value.includes('T') ? new Date(value) : new Date(`${value}T00:00:00`);
-  return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString();
+  const date = new Date(value.includes('T') ? value : `${value}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString();
 }
 
-// USD currency for the money fields. Accepts a number or numeric string.
-function formatMoney(value?: number | string | null) {
-  if (value == null || value === '') return '—';
-  const n = Number(value);
-  if (Number.isNaN(n)) return String(value);
-  return n.toLocaleString(undefined, {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 2,
-  });
+function addDays(date: string, days: number) {
+  const parsed = new Date(`${date}T00:00:00Z`);
+  parsed.setUTCDate(parsed.getUTCDate() + days);
+  return parsed.toISOString().slice(0, 10);
 }
 
-// 'YYYY-MM' (from <input type="month">) → 'Mon YYYY'.
-function formatMonth(value?: string | null) {
-  if (!value) return '—';
-  const m = /^(\d{4})-(\d{2})$/.exec(value);
-  if (!m) return value;
-  const d = new Date(Number(m[1]), Number(m[2]) - 1, 1);
-  return Number.isNaN(d.getTime())
-    ? value
-    : d.toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
-}
-
-// due = invoice_date + net_terms_days, computed in UTC so it never drifts a day.
-function addDays(isoDate: string, days: number): string {
-  const d = new Date(`${isoDate}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
+function cleanParty(party: Party) {
+  return Object.fromEntries(
+    Object.entries(party).map(([key, value]) => [key, value.trim() || null]),
+  ) as unknown as Party;
 }
 
 export function Invoices() {
-  const [rows, setRows] = useState<any[]>([]);
-  const [open, setOpen] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [selected, setSelected] = useState<any | null>(null);
-  const [form, setForm] = useState<any>(EMPTY);
-  const [saving, setSaving] = useState(false);
+  const [rows, setRows] = useState<Invoice[]>([]);
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [total, setTotal] = useState(0);
+  const [summary, setSummary] = useState<InvoiceListResponse['summary']>({
+    outstanding_by_currency: {},
+    overdue_count: 0,
+    draft_count: 0,
+  });
   const [loading, setLoading] = useState(true);
-  // Document section (in the detail modal): the email toggle, the recipient
-  // override, and a busy flag shared by Download + Send.
-  const [emailOn, setEmailOn] = useState(false);
+  const [page, setPage] = useState(1);
+  const [query, setQuery] = useState('');
+  const [companyFilter, setCompanyFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [archivedFilter, setArchivedFilter] = useState('false');
+  const [formOpen, setFormOpen] = useState(false);
+  const [editing, setEditing] = useState<Invoice | null>(null);
+  const [form, setForm] = useState<InvoiceForm>(EMPTY_FORM);
+  const [saving, setSaving] = useState(false);
+  const [selected, setSelected] = useState<Invoice | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
   const [recipient, setRecipient] = useState('');
   const [docBusy, setDocBusy] = useState(false);
-  // Companies (user groups) — used as the invoice issuer whose logo brands the PDF.
-  const { groups, byId } = useUserGroups();
-  // Only admin-tier may choose the issuing company. For everyone else it's
-  // auto-set server-side to their own group, so the dropdown is hidden.
-  const { profile } = useAuth();
-  const canChooseCompany = isAdmin(profile?.role);
+  const [confirm, setConfirm] = useState<ConfirmSpec | null>(null);
+  const pageSize = 25;
 
-  // Reset the Document controls whenever a different invoice is opened.
-  useEffect(() => {
-    setEmailOn(false);
-    setRecipient(selected?.bill_to_email ?? '');
-  }, [selected?.id]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  function load() {
-    setLoading(true);
-    api
-      .get('/invoices')
-      .then((r) => setRows(r.data ?? []))
-      .catch((e) => toast.error(e?.response?.data?.error ?? 'Failed to load invoices'))
-      .finally(() => setLoading(false));
+  async function loadCompanies() {
+    try {
+      const response = await api.get<Company[]>('/invoices/companies');
+      setCompanies(response.data ?? []);
+    } catch {
+      setCompanies([]);
+    }
   }
+
+  async function load() {
+    setLoading(true);
+    try {
+      const response = await api.get<InvoiceListResponse>('/invoices', {
+        params: {
+          page,
+          page_size: pageSize,
+          q: query || undefined,
+          company_group_id: companyFilter || undefined,
+          display_status: statusFilter || undefined,
+          archived: archivedFilter,
+        },
+      });
+      setRows(response.data.items ?? []);
+      setTotal(response.data.total ?? 0);
+      setSummary(response.data.summary ?? summary);
+    } catch (error: any) {
+      toast.error(error?.response?.data?.error ?? 'Failed to load invoices');
+    } finally {
+      setLoading(false);
+    }
+  }
+
   useEffect(() => {
-    load();
+    void loadCompanies();
   }, []);
+  useEffect(() => {
+    const timer = window.setTimeout(() => void load(), query ? 250 : 0);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, query, companyFilter, statusFilter, archivedFilter]);
   useInvalidationListener('invoices', load);
 
+  const totals = useMemo(() => {
+    const subtotal = form.line_items.reduce(
+      (sum, item) => sum + Number(item.quantity || 0) * Number(item.unit_rate || 0),
+      0,
+    );
+    const discount = Math.max(0, Number(form.discount_amount || 0));
+    const tax = Math.max(
+      0,
+      (Math.max(0, subtotal - discount) * Number(form.tax_percent || 0)) / 100,
+    );
+    return { subtotal, discount, tax, total: Math.max(0, subtotal - discount) + tax };
+  }, [form.line_items, form.discount_amount, form.tax_percent]);
+
+  function chooseCompany(companyId: string) {
+    const company = companies.find((item) => item.id === companyId);
+    setForm((current) => ({
+      ...current,
+      company_group_id: companyId,
+      issuer_snapshot: {
+        ...current.issuer_snapshot,
+        name: company?.name ?? '',
+        email: company?.email ?? '',
+      },
+    }));
+  }
+
   function openCreate() {
-    setForm(EMPTY);
-    setEditingId(null);
-    setOpen(true);
-  }
-
-  function closeForm() {
-    setOpen(false);
-    setEditingId(null);
-    setForm(EMPTY);
-  }
-
-  // Prefill with ONLY writable fields — the update schema is `.strict()`.
-  function openEdit(row: any) {
+    const company = companies.length === 1 ? companies[0] : undefined;
+    setEditing(null);
     setForm({
-      consultant_name: row.consultant_name ?? '',
-      vendor_name: row.vendor_name ?? '',
-      invoice_number: row.invoice_number ?? '',
-      invoice_date: row.invoice_date ?? '',
-      due_date: row.due_date ?? '',
-      net_terms_days: row.net_terms_days ?? '',
-      pay_rate: row.pay_rate ?? '',
-      billing_month: row.billing_month ?? '',
-      invoice_amount: row.invoice_amount ?? '',
-      bill_to_email: row.bill_to_email ?? '',
-      company_group_id: row.company_group_id ?? '',
-      status: (row.status as Status) ?? 'Submitted',
-      notes: row.notes ?? '',
+      ...EMPTY_FORM,
+      issuer_snapshot: {
+        ...EMPTY_PARTY,
+        name: company?.name ?? '',
+        email: company?.email ?? '',
+      },
+      bill_to_snapshot: { ...EMPTY_PARTY },
+      line_items: EMPTY_FORM.line_items.map((item) => ({ ...item })),
+      company_group_id: company?.id ?? '',
     });
-    setEditingId(row.id);
-    setSelected(null);
-    setOpen(true);
+    setFormOpen(true);
   }
 
-  // Auto-fill due date from invoice date + net terms when both are present.
-  // Stays fully editable — the user can override the suggested due date.
-  function patchDates(next: Partial<typeof EMPTY>) {
-    const f = { ...form, ...next };
-    if (f.invoice_date && f.net_terms_days !== '' && f.net_terms_days != null) {
-      const days = Number(f.net_terms_days);
-      if (!Number.isNaN(days)) f.due_date = addDays(f.invoice_date, days);
-    }
-    setForm(f);
+  function openEdit(invoice: Invoice) {
+    setEditing(invoice);
+    setSelected(null);
+    setForm({
+      company_group_id: invoice.company_group_id,
+      invoice_number: invoice.invoice_number,
+      invoice_date: invoice.invoice_date ?? '',
+      due_date: invoice.due_date ?? '',
+      net_terms_days: invoice.net_terms_days == null ? '' : String(invoice.net_terms_days),
+      currency: invoice.currency || 'USD',
+      discount_amount: String(invoice.discount_amount ?? 0),
+      tax_percent: String(invoice.tax_percent ?? 0),
+      notes: invoice.notes ?? '',
+      issuer_snapshot: { ...EMPTY_PARTY, ...(invoice.issuer_snapshot ?? {}) },
+      bill_to_snapshot: { ...EMPTY_PARTY, ...(invoice.bill_to_snapshot ?? {}) },
+      line_items: (invoice.line_items ?? []).map((item) => ({
+        description: item.description,
+        service_period: item.service_period ?? '',
+        quantity: item.quantity,
+        unit: item.unit,
+        unit_rate: item.unit_rate,
+      })),
+    });
+    setFormOpen(true);
+  }
+
+  function patchDates(patch: Partial<InvoiceForm>) {
+    setForm((current) => {
+      const next = { ...current, ...patch };
+      const days = Number(next.net_terms_days);
+      if (next.invoice_date && next.net_terms_days !== '' && !Number.isNaN(days)) {
+        next.due_date = addDays(next.invoice_date, days);
+      }
+      return next;
+    });
+  }
+
+  function patchParty(
+    side: 'issuer_snapshot' | 'bill_to_snapshot',
+    key: keyof Party,
+    value: string,
+  ) {
+    setForm((current) => ({ ...current, [side]: { ...current[side], [key]: value } }));
+  }
+
+  function patchItem(index: number, patch: Partial<LineItem>) {
+    setForm((current) => ({
+      ...current,
+      line_items: current.line_items.map((item, i) => (i === index ? { ...item, ...patch } : item)),
+    }));
   }
 
   async function save() {
-    if (saving) return;
-    if (!form.consultant_name?.trim()) return toast.error('Consultant name is required');
-    if (!form.vendor_name?.trim()) return toast.error('Vendor is required');
+    if (!form.company_group_id) return toast.error('Company is required');
+    if (!form.invoice_number.trim()) return toast.error('Invoice number is required');
+    if (!form.bill_to_snapshot.name.trim()) return toast.error('Bill-to name is required');
+    if (form.line_items.some((item) => !item.description.trim())) {
+      return toast.error('Every line item needs a description');
+    }
     setSaving(true);
     const payload = {
-      consultant_name: form.consultant_name.trim(),
-      vendor_name: form.vendor_name.trim(),
-      invoice_number: form.invoice_number?.trim() || null,
+      ...form,
+      invoice_number: form.invoice_number.trim(),
       invoice_date: form.invoice_date || null,
       due_date: form.due_date || null,
-      net_terms_days:
-        form.net_terms_days === '' || form.net_terms_days == null
-          ? null
-          : Number(form.net_terms_days),
-      // Send null (not '') for empty money fields so the backend doesn't coerce
-      // a blank into 0.
-      pay_rate: form.pay_rate === '' || form.pay_rate == null ? null : Number(form.pay_rate),
-      invoice_amount:
-        form.invoice_amount === '' || form.invoice_amount == null
-          ? null
-          : Number(form.invoice_amount),
-      billing_month: form.billing_month || null,
-      bill_to_email: form.bill_to_email?.trim() || null,
-      company_group_id: form.company_group_id || null,
-      status: form.status,
-      notes: form.notes?.trim() || null,
+      net_terms_days: form.net_terms_days === '' ? null : Number(form.net_terms_days),
+      discount_amount: Number(form.discount_amount || 0),
+      tax_percent: Number(form.tax_percent || 0),
+      notes: form.notes.trim() || null,
+      issuer_snapshot: cleanParty(form.issuer_snapshot),
+      bill_to_snapshot: cleanParty(form.bill_to_snapshot),
+      line_items: form.line_items.map((item) => ({
+        description: item.description.trim(),
+        service_period: item.service_period || null,
+        quantity: Number(item.quantity),
+        unit: item.unit.trim(),
+        unit_rate: Number(item.unit_rate),
+      })),
     };
     try {
-      let created: any = null;
-      if (editingId) {
-        await api.patch(`/invoices/${editingId}`, payload);
-        toast.success('Invoice updated');
-      } else {
-        const res = await api.post('/invoices', payload);
-        created = res.data;
-        toast.success('Invoice added');
-      }
-      closeForm();
+      const response = editing
+        ? await api.patch<Invoice>(`/invoices/${editing.id}`, payload)
+        : await api.post<Invoice>('/invoices', payload);
+      toast.success(editing ? 'Invoice updated' : 'Draft invoice created');
+      setFormOpen(false);
+      setEditing(null);
       invalidate('invoices');
-      load();
-      // For a NEW invoice, open its detail — the "Document" panel — so the user
-      // can download or email the PDF right after creating it.
-      if (created) setSelected(created);
-    } catch (e: any) {
-      toast.error(e?.response?.data?.error ?? 'Something went wrong. Please try again.');
+      await load();
+      await openDetail(response.data.id);
+    } catch (error: any) {
+      toast.error(error?.response?.data?.error ?? 'Unable to save invoice');
     } finally {
       setSaving(false);
     }
   }
 
-  async function remove(row: any) {
-    const label = row.invoice_number ? `#${row.invoice_number}` : `for ${row.consultant_name}`;
-    if (!confirm(`Delete invoice ${label}? This cannot be undone.`)) return;
+  async function openDetail(id: string) {
+    setDetailLoading(true);
     try {
-      await api.delete(`/invoices/${row.id}`);
-      setRows((prev) => prev.filter((r) => r.id !== row.id));
+      const response = await api.get<Invoice>(`/invoices/${id}`);
+      setSelected(response.data);
+      setRecipient(response.data.bill_to_snapshot?.email ?? '');
+    } catch (error: any) {
+      toast.error(error?.response?.data?.error ?? 'Failed to load invoice');
+    } finally {
+      setDetailLoading(false);
+    }
+  }
+
+  async function refreshAfterAction(invoice?: Invoice) {
+    invalidate('invoices');
+    await load();
+    if (invoice) {
+      setSelected(invoice);
+      setRecipient(invoice.bill_to_snapshot?.email ?? '');
+    } else {
       setSelected(null);
-      invalidate('invoices');
-      toast.success('Invoice deleted');
-    } catch (e: any) {
-      toast.error(e?.response?.data?.error ?? 'Delete failed');
     }
   }
 
-  // Generate + download the invoice PDF. Authenticated blob fetch through the
-  // bearer-injecting api client (the endpoint is not a public signed URL).
-  async function downloadDoc(row: any) {
+  function requestTransition(to_status: LifecycleStatus, label: string) {
+    if (!selected) return;
+    setConfirm({
+      title: `${label} invoice`,
+      message: `Invoice #${selected.invoice_number} will move from ${selected.status} to ${to_status}.`,
+      confirmLabel: label,
+      tone: to_status === 'Cancelled' ? 'danger' : 'default',
+      run: async () => {
+        const response = await api.post<Invoice>(`/invoices/${selected.id}/transition`, {
+          to_status,
+        });
+        toast.success(`Invoice ${to_status.toLowerCase()}`);
+        await refreshAfterAction(response.data);
+      },
+    });
+  }
+
+  function requestArchive() {
+    if (!selected) return;
+    setConfirm({
+      title: selected.archived_at ? 'Restore invoice' : 'Archive invoice',
+      message: selected.archived_at
+        ? `Restore invoice #${selected.invoice_number} to active records?`
+        : `Archive invoice #${selected.invoice_number}? It remains in the audit history.`,
+      confirmLabel: selected.archived_at ? 'Restore' : 'Archive',
+      run: async () => {
+        const action = selected.archived_at ? 'restore' : 'archive';
+        const response = await api.post<Invoice>(`/invoices/${selected.id}/${action}`);
+        toast.success(selected.archived_at ? 'Invoice restored' : 'Invoice archived');
+        await refreshAfterAction(response.data);
+      },
+    });
+  }
+
+  function requestDelete() {
+    if (!selected) return;
+    setConfirm({
+      title: 'Delete draft invoice',
+      message: `Permanently delete draft invoice #${selected.invoice_number}? This cannot be undone.`,
+      confirmLabel: 'Delete draft',
+      tone: 'danger',
+      run: async () => {
+        await api.delete(`/invoices/${selected.id}`);
+        toast.success('Draft deleted');
+        await refreshAfterAction();
+      },
+    });
+  }
+
+  async function download(invoice: Invoice) {
     setDocBusy(true);
     try {
-      const res = await api.get(`/invoices/${row.id}/document`, { responseType: 'blob' });
-      const url = URL.createObjectURL(res.data as Blob);
-      const a = window.document.createElement('a');
-      a.href = url;
-      const base = row.invoice_number
-        ? String(row.invoice_number).replace(/[^a-zA-Z0-9._-]+/g, '-')
-        : row.id;
-      a.download = `invoice-${base}.pdf`;
-      window.document.body.appendChild(a);
-      a.click();
-      a.remove();
+      const response = await api.get(`/invoices/${invoice.id}/document`, { responseType: 'blob' });
+      const url = URL.createObjectURL(response.data);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `invoice-${invoice.invoice_number}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
       URL.revokeObjectURL(url);
-    } catch {
-      toast.error('Failed to generate the invoice document');
+    } catch (error: any) {
+      toast.error(error?.response?.data?.error ?? 'Failed to generate PDF');
     } finally {
       setDocBusy(false);
     }
   }
 
-  // Email the invoice PDF to the recipient (the "Email this invoice" toggle).
-  async function sendDoc(row: any) {
-    const to = recipient.trim();
-    if (!to) {
-      toast.error('Enter a recipient email');
-      return;
-    }
+  async function email(invoice: Invoice) {
+    if (!recipient.trim()) return toast.error('Recipient email is required');
     setDocBusy(true);
     try {
-      const res = await api.post(`/invoices/${row.id}/send`, { recipient_email: to });
-      toast.success(`Invoice emailed to ${to}`);
-      const stamp = res.data?.last_emailed_at ?? new Date().toISOString();
-      setSelected((prev: any) =>
-        prev ? { ...prev, last_emailed_at: stamp, bill_to_email: prev.bill_to_email || to } : prev,
-      );
-      invalidate('invoices');
-      load();
-    } catch (e: any) {
-      toast.error(e?.response?.data?.error ?? 'Failed to send the invoice');
+      const response = await api.post(`/invoices/${invoice.id}/send`, {
+        recipient_email: recipient.trim(),
+      });
+      toast.success(`Invoice emailed to ${response.data.emailed_to}`);
+      await openDetail(invoice.id);
+      await load();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.error ?? 'Failed to email invoice');
     } finally {
       setDocBusy(false);
     }
   }
+
+  const pageCount = Math.max(1, Math.ceil(total / pageSize));
+  const outstanding = Object.entries(summary.outstanding_by_currency ?? {})
+    .map(([currency, amount]) => fmtMoney(amount, currency))
+    .join(' · ');
 
   return (
     <Layout title="Invoices">
       <PageHeader
         title="Invoices"
-        description="Track consultant invoices — vendor, dates, net terms, and payment status."
+        description="Create, approve, deliver, and track company invoices."
         action={<Button onClick={openCreate}>+ New invoice</Button>}
       />
+
+      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <Metric label="Outstanding" value={outstanding || '—'} />
+        <Metric label="Overdue" value={String(summary.overdue_count ?? 0)} tone="danger" />
+        <Metric label="Drafts" value={String(summary.draft_count ?? 0)} />
+      </div>
+
+      <div className="mb-3 grid grid-cols-1 gap-2 rounded-xl border border-border bg-surface p-3 md:grid-cols-4">
+        <FormInput
+          aria-label="Search invoices"
+          placeholder="Search number or party…"
+          value={query}
+          onChange={(event) => {
+            setPage(1);
+            setQuery(event.target.value);
+          }}
+        />
+        <SelectInput
+          aria-label="Filter by company"
+          value={companyFilter}
+          onChange={(event) => {
+            setPage(1);
+            setCompanyFilter(event.target.value);
+          }}
+          options={[
+            { value: '', label: 'All companies' },
+            ...companies.map((company) => ({ value: company.id, label: company.name })),
+          ]}
+        />
+        <SelectInput
+          aria-label="Filter by status"
+          value={statusFilter}
+          onChange={(event) => {
+            setPage(1);
+            setStatusFilter(event.target.value);
+          }}
+          options={[
+            { value: '', label: 'All statuses' },
+            ...(['Draft', 'Submitted', 'Approved', 'Paid', 'Overdue', 'Cancelled'] as const).map(
+              (status) => ({ value: status, label: status }),
+            ),
+          ]}
+        />
+        <SelectInput
+          aria-label="Filter archived invoices"
+          value={archivedFilter}
+          onChange={(event) => {
+            setPage(1);
+            setArchivedFilter(event.target.value);
+          }}
+          options={[
+            { value: 'false', label: 'Active invoices' },
+            { value: 'true', label: 'Archived invoices' },
+            { value: 'all', label: 'Active + archived' },
+          ]}
+        />
+      </div>
+
       <DataTable
         loading={loading}
-        empty="No invoices yet. Add your first invoice to start tracking."
+        empty="No invoices match these filters."
+        rows={rows}
+        onRowClick={(row) => void openDetail(row.id)}
         columns={[
+          { key: 'invoice_number', header: 'Invoice #' },
           {
-            key: 'invoice_number',
-            header: 'Invoice #',
-            render: (row: any) => row.invoice_number || '—',
-          },
-          { key: 'consultant_name', header: 'Consultant' },
-          { key: 'vendor_name', header: 'Vendor' },
-          {
-            key: 'billing_month',
-            header: 'Billing month',
-            render: (row: any) => formatMonth(row.billing_month),
+            key: 'bill_to',
+            header: 'Bill to',
+            render: (row) => row.bill_to_snapshot?.name || '—',
           },
           {
-            key: 'pay_rate',
-            header: 'Pay rate',
-            align: 'right',
-            render: (row: any) => formatMoney(row.pay_rate),
-          },
-          {
-            key: 'invoice_amount',
-            header: 'Invoice amount',
-            align: 'right',
-            render: (row: any) => formatMoney(row.invoice_amount),
+            key: 'company',
+            header: 'Issuer',
+            render: (row) => row.issuer_snapshot?.name || '—',
+            hideOnMobile: true,
           },
           {
             key: 'invoice_date',
             header: 'Invoice date',
-            render: (row: any) => formatDate(row.invoice_date),
+            render: (row) => fmtDate(row.invoice_date),
+            hideOnMobile: true,
           },
-          { key: 'due_date', header: 'Due date', render: (row: any) => formatDate(row.due_date) },
+          { key: 'due_date', header: 'Due date', render: (row) => fmtDate(row.due_date) },
           {
-            key: 'net_terms_days',
-            header: 'Net terms',
-            render: (row: any) => (row.net_terms_days != null ? `${row.net_terms_days} days` : '—'),
+            key: 'total_amount',
+            header: 'Total',
+            align: 'right',
+            render: (row) => fmtMoney(row.total_amount, row.currency),
           },
           {
             key: 'status',
             header: 'Status',
-            render: (row: any) => <Pill tone={statusTone(row.status)}>{row.status}</Pill>,
-          },
-          {
-            key: 'actions',
-            header: '',
-            align: 'right',
-            render: (row: any) => (
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelected(row);
-                }}
-              >
-                View
-              </Button>
+            render: (row) => (
+              <Pill tone={STATUS_TONES[row.display_status ?? row.status]}>
+                {row.display_status ?? row.status}
+              </Pill>
             ),
           },
         ]}
-        rows={rows}
-        onRowClick={setSelected}
       />
 
-      {/* Create / Edit */}
+      <div className="mt-3 flex items-center justify-between text-xs text-muted">
+        <span>
+          {total
+            ? `${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, total)} of ${total}`
+            : '0 invoices'}
+        </span>
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={page <= 1}
+            onClick={() => setPage(page - 1)}
+          >
+            Previous
+          </Button>
+          <span className="self-center">
+            Page {page} of {pageCount}
+          </span>
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={page >= pageCount}
+            onClick={() => setPage(page + 1)}
+          >
+            Next
+          </Button>
+        </div>
+      </div>
+
       <Modal
-        open={open}
-        onClose={closeForm}
-        title={editingId ? 'Edit invoice' : 'New invoice'}
-        description={editingId ? 'Update this invoice record.' : 'Add an invoice to the tracker.'}
+        open={formOpen}
+        onClose={() => setFormOpen(false)}
+        size="xl"
+        title={editing ? `Edit invoice #${editing.invoice_number}` : 'New draft invoice'}
+        description="Totals are calculated and validated by the server."
         footer={
           <>
-            <Button variant="secondary" onClick={closeForm}>
+            <Button variant="secondary" onClick={() => setFormOpen(false)}>
               Cancel
             </Button>
             <Button onClick={save} loading={saving}>
-              {saving ? 'Saving' : editingId ? 'Save changes' : 'Save invoice'}
+              {editing ? 'Save changes' : 'Create draft'}
             </Button>
           </>
         }
       >
-        <div className="space-y-3">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <FormInput
-              label="Consultant name *"
-              value={form.consultant_name}
-              onChange={(e) => setForm({ ...form, consultant_name: e.target.value })}
-            />
-            <FormInput
-              label="Vendor *"
-              value={form.vendor_name}
-              onChange={(e) => setForm({ ...form, vendor_name: e.target.value })}
-            />
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <FormInput
-              label="Invoice number"
-              value={form.invoice_number}
-              onChange={(e) => setForm({ ...form, invoice_number: e.target.value })}
-            />
-            <FormInput
-              label="Net terms (days)"
-              type="number"
-              value={form.net_terms_days}
-              onChange={(e) => patchDates({ net_terms_days: e.target.value })}
-            />
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <FormInput
-              label="Invoice date"
-              type="date"
-              value={form.invoice_date}
-              onChange={(e) => patchDates({ invoice_date: e.target.value })}
-            />
-            <FormInput
-              label="Due date"
-              type="date"
-              value={form.due_date}
-              onChange={(e) => setForm({ ...form, due_date: e.target.value })}
-            />
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <FormInput
-              label="Pay rate ($)"
-              type="number"
-              step="0.01"
-              min="0"
-              placeholder="e.g. 65.00"
-              value={form.pay_rate}
-              onChange={(e) => setForm({ ...form, pay_rate: e.target.value })}
-            />
-            <FormInput
-              label="Invoice amount ($)"
-              type="number"
-              step="0.01"
-              min="0"
-              placeholder="e.g. 10400.00"
-              value={form.invoice_amount}
-              onChange={(e) => setForm({ ...form, invoice_amount: e.target.value })}
-            />
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <FormInput
-              label="Billing month"
-              type="month"
-              value={form.billing_month}
-              onChange={(e) => setForm({ ...form, billing_month: e.target.value })}
-            />
-            <FormInput
-              label="Bill-to email"
-              type="email"
-              placeholder="vendor@example.com"
-              value={form.bill_to_email}
-              onChange={(e) => setForm({ ...form, bill_to_email: e.target.value })}
-            />
-          </div>
-          {canChooseCompany && (
-            <SelectInput
-              label="Company (invoice issuer)"
-              value={form.company_group_id}
-              onChange={(e) => setForm({ ...form, company_group_id: e.target.value })}
-              options={[
-                { value: '', label: '— None (default branding) —' },
-                ...groups.map((g) => ({ value: g.id, label: g.name })),
-              ]}
-            />
-          )}
-          <SelectInput
-            label="Status"
-            value={form.status}
-            onChange={(e) => setForm({ ...form, status: e.target.value as Status })}
-            options={STATUSES.map((s) => ({ value: s, label: s }))}
-          />
-          <FormInput
-            label="Notes"
-            value={form.notes}
-            onChange={(e) => setForm({ ...form, notes: e.target.value })}
-          />
-          {!editingId && (
-            <p className="text-xs text-muted">
-              After saving, the invoice opens with a Document panel to download or email the PDF.
-            </p>
-          )}
-        </div>
-      </Modal>
-
-      {/* Detail */}
-      <Modal
-        open={!!selected}
-        onClose={() => setSelected(null)}
-        title={selected?.invoice_number ? `Invoice #${selected.invoice_number}` : 'Invoice'}
-        footer={
-          <>
-            {selected && (
-              <Button variant="danger-ghost" className="mr-auto" onClick={() => remove(selected)}>
-                Delete
-              </Button>
-            )}
-            {selected && (
-              <Button variant="secondary" onClick={() => openEdit(selected)}>
-                Edit
-              </Button>
-            )}
-            <Button variant="secondary" onClick={() => setSelected(null)}>
-              Close
-            </Button>
-          </>
-        }
-      >
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-          <Detail label="Consultant" value={selected?.consultant_name} />
-          <Detail label="Vendor" value={selected?.vendor_name} />
-          <Detail label="Invoice #" value={selected?.invoice_number} />
-          <div className="rounded-lg border border-border bg-hover/50 px-3 py-2">
-            <div className="text-[10px] font-semibold uppercase tracking-widest text-muted">
-              Status
+        <div className="space-y-6">
+          <section>
+            <SectionTitle>Invoice details</SectionTitle>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <SelectInput
+                label="Issuing company *"
+                value={form.company_group_id}
+                onChange={(event) => chooseCompany(event.target.value)}
+                options={[
+                  { value: '', label: 'Select company' },
+                  ...companies.map((company) => ({ value: company.id, label: company.name })),
+                ]}
+              />
+              <FormInput
+                label="Invoice number *"
+                value={form.invoice_number}
+                onChange={(event) => setForm({ ...form, invoice_number: event.target.value })}
+              />
+              <FormInput
+                label="Invoice date"
+                type="date"
+                value={form.invoice_date}
+                onChange={(event) => patchDates({ invoice_date: event.target.value })}
+              />
+              <FormInput
+                label="Net terms (days)"
+                type="number"
+                min="0"
+                value={form.net_terms_days}
+                onChange={(event) => patchDates({ net_terms_days: event.target.value })}
+              />
+              <FormInput
+                label="Due date"
+                type="date"
+                value={form.due_date}
+                onChange={(event) => setForm({ ...form, due_date: event.target.value })}
+              />
+              <FormInput
+                label="Currency"
+                maxLength={3}
+                value={form.currency}
+                onChange={(event) =>
+                  setForm({ ...form, currency: event.target.value.toUpperCase() })
+                }
+              />
+              <FormInput
+                label="Discount amount"
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.discount_amount}
+                onChange={(event) => setForm({ ...form, discount_amount: event.target.value })}
+              />
+              <FormInput
+                label="Tax %"
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                value={form.tax_percent}
+                onChange={(event) => setForm({ ...form, tax_percent: event.target.value })}
+              />
             </div>
-            <div className="mt-1">
-              <Pill tone={statusTone(selected?.status)}>{selected?.status ?? '—'}</Pill>
-            </div>
-          </div>
-          <Detail label="Billing month" value={formatMonth(selected?.billing_month)} />
-          <Detail label="Pay rate" value={formatMoney(selected?.pay_rate)} />
-          <Detail label="Invoice amount" value={formatMoney(selected?.invoice_amount)} />
-          <Detail label="Invoice date" value={formatDate(selected?.invoice_date)} />
-          <Detail label="Due date" value={formatDate(selected?.due_date)} />
-          <Detail
-            label="Net terms"
-            value={selected?.net_terms_days != null ? `${selected.net_terms_days} days` : '—'}
-          />
-          <Detail
-            label="Company (issuer)"
-            value={selected?.company_group_id ? byId[selected.company_group_id]?.name : null}
-          />
-          <Detail label="Bill-to email" value={selected?.bill_to_email} />
-          <Detail
-            label="Last emailed"
-            value={selected?.last_emailed_at ? formatDate(selected.last_emailed_at) : 'Never'}
-          />
-          <Detail label="Created" value={formatDate(selected?.created_at)} />
-          <div className="sm:col-span-2">
-            <Detail label="Notes" value={selected?.notes} />
-          </div>
-        </div>
+          </section>
 
-        {/* Document — generate a downloadable PDF, with an opt-in email toggle. */}
-        <div className="mt-4 rounded-xl border border-border bg-hover/30 p-3.5">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="text-sm font-semibold text-ink">Document</div>
-              <div className="text-xs text-muted">
-                Generate a PDF of this invoice — download it, or email it to the bill-to address.
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+            <PartyFields
+              title="Issuer snapshot"
+              party={form.issuer_snapshot}
+              onChange={(key, value) => patchParty('issuer_snapshot', key, value)}
+            />
+            <PartyFields
+              title="Bill-to snapshot"
+              party={form.bill_to_snapshot}
+              onChange={(key, value) => patchParty('bill_to_snapshot', key, value)}
+            />
+          </div>
+
+          <section>
+            <div className="mb-2 flex items-center justify-between">
+              <SectionTitle>Line items</SectionTitle>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() =>
+                  setForm({
+                    ...form,
+                    line_items: [
+                      ...form.line_items,
+                      {
+                        description: '',
+                        service_period: '',
+                        quantity: '1',
+                        unit: 'hours',
+                        unit_rate: '0',
+                      },
+                    ],
+                  })
+                }
+              >
+                + Add item
+              </Button>
+            </div>
+            <div className="space-y-3">
+              {form.line_items.map((item, index) => (
+                <div key={index} className="rounded-xl border border-border bg-hover/30 p-3">
+                  <div className="grid grid-cols-1 gap-2 md:grid-cols-[2fr_1fr_.8fr_.8fr_1fr_auto]">
+                    <FormInput
+                      label="Description *"
+                      value={item.description}
+                      onChange={(event) => patchItem(index, { description: event.target.value })}
+                    />
+                    <FormInput
+                      label="Service month"
+                      type="month"
+                      value={item.service_period}
+                      onChange={(event) => patchItem(index, { service_period: event.target.value })}
+                    />
+                    <FormInput
+                      label="Quantity"
+                      type="number"
+                      min="0.0001"
+                      step="0.01"
+                      value={item.quantity}
+                      onChange={(event) => patchItem(index, { quantity: event.target.value })}
+                    />
+                    <FormInput
+                      label="Unit"
+                      value={item.unit}
+                      onChange={(event) => patchItem(index, { unit: event.target.value })}
+                    />
+                    <FormInput
+                      label="Unit rate"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={item.unit_rate}
+                      onChange={(event) => patchItem(index, { unit_rate: event.target.value })}
+                    />
+                    <div className="flex items-end">
+                      <Button
+                        size="sm"
+                        variant="danger-ghost"
+                        disabled={form.line_items.length === 1}
+                        onClick={() =>
+                          setForm({
+                            ...form,
+                            line_items: form.line_items.filter((_, i) => i !== index),
+                          })
+                        }
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="mt-2 text-right text-xs font-medium text-ink">
+                    {fmtMoney(
+                      Number(item.quantity || 0) * Number(item.unit_rate || 0),
+                      form.currency,
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-medium text-ink">Notes</span>
+              <textarea
+                rows={5}
+                value={form.notes}
+                onChange={(event) => setForm({ ...form, notes: event.target.value })}
+                className="w-full rounded-md border border-border-strong bg-surface px-3 py-2 text-[13px] text-ink focus:outline-none focus-visible:ring-2 focus-visible:border-accent"
+              />
+            </label>
+            <div className="rounded-xl border border-border bg-hover/30 p-4 text-sm">
+              <TotalRow label="Subtotal" value={fmtMoney(totals.subtotal, form.currency)} />
+              <TotalRow label="Discount" value={`− ${fmtMoney(totals.discount, form.currency)}`} />
+              <TotalRow label="Tax" value={fmtMoney(totals.tax, form.currency)} />
+              <div className="mt-3 border-t border-border pt-3">
+                <TotalRow label="Total" value={fmtMoney(totals.total, form.currency)} strong />
               </div>
             </div>
-            <label className="flex shrink-0 cursor-pointer select-none items-center gap-2">
-              <span className="text-xs text-muted">Email it</span>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={emailOn}
-                aria-label="Email this invoice"
-                onClick={() => setEmailOn((v) => !v)}
-                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                  emailOn ? 'bg-primary' : 'bg-border'
-                }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
-                    emailOn ? 'translate-x-4' : 'translate-x-0.5'
-                  }`}
-                />
-              </button>
-            </label>
-          </div>
-
-          <div className="mt-3 flex flex-wrap items-end gap-2">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => downloadDoc(selected)}
-              loading={docBusy && !emailOn}
-              disabled={docBusy}
-            >
-              Download PDF
-            </Button>
-            {emailOn && (
-              <>
-                <div className="min-w-[180px] flex-1">
-                  <FormInput
-                    label="Recipient email"
-                    type="email"
-                    placeholder="vendor@example.com"
-                    value={recipient}
-                    onChange={(e) => setRecipient(e.target.value)}
-                  />
-                </div>
-                <Button
-                  size="sm"
-                  onClick={() => sendDoc(selected)}
-                  loading={docBusy}
-                  disabled={docBusy || !recipient.trim()}
-                >
-                  Send
-                </Button>
-              </>
-            )}
           </div>
         </div>
       </Modal>
+
+      <Modal
+        open={!!selected || detailLoading}
+        onClose={() => setSelected(null)}
+        size="lg"
+        title={selected ? `Invoice #${selected.invoice_number}` : 'Loading invoice'}
+        footer={
+          selected ? (
+            <>
+              {selected.permitted_actions?.delete && (
+                <Button variant="danger-ghost" className="mr-auto" onClick={requestDelete}>
+                  Delete draft
+                </Button>
+              )}
+              {selected.permitted_actions?.archive && (
+                <Button variant="secondary" className="mr-auto" onClick={requestArchive}>
+                  Archive
+                </Button>
+              )}
+              {selected.permitted_actions?.restore && (
+                <Button variant="secondary" className="mr-auto" onClick={requestArchive}>
+                  Restore
+                </Button>
+              )}
+              {selected.permitted_actions?.edit && (
+                <Button variant="secondary" onClick={() => openEdit(selected)}>
+                  Edit
+                </Button>
+              )}
+              <Button variant="secondary" onClick={() => setSelected(null)}>
+                Close
+              </Button>
+            </>
+          ) : undefined
+        }
+      >
+        {selected ? (
+          <div className="space-y-5">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-hover/30 p-3">
+              <div>
+                <Pill tone={STATUS_TONES[selected.display_status]}>{selected.display_status}</Pill>
+                {selected.archived_at && (
+                  <span className="ml-2 text-xs text-muted">
+                    Archived {fmtDate(selected.archived_at)}
+                  </span>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {selected.permitted_actions?.submit && (
+                  <Button size="sm" onClick={() => requestTransition('Submitted', 'Submit')}>
+                    Submit
+                  </Button>
+                )}
+                {selected.permitted_actions?.approve && (
+                  <Button size="sm" onClick={() => requestTransition('Approved', 'Approve')}>
+                    Approve
+                  </Button>
+                )}
+                {selected.permitted_actions?.mark_paid && (
+                  <Button size="sm" onClick={() => requestTransition('Paid', 'Mark paid')}>
+                    Mark paid
+                  </Button>
+                )}
+                {selected.permitted_actions?.cancel && (
+                  <Button
+                    size="sm"
+                    variant="danger-ghost"
+                    onClick={() => requestTransition('Cancelled', 'Cancel')}
+                  >
+                    Cancel invoice
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+              <Detail label="Invoice date" value={fmtDate(selected.invoice_date)} />
+              <Detail label="Due date" value={fmtDate(selected.due_date)} />
+              <Detail label="Currency" value={selected.currency} />
+              <Detail label="Total" value={fmtMoney(selected.total_amount, selected.currency)} />
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <PartyCard label="Bill to" party={selected.bill_to_snapshot} />
+              <PartyCard label="From" party={selected.issuer_snapshot} />
+            </div>
+
+            <div className="overflow-x-auto rounded-xl border border-border">
+              <table className="w-full min-w-[620px] text-sm">
+                <thead className="bg-hover text-left text-[10px] uppercase tracking-widest text-muted">
+                  <tr>
+                    <th className="px-3 py-2">Description</th>
+                    <th className="px-3 py-2">Period</th>
+                    <th className="px-3 py-2 text-right">Quantity</th>
+                    <th className="px-3 py-2 text-right">Rate</th>
+                    <th className="px-3 py-2 text-right">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(selected.line_items ?? []).map((item, index) => (
+                    <tr key={index} className="border-t border-border">
+                      <td className="px-3 py-2 font-medium text-ink">{item.description}</td>
+                      <td className="px-3 py-2 text-muted">{item.service_period || '—'}</td>
+                      <td className="px-3 py-2 text-right">
+                        {item.quantity} {item.unit}
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        {fmtMoney(item.unit_rate, selected.currency)}
+                      </td>
+                      <td className="px-3 py-2 text-right font-medium">
+                        {fmtMoney(item.amount, selected.currency)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="ml-auto w-full max-w-sm rounded-xl border border-border bg-hover/30 p-4">
+              <TotalRow label="Subtotal" value={fmtMoney(selected.subtotal, selected.currency)} />
+              <TotalRow
+                label="Discount"
+                value={`− ${fmtMoney(selected.discount_amount, selected.currency)}`}
+              />
+              <TotalRow
+                label={`Tax (${selected.tax_percent}%)`}
+                value={fmtMoney(selected.tax_amount, selected.currency)}
+              />
+              <div className="mt-3 border-t border-border pt-3">
+                <TotalRow
+                  label="Total"
+                  value={fmtMoney(selected.total_amount, selected.currency)}
+                  strong
+                />
+              </div>
+            </div>
+
+            {selected.notes && <Detail label="Notes" value={selected.notes} />}
+
+            {!!selected.status_history?.length && (
+              <div className="rounded-xl border border-border p-4">
+                <div className="mb-3 font-semibold text-ink">Status history</div>
+                <div className="space-y-2">
+                  {selected.status_history.map((entry) => (
+                    <div
+                      key={entry.id}
+                      className="flex flex-wrap items-center justify-between gap-2 text-xs"
+                    >
+                      <span className="text-ink">
+                        {entry.from_status ? `${entry.from_status} → ` : ''}
+                        <span className="font-semibold">{entry.to_status}</span>
+                        {entry.note ? ` · ${entry.note}` : ''}
+                      </span>
+                      <span className="text-muted">{fmtDate(entry.changed_at)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {(selected.permitted_actions?.download || selected.permitted_actions?.email) && (
+              <div className="rounded-xl border border-border p-4">
+                <div className="mb-3">
+                  <div className="font-semibold text-ink">Document delivery</div>
+                  <div className="text-xs text-muted">
+                    Download the current PDF or email it when the workflow permits.
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-end gap-2">
+                  {selected.permitted_actions?.download && (
+                    <Button
+                      variant="secondary"
+                      onClick={() => void download(selected)}
+                      loading={docBusy}
+                    >
+                      Download PDF
+                    </Button>
+                  )}
+                  {selected.permitted_actions?.email && (
+                    <>
+                      <div className="min-w-[220px] flex-1">
+                        <FormInput
+                          label="Recipient email"
+                          type="email"
+                          value={recipient}
+                          onChange={(event) => setRecipient(event.target.value)}
+                        />
+                      </div>
+                      <Button
+                        onClick={() => void email(selected)}
+                        loading={docBusy}
+                        disabled={!recipient.trim()}
+                      >
+                        Send invoice
+                      </Button>
+                    </>
+                  )}
+                </div>
+                {selected.last_emailed_at && (
+                  <div className="mt-2 text-xs text-muted">
+                    Last emailed {fmtDate(selected.last_emailed_at)}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="py-12 text-center text-sm text-muted">Loading…</div>
+        )}
+      </Modal>
+
+      <ConfirmDialog spec={confirm} onClose={() => setConfirm(null)} />
     </Layout>
   );
 }
 
-function Detail({ label, value }: { label: string; value?: string | null }) {
-  const content = value && String(value).trim() ? value : '—';
+function Metric({ label, value, tone }: { label: string; value: string; tone?: 'danger' }) {
   return (
-    <div className="rounded-lg border border-border bg-hover/50 px-3 py-2">
+    <div className="rounded-xl border border-border bg-surface p-4">
       <div className="text-[10px] font-semibold uppercase tracking-widest text-muted">{label}</div>
-      <div className="mt-1 text-ink break-words">{content}</div>
+      <div
+        className={`mt-1 text-xl font-semibold ${tone === 'danger' ? 'text-danger' : 'text-ink'}`}
+      >
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function SectionTitle({ children }: { children: string }) {
+  return <h4 className="mb-3 text-sm font-semibold text-ink">{children}</h4>;
+}
+
+function PartyFields({
+  title,
+  party,
+  onChange,
+}: {
+  title: string;
+  party: Party;
+  onChange: (key: keyof Party, value: string) => void;
+}) {
+  return (
+    <section className="rounded-xl border border-border p-4">
+      <SectionTitle>{title}</SectionTitle>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <FormInput
+          label="Name *"
+          value={party.name}
+          onChange={(event) => onChange('name', event.target.value)}
+        />
+        <FormInput
+          label="Email"
+          type="email"
+          value={party.email}
+          onChange={(event) => onChange('email', event.target.value)}
+        />
+        <FormInput
+          label="Phone"
+          value={party.phone}
+          onChange={(event) => onChange('phone', event.target.value)}
+        />
+        <FormInput
+          label="Website"
+          value={party.website}
+          onChange={(event) => onChange('website', event.target.value)}
+        />
+        <FormInput
+          label="Country"
+          value={party.country}
+          onChange={(event) => onChange('country', event.target.value)}
+        />
+        <FormInput
+          label="Tax ID"
+          value={party.tax_id}
+          onChange={(event) => onChange('tax_id', event.target.value)}
+        />
+        <label className="block sm:col-span-2">
+          <span className="mb-1.5 block text-xs font-medium text-ink">Address</span>
+          <textarea
+            rows={3}
+            value={party.address}
+            onChange={(event) => onChange('address', event.target.value)}
+            className="w-full rounded-md border border-border-strong bg-surface px-3 py-2 text-[13px] text-ink focus:outline-none focus-visible:ring-2 focus-visible:border-accent"
+          />
+        </label>
+      </div>
+    </section>
+  );
+}
+
+function PartyCard({ label, party }: { label: string; party?: Party | null }) {
+  const lines = party
+    ? [
+        party.name,
+        party.address,
+        party.country,
+        party.email,
+        party.phone,
+        party.website,
+        party.tax_id ? `Tax ID: ${party.tax_id}` : '',
+      ].filter(Boolean)
+    : [];
+  return <Detail label={label} value={lines.join('\n')} />;
+}
+
+function Detail({ label, value }: { label: string; value?: string | null }) {
+  return (
+    <div className="whitespace-pre-line rounded-xl border border-border bg-hover/30 px-3 py-2">
+      <div className="text-[10px] font-semibold uppercase tracking-widest text-muted">{label}</div>
+      <div className="mt-1 break-words text-sm text-ink">{value?.trim() || '—'}</div>
+    </div>
+  );
+}
+
+function TotalRow({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
+  return (
+    <div
+      className={`flex items-center justify-between gap-4 py-1 ${strong ? 'text-base font-semibold text-ink' : 'text-sm text-ink-2'}`}
+    >
+      <span>{label}</span>
+      <span>{value}</span>
     </div>
   );
 }

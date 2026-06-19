@@ -7,7 +7,6 @@ import {
   ADMIN_TIER,
   GROUP_LEAD_ROLES,
   DEVELOPER_CAPABILITIES,
-  PAGE_ACCESS_CAPABILITIES,
   isPageAccessCapability,
   canAssignRole,
   Role,
@@ -515,7 +514,7 @@ export const setCapabilities: RequestHandler = async (req, res) => {
 // ---------------------------------------------------------------------------
 // PATCH /admin/users/:id/page-access
 //
-// ADMIN_TIER-only. Grants/revokes PAGE-ACCESS capabilities (e.g. 'invoices')
+// ADMIN_TIER-only. Grants/revokes the configured PAGE-ACCESS capabilities
 // for ANY user, of any role. Unlike setCapabilities above (SUPER_ADMIN-only,
 // DEVELOPER-only targets, the powerful admin-page catalog), page-access caps
 // only unlock a single feature page and carry no admin power — so a DIRECTOR /
@@ -524,9 +523,7 @@ export const setCapabilities: RequestHandler = async (req, res) => {
 // The merge preserves the target's existing NON-page capabilities (the
 // DEVELOPER admin grants), so an admin toggling someone's invoices access can
 // never accidentally strip a DEVELOPER's `users`/`feature_flags` grants.
-const pageAccessSchema = z
-  .object({ capabilities: z.array(z.enum(PAGE_ACCESS_CAPABILITIES)) })
-  .strict();
+const pageAccessSchema = z.object({ capabilities: z.array(z.never()).max(0) }).strict();
 
 export const setPageAccess: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
@@ -549,7 +546,9 @@ export const setPageAccess: RequestHandler = async (req, res) => {
 
   // Preserve every existing non-page capability; replace the page-access set
   // wholesale with what the admin submitted.
-  const existingNonPage = (t.capabilities ?? []).filter((c) => !isPageAccessCapability(c));
+  const existingNonPage = (t.capabilities ?? []).filter(
+    (c) => c !== 'invoices' && !isPageAccessCapability(c),
+  );
   const pageCaps = [...new Set(parsed.data.capabilities)];
   const caps = [...new Set([...existingNonPage, ...pageCaps])] as DeveloperCapability[];
 
