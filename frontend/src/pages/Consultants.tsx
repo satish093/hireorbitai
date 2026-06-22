@@ -13,7 +13,7 @@ import { Button } from '../components/Button';
 import { EmptyState } from '../components/EmptyState';
 import { SkeletonCard } from '../components/Skeleton';
 import { GroupBadge, useUserGroups, invalidateUserGroupsCache } from '../components/GroupBadge';
-import { Popover } from '../components/ui/Popover';
+import { MarketingStatusSelect, MarketingStatusPills } from '../components/MarketingStatusSelect';
 import {
   ConsultantCard,
   filterConsultants,
@@ -40,108 +40,6 @@ interface RecruiterRow {
     email?: string | null;
     group_id?: string | null;
   } | null;
-}
-
-const STATUS_TONE: Record<string, string> = {
-  ACTIVE:
-    'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30 focus:ring-emerald-500/30',
-  PAUSED:
-    'bg-amber-50 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-500/30 focus:ring-amber-500/30',
-  PLACED:
-    'bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-500/30 focus:ring-blue-500/30',
-};
-
-const STATUS_OPTIONS = [
-  { value: 'ACTIVE', label: 'Active', dot: 'bg-emerald-500' },
-  { value: 'PAUSED', label: 'Paused', dot: 'bg-amber-400' },
-  { value: 'PLACED', label: 'Placed', dot: 'bg-blue-500' },
-] as const;
-
-function StatusSelect({
-  value,
-  onChange,
-}: {
-  value: 'ACTIVE' | 'PAUSED' | 'PLACED';
-  onChange: (v: string) => void;
-}) {
-  const opt = STATUS_OPTIONS.find((o) => o.value === value)!;
-  return (
-    <Popover
-      align="left"
-      button={(open) => (
-        <button
-          className={clsx(
-            'inline-flex items-center gap-1.5 text-[11px] font-medium pl-2.5 pr-2 py-1 rounded-full border cursor-pointer focus:outline-none focus:ring-2 transition',
-            STATUS_TONE[value],
-          )}
-        >
-          {opt.label}
-          <svg
-            width="10"
-            height="6"
-            viewBox="0 0 10 6"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            className={clsx('transition-transform', open && 'rotate-180')}
-          >
-            <path d="M1 1l4 4 4-4" />
-          </svg>
-        </button>
-      )}
-    >
-      {(close) => (
-        <div className="py-1 min-w-[120px]">
-          {STATUS_OPTIONS.map((o) => (
-            <button
-              key={o.value}
-              onClick={() => {
-                onChange(o.value);
-                close();
-              }}
-              className={clsx(
-                'w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm text-ink hover:bg-hover transition cursor-pointer',
-                o.value === value && 'bg-hover',
-              )}
-            >
-              <span className={clsx('w-2 h-2 rounded-full shrink-0', o.dot)} />
-              {o.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </Popover>
-  );
-}
-
-// ── Status filter pills (desktop toolbar + mobile sheet) ───────────────────
-
-const FILTER_OPTIONS = [
-  { value: 'ALL', label: 'All' },
-  { value: 'ACTIVE', label: 'Active' },
-  { value: 'PAUSED', label: 'Paused' },
-  { value: 'PLACED', label: 'Placed' },
-];
-
-function StatusPills({ active, onChange }: { active: string; onChange: (v: string) => void }) {
-  return (
-    <div className="flex flex-wrap gap-2">
-      {FILTER_OPTIONS.map((o) => (
-        <button
-          key={o.value}
-          onClick={() => onChange(o.value)}
-          className={clsx(
-            'h-8 px-3 rounded-full text-[13px] font-semibold border transition-colors',
-            o.value === active
-              ? 'bg-ink text-bg border-ink'
-              : 'bg-surface text-ink-2 border-border hover:border-border-strong',
-          )}
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
-  );
 }
 
 export function Consultants() {
@@ -343,7 +241,7 @@ export function Consultants() {
             style={{ fontSize: 14 }}
           />
         </div>
-        <StatusPills active={filters.status} onChange={(v) => setFilter('status', v)} />
+        <MarketingStatusPills active={filters.status} onChange={(v) => setFilter('status', v)} />
       </div>
 
       {/* ── Mobile toolbar (search + filter button) ── */}
@@ -468,7 +366,10 @@ export function Consultants() {
               header: 'Status',
               render: (c: ConsultantRow) => (
                 <span onClick={(e) => e.stopPropagation()}>
-                  <StatusSelect value={c.marketing_status} onChange={(v) => setStatus(c.id, v)} />
+                  <MarketingStatusSelect
+                    value={c.marketing_status}
+                    onChange={(v) => setStatus(c.id, v)}
+                  />
                 </span>
               ),
             },
@@ -673,7 +574,7 @@ export function Consultants() {
           <div className="text-xs font-semibold uppercase tracking-wide text-muted mb-3">
             Status
           </div>
-          <StatusPills active={filters.status} onChange={(v) => setFilter('status', v)} />
+          <MarketingStatusPills active={filters.status} onChange={(v) => setFilter('status', v)} />
         </div>
       </BottomSheet>
 

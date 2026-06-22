@@ -2,11 +2,15 @@ import { Link } from 'react-router-dom';
 import { Avatar } from './TaskBits';
 import { GroupBadge } from './GroupBadge';
 import { Button } from './Button';
+import { StatusBadge } from './StatusBadge';
+import type { MarketingStatus } from './MarketingStatusSelect';
 
 export interface RecruiterCardRow {
   id: string;
   team?: string | null;
   consultant_count?: number;
+  /** Bench status — mirrors consultants. Absent on un-migrated rows (→ ACTIVE). */
+  marketing_status?: MarketingStatus | null;
   user?: {
     id: string;
     full_name?: string | null;
@@ -65,16 +69,19 @@ export function RecruiterCard({ recruiter: r, onClick, onSupervisors, onGroup }:
             <span className="text-[15px] font-semibold" style={{ color: 'var(--ink)' }}>
               {name}
             </span>
-            {consultantCount > 0 && (
-              <Link
-                to={`/consultants?recruiter=${r.id}`}
-                onClick={(e) => e.stopPropagation()}
-                className="shrink-0 text-[11px] font-bold px-2 py-0.5 rounded-full"
-                style={{ background: 'var(--brand-soft)', color: 'var(--brand-on-soft)' }}
-              >
-                {consultantCount} consultant{consultantCount !== 1 ? 's' : ''}
-              </Link>
-            )}
+            <div className="flex items-center gap-1.5 shrink-0">
+              <StatusBadge status={r.marketing_status ?? 'ACTIVE'} />
+              {consultantCount > 0 && (
+                <Link
+                  to={`/consultants?recruiter=${r.id}`}
+                  onClick={(e) => e.stopPropagation()}
+                  className="text-[11px] font-bold px-2 py-0.5 rounded-full"
+                  style={{ background: 'var(--brand-soft)', color: 'var(--brand-on-soft)' }}
+                >
+                  {consultantCount} consultant{consultantCount !== 1 ? 's' : ''}
+                </Link>
+              )}
+            </div>
           </div>
 
           <div
@@ -106,13 +113,20 @@ export function RecruiterCard({ recruiter: r, onClick, onSupervisors, onGroup }:
   );
 }
 
-/** Client-side filter for recruiters. */
-export function filterRecruiters(rows: RecruiterCardRow[], query: string): RecruiterCardRow[] {
-  if (!query) return rows;
+/** Client-side filter for recruiters (search + optional status). */
+export function filterRecruiters(
+  rows: RecruiterCardRow[],
+  query: string,
+  status: string = 'ALL',
+): RecruiterCardRow[] {
   const q = query.toLowerCase();
   return rows.filter((r) => {
-    const name = (r.user?.full_name ?? r.user?.email ?? '').toLowerCase();
-    const team = (r.team ?? '').toLowerCase();
-    return name.includes(q) || team.includes(q);
+    if (status && status !== 'ALL' && (r.marketing_status ?? 'ACTIVE') !== status) return false;
+    if (q) {
+      const name = (r.user?.full_name ?? r.user?.email ?? '').toLowerCase();
+      const team = (r.team ?? '').toLowerCase();
+      if (!name.includes(q) && !team.includes(q)) return false;
+    }
+    return true;
   });
 }
