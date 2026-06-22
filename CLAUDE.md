@@ -2,6 +2,12 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## graphify
+
+- **graphify** (`.claude/skills/graphify/SKILL.md`) — any input to knowledge graph. Trigger: `/graphify`
+
+When the user types `/graphify`, invoke the Skill tool with `skill: "graphify"` before doing anything else.
+
 ## Repository
 
 HireOrbit AI — npm-workspaces monorepo (`backend/`, `frontend/`, `shared/`) for a role-based consultant marketing + recruiting platform. **Self-hosted everything**: Node 22 + self-hosted PostgreSQL + filesystem storage on a single VPS. No managed Auth, no managed Postgres, no managed Storage.

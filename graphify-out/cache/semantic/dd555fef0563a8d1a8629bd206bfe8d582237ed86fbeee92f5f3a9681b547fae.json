@@ -1,0 +1,38 @@
+{
+  "nodes": [
+    {
+      "id": "commands_check_deploy",
+      "label": "/check-deploy command",
+      "file_type": "document",
+      "source_file": ".claude/commands/check-deploy.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "commands_check_deploy",
+      "target": "rules_deploy",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": ".claude/commands/check-deploy.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "commands_check_deploy",
+      "target": "rules_database_node_pg_migrate",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": ".claude/commands/check-deploy.md",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": []
+}

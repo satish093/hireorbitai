@@ -1,0 +1,156 @@
+{
+  "nodes": [
+    {
+      "id": "e_claude_hireorbitai_scripts_ops_sh",
+      "label": "ops.sh",
+      "file_type": "code",
+      "source_file": "scripts/ops.sh",
+      "source_location": "L1",
+      "metadata": { "language": "bash", "kind": "file" }
+    },
+    {
+      "id": "e_claude_hireorbitai_scripts_ops_sh__entry",
+      "label": "ops.sh script",
+      "file_type": "code",
+      "source_file": "scripts/ops.sh",
+      "source_location": "L1",
+      "metadata": { "language": "bash", "kind": "bash_entrypoint" }
+    },
+    {
+      "id": "scripts_ops_require_rclone",
+      "label": "require_rclone()",
+      "file_type": "code",
+      "source_file": "scripts/ops.sh",
+      "source_location": "L38",
+      "metadata": { "language": "bash", "kind": "bash_function" }
+    },
+    {
+      "id": "scripts_ops_newest_stamp_dir",
+      "label": "newest_stamp_dir()",
+      "file_type": "code",
+      "source_file": "scripts/ops.sh",
+      "source_location": "L49",
+      "metadata": { "language": "bash", "kind": "bash_function" }
+    },
+    {
+      "id": "scripts_ops_ensure_remote",
+      "label": "ensure_remote()",
+      "file_type": "code",
+      "source_file": "scripts/ops.sh",
+      "source_location": "L57",
+      "metadata": { "language": "bash", "kind": "bash_function" }
+    },
+    {
+      "id": "scripts_ops_install_weekly_cron",
+      "label": "install_weekly_cron()",
+      "file_type": "code",
+      "source_file": "scripts/ops.sh",
+      "source_location": "L70",
+      "metadata": { "language": "bash", "kind": "bash_function" }
+    },
+    {
+      "id": "scripts_ops_cleanup",
+      "label": "cleanup()",
+      "file_type": "code",
+      "source_file": "scripts/ops.sh",
+      "source_location": "L192",
+      "metadata": { "language": "bash", "kind": "bash_function" }
+    }
+  ],
+  "edges": [
+    {
+      "source": "e_claude_hireorbitai_scripts_ops_sh",
+      "target": "e_claude_hireorbitai_scripts_ops_sh__entry",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/ops.sh",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "e_claude_hireorbitai_scripts_ops_sh",
+      "target": "dirname_bash_source_0_lib_env_sh",
+      "relation": "imports",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/ops.sh",
+      "source_location": "L36",
+      "weight": 1.0,
+      "context": "import"
+    },
+    {
+      "source": "e_claude_hireorbitai_scripts_ops_sh",
+      "target": "scripts_ops_require_rclone",
+      "relation": "defines",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/ops.sh",
+      "source_location": "L38",
+      "weight": 1.0
+    },
+    {
+      "source": "e_claude_hireorbitai_scripts_ops_sh",
+      "target": "scripts_ops_newest_stamp_dir",
+      "relation": "defines",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/ops.sh",
+      "source_location": "L49",
+      "weight": 1.0
+    },
+    {
+      "source": "e_claude_hireorbitai_scripts_ops_sh",
+      "target": "scripts_ops_ensure_remote",
+      "relation": "defines",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/ops.sh",
+      "source_location": "L57",
+      "weight": 1.0
+    },
+    {
+      "source": "e_claude_hireorbitai_scripts_ops_sh",
+      "target": "scripts_ops_install_weekly_cron",
+      "relation": "defines",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/ops.sh",
+      "source_location": "L70",
+      "weight": 1.0
+    },
+    {
+      "source": "e_claude_hireorbitai_scripts_ops_sh",
+      "target": "scripts_ops_cleanup",
+      "relation": "defines",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/ops.sh",
+      "source_location": "L192",
+      "weight": 1.0
+    },
+    {
+      "source": "e_claude_hireorbitai_scripts_ops_sh__entry",
+      "target": "scripts_ops_ensure_remote",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/ops.sh",
+      "source_location": "L95",
+      "weight": 1.0,
+      "context": "call"
+    },
+    {
+      "source": "e_claude_hireorbitai_scripts_ops_sh__entry",
+      "target": "scripts_ops_install_weekly_cron",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/ops.sh",
+      "source_location": "L119",
+      "weight": 1.0,
+      "context": "call"
+    },
+    {
+      "source": "e_claude_hireorbitai_scripts_ops_sh__entry",
+      "target": "scripts_ops_require_rclone",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/ops.sh",
+      "source_location": "L146",
+      "weight": 1.0,
+      "context": "call"
+    }
+  ]
+}

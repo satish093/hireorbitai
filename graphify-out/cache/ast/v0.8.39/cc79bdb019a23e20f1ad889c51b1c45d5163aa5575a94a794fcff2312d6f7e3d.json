@@ -1,0 +1,85 @@
+{
+  "nodes": [
+    {
+      "id": "e_claude_hireorbitai_infrastructure_bootstrap_vps_sh",
+      "label": "bootstrap-vps.sh",
+      "file_type": "code",
+      "source_file": "infrastructure/bootstrap-vps.sh",
+      "source_location": "L1",
+      "metadata": { "language": "bash", "kind": "file" }
+    },
+    {
+      "id": "e_claude_hireorbitai_infrastructure_bootstrap_vps_sh__entry",
+      "label": "bootstrap-vps.sh script",
+      "file_type": "code",
+      "source_file": "infrastructure/bootstrap-vps.sh",
+      "source_location": "L1",
+      "metadata": { "language": "bash", "kind": "bash_entrypoint" }
+    },
+    {
+      "id": "infrastructure_bootstrap_vps_log",
+      "label": "log()",
+      "file_type": "code",
+      "source_file": "infrastructure/bootstrap-vps.sh",
+      "source_location": "L46",
+      "metadata": { "language": "bash", "kind": "bash_function" }
+    },
+    {
+      "id": "infrastructure_bootstrap_vps_skip",
+      "label": "skip()",
+      "file_type": "code",
+      "source_file": "infrastructure/bootstrap-vps.sh",
+      "source_location": "L47",
+      "metadata": { "language": "bash", "kind": "bash_function" }
+    }
+  ],
+  "edges": [
+    {
+      "source": "e_claude_hireorbitai_infrastructure_bootstrap_vps_sh",
+      "target": "e_claude_hireorbitai_infrastructure_bootstrap_vps_sh__entry",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "infrastructure/bootstrap-vps.sh",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "e_claude_hireorbitai_infrastructure_bootstrap_vps_sh",
+      "target": "infrastructure_bootstrap_vps_log",
+      "relation": "defines",
+      "confidence": "EXTRACTED",
+      "source_file": "infrastructure/bootstrap-vps.sh",
+      "source_location": "L46",
+      "weight": 1.0
+    },
+    {
+      "source": "e_claude_hireorbitai_infrastructure_bootstrap_vps_sh",
+      "target": "infrastructure_bootstrap_vps_skip",
+      "relation": "defines",
+      "confidence": "EXTRACTED",
+      "source_file": "infrastructure/bootstrap-vps.sh",
+      "source_location": "L47",
+      "weight": 1.0
+    },
+    {
+      "source": "e_claude_hireorbitai_infrastructure_bootstrap_vps_sh__entry",
+      "target": "infrastructure_bootstrap_vps_log",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "infrastructure/bootstrap-vps.sh",
+      "source_location": "L50",
+      "weight": 1.0,
+      "context": "call"
+    },
+    {
+      "source": "e_claude_hireorbitai_infrastructure_bootstrap_vps_sh__entry",
+      "target": "infrastructure_bootstrap_vps_skip",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "infrastructure/bootstrap-vps.sh",
+      "source_location": "L61",
+      "weight": 1.0,
+      "context": "call"
+    }
+  ]
+}

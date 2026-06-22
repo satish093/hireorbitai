@@ -1,0 +1,243 @@
+{
+  "nodes": [
+    {
+      "id": "docs_testing_verify_gate",
+      "label": "npm run verify (pre-push gate)",
+      "file_type": "concept",
+      "source_file": "docs/testing.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_testing_verify_full",
+      "label": "npm run verify:full (verify + build + E2E)",
+      "file_type": "concept",
+      "source_file": "docs/testing.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_testing_vitest_unit_layer",
+      "label": "Layer 1 \u2014 Vitest Unit Tests (DB mocked)",
+      "file_type": "concept",
+      "source_file": "docs/testing.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_testing_db_mock_pattern",
+      "label": "vi.hoisted + vi.mock('../config/db') Mock Pattern",
+      "file_type": "rationale",
+      "source_file": "docs/testing.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_testing_typescript_lint_layer",
+      "label": "Layer 2 \u2014 TypeScript + Lint",
+      "file_type": "concept",
+      "source_file": "docs/testing.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_testing_playwright_e2e_layer",
+      "label": "Layer 3 \u2014 Playwright E2E Tests (mocked API)",
+      "file_type": "concept",
+      "source_file": "docs/testing.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_testing_mock_api_helper",
+      "label": "mockApi / seedSession Test Helpers",
+      "file_type": "concept",
+      "source_file": "docs/testing.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_testing_a11y_audit_layer",
+      "label": "Layer 4 \u2014 Accessibility Audit (axe-core WCAG)",
+      "file_type": "concept",
+      "source_file": "docs/testing.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_testing_security_ratchet_layer",
+      "label": "Layer 5 \u2014 Security Patterns Ratchet",
+      "file_type": "rationale",
+      "source_file": "docs/testing.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_testing_patterns_test_spec",
+      "label": "backend/src/security/patterns.test.ts",
+      "file_type": "code",
+      "source_file": "docs/testing.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "docs_testing_verify_full",
+      "target": "docs_testing_verify_gate",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/testing.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_testing_verify_gate",
+      "target": "docs_testing_vitest_unit_layer",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/testing.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_testing_verify_gate",
+      "target": "docs_testing_typescript_lint_layer",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/testing.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_testing_verify_full",
+      "target": "docs_testing_playwright_e2e_layer",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/testing.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_testing_vitest_unit_layer",
+      "target": "docs_testing_db_mock_pattern",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/testing.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_testing_playwright_e2e_layer",
+      "target": "docs_testing_mock_api_helper",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/testing.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_testing_a11y_audit_layer",
+      "target": "docs_testing_mock_api_helper",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/testing.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_testing_a11y_audit_layer",
+      "target": "docs_testing_playwright_e2e_layer",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/testing.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_testing_security_ratchet_layer",
+      "target": "docs_testing_patterns_test_spec",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/testing.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_testing_vitest_unit_layer",
+      "target": "docs_testing_patterns_test_spec",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/testing.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_testing_typescript_lint_layer",
+      "target": "shared_readme_shared_build",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/testing.md",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "testing_five_layer_suite",
+      "label": "Five-layer test suite gated by npm run verify",
+      "nodes": [
+        "docs_testing_vitest_unit_layer",
+        "docs_testing_typescript_lint_layer",
+        "docs_testing_playwright_e2e_layer",
+        "docs_testing_a11y_audit_layer",
+        "docs_testing_security_ratchet_layer"
+      ],
+      "relation": "participate_in",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/testing.md"
+    }
+  ]
+}

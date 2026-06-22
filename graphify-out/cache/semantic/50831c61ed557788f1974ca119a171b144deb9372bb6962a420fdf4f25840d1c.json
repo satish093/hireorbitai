@@ -1,0 +1,89 @@
+{
+  "nodes": [
+    {
+      "id": "deployment_local_local_dev_setup",
+      "label": "Local development setup",
+      "file_type": "document",
+      "source_file": "docs/deployment/local.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "deployment_local_dev_windows_script",
+      "label": "scripts/dev-windows.cmd one-command setup",
+      "file_type": "concept",
+      "source_file": "docs/deployment/local.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "deployment_local_local_dev_setup",
+      "target": "deployment_local_dev_windows_script",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/local.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "deployment_local_local_dev_setup",
+      "target": "deployment_02_databases_init_sql",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/local.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "deployment_local_local_dev_setup",
+      "target": "deployment_cloudpanel_hostinger_vps_deploy",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/local.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "deployment_local_local_dev_setup",
+      "target": "deployment_production_runbook_ops",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/local.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "deployment_local_local_dev_setup",
+      "target": "architecture_system_overview",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/local.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "deployment_local_local_dev_setup",
+      "target": "deployment_06_fresh_reset_reset_dev",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.7,
+      "source_file": "docs/deployment/local.md",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": []
+}

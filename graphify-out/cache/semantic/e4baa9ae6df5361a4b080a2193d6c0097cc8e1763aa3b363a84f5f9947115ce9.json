@@ -1,0 +1,100 @@
+{
+  "nodes": [
+    {
+      "id": "deployment_01_vps_cloudpanel",
+      "label": "VPS + CloudPanel production setup",
+      "file_type": "document",
+      "source_file": "docs/deployment/01-vps-cloudpanel.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "deployment_01_vps_cloudpanel_pm2_process",
+      "label": "PM2 process hireorbitai-api",
+      "file_type": "concept",
+      "source_file": "docs/deployment/01-vps-cloudpanel.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "deployment_01_vps_cloudpanel_nginx_proxy",
+      "label": "Nginx reverse proxy (/api + SSE)",
+      "file_type": "concept",
+      "source_file": "docs/deployment/01-vps-cloudpanel.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "deployment_01_vps_cloudpanel",
+      "target": "deployment_01_vps_cloudpanel_pm2_process",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/01-vps-cloudpanel.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "deployment_01_vps_cloudpanel",
+      "target": "deployment_01_vps_cloudpanel_nginx_proxy",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/01-vps-cloudpanel.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "deployment_01_vps_cloudpanel",
+      "target": "deployment_02_databases_separation",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/01-vps-cloudpanel.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "deployment_01_vps_cloudpanel",
+      "target": "deployment_auto_deploy_deploy_keys",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/01-vps-cloudpanel.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "deployment_01_vps_cloudpanel",
+      "target": "deployment_05_deploy_and_rollback_update_sh",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/01-vps-cloudpanel.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "deployment_01_vps_cloudpanel_nginx_proxy",
+      "target": "changelog_realtime_messaging_sse",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "docs/deployment/01-vps-cloudpanel.md",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": []
+}

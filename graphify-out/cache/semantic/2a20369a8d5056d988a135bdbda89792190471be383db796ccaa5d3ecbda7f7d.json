@@ -1,0 +1,211 @@
+{
+  "nodes": [
+    {
+      "id": "rbac_matrix_permission_matrix",
+      "label": "RBAC permission matrix & definition of done",
+      "file_type": "document",
+      "source_file": "docs/rbac-matrix.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "rbac_matrix_roles_tiers",
+      "label": "Roles & tiers (OWNER/ADMIN/MANAGER/OPERATOR/ALL)",
+      "file_type": "concept",
+      "source_file": "docs/rbac-matrix.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "rbac_matrix_two_layer_authz",
+      "label": "Two-layer authorization (route tier + ownership)",
+      "file_type": "rationale",
+      "source_file": "docs/rbac-matrix.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "rbac_matrix_developer_capability",
+      "label": "DEVELOPER capability-only access",
+      "file_type": "rationale",
+      "source_file": "docs/rbac-matrix.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "rbac_matrix_group_scoping",
+      "label": "Group-scoped leads (groupScope guards)",
+      "file_type": "concept",
+      "source_file": "docs/rbac-matrix.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "rbac_matrix_workspace_wide_exceptions",
+      "label": "Workspace-wide RBAC exceptions",
+      "file_type": "rationale",
+      "source_file": "docs/rbac-matrix.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "rbac_matrix_messages_permission_policy",
+      "label": "Messages permission policy (permission.service.ts)",
+      "file_type": "concept",
+      "source_file": "docs/rbac-matrix.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "rbac_matrix_rbac_fixture",
+      "label": "rbacMatrix.ts machine-checked fixture",
+      "file_type": "concept",
+      "source_file": "docs/rbac-matrix.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "rbac_matrix_permission_matrix",
+      "target": "rbac_matrix_roles_tiers",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/rbac-matrix.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "rbac_matrix_permission_matrix",
+      "target": "rbac_matrix_two_layer_authz",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/rbac-matrix.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "rbac_matrix_permission_matrix",
+      "target": "rbac_matrix_developer_capability",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/rbac-matrix.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "rbac_matrix_permission_matrix",
+      "target": "rbac_matrix_group_scoping",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/rbac-matrix.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "rbac_matrix_permission_matrix",
+      "target": "rbac_matrix_workspace_wide_exceptions",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/rbac-matrix.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "rbac_matrix_permission_matrix",
+      "target": "rbac_matrix_messages_permission_policy",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/rbac-matrix.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "rbac_matrix_permission_matrix",
+      "target": "rbac_matrix_rbac_fixture",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/rbac-matrix.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "rbac_matrix_developer_capability",
+      "target": "rbac_matrix_roles_tiers",
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/rbac-matrix.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "rbac_matrix_messages_permission_policy",
+      "target": "changelog_messaging_permission_engine",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "docs/rbac-matrix.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "rbac_matrix_two_layer_authz",
+      "target": "api_conventions_status_codes",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.75,
+      "source_file": "docs/rbac-matrix.md",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "rbac_authorization_model",
+      "label": "RBAC authorization model: tiers, ownership, groups, messaging policy",
+      "nodes": [
+        "rbac_matrix_roles_tiers",
+        "rbac_matrix_two_layer_authz",
+        "rbac_matrix_group_scoping",
+        "rbac_matrix_messages_permission_policy",
+        "rbac_overview_chat_policy"
+      ],
+      "relation": "implement",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/rbac-matrix.md"
+    }
+  ]
+}

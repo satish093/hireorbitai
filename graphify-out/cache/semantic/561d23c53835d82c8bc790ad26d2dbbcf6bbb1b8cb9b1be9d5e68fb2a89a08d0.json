@@ -1,0 +1,112 @@
+{
+  "nodes": [
+    {
+      "id": "docs_test_plan_b_mock_mode",
+      "label": "Job-ingestion Mock Mode (JOB_SOURCES_MOCK)",
+      "file_type": "rationale",
+      "source_file": "docs/test-plan-b.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_test_plan_b_plan_b_config",
+      "label": "Plan B Job-Ingestion Config (LinkedIn + JSearch + Adzuna)",
+      "file_type": "concept",
+      "source_file": "docs/test-plan-b.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_test_plan_b_mock_external_id",
+      "label": "MOCK- external_id Prefix Convention",
+      "file_type": "concept",
+      "source_file": "docs/test-plan-b.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_test_plan_b_jobs_sync_endpoint",
+      "label": "POST /api/jobs/sync (immediate sync trigger)",
+      "file_type": "concept",
+      "source_file": "docs/test-plan-b.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_test_plan_b_enable_jobs_plan_b_migration",
+      "label": "enable-jobs-plan-b.sql Migration",
+      "file_type": "concept",
+      "source_file": "docs/test-plan-b.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "docs_test_plan_b_mock_mode",
+      "target": "docs_test_plan_b_plan_b_config",
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/test-plan-b.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_test_plan_b_mock_mode",
+      "target": "docs_test_plan_b_mock_external_id",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/test-plan-b.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_test_plan_b_plan_b_config",
+      "target": "docs_test_plan_b_enable_jobs_plan_b_migration",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/test-plan-b.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_test_plan_b_jobs_sync_endpoint",
+      "target": "docs_test_plan_b_mock_mode",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/test-plan-b.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_test_plan_b_plan_b_config",
+      "target": "infrastructure_readme_cloudpanel",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.65,
+      "source_file": "docs/test-plan-b.md",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": []
+}

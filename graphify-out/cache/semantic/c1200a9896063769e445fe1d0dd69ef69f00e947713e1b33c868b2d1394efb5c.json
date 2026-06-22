@@ -1,0 +1,131 @@
+{
+  "nodes": [
+    {
+      "id": "deployment_production_runbook_ops",
+      "label": "Production day-2 ops runbook",
+      "file_type": "document",
+      "source_file": "docs/deployment/production.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "deployment_production_ops_sh",
+      "label": "scripts/ops.sh (backup/restore/migrate)",
+      "file_type": "concept",
+      "source_file": "docs/deployment/production.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "deployment_production_incident_playbooks",
+      "label": "Incident playbooks (429, login bounce, uploads, email, AI)",
+      "file_type": "concept",
+      "source_file": "docs/deployment/production.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "deployment_production_mega_offsite_backup",
+      "label": "Mega off-site backup target",
+      "file_type": "concept",
+      "source_file": "docs/deployment/production.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "deployment_production_runbook_ops",
+      "target": "deployment_production_ops_sh",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/production.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "deployment_production_runbook_ops",
+      "target": "deployment_production_incident_playbooks",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/production.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "deployment_production_runbook_ops",
+      "target": "deployment_production_mega_offsite_backup",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/production.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "deployment_production_runbook_ops",
+      "target": "deployment_05_deploy_and_rollback_update_sh",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/production.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "deployment_production_runbook_ops",
+      "target": "deployment_cloudpanel_hostinger_vps_deploy",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/production.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "deployment_production_runbook_ops",
+      "target": "api_conventions_rate_limiting",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/production.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "deployment_production_ops_sh",
+      "target": "deployment_production_mega_offsite_backup",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/production.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "deployment_production_incident_playbooks",
+      "target": "deployment_email_deliverability_brevo_auth",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "docs/deployment/production.md",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": []
+}

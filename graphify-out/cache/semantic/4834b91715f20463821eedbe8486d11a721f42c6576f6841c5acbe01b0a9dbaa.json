@@ -1,0 +1,48 @@
+{
+  "nodes": [
+    {
+      "id": "deployment_07_weekend_release_checklist",
+      "label": "Weekend release checklist",
+      "file_type": "document",
+      "source_file": "docs/deployment/07-weekend-release-checklist.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "deployment_07_weekend_release_checklist",
+      "target": "deployment_05_deploy_and_rollback",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/07-weekend-release-checklist.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "deployment_07_weekend_release_checklist",
+      "target": "deployment_05_deploy_and_rollback_update_sh",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/07-weekend-release-checklist.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "deployment_07_weekend_release_checklist",
+      "target": "deployment_04_github_actions_ci_yml",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/07-weekend-release-checklist.md",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": []
+}

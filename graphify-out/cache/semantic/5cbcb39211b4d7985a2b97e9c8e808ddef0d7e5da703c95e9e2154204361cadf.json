@@ -1,0 +1,70 @@
+{
+  "nodes": [
+    {
+      "id": "release_notes_redesign",
+      "label": "Mobile/Desktop/Communication Redesign Release Notes",
+      "file_type": "document",
+      "source_file": "RELEASE_NOTES.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "release_notes_canmessage_enforcement",
+      "label": "Server-Side canMessage Permission Enforcement",
+      "file_type": "concept",
+      "source_file": "RELEASE_NOTES.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "release_notes_feature_flag_rollout",
+      "label": "Staged Feature-Flag Rollout Plan",
+      "file_type": "rationale",
+      "source_file": "RELEASE_NOTES.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "release_notes_redesign",
+      "target": "release_notes_canmessage_enforcement",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "RELEASE_NOTES.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "release_notes_redesign",
+      "target": "release_notes_feature_flag_rollout",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "RELEASE_NOTES.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "release_notes_canmessage_enforcement",
+      "target": "changelog_fail_closed_rbac",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "RELEASE_NOTES.md",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": []
+}

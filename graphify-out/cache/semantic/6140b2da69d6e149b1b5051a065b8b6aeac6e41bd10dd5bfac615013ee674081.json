@@ -1,0 +1,127 @@
+{
+  "nodes": [
+    {
+      "id": "scripts_security_scan_static_guard",
+      "label": "Static Pattern Guard (security scan layer 1)",
+      "file_type": "concept",
+      "source_file": "scripts/SECURITY-SCAN.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "scripts_security_scan_idor_audit",
+      "label": "IDOR / Authorization Audit (on demand)",
+      "file_type": "concept",
+      "source_file": "scripts/SECURITY-SCAN.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "scripts_security_scan_dependency_audit",
+      "label": "npm audit Dependency Scan (CI)",
+      "file_type": "concept",
+      "source_file": "scripts/SECURITY-SCAN.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "scripts_security_scan_zap_baseline",
+      "label": "OWASP ZAP Baseline Passive Scan (opt-in)",
+      "file_type": "rationale",
+      "source_file": "scripts/SECURITY-SCAN.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "scripts_security_scan_security_rules",
+      "label": ".claude/rules/security.md",
+      "file_type": "document",
+      "source_file": "scripts/SECURITY-SCAN.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "scripts_security_scan_static_guard",
+      "target": "docs_testing_patterns_test_spec",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/SECURITY-SCAN.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "scripts_security_scan_static_guard",
+      "target": "scripts_security_scan_security_rules",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/SECURITY-SCAN.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "scripts_security_scan_static_guard",
+      "target": "docs_testing_verify_gate",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/SECURITY-SCAN.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "scripts_security_scan_static_guard",
+      "target": "docs_testing_security_ratchet_layer",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "scripts/SECURITY-SCAN.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "scripts_security_scan_zap_baseline",
+      "target": "scripts_security_scan_static_guard",
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/SECURITY-SCAN.md",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "layered_security_scanning",
+      "label": "Layered low-cost security scanning (static guard, IDOR audit, npm audit, ZAP)",
+      "nodes": [
+        "scripts_security_scan_static_guard",
+        "scripts_security_scan_idor_audit",
+        "scripts_security_scan_dependency_audit",
+        "scripts_security_scan_zap_baseline"
+      ],
+      "relation": "participate_in",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/SECURITY-SCAN.md"
+    }
+  ]
+}

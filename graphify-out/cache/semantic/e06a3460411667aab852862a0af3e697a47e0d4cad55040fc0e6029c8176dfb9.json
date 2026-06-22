@@ -1,0 +1,149 @@
+{
+  "nodes": [
+    {
+      "id": "setup_guide",
+      "label": "Setup Guide",
+      "file_type": "document",
+      "source_file": "SETUP.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "setup_reset_dev_prod_guard",
+      "label": "reset-dev.mjs Production Guard",
+      "file_type": "rationale",
+      "source_file": "SETUP.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "setup_deployment_flow",
+      "label": "Deployment Flow (feature -> dev -> staging -> prod)",
+      "file_type": "concept",
+      "source_file": "SETUP.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "setup_guide",
+      "target": "setup_reset_dev_prod_guard",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SETUP.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "setup_guide",
+      "target": "setup_deployment_flow",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SETUP.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "setup_guide",
+      "target": "workflows_dev_workflow",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SETUP.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "setup_guide",
+      "target": "workflows_deploy_production_workflow",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SETUP.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "setup_guide",
+      "target": "workflows_rollback_workflow",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SETUP.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "setup_guide",
+      "target": "workflows_security_scan_workflow",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SETUP.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "setup_guide",
+      "target": "migrations_guide",
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "SETUP.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "setup_deployment_flow",
+      "target": "workflows_deploy_production_vps_cron_pull",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.75,
+      "source_file": "SETUP.md",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "deploy_pipeline_branch_to_prod",
+      "label": "Branch-to-Production CI/CD Pipeline",
+      "nodes": [
+        "contributing_branch_model",
+        "workflows_dev_workflow",
+        "workflows_deploy_staging_workflow",
+        "workflows_deploy_production_workflow",
+        "setup_deployment_flow"
+      ],
+      "relation": "participate_in",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SETUP.md"
+    },
+    {
+      "id": "dev_db_safety_guards",
+      "label": "Dev/Prod DB Safety Guards",
+      "nodes": [
+        "workflows_dev_prod_db_guard",
+        "setup_reset_dev_prod_guard",
+        "workflows_security_scan_prod_target_guard"
+      ],
+      "relation": "form",
+      "confidence": "INFERRED",
+      "confidence_score": 0.75,
+      "source_file": "SETUP.md"
+    }
+  ]
+}

@@ -1,0 +1,102 @@
+{
+  "nodes": [
+    {
+      "id": "shared_readme_package",
+      "label": "@hireorbitai/shared Workspace Package",
+      "file_type": "concept",
+      "source_file": "shared/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "shared_readme_roles_module",
+      "label": "shared/src/roles.ts (Role enum + tier helpers)",
+      "file_type": "code",
+      "source_file": "shared/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "shared_readme_tasks_module",
+      "label": "shared/src/tasks.ts (TaskStatus / TaskPriority)",
+      "file_type": "code",
+      "source_file": "shared/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "shared_readme_shared_build",
+      "label": "npm run shared:build (compile to shared/dist)",
+      "file_type": "concept",
+      "source_file": "shared/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "shared_readme_workspaces_decision",
+      "label": "npm Workspaces over tsconfig Project References",
+      "file_type": "rationale",
+      "source_file": "shared/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "shared_readme_package",
+      "target": "shared_readme_roles_module",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "shared/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "shared_readme_package",
+      "target": "shared_readme_tasks_module",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "shared/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "shared_readme_package",
+      "target": "shared_readme_shared_build",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "shared/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "shared_readme_workspaces_decision",
+      "target": "shared_readme_package",
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "shared/README.md",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": []
+}
