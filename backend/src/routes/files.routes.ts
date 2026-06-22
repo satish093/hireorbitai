@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { createReadStream, promises as fs } from 'node:fs';
+import { extname } from 'node:path';
 import { resolveOnDisk, verifyDownloadSignature } from '../config/storage.local';
 import { httpError } from '../types';
 
@@ -19,6 +20,32 @@ const MIME_ALLOWLIST = new Set([
   'image/gif',
   'image/webp',
   'text/plain',
+]);
+
+// Fallback content-type by file extension, used when the `.meta` sidecar that
+// records the upload-time type is missing (older uploads, or files restored to
+// disk without their `.meta`). Without this the file is served as
+// application/octet-stream; because the site sends a global
+// `X-Content-Type-Options: nosniff`, the browser then REFUSES to render it in an
+// <img> and shows a broken-image icon (this is what broke company logos). SVG is
+// intentionally never inferred — it can carry active content.
+const EXT_CONTENT_TYPE: Record<string, string> = {
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+  '.pdf': 'application/pdf',
+};
+
+// Types safe to render inline in the browser (logos, image/PDF previews).
+// Anything else is served as an attachment (download) for defense in depth.
+const INLINE_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+  'application/pdf',
 ]);
 
 export const filesRouter = Router();
@@ -48,8 +75,10 @@ filesRouter.get('/:bucket/*', async (req, res, next) => {
     const fullPath = resolveOnDisk(bucket, p);
     const stat = await fs.stat(fullPath).catch(() => null);
     if (!stat || !stat.isFile()) throw httpError(404, 'Not found');
-    // Echo back the content-type stored at upload time if available.
-    let contentType = 'application/octet-stream';
+    // Resolve the content-type. Prefer the type captured at upload time (the
+    // `.meta` sidecar); when that's missing or not allow-listed, infer a safe
+    // type from the file extension so images still render under `nosniff`.
+    let contentType = '';
     try {
       const meta = await fs.readFile(fullPath + '.meta', 'utf8');
       const parsed = JSON.parse(meta) as { contentType?: string };
@@ -57,11 +86,15 @@ filesRouter.get('/:bucket/*', async (req, res, next) => {
         contentType = parsed.contentType;
       }
     } catch {
-      /* no meta, use default */
+      /* no meta — fall through to extension inference */
     }
+    if (!contentType) contentType = EXT_CONTENT_TYPE[extname(p).toLowerCase()] ?? '';
+    if (!contentType) contentType = 'application/octet-stream';
+
     res.setHeader('Content-Type', contentType);
     res.setHeader('Content-Length', String(stat.size));
-    res.setHeader('Content-Disposition', 'attachment');
+    // Images/PDFs render inline (logos, previews); everything else downloads.
+    res.setHeader('Content-Disposition', INLINE_TYPES.has(contentType) ? 'inline' : 'attachment');
     res.setHeader('Cache-Control', 'private, max-age=0, must-revalidate');
     createReadStream(fullPath).pipe(res);
   } catch (err) {
