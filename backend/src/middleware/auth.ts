@@ -134,7 +134,7 @@ export const requireRole =
 
 /**
  * True when the user holds the given capability grant.
- *   - PAGE_ACCESS capabilities (e.g. 'invoices') apply to ANY role.
+ *   - PAGE_ACCESS capabilities, when defined, apply to ANY role.
  *   - DEVELOPER admin capabilities apply ONLY to a DEVELOPER account.
  */
 export function hasCapability(

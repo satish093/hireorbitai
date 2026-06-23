@@ -1,0 +1,89 @@
+{
+  "nodes": [
+    {
+      "id": "deployment_03_render_dev_hosting",
+      "label": "Render free dev hosting",
+      "file_type": "document",
+      "source_file": "docs/deployment/03-render-dev-hosting.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "deployment_03_render_dev_hosting_db_bootstrap",
+      "label": "scripts/db-bootstrap.mjs (self-init dev DB)",
+      "file_type": "concept",
+      "source_file": "docs/deployment/03-render-dev-hosting.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "deployment_03_render_dev_hosting",
+      "target": "deployment_03_render_dev_hosting_db_bootstrap",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/03-render-dev-hosting.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "deployment_03_render_dev_hosting",
+      "target": "deployment_02_databases_neon_dev",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/03-render-dev-hosting.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "deployment_03_render_dev_hosting",
+      "target": "deployment_readme_render_yaml_blueprint",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/03-render-dev-hosting.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "deployment_03_render_dev_hosting",
+      "target": "deployment_04_github_actions_dev_yml",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/03-render-dev-hosting.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "deployment_03_render_dev_hosting",
+      "target": "dev_environment_dual_environment",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "docs/deployment/03-render-dev-hosting.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "deployment_03_render_dev_hosting_db_bootstrap",
+      "target": "deployment_02_databases_init_sql",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/03-render-dev-hosting.md",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": []
+}

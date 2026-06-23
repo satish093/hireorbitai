@@ -60,6 +60,11 @@ const STATUS_TONE: Record<string, PillTone> = {
     text: 'text-amber-700 dark:text-amber-300',
     dot: 'bg-amber-500',
   },
+  READY_TO_COMPLETE: {
+    bg: 'bg-emerald-50 dark:bg-emerald-500/15',
+    text: 'text-emerald-700 dark:text-emerald-300',
+    dot: 'bg-emerald-500',
+  },
   DRAFT: { bg: 'bg-hover', text: 'text-muted', dot: 'bg-muted' },
   ACTIVE: {
     bg: 'bg-emerald-50 dark:bg-emerald-500/15',
@@ -80,6 +85,7 @@ const STATUS_PULSING = new Set([
   'ASSIGNMENT_PENDING',
   'FINAL_ASSESSMENT_PENDING',
   'MANAGER_REVIEW_PENDING',
+  'READY_TO_COMPLETE',
 ]);
 // Plain-language labels for the assignment + course statuses learners and
 // managers see. Falls back to a de-underscored version for anything new.
@@ -93,6 +99,7 @@ const STATUS_LABEL: Record<string, string> = {
   ASSIGNMENT_PENDING: 'Work to submit',
   FINAL_ASSESSMENT_PENDING: 'Final assessment due',
   MANAGER_REVIEW_PENDING: 'Awaiting manager review',
+  READY_TO_COMPLETE: 'Ready to complete',
   DRAFT: 'Draft',
   ACTIVE: 'Published',
   ARCHIVED: 'Archived',

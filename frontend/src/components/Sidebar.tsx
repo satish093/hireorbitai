@@ -123,7 +123,6 @@ export const NAV_SECTIONS: Section[] = [
         icon: IconFileText,
         roles: MANAGER_TIER,
         flagKey: 'invoices',
-        capability: 'invoices',
       },
       {
         to: '/reports',

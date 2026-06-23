@@ -21,6 +21,10 @@ type AssignmentStatus =
   | 'ASSIGNMENT_PENDING'
   | 'FINAL_ASSESSMENT_PENDING'
   | 'MANAGER_REVIEW_PENDING'
+  // All gates passed, but the learner hasn't pressed "Complete" yet. The
+  // status machine no longer auto-flips to COMPLETED — completion is an
+  // explicit action (see completeAssignment).
+  | 'READY_TO_COMPLETE'
   | 'COMPLETED'
   | 'FAILED'
   | 'OVERDUE';
@@ -513,8 +517,10 @@ function deriveStatus(g: GateState): { status: AssignmentStatus; blockers: strin
     if (!anyTouched) return { status: 'NOT_STARTED', blockers };
   }
 
-  // All gates green → COMPLETED.
-  if (blockers.length === 0) return { status: 'COMPLETED', blockers };
+  // All gates green → the learner may now finish. We deliberately DON'T return
+  // COMPLETED here: completion is an explicit click (completeAssignment), not an
+  // automatic side effect of finishing the last lesson/quiz.
+  if (blockers.length === 0) return { status: 'READY_TO_COMPLETE', blockers };
 
   // First blocker on the "after lessons" axis surfaces a specific pending state.
   if (!g.lessons.ok || !g.time.ok || !g.uploads.ok) return { status: 'IN_PROGRESS', blockers };
@@ -537,13 +543,50 @@ function deriveStatus(g: GateState): { status: AssignmentStatus; blockers: strin
  */
 export async function recalcAssignmentStatus(assignmentId: string): Promise<CompletionEvaluation> {
   const evalResult = await evaluateCompletion(assignmentId);
-  const patch: any = {
-    progress_percentage: evalResult.progress_percentage,
-    status: evalResult.status,
-    completed_at: evalResult.status === 'COMPLETED' ? new Date().toISOString() : null,
-  };
+
+  // Completion is now an explicit learner action. A recalc must never auto-flip
+  // a row to COMPLETED, and must never UN-complete a row that the learner already
+  // finished (e.g. a later progress write or a manager edit). So: preserve an
+  // existing COMPLETED status; otherwise persist the freshly derived status,
+  // which now tops out at READY_TO_COMPLETE.
+  const { data: current } = await repo.assignments.get(assignmentId);
+  const alreadyCompleted = (current as { status?: string } | null)?.status === 'COMPLETED';
+
+  const patch: any = { progress_percentage: evalResult.progress_percentage };
+  if (alreadyCompleted) {
+    patch.status = 'COMPLETED';
+  } else {
+    patch.status = evalResult.status;
+    patch.completed_at = null;
+  }
   await repo.assignments.update(assignmentId, patch);
-  return evalResult;
+  return alreadyCompleted ? { ...evalResult, status: 'COMPLETED' } : evalResult;
+}
+
+/**
+ * Explicit learner completion. Re-evaluates the gates and only flips the row to
+ * COMPLETED when every requirement is met (status READY_TO_COMPLETE). Throws a
+ * 4xx with the outstanding blockers otherwise — there's still no path to
+ * COMPLETED that skips the gates.
+ */
+export async function completeAssignment(assignmentId: string): Promise<CompletionEvaluation> {
+  const evalResult = await evaluateCompletion(assignmentId);
+  if (evalResult.status === 'COMPLETED') return evalResult; // idempotent
+  if (evalResult.status === 'FAILED') {
+    throw httpError(409, 'This course was not passed and cannot be completed.');
+  }
+  if (evalResult.status !== 'READY_TO_COMPLETE') {
+    throw httpError(
+      400,
+      `Not all requirements are met yet: ${evalResult.blockers.join('; ') || 'in progress'}.`,
+    );
+  }
+  await repo.assignments.update(assignmentId, {
+    status: 'COMPLETED',
+    progress_percentage: evalResult.progress_percentage,
+    completed_at: new Date().toISOString(),
+  });
+  return { ...evalResult, status: 'COMPLETED' };
 }
 
 /** Legacy alias — keep so older callers don't break. */

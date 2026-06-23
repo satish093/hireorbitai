@@ -1,0 +1,236 @@
+{
+  "nodes": [
+    {
+      "id": "e_claude_hireorbitai_scripts_dev_windows_ps1",
+      "label": "dev-windows.ps1",
+      "file_type": "code",
+      "source_file": "scripts/dev-windows.ps1",
+      "source_location": "L1"
+    },
+    {
+      "id": "scripts_dev_windows_say",
+      "label": "Say()",
+      "file_type": "code",
+      "source_file": "scripts/dev-windows.ps1",
+      "source_location": "L71"
+    },
+    {
+      "id": "scripts_dev_windows_ok",
+      "label": "Ok()",
+      "file_type": "code",
+      "source_file": "scripts/dev-windows.ps1",
+      "source_location": "L72"
+    },
+    {
+      "id": "scripts_dev_windows_skip",
+      "label": "Skip()",
+      "file_type": "code",
+      "source_file": "scripts/dev-windows.ps1",
+      "source_location": "L73"
+    },
+    {
+      "id": "scripts_dev_windows_warn",
+      "label": "Warn()",
+      "file_type": "code",
+      "source_file": "scripts/dev-windows.ps1",
+      "source_location": "L74"
+    },
+    {
+      "id": "scripts_dev_windows_die",
+      "label": "Die()",
+      "file_type": "code",
+      "source_file": "scripts/dev-windows.ps1",
+      "source_location": "L75"
+    },
+    {
+      "id": "scripts_dev_windows_require_command",
+      "label": "Require-Command()",
+      "file_type": "code",
+      "source_file": "scripts/dev-windows.ps1",
+      "source_location": "L77"
+    },
+    {
+      "id": "scripts_dev_windows_new_randomsecret",
+      "label": "New-RandomSecret()",
+      "file_type": "code",
+      "source_file": "scripts/dev-windows.ps1",
+      "source_location": "L83"
+    },
+    {
+      "id": "scripts_dev_windows_set_envkey",
+      "label": "Set-EnvKey()",
+      "file_type": "code",
+      "source_file": "scripts/dev-windows.ps1",
+      "source_location": "L89"
+    }
+  ],
+  "edges": [
+    {
+      "source": "e_claude_hireorbitai_scripts_dev_windows_ps1",
+      "target": "scripts_dev_windows_say",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/dev-windows.ps1",
+      "source_location": "L71",
+      "weight": 1.0
+    },
+    {
+      "source": "e_claude_hireorbitai_scripts_dev_windows_ps1",
+      "target": "scripts_dev_windows_ok",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/dev-windows.ps1",
+      "source_location": "L72",
+      "weight": 1.0
+    },
+    {
+      "source": "e_claude_hireorbitai_scripts_dev_windows_ps1",
+      "target": "scripts_dev_windows_skip",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/dev-windows.ps1",
+      "source_location": "L73",
+      "weight": 1.0
+    },
+    {
+      "source": "e_claude_hireorbitai_scripts_dev_windows_ps1",
+      "target": "scripts_dev_windows_warn",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/dev-windows.ps1",
+      "source_location": "L74",
+      "weight": 1.0
+    },
+    {
+      "source": "e_claude_hireorbitai_scripts_dev_windows_ps1",
+      "target": "scripts_dev_windows_die",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/dev-windows.ps1",
+      "source_location": "L75",
+      "weight": 1.0
+    },
+    {
+      "source": "e_claude_hireorbitai_scripts_dev_windows_ps1",
+      "target": "scripts_dev_windows_require_command",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/dev-windows.ps1",
+      "source_location": "L77",
+      "weight": 1.0
+    },
+    {
+      "source": "e_claude_hireorbitai_scripts_dev_windows_ps1",
+      "target": "scripts_dev_windows_new_randomsecret",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/dev-windows.ps1",
+      "source_location": "L83",
+      "weight": 1.0
+    },
+    {
+      "source": "e_claude_hireorbitai_scripts_dev_windows_ps1",
+      "target": "scripts_dev_windows_set_envkey",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/dev-windows.ps1",
+      "source_location": "L89",
+      "weight": 1.0
+    },
+    {
+      "source": "scripts_dev_windows_require_command",
+      "target": "scripts_dev_windows_die",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/dev-windows.ps1",
+      "source_location": "L79",
+      "weight": 1.0
+    }
+  ],
+  "raw_calls": [
+    {
+      "caller_nid": "scripts_dev_windows_say",
+      "callee": "Write-Host",
+      "is_member_call": false,
+      "source_file": "E:\\claude\\hireorbitai\\scripts\\dev-windows.ps1",
+      "source_location": "L71"
+    },
+    {
+      "caller_nid": "scripts_dev_windows_ok",
+      "callee": "Write-Host",
+      "is_member_call": false,
+      "source_file": "E:\\claude\\hireorbitai\\scripts\\dev-windows.ps1",
+      "source_location": "L72"
+    },
+    {
+      "caller_nid": "scripts_dev_windows_skip",
+      "callee": "Write-Host",
+      "is_member_call": false,
+      "source_file": "E:\\claude\\hireorbitai\\scripts\\dev-windows.ps1",
+      "source_location": "L73"
+    },
+    {
+      "caller_nid": "scripts_dev_windows_warn",
+      "callee": "Write-Host",
+      "is_member_call": false,
+      "source_file": "E:\\claude\\hireorbitai\\scripts\\dev-windows.ps1",
+      "source_location": "L74"
+    },
+    {
+      "caller_nid": "scripts_dev_windows_die",
+      "callee": "Write-Host",
+      "is_member_call": false,
+      "source_file": "E:\\claude\\hireorbitai\\scripts\\dev-windows.ps1",
+      "source_location": "L75"
+    },
+    {
+      "caller_nid": "scripts_dev_windows_require_command",
+      "callee": "Get-Command",
+      "is_member_call": false,
+      "source_file": "E:\\claude\\hireorbitai\\scripts\\dev-windows.ps1",
+      "source_location": "L78"
+    },
+    {
+      "caller_nid": "scripts_dev_windows_new_randomsecret",
+      "callee": "New-Object",
+      "is_member_call": false,
+      "source_file": "E:\\claude\\hireorbitai\\scripts\\dev-windows.ps1",
+      "source_location": "L84"
+    },
+    {
+      "caller_nid": "scripts_dev_windows_set_envkey",
+      "callee": "Test-Path",
+      "is_member_call": false,
+      "source_file": "E:\\claude\\hireorbitai\\scripts\\dev-windows.ps1",
+      "source_location": "L91"
+    },
+    {
+      "caller_nid": "scripts_dev_windows_set_envkey",
+      "callee": "Set-Content",
+      "is_member_call": false,
+      "source_file": "E:\\claude\\hireorbitai\\scripts\\dev-windows.ps1",
+      "source_location": "L92"
+    },
+    {
+      "caller_nid": "scripts_dev_windows_set_envkey",
+      "callee": "Get-Content",
+      "is_member_call": false,
+      "source_file": "E:\\claude\\hireorbitai\\scripts\\dev-windows.ps1",
+      "source_location": "L95"
+    },
+    {
+      "caller_nid": "scripts_dev_windows_set_envkey",
+      "callee": "Set-Content",
+      "is_member_call": false,
+      "source_file": "E:\\claude\\hireorbitai\\scripts\\dev-windows.ps1",
+      "source_location": "L98"
+    },
+    {
+      "caller_nid": "scripts_dev_windows_set_envkey",
+      "callee": "Add-Content",
+      "is_member_call": false,
+      "source_file": "E:\\claude\\hireorbitai\\scripts\\dev-windows.ps1",
+      "source_location": "L100"
+    }
+  ]
+}

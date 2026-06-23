@@ -1,0 +1,145 @@
+{
+  "nodes": [
+    {
+      "id": "deployment_readme_deployment_index",
+      "label": "Deployment docs index + architecture",
+      "file_type": "document",
+      "source_file": "docs/deployment/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "deployment_readme_render_yaml_blueprint",
+      "label": "render.yaml Blueprint",
+      "file_type": "concept",
+      "source_file": "docs/deployment/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "deployment_readme_deployment_index",
+      "target": "deployment_00_production_runbook",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "deployment_readme_deployment_index",
+      "target": "deployment_01_vps_cloudpanel",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "deployment_readme_deployment_index",
+      "target": "deployment_02_databases_separation",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "deployment_readme_deployment_index",
+      "target": "deployment_03_render_dev_hosting",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "deployment_readme_deployment_index",
+      "target": "deployment_04_github_actions",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "deployment_readme_deployment_index",
+      "target": "deployment_05_deploy_and_rollback",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "deployment_readme_deployment_index",
+      "target": "deployment_06_fresh_reset",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "deployment_readme_deployment_index",
+      "target": "deployment_07_weekend_release_checklist",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "deployment_readme_deployment_index",
+      "target": "deployment_02_databases_db_guard",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "deployment_readme_render_yaml_blueprint",
+      "target": "deployment_03_render_dev_hosting",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/README.md",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "dual_environment_separation",
+      "label": "Dual-environment separation (prod VPS / dev Neon+Render / DB guard)",
+      "nodes": [
+        "dev_environment_dual_environment",
+        "deployment_02_databases_separation",
+        "deployment_02_databases_db_guard",
+        "deployment_03_render_dev_hosting",
+        "deployment_02_databases_neon_dev"
+      ],
+      "relation": "form",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/README.md"
+    }
+  ]
+}

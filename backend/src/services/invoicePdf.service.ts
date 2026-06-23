@@ -1,21 +1,35 @@
 import PDFDocument from 'pdfkit';
 
-// ---------------------------------------------------------------------------
-// Invoice PDF renderer.
-//
-// Produces a single-page A4 invoice document from an invoices row using pdfkit
-// (pure JS, no headless browser — see the plan: Playwright is present but
-// launching Chromium per invoice is too heavy for the single VPS). Only the 14
-// standard PDF fonts (Helvetica*) are used, so there is no font-file dependency.
-//
-// The same buffer backs both paths: GET /invoices/:id/document streams it for
-// download, and POST /invoices/:id/send attaches it to the Brevo email. The PDF
-// is generated on demand — never persisted — so it always reflects current data.
-//
-// Layout (top → bottom): accent bar → letterhead + INVOICE title + status pill →
-// meta strip (dates / terms) → Bill-to + From → line-items table → Amount Due
-// block → notes / payment terms → footer.
-// ---------------------------------------------------------------------------
+export interface InvoicePartySnapshot {
+  name: string;
+  address?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  website?: string | null;
+  country?: string | null;
+  tax_id?: string | null;
+}
+
+export interface InvoiceLineItem {
+  id?: string;
+  invoice_id?: string;
+  description: string;
+  service_period?: string | null;
+  quantity: number | string;
+  unit: string;
+  unit_rate: number | string;
+  amount: number | string;
+  position: number;
+}
+
+export interface InvoiceStatusHistory {
+  id: string;
+  from_status?: string | null;
+  to_status: string;
+  changed_by?: string | null;
+  changed_at: string | Date;
+  note?: string | null;
+}
 
 export interface InvoiceRow {
   id: string;
@@ -25,485 +39,454 @@ export interface InvoiceRow {
   billing_month?: string | null;
   pay_rate?: number | string | null;
   invoice_amount?: number | string | null;
-  // `date` / `timestamptz` columns arrive as JS Date objects from the DB shim
-  // (pg's default parsers); fmtDate handles both Date and string.
   invoice_date?: string | Date | null;
   due_date?: string | Date | null;
   net_terms_days?: number | null;
   status?: string | null;
+  display_status?: string | null;
   bill_to_email?: string | null;
   notes?: string | null;
   created_at?: string | Date | null;
   company_group_id?: string | null;
+  issuer_snapshot?: InvoicePartySnapshot | null;
+  bill_to_snapshot?: InvoicePartySnapshot | null;
+  currency?: string | null;
+  discount_amount?: number | string | null;
+  tax_percent?: number | string | null;
+  subtotal?: number | string | null;
+  tax_amount?: number | string | null;
+  total_amount?: number | string | null;
+  archived_at?: string | Date | null;
+  line_items?: InvoiceLineItem[];
+  status_history?: InvoiceStatusHistory[];
+  permitted_actions?: Record<string, boolean>;
 }
 
-/** Issuing-company branding for the letterhead. Resolved from the invoice's
- *  company_group_id (the user group / company): its name + uploaded logo bytes.
- *  When `logo` is absent a placeholder mark (the company initials) is drawn. */
 export interface InvoiceBrand {
   name?: string | null;
   email?: string | null;
-  /** 6-digit hex brand color (from the company / logo analysis) used to theme
-   *  the accent bar, Amount Due block, company name, and mark. */
   color?: string | null;
-  /** Raw logo bytes — embedded in the PDF letterhead. */
   logo?: Buffer | null;
-  /** Signed logo URL — used to brand the invoice EMAIL header (the PDF uses the
-   *  raw bytes; an email needs a hosted URL). */
   logoUrl?: string | null;
 }
 
-// Palette — mirrors the app brand (indigo-600) + slate scale.
-const BRAND = '#4f46e5';
-const INK = '#0f172a'; // slate-900
-const SUB = '#334155'; // slate-700
-const MUTED = '#64748b'; // slate-500
-const LINE = '#e2e8f0'; // slate-200
-const HEADBG = '#f1f5f9'; // slate-100
+type Doc = InstanceType<typeof PDFDocument>;
 
-// Status pill tones — mirror the frontend <Pill> tones on the Invoices page.
-const STATUS_TONE: Record<string, { bg: string; text: string }> = {
-  Draft: { bg: '#f1f5f9', text: '#64748b' },
-  Submitted: { bg: '#dbeafe', text: '#1d4ed8' },
-  Approved: { bg: '#ede9fe', text: '#6d28d9' },
-  Paid: { bg: '#dcfce7', text: '#15803d' },
-  Overdue: { bg: '#fee2e2', text: '#b91c1c' },
-  Cancelled: { bg: '#e2e8f0', text: '#475569' },
+// The supplied reference invoice is US Letter (612 × 792), not A4.
+const PAGE_W = 612;
+const PAGE_H = 792;
+const LEFT = 22;
+const RIGHT = PAGE_W - 22;
+const WIDTH = RIGHT - LEFT;
+const BLUE = '#0b84bd';
+const INK = '#111111';
+const MUTED = '#7c8790';
+const LINE = '#d9dde0';
+const LIGHT = '#f1f1f1';
+const HEX = /^#[0-9a-f]{6}$/i;
+
+const COL = {
+  item: { x: 22, width: 270 },
+  quantity: { x: 292, width: 95 },
+  price: { x: 387, width: 95 },
+  amount: { x: 482, width: 108 },
 };
 
-const PAGE_W = 595.28; // A4
-const PAGE_H = 841.89;
-const LEFT = 50;
-const RIGHT = 545;
-const CW = RIGHT - LEFT; // 495
-const HEX_RE = /^#[0-9A-Fa-f]{6}$/;
+function money(value: unknown, currency = 'USD'): string {
+  const amount = Number(value ?? 0);
+  try {
+    return amount.toLocaleString('en-US', {
+      style: 'currency',
+      currency,
+      maximumFractionDigits: 2,
+    });
+  } catch {
+    return `${currency} ${amount.toFixed(2)}`;
+  }
+}
 
-function fmtMoney(value?: number | string | null): string {
-  if (value == null || value === '') return '—';
-  const n = Number(value);
-  if (Number.isNaN(n)) return String(value);
-  return n.toLocaleString('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 2,
+function decimal(value: unknown): string {
+  return Number(value ?? 0).toLocaleString('en-US', { maximumFractionDigits: 4 });
+}
+
+function date(value?: string | Date | null, long = false): string {
+  if (!value) return '—';
+  const parsed =
+    value instanceof Date
+      ? value
+      : new Date(String(value).includes('T') ? String(value) : `${String(value)}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return String(value);
+  return parsed.toLocaleDateString('en-US', {
+    month: long ? 'long' : 'short',
+    day: 'numeric',
+    year: 'numeric',
   });
 }
 
-function fmtDate(value?: string | Date | null): string {
-  if (!value) return '—';
-  // The DB shim returns `date` / `timestamptz` columns as JS Date objects (pg's
-  // default type parsers), but callers may also pass ISO strings. Handle both —
-  // calling .includes() on a Date is what produced a 500 in production.
-  const d =
-    value instanceof Date
-      ? value
-      : String(value).includes('T')
-        ? new Date(String(value))
-        : new Date(`${String(value)}T00:00:00`);
-  return Number.isNaN(d.getTime())
-    ? String(value)
-    : d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+function servicePeriod(value?: string | null): string {
+  const match = /^(\d{4})-(\d{2})$/.exec(value ?? '');
+  if (!match) return value || '';
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const first = new Date(year, month - 1, 1);
+  const last = new Date(year, month, 0);
+  const monthName = first.toLocaleDateString('en-US', { month: 'long' });
+  return `${monthName} 1 - ${monthName} ${last.getDate()}, ${year}`;
 }
 
-function fmtMonth(value?: string | null): string {
-  if (!value) return '—';
-  const s = String(value);
-  const m = /^(\d{4})-(\d{2})$/.exec(s);
-  if (!m) return s;
-  const d = new Date(Number(m[1]), Number(m[2]) - 1, 1);
-  return Number.isNaN(d.getTime())
-    ? s
-    : d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+function partyLines(party?: InvoicePartySnapshot | null): string[] {
+  if (!party) return [];
+  return [
+    ...(party.address?.split(/\r?\n/).map((line) => line.trim()) ?? []),
+    party.country,
+    party.phone,
+    party.website,
+  ].filter((value): value is string => !!value);
 }
 
-/** A safe, filesystem-friendly base name for the downloaded file (no extension). */
+function initials(name: string): string {
+  return (
+    name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase())
+      .join('') || 'CO'
+  );
+}
+
 export function invoiceFileBase(invoice: InvoiceRow): string {
   const raw = invoice.invoice_number?.trim() || invoice.id;
   const safe = raw.replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '');
   return `invoice-${safe || invoice.id}`;
 }
 
-type Doc = InstanceType<typeof PDFDocument>;
-
-/** A small labelled value block (uppercase label over a value). Returns nothing;
- *  positions are absolute. */
-function metaCell(doc: Doc, label: string, value: string, x: number, y: number, w: number): void {
+function drawLogo(doc: Doc, issuer: InvoicePartySnapshot, brand: InvoiceBrand | undefined) {
+  if (brand?.logo) {
+    try {
+      // Match the reference's large, wide company logo block.
+      doc.image(brand.logo, LEFT, 25, { fit: [200, 72], valign: 'center' });
+      return;
+    } catch {
+      // Corrupt or unsupported logos use the branded fallback below.
+    }
+  }
+  const color = brand?.color && HEX.test(brand.color) ? brand.color : BLUE;
+  doc.roundedRect(LEFT, 28, 62, 62, 3).fill(color);
   doc
-    .fillColor(MUTED)
     .font('Helvetica-Bold')
-    .fontSize(7.5)
-    .text(label.toUpperCase(), x, y, { width: w, characterSpacing: 0.4 });
+    .fontSize(22)
+    .fillColor('#ffffff')
+    .text(initials(issuer.name), LEFT, 48, { width: 62, align: 'center' });
   doc
+    .font('Helvetica-Bold')
+    .fontSize(20)
     .fillColor(INK)
-    .font('Helvetica')
-    .fontSize(10.5)
-    .text(value, x, y + 12, { width: w });
+    .text(issuer.name, LEFT + 76, 46, {
+      width: 210,
+    });
 }
 
-/** Right-aligned status pill. Returns the pill's left x so callers can stack. */
-function statusPill(doc: Doc, status: string, rightX: number, y: number): void {
-  const tone = STATUS_TONE[status] ?? STATUS_TONE.Submitted;
-  const label = (status || 'Submitted').toUpperCase();
-  doc.font('Helvetica-Bold').fontSize(8.5);
-  const tw = doc.widthOfString(label, { characterSpacing: 0.5 });
-  const padX = 10;
-  const h = 18;
-  const w = tw + padX * 2;
-  const x = rightX - w;
-  doc.roundedRect(x, y, w, h, 9).fill(tone.bg);
-  doc
-    .fillColor(tone.text)
-    .text(label, x + padX, y + 5, { lineBreak: false, characterSpacing: 0.5 });
-}
-
-/** Up-to-two-letter initials from a company name ("Zangle Technologies" → "ZT"). */
-function initialsOf(name: string): string {
-  const parts = name.split(/\s+/).filter(Boolean);
-  const letters = parts
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase() ?? '')
-    .join('');
-  return letters || 'CO';
-}
-
-/** A brand-tinted rounded square with the company initials — the fallback mark
- *  when a company has no uploaded logo (logos render at natural aspect instead). */
-function drawCompanyMark(
+function drawFirstPageHeader(
   doc: Doc,
-  name: string,
-  color: string,
-  x: number,
-  y: number,
-  s: number,
-): void {
-  doc.save();
-  doc.roundedRect(x, y, s, s, 8).fillOpacity(0.12).fill(color);
-  doc.restore();
+  invoice: InvoiceRow,
+  brand: InvoiceBrand | undefined,
+): number {
+  const issuer = invoice.issuer_snapshot ?? {
+    name: brand?.name || 'HireOrbit AI',
+    email: brand?.email,
+  };
+  drawLogo(doc, issuer, brand);
+
   doc
-    .fillColor(color)
-    .fillOpacity(1)
+    .font('Helvetica')
+    .fontSize(30)
+    .fillColor(INK)
+    .text('INVOICE', 350, 27, { width: 240, align: 'right' });
+
+  const issuerDetails = partyLines(issuer);
+  doc.font('Helvetica-Bold').fontSize(10).text(issuer.name, 350, 75, {
+    width: 240,
+    align: 'right',
+  });
+  if (issuerDetails.length) {
+    doc.font('Helvetica').fontSize(9).text(issuerDetails.join('\n'), 350, 90, {
+      width: 240,
+      align: 'right',
+      lineGap: 1,
+    });
+  }
+
+  const issuerBottom =
+    90 +
+    doc.heightOfString(issuerDetails.join('\n') || ' ', {
+      width: 240,
+      lineGap: 1,
+    });
+  const dividerY = Math.max(170, issuerBottom + 14);
+  doc.moveTo(0, dividerY).lineTo(PAGE_W, dividerY).lineWidth(0.8).strokeColor(LINE).stroke();
+
+  const infoY = dividerY + 13;
+  const bill = invoice.bill_to_snapshot;
+  doc.font('Helvetica').fontSize(9).fillColor(MUTED).text('BILL TO', LEFT, infoY);
+  doc
     .font('Helvetica-Bold')
-    .fontSize(s * 0.36)
-    .text(initialsOf(name), x, y + s / 2 - s * 0.22, { width: s, align: 'center' });
+    .fontSize(10)
+    .fillColor(INK)
+    .text(bill?.name || invoice.vendor_name || '—', LEFT, infoY + 14, { width: 260 });
+  const billDetails = [
+    ...(bill?.address?.split(/\r?\n/).map((line) => line.trim()) ?? []),
+    bill?.country,
+  ].filter((value): value is string => !!value);
+  if (billDetails.length) {
+    doc
+      .font('Helvetica')
+      .fontSize(9)
+      .text(billDetails.join('\n'), LEFT, infoY + 29, { width: 260, lineGap: 1 });
+  }
+  if (bill?.email || invoice.bill_to_email) {
+    const addressHeight = doc.heightOfString(billDetails.join('\n') || ' ', {
+      width: 260,
+      lineGap: 1,
+    });
+    doc
+      .font('Helvetica')
+      .fontSize(9)
+      .text(bill?.email || invoice.bill_to_email || '', LEFT, infoY + 38 + addressHeight, {
+        width: 260,
+      });
+  }
+
+  const metaLabelX = 365;
+  const metaValueX = 485;
+  const metaRows = [
+    ['Invoice Number:', invoice.invoice_number || '—'],
+    ['Invoice Date:', date(invoice.invoice_date, true)],
+    ['Payment Due:', date(invoice.due_date, true)],
+  ];
+  let metaY = infoY;
+  for (const [label, value] of metaRows) {
+    doc
+      .font('Helvetica-Bold')
+      .fontSize(9)
+      .fillColor(INK)
+      .text(label, metaLabelX, metaY, { width: 112, align: 'right' });
+    doc.font('Helvetica').text(value, metaValueX, metaY, { width: 105, align: 'left' });
+    metaY += 18;
+  }
+  doc.rect(350, metaY - 3, 240, 21).fill(LIGHT);
+  doc
+    .font('Helvetica-Bold')
+    .fontSize(9)
+    .fillColor(INK)
+    .text(`Amount Due (${invoice.currency || 'USD'}):`, 360, metaY + 3, {
+      width: 118,
+      align: 'right',
+    });
+  doc.text(
+    money(invoice.total_amount ?? invoice.invoice_amount, invoice.currency || 'USD'),
+    486,
+    metaY + 3,
+    {
+      width: 94,
+      align: 'left',
+    },
+  );
+
+  const billHeight = doc.heightOfString(billDetails.join('\n') || ' ', { width: 260, lineGap: 1 });
+  return Math.max(metaY + 32, infoY + 50 + billHeight);
+}
+
+function drawContinuationHeader(doc: Doc, invoice: InvoiceRow) {
+  doc
+    .font('Helvetica')
+    .fontSize(22)
+    .fillColor(INK)
+    .text('INVOICE', LEFT, 24, { width: WIDTH, align: 'right' });
+  doc
+    .font('Helvetica')
+    .fontSize(9)
+    .fillColor(MUTED)
+    .text(`# ${invoice.invoice_number || '—'} · continued`, LEFT, 55, {
+      width: WIDTH,
+      align: 'right',
+    });
+  doc.moveTo(LEFT, 76).lineTo(RIGHT, 76).strokeColor(LINE).stroke();
+}
+
+function drawTableHeader(doc: Doc, y: number, color: string): number {
+  doc.rect(0, y, PAGE_W, 27).fill(color);
+  doc.font('Helvetica-Bold').fontSize(9).fillColor('#ffffff');
+  doc.text('Items', COL.item.x, y + 9, { width: COL.item.width });
+  doc.text('Quantity', COL.quantity.x, y + 9, { width: COL.quantity.width, align: 'center' });
+  doc.text('Price', COL.price.x, y + 9, { width: COL.price.width, align: 'right' });
+  doc.text('Amount', COL.amount.x, y + 9, { width: COL.amount.width, align: 'right' });
+  return y + 27;
+}
+
+function drawFooter(doc: Doc, issuerName: string, page: number) {
+  doc
+    .font('Helvetica-Bold')
+    .fontSize(12)
+    .fillColor('#123c8a')
+    .text('Powered by HireOrbit AI', LEFT, PAGE_H - 45, {
+      width: WIDTH,
+      align: 'center',
+    });
+  if (page > 1) {
+    doc
+      .font('Helvetica')
+      .fontSize(7)
+      .fillColor(MUTED)
+      .text(`${issuerName} · Page ${page}`, RIGHT - 150, PAGE_H - 22, {
+        width: 150,
+        align: 'right',
+      });
+  }
 }
 
 export function renderInvoicePdf(invoice: InvoiceRow, brand?: InvoiceBrand): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ size: 'A4', margin: LEFT });
+    const doc = new PDFDocument({ size: 'LETTER', margin: 0, autoFirstPage: true, compress: true });
     const chunks: Buffer[] = [];
-    doc.on('data', (c: Buffer) => chunks.push(c));
+    doc.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
 
-    const amount = fmtMoney(invoice.invoice_amount);
-    // The issuing company (a user group) brands the invoice. No fake platform
-    // issuer: when no company is linked, the letterhead/From are simply omitted.
-    const themeColor = brand?.color && HEX_RE.test(brand.color) ? brand.color : BRAND;
-    const brandName = brand?.name?.trim() || '';
-    const brandEmail = brand?.email?.trim() || '';
-    const brandLogo = brand?.logo ?? null;
-    const hasBrand = !!(brandName || brandLogo);
+    const color = brand?.color && HEX.test(brand.color) ? brand.color : BLUE;
+    const issuerName = invoice.issuer_snapshot?.name || brand?.name || 'HireOrbit AI';
+    const currency = invoice.currency || 'USD';
+    const items = invoice.line_items?.length
+      ? invoice.line_items
+      : [
+          {
+            description: invoice.consultant_name || 'Professional consulting services',
+            service_period: invoice.billing_month,
+            quantity: 1,
+            unit: 'service',
+            unit_rate: invoice.pay_rate ?? invoice.invoice_amount ?? 0,
+            amount: invoice.invoice_amount ?? 0,
+            position: 0,
+          },
+        ];
 
-    // --- Top accent bar (full bleed, themed) -------------------------------
-    doc.rect(0, 0, PAGE_W, 5).fill(themeColor);
+    let page = 1;
+    let y = drawFirstPageHeader(doc, invoice, brand);
+    y = drawTableHeader(doc, y, color);
 
-    // --- Letterhead (left) -------------------------------------------------
-    if (hasBrand) {
-      if (brandLogo) {
-        // A company logo is usually a wordmark that already contains the name —
-        // render it at its natural aspect ratio (not squished into a tiny square)
-        // and DON'T repeat the name as text. The company name + email still
-        // appear in the FROM block on the right.
-        try {
-          // Logo-driven header: render the logo large + prominent (its natural
-          // aspect, anchored top-left). `fit` scales it within the box.
-          doc.image(brandLogo, LEFT, 44, { fit: [250, 82] });
-        } catch {
-          // Corrupt/unsupported image bytes → fall back to the initials mark + name.
-          drawCompanyMark(doc, brandName || 'Company', themeColor, LEFT, 50, 46);
-          if (brandName) {
-            doc
-              .fillColor(themeColor)
-              .font('Helvetica-Bold')
-              .fontSize(17)
-              .text(brandName, LEFT + 58, 55, { width: 270 });
-          }
-        }
-      } else {
-        // No logo → brand-tinted initials mark + the company name + email.
-        const markS = 46;
-        const markY = 50;
-        drawCompanyMark(doc, brandName || 'Company', themeColor, LEFT, markY, markS);
-        const txtX = LEFT + markS + 12;
-        if (brandName) {
-          doc
-            .fillColor(themeColor)
-            .font('Helvetica-Bold')
-            .fontSize(17)
-            .text(brandName, txtX, markY + 5, { width: 270 });
-        }
-        if (brandEmail) {
-          doc
-            .fillColor(MUTED)
-            .font('Helvetica')
-            .fontSize(9)
-            .text(brandEmail, txtX, markY + 28, { width: 270 });
-        }
-      }
-    }
-
-    // --- INVOICE title + number + status (right) ---------------------------
-    doc
-      .fillColor(INK)
-      .font('Helvetica-Bold')
-      .fontSize(30)
-      .text('INVOICE', LEFT, 50, { align: 'right', width: CW, characterSpacing: 1 });
-    doc
-      .fillColor(MUTED)
-      .font('Helvetica')
-      .fontSize(11)
-      .text(invoice.invoice_number ? `# ${invoice.invoice_number}` : '# —', LEFT, 86, {
-        align: 'right',
-        width: CW,
-      });
-    statusPill(doc, invoice.status || 'Submitted', RIGHT, 104);
-
-    // --- Divider -----------------------------------------------------------
-    doc.moveTo(LEFT, 134).lineTo(RIGHT, 134).lineWidth(1).strokeColor(LINE).stroke();
-
-    // --- Meta strip: dates + terms (4 columns) -----------------------------
-    const colW = CW / 4;
-    const metaY = 148;
-    metaCell(doc, 'Invoice date', fmtDate(invoice.invoice_date), LEFT, metaY, colW - 8);
-    metaCell(doc, 'Due date', fmtDate(invoice.due_date), LEFT + colW, metaY, colW - 8);
-    metaCell(
-      doc,
-      'Billing period',
-      fmtMonth(invoice.billing_month),
-      LEFT + colW * 2,
-      metaY,
-      colW - 8,
-    );
-    metaCell(
-      doc,
-      'Net terms',
-      invoice.net_terms_days != null ? `${invoice.net_terms_days} days` : '—',
-      LEFT + colW * 3,
-      metaY,
-      colW - 8,
-    );
-
-    // --- Bill To (left) + From (right) -------------------------------------
-    const partyY = 200;
-    doc
-      .fillColor(MUTED)
-      .font('Helvetica-Bold')
-      .fontSize(7.5)
-      .text('BILL TO', LEFT, partyY, { characterSpacing: 0.4 });
-    doc
-      .fillColor(INK)
-      .font('Helvetica-Bold')
-      .fontSize(12.5)
-      .text(invoice.vendor_name || '—', LEFT, partyY + 13, { width: CW / 2 - 10 });
-    if (invoice.bill_to_email) {
-      doc
-        .fillColor(MUTED)
-        .font('Helvetica')
-        .fontSize(9.5)
-        .text(invoice.bill_to_email, LEFT, partyY + 31, { width: CW / 2 - 10 });
-    }
-
-    if (hasBrand && brandName) {
-      const fromX = LEFT + CW / 2;
-      doc
-        .fillColor(MUTED)
-        .font('Helvetica-Bold')
-        .fontSize(7.5)
-        .text('FROM', fromX, partyY, { width: CW / 2, align: 'right', characterSpacing: 0.4 });
-      doc
-        .fillColor(INK)
-        .font('Helvetica-Bold')
-        .fontSize(12.5)
-        .text(brandName, fromX, partyY + 13, { width: CW / 2, align: 'right' });
-      if (brandEmail) {
-        doc
-          .fillColor(MUTED)
-          .font('Helvetica')
-          .fontSize(9.5)
-          .text(brandEmail, fromX, partyY + 31, { width: CW / 2, align: 'right' });
-      }
-    }
-
-    // --- Line-items table --------------------------------------------------
-    const cols = {
-      desc: { x: LEFT + 12, w: 226 },
-      period: { x: 300, w: 70 },
-      rate: { x: 360, w: 88 },
-      amount: { x: 455, w: 78 },
+    const nextPage = () => {
+      drawFooter(doc, issuerName, page);
+      doc.addPage({ size: 'LETTER', margin: 0 });
+      page += 1;
+      drawContinuationHeader(doc, invoice);
+      y = drawTableHeader(doc, 92, color);
     };
-    let y = 268;
 
-    // Header row
-    const headH = 24;
-    doc.rect(LEFT, y, CW, headH).fill(HEADBG);
-    doc
-      .fillColor(SUB)
-      .font('Helvetica-Bold')
-      .fontSize(8)
-      .text('DESCRIPTION', cols.desc.x, y + 8, {
-        width: cols.desc.w,
-        characterSpacing: 0.4,
-      });
-    doc.text('PERIOD', cols.period.x, y + 8, { width: cols.period.w, characterSpacing: 0.4 });
-    doc.text('RATE', cols.rate.x, y + 8, {
-      width: cols.rate.w,
-      align: 'right',
-      characterSpacing: 0.4,
-    });
-    doc.text('AMOUNT', cols.amount.x, y + 8, {
-      width: cols.amount.w,
-      align: 'right',
-      characterSpacing: 0.4,
-    });
-    y += headH;
+    for (const item of items) {
+      doc.font('Helvetica-Bold').fontSize(9);
+      const descriptionHeight = doc.heightOfString(item.description, { width: 248 });
+      const periodText = servicePeriod(item.service_period);
+      doc.font('Helvetica').fontSize(9);
+      const periodHeight = periodText ? doc.heightOfString(periodText, { width: 248 }) : 0;
+      const rowHeight = Math.max(39, descriptionHeight + periodHeight + 16);
+      if (y + rowHeight > PAGE_H - 105) nextPage();
 
-    // Single line item: the consultant's services for the billing period.
-    const rowH = 38;
-    doc
-      .fillColor(INK)
-      .font('Helvetica-Bold')
-      .fontSize(10.5)
-      .text(invoice.consultant_name || 'Consulting services', cols.desc.x, y + 8, {
-        width: cols.desc.w,
-      });
-    doc
-      .fillColor(MUTED)
-      .font('Helvetica')
-      .fontSize(8.5)
-      .text('Professional consulting services', cols.desc.x, y + 23, { width: cols.desc.w });
-    doc
-      .fillColor(SUB)
-      .font('Helvetica')
-      .fontSize(10)
-      .text(fmtMonth(invoice.billing_month), cols.period.x, y + 12, { width: cols.period.w });
-    doc.text(fmtMoney(invoice.pay_rate), cols.rate.x, y + 12, {
-      width: cols.rate.w,
-      align: 'right',
-    });
-    doc
-      .fillColor(INK)
-      .font('Helvetica-Bold')
-      .fontSize(10)
-      .text(amount, cols.amount.x, y + 12, { width: cols.amount.w, align: 'right' });
-    y += rowH;
-    doc.moveTo(LEFT, y).lineTo(RIGHT, y).lineWidth(0.75).strokeColor(LINE).stroke();
-
-    // --- Amount Due block (right) ------------------------------------------
-    y += 16;
-    const dueW = 250;
-    const dueX = RIGHT - dueW;
-    const dueH = 44;
-    doc.roundedRect(dueX, y, dueW, dueH, 8).fill(themeColor);
-    doc.save();
-    doc
-      .fillColor('#ffffff')
-      .fillOpacity(0.85)
-      .font('Helvetica-Bold')
-      .fontSize(9)
-      .text('AMOUNT DUE', dueX + 16, y + 11, { characterSpacing: 0.6 });
-    doc.restore();
-    doc
-      .fillColor('#ffffff')
-      .fillOpacity(1)
-      .font('Helvetica-Bold')
-      .fontSize(18)
-      .text(amount, dueX + 16, y + 9, { width: dueW - 32, align: 'right' });
-    if (invoice.due_date) {
-      doc.save();
       doc
-        .fillColor('#ffffff')
-        .fillOpacity(0.75)
+        .font('Helvetica-Bold')
+        .fontSize(9)
+        .fillColor(INK)
+        .text(item.description, COL.item.x, y + 10, { width: 248 });
+      if (periodText) {
+        doc
+          .font('Helvetica')
+          .fontSize(9)
+          .text(periodText, COL.item.x, y + 12 + descriptionHeight, { width: 248 });
+      }
+      doc
         .font('Helvetica')
-        .fontSize(7.5)
-        .text(`Due ${fmtDate(invoice.due_date)}`, dueX + 16, y + 30, {
-          width: dueW - 32,
-          align: 'right',
+        .fontSize(9)
+        .text(decimal(item.quantity), COL.quantity.x, y + 10, {
+          width: COL.quantity.width,
+          align: 'center',
         });
-      doc.restore();
-    }
-    y += dueH + 26;
-
-    // --- Notes + payment terms (left) --------------------------------------
-    const termsText =
-      invoice.net_terms_days != null
-        ? `Payment due within ${invoice.net_terms_days} day${
-            invoice.net_terms_days === 1 ? '' : 's'
-          } of the invoice date${invoice.due_date ? ` (by ${fmtDate(invoice.due_date)})` : ''}.`
-        : invoice.due_date
-          ? `Payment due by ${fmtDate(invoice.due_date)}.`
-          : '';
-
-    if (invoice.notes && invoice.notes.trim()) {
-      doc
-        .fillColor(MUTED)
-        .font('Helvetica-Bold')
-        .fontSize(8)
-        .text('NOTES', LEFT, y, { characterSpacing: 0.4 });
-      doc
-        .fillColor(SUB)
-        .font('Helvetica')
-        .fontSize(9.5)
-        .text(invoice.notes.trim(), LEFT, y + 13, { width: CW });
-      y = doc.y + 12;
-    }
-
-    if (termsText) {
-      doc.rect(LEFT, y, CW, 1).fill(LINE);
-      y += 12;
-      doc
-        .fillColor(MUTED)
-        .font('Helvetica-Bold')
-        .fontSize(8)
-        .text('PAYMENT TERMS', LEFT, y, { characterSpacing: 0.4 });
-      doc
-        .fillColor(SUB)
-        .font('Helvetica')
-        .fontSize(9.5)
-        .text(termsText, LEFT, y + 13, { width: CW });
-    }
-
-    // --- Footer ------------------------------------------------------------
-    // Pinned ABOVE the A4 bottom margin (PAGE_H − 50 ≈ 792). Drawing at/below
-    // that boundary makes pdfkit auto-add blank pages — the prior 4-page bug.
-    const footY = PAGE_H - 94; // ≈ 748; lowest line (footY+13) ends ~771
-    doc
-      .moveTo(LEFT, footY - 12)
-      .lineTo(RIGHT, footY - 12)
-      .lineWidth(0.75)
-      .strokeColor(LINE)
-      .stroke();
-    doc
-      .fillColor(SUB)
-      .font('Helvetica-Bold')
-      .fontSize(9)
-      .text('Thank you for your business.', LEFT, footY, { width: CW / 2 });
-    const footerBrand = [brandName, brandEmail].filter(Boolean).join(' · ');
-    if (footerBrand) {
-      doc
-        .fillColor(MUTED)
-        .font('Helvetica')
-        .fontSize(8)
-        .text(footerBrand, LEFT, footY + 13, { width: CW / 2 });
-    }
-    doc
-      .fillColor(MUTED)
-      .font('Helvetica')
-      .fontSize(8)
-      .text(`Generated ${fmtDate(new Date().toISOString())}`, LEFT, footY + 4, {
-        width: CW,
+      doc.text(money(item.unit_rate, currency), COL.price.x, y + 10, {
+        width: COL.price.width,
         align: 'right',
       });
+      doc.text(money(item.amount, currency), COL.amount.x, y + 10, {
+        width: COL.amount.width,
+        align: 'right',
+      });
+      y += rowHeight;
+      doc.moveTo(0, y).lineTo(PAGE_W, y).lineWidth(1.5).strokeColor(LINE).stroke();
+    }
 
+    const hasDiscount = Number(invoice.discount_amount ?? 0) > 0;
+    const hasTax = Number(invoice.tax_amount ?? 0) > 0 || Number(invoice.tax_percent ?? 0) > 0;
+    const summaryHeight =
+      80 + (hasDiscount ? 18 : 0) + (hasTax ? 18 : 0) + (invoice.notes ? 45 : 0);
+    if (y + summaryHeight > PAGE_H - 80) nextPage();
+    y += 18;
+
+    const totalsLabelX = 405;
+    const totalsValueX = 505;
+    const totalsWidth = 85;
+    const summaryRows: Array<[string, unknown]> = [
+      ['Total:', invoice.subtotal ?? invoice.invoice_amount ?? 0],
+    ];
+    if (hasDiscount) summaryRows.push(['Discount:', -Number(invoice.discount_amount)]);
+    if (hasTax)
+      summaryRows.push([`Tax (${decimal(invoice.tax_percent)}%):`, invoice.tax_amount ?? 0]);
+
+    for (const [label, value] of summaryRows) {
+      doc
+        .font('Helvetica-Bold')
+        .fontSize(9)
+        .fillColor(INK)
+        .text(label, totalsLabelX, y, { width: 92, align: 'right' });
+      doc
+        .font('Helvetica')
+        .text(money(value, currency), totalsValueX, y, { width: totalsWidth, align: 'right' });
+      y += 18;
+    }
+    doc.moveTo(405, y).lineTo(590, y).lineWidth(1.5).strokeColor(LINE).stroke();
+    y += 15;
+    doc
+      .font('Helvetica-Bold')
+      .fontSize(9)
+      .text(`Amount Due (${currency}):`, 380, y, { width: 117, align: 'right' });
+    doc.text(money(invoice.total_amount ?? invoice.invoice_amount, currency), totalsValueX, y, {
+      width: totalsWidth,
+      align: 'right',
+    });
+
+    let noteY = y + 35;
+    if (invoice.notes) {
+      doc.font('Helvetica-Bold').fontSize(8).fillColor(MUTED).text('NOTES', LEFT, noteY);
+      doc
+        .font('Helvetica')
+        .fontSize(8)
+        .fillColor(INK)
+        .text(invoice.notes, LEFT, noteY + 12, { width: 330 });
+      noteY = doc.y + 12;
+    }
+    if (invoice.net_terms_days != null || invoice.due_date) {
+      doc.font('Helvetica-Bold').fontSize(8).fillColor(MUTED).text('PAYMENT TERMS', LEFT, noteY);
+      doc
+        .font('Helvetica')
+        .fontSize(8)
+        .fillColor(INK)
+        .text(
+          invoice.net_terms_days != null
+            ? `Payment is due within ${invoice.net_terms_days} days${invoice.due_date ? `, by ${date(invoice.due_date, true)}` : ''}.`
+            : `Payment is due by ${date(invoice.due_date, true)}.`,
+          LEFT,
+          noteY + 12,
+          { width: 330 },
+        );
+    }
+
+    drawFooter(doc, issuerName, page);
     doc.end();
   });
 }

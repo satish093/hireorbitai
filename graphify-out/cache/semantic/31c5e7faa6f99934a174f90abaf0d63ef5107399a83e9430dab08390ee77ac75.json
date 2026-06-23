@@ -1,0 +1,78 @@
+{
+  "nodes": [
+    {
+      "id": "agents_controller_auditor",
+      "label": "controller-auditor agent",
+      "file_type": "document",
+      "source_file": ".claude/agents/controller-auditor.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "agents_controller_auditor",
+      "target": "rules_security",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": ".claude/agents/controller-auditor.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "agents_controller_auditor",
+      "target": "rules_security_loadandauthorize",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": ".claude/agents/controller-auditor.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "agents_controller_auditor",
+      "target": "rules_security_mass_assignment_guard",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": ".claude/agents/controller-auditor.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "agents_controller_auditor",
+      "target": "rules_security_admin_lifecycle",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": ".claude/agents/controller-auditor.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "agents_controller_auditor",
+      "target": "rules_security_email_lookup",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": ".claude/agents/controller-auditor.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "agents_controller_auditor",
+      "target": "skills_idor_audit",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": ".claude/agents/controller-auditor.md",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": []
+}

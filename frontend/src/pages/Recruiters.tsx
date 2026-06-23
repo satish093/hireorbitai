@@ -8,6 +8,11 @@ import { PageHeader } from '../components/PageHeader';
 import { Button } from '../components/Button';
 import { SelectInput } from '../components/SelectInput';
 import { GroupBadge, useUserGroups, invalidateUserGroupsCache } from '../components/GroupBadge';
+import {
+  MarketingStatusSelect,
+  MarketingStatusPills,
+  type MarketingStatus,
+} from '../components/MarketingStatusSelect';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useEntityList } from '../hooks/useEntityList';
@@ -37,6 +42,7 @@ interface RecruiterRow {
   target_submissions_per_week?: number | null;
   notes?: string | null;
   consultant_count?: number;
+  marketing_status?: MarketingStatus | null;
   user?: {
     id: string;
     full_name?: string | null;
@@ -71,7 +77,9 @@ export function Recruiters() {
   const { profile } = useAuth();
   const { groups } = useUserGroups();
   const isAdminTierUser = !!profile && (ADMIN_TIER as readonly string[]).includes(profile.role);
-  const { query, setQuery } = useEntityList<Record<string, never>>({});
+  const { query, setQuery, filters, setFilter } = useEntityList<{ status: string }>({
+    status: 'ALL',
+  });
   const [rows, setRows] = useState<RecruiterRow[]>([]);
   const [candidates, setCandidates] = useState<CandidateUser[]>([]);
   const [groupManagers, setGroupManagers] = useState<ManagerCandidate[]>([]);
@@ -91,6 +99,21 @@ export function Recruiters() {
       .then((r) => setRows(r.data ?? []))
       .catch((e) => toast.error(e?.response?.data?.error ?? 'Failed to load recruiters'))
       .finally(() => setLoading(false));
+  }
+
+  async function setStatus(id: string, marketing_status: string) {
+    // Optimistic flip so the chip updates instantly; reload to reconcile.
+    setRows((prev) =>
+      prev.map((r) =>
+        r.id === id ? { ...r, marketing_status: marketing_status as MarketingStatus } : r,
+      ),
+    );
+    try {
+      await api.post(`/recruiters/${id}/marketing-status`, { marketing_status });
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error ?? 'Something went wrong. Please try again.');
+      load();
+    }
   }
 
   useEffect(() => {
@@ -205,19 +228,22 @@ export function Recruiters() {
         description="The team and reporting lines. Manage supervisor assignments per recruiter."
       />
 
-      {/* ── Search bar (both breakpoints) ── */}
-      <div
-        className="flex items-center gap-2 h-10 px-3 rounded-xl mb-4"
-        style={{ background: 'var(--surface)', border: '1px solid var(--border)', maxWidth: 360 }}
-      >
-        <IconSearch size={15} className="text-muted shrink-0" />
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search recruiters…"
-          className="flex-1 bg-transparent outline-none text-ink placeholder:text-muted"
-          style={{ fontSize: 15 }}
-        />
+      {/* ── Search + status filter (both breakpoints) ── */}
+      <div className="flex flex-wrap items-center gap-3 mb-4">
+        <div
+          className="flex items-center gap-2 h-10 px-3 rounded-xl flex-1"
+          style={{ background: 'var(--surface)', border: '1px solid var(--border)', maxWidth: 360 }}
+        >
+          <IconSearch size={15} className="text-muted shrink-0" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search recruiters…"
+            className="flex-1 bg-transparent outline-none text-ink placeholder:text-muted"
+            style={{ fontSize: 15 }}
+          />
+        </div>
+        <MarketingStatusPills active={filters.status} onChange={(v) => setFilter('status', v)} />
       </div>
 
       {/* ── Mobile cards (< md) ── */}
@@ -228,15 +254,19 @@ export function Recruiters() {
             <SkeletonCard />
             <SkeletonCard />
           </>
-        ) : filterRecruiters(rows, query).length === 0 ? (
+        ) : filterRecruiters(rows, query, filters.status).length === 0 ? (
           <EmptyState
             icon={<IconUsers size={22} className="text-muted" />}
             title="No recruiters found"
-            description={query ? 'Try a different search.' : 'No recruiters on the team yet.'}
+            description={
+              query || filters.status !== 'ALL'
+                ? 'Try clearing your search or filter.'
+                : 'No recruiters on the team yet.'
+            }
             compact
           />
         ) : (
-          filterRecruiters(rows, query).map((r) => (
+          filterRecruiters(rows, query, filters.status).map((r) => (
             <RecruiterCard
               key={r.id}
               recruiter={{
@@ -253,7 +283,7 @@ export function Recruiters() {
       {/* ── Desktop DataTable (≥ md) ── */}
       <div className="hidden md:block">
         <DataTable
-          rows={filterRecruiters(rows, query) as RecruiterRow[]}
+          rows={filterRecruiters(rows, query, filters.status) as RecruiterRow[]}
           loading={loading}
           empty="No recruiters yet."
           columns={[
@@ -341,6 +371,18 @@ export function Recruiters() {
               align: 'right',
               hideOnMobile: true,
               render: (r: RecruiterRow) => r.target_submissions_per_week ?? '—',
+            },
+            {
+              key: 'status',
+              header: 'Status',
+              render: (r: RecruiterRow) => (
+                <span onClick={(e) => e.stopPropagation()}>
+                  <MarketingStatusSelect
+                    value={r.marketing_status ?? 'ACTIVE'}
+                    onChange={(v) => setStatus(r.id, v)}
+                  />
+                </span>
+              ),
             },
             {
               key: 'actions',

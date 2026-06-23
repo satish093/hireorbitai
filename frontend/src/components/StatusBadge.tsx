@@ -23,6 +23,11 @@ export const STATUS_TONES: Record<string, PillTone> = {
     text: 'text-blue-700 dark:text-blue-300',
     dot: 'bg-blue-500',
   },
+  DEACTIVATED: {
+    bg: 'bg-slate-100 dark:bg-slate-500/15',
+    text: 'text-slate-600 dark:text-slate-300',
+    dot: 'bg-slate-400',
+  },
   SUBMITTED: { bg: 'bg-hover', text: 'text-ink', dot: 'bg-muted' },
   SCREENING: {
     bg: 'bg-sky-50 dark:bg-sky-500/15',

@@ -1,0 +1,495 @@
+{
+  "nodes": [
+    {
+      "id": "e_claude_hireorbitai_claude_settings_json",
+      "label": "settings.json",
+      "file_type": "code",
+      "source_file": ".claude/settings.json",
+      "source_location": "L1"
+    },
+    {
+      "id": "claude_settings_schema",
+      "label": "$schema",
+      "file_type": "code",
+      "source_file": ".claude/settings.json",
+      "source_location": "L2"
+    },
+    {
+      "id": "claude_settings_comment",
+      "label": "_comment",
+      "file_type": "code",
+      "source_file": ".claude/settings.json",
+      "source_location": "L3"
+    },
+    {
+      "id": "claude_settings_permissions",
+      "label": "permissions",
+      "file_type": "code",
+      "source_file": ".claude/settings.json",
+      "source_location": "L4"
+    },
+    {
+      "id": "claude_settings_permissions_allow",
+      "label": "allow",
+      "file_type": "code",
+      "source_file": ".claude/settings.json",
+      "source_location": "L5"
+    },
+    {
+      "id": "claude_settings_permissions_deny",
+      "label": "deny",
+      "file_type": "code",
+      "source_file": ".claude/settings.json",
+      "source_location": "L29"
+    },
+    {
+      "id": "claude_settings_hooks",
+      "label": "hooks",
+      "file_type": "code",
+      "source_file": ".claude/settings.json",
+      "source_location": "L39"
+    },
+    {
+      "id": "claude_settings_hooks_posttooluse",
+      "label": "PostToolUse",
+      "file_type": "code",
+      "source_file": ".claude/settings.json",
+      "source_location": "L40"
+    },
+    {
+      "id": "claude_settings_env",
+      "label": "env",
+      "file_type": "code",
+      "source_file": ".claude/settings.json",
+      "source_location": "L53"
+    },
+    {
+      "id": "claude_settings_env_hireorbitai_strict_commits",
+      "label": "HIREORBITAI_STRICT_COMMITS",
+      "file_type": "code",
+      "source_file": ".claude/settings.json",
+      "source_location": "L54"
+    },
+    {
+      "id": "claude_settings_env_claude_code_experimental_agent_teams",
+      "label": "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS",
+      "file_type": "code",
+      "source_file": ".claude/settings.json",
+      "source_location": "L55"
+    },
+    {
+      "id": "claude_settings_env_claude_flow_v3_enabled",
+      "label": "CLAUDE_FLOW_V3_ENABLED",
+      "file_type": "code",
+      "source_file": ".claude/settings.json",
+      "source_location": "L56"
+    },
+    {
+      "id": "claude_settings_env_claude_flow_hooks_enabled",
+      "label": "CLAUDE_FLOW_HOOKS_ENABLED",
+      "file_type": "code",
+      "source_file": ".claude/settings.json",
+      "source_location": "L57"
+    }
+  ],
+  "edges": [
+    {
+      "source": "e_claude_hireorbitai_claude_settings_json",
+      "target": "claude_settings_schema",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": ".claude/settings.json",
+      "source_location": "L2",
+      "weight": 1.0
+    },
+    {
+      "source": "e_claude_hireorbitai_claude_settings_json",
+      "target": "claude_settings_comment",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": ".claude/settings.json",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "e_claude_hireorbitai_claude_settings_json",
+      "target": "claude_settings_permissions",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": ".claude/settings.json",
+      "source_location": "L4",
+      "weight": 1.0
+    },
+    {
+      "source": "claude_settings_permissions",
+      "target": "claude_settings_permissions_allow",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": ".claude/settings.json",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "claude_settings_permissions_allow",
+      "target": "ref_bash_git_status",
+      "relation": "extends",
+      "confidence": "EXTRACTED",
+      "source_file": ".claude/settings.json",
+      "source_location": "L5",
+      "weight": 1.0,
+      "context": "import"
+    },
+    {
+      "source": "claude_settings_permissions_allow",
+      "target": "ref_bash_git_diff",
+      "relation": "extends",
+      "confidence": "EXTRACTED",
+      "source_file": ".claude/settings.json",
+      "source_location": "L5",
+      "weight": 1.0,
+      "context": "import"
+    },
+    {
+      "source": "claude_settings_permissions_allow",
+      "target": "ref_bash_git_log",
+      "relation": "extends",
+      "confidence": "EXTRACTED",
+      "source_file": ".claude/settings.json",
+      "source_location": "L5",
+      "weight": 1.0,
+      "context": "import"
+    },
+    {
+      "source": "claude_settings_permissions_allow",
+      "target": "ref_bash_git_branch",
+      "relation": "extends",
+      "confidence": "EXTRACTED",
+      "source_file": ".claude/settings.json",
+      "source_location": "L5",
+      "weight": 1.0,
+      "context": "import"
+    },
+    {
+      "source": "claude_settings_permissions_allow",
+      "target": "ref_bash_git_show",
+      "relation": "extends",
+      "confidence": "EXTRACTED",
+      "source_file": ".claude/settings.json",
+      "source_location": "L5",
+      "weight": 1.0,
+      "context": "import"
+    },
+    {
+      "source": "claude_settings_permissions_allow",
+      "target": "ref_bash_npm_run_typecheck",
+      "relation": "extends",
+      "confidence": "EXTRACTED",
+      "source_file": ".claude/settings.json",
+      "source_location": "L5",
+      "weight": 1.0,
+      "context": "import"
+    },
+    {
+      "source": "claude_settings_permissions_allow",
+      "target": "ref_bash_npm_run_lint",
+      "relation": "extends",
+      "confidence": "EXTRACTED",
+      "source_file": ".claude/settings.json",
+      "source_location": "L5",
+      "weight": 1.0,
+      "context": "import"
+    },
+    {
+      "source": "claude_settings_permissions_allow",
+      "target": "ref_bash_npm_run_build",
+      "relation": "extends",
+      "confidence": "EXTRACTED",
+      "source_file": ".claude/settings.json",
+      "source_location": "L5",
+      "weight": 1.0,
+      "context": "import"
+    },
+    {
+      "source": "claude_settings_permissions_allow",
+      "target": "ref_bash_npm_prefix_backend_run_typecheck",
+      "relation": "extends",
+      "confidence": "EXTRACTED",
+      "source_file": ".claude/settings.json",
+      "source_location": "L5",
+      "weight": 1.0,
+      "context": "import"
+    },
+    {
+      "source": "claude_settings_permissions_allow",
+      "target": "ref_bash_npm_prefix_backend_run_lint",
+      "relation": "extends",
+      "confidence": "EXTRACTED",
+      "source_file": ".claude/settings.json",
+      "source_location": "L5",
+      "weight": 1.0,
+      "context": "import"
+    },
+    {
+      "source": "claude_settings_permissions_allow",
+      "target": "ref_bash_npm_prefix_backend_run_build",
+      "relation": "extends",
+      "confidence": "EXTRACTED",
+      "source_file": ".claude/settings.json",
+      "source_location": "L5",
+      "weight": 1.0,
+      "context": "import"
+    },
+    {
+      "source": "claude_settings_permissions_allow",
+      "target": "ref_bash_npm_prefix_backend_test",
+      "relation": "extends",
+      "confidence": "EXTRACTED",
+      "source_file": ".claude/settings.json",
+      "source_location": "L5",
+      "weight": 1.0,
+      "context": "import"
+    },
+    {
+      "source": "claude_settings_permissions_allow",
+      "target": "ref_bash_npm_prefix_backend_test",
+      "relation": "extends",
+      "confidence": "EXTRACTED",
+      "source_file": ".claude/settings.json",
+      "source_location": "L5",
+      "weight": 1.0,
+      "context": "import"
+    },
+    {
+      "source": "claude_settings_permissions_allow",
+      "target": "ref_bash_npm_prefix_frontend_run_typecheck",
+      "relation": "extends",
+      "confidence": "EXTRACTED",
+      "source_file": ".claude/settings.json",
+      "source_location": "L5",
+      "weight": 1.0,
+      "context": "import"
+    },
+    {
+      "source": "claude_settings_permissions_allow",
+      "target": "ref_bash_npm_prefix_frontend_run_lint",
+      "relation": "extends",
+      "confidence": "EXTRACTED",
+      "source_file": ".claude/settings.json",
+      "source_location": "L5",
+      "weight": 1.0,
+      "context": "import"
+    },
+    {
+      "source": "claude_settings_permissions_allow",
+      "target": "ref_bash_npm_prefix_frontend_run_build",
+      "relation": "extends",
+      "confidence": "EXTRACTED",
+      "source_file": ".claude/settings.json",
+      "source_location": "L5",
+      "weight": 1.0,
+      "context": "import"
+    },
+    {
+      "source": "claude_settings_permissions_allow",
+      "target": "ref_bash_npm_run_shared_build",
+      "relation": "extends",
+      "confidence": "EXTRACTED",
+      "source_file": ".claude/settings.json",
+      "source_location": "L5",
+      "weight": 1.0,
+      "context": "import"
+    },
+    {
+      "source": "claude_settings_permissions_allow",
+      "target": "ref_bash_npm_run_format_check",
+      "relation": "extends",
+      "confidence": "EXTRACTED",
+      "source_file": ".claude/settings.json",
+      "source_location": "L5",
+      "weight": 1.0,
+      "context": "import"
+    },
+    {
+      "source": "claude_settings_permissions_allow",
+      "target": "ref_bash_npx_claude_flow",
+      "relation": "extends",
+      "confidence": "EXTRACTED",
+      "source_file": ".claude/settings.json",
+      "source_location": "L5",
+      "weight": 1.0,
+      "context": "import"
+    },
+    {
+      "source": "claude_settings_permissions_allow",
+      "target": "ref_bash_npx_claude_flow",
+      "relation": "extends",
+      "confidence": "EXTRACTED",
+      "source_file": ".claude/settings.json",
+      "source_location": "L5",
+      "weight": 1.0,
+      "context": "import"
+    },
+    {
+      "source": "claude_settings_permissions_allow",
+      "target": "ref_bash_node_claude",
+      "relation": "extends",
+      "confidence": "EXTRACTED",
+      "source_file": ".claude/settings.json",
+      "source_location": "L5",
+      "weight": 1.0,
+      "context": "import"
+    },
+    {
+      "source": "claude_settings_permissions_allow",
+      "target": "ref_mcp_claude_flow",
+      "relation": "extends",
+      "confidence": "EXTRACTED",
+      "source_file": ".claude/settings.json",
+      "source_location": "L5",
+      "weight": 1.0,
+      "context": "import"
+    },
+    {
+      "source": "claude_settings_permissions",
+      "target": "claude_settings_permissions_deny",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": ".claude/settings.json",
+      "source_location": "L29",
+      "weight": 1.0
+    },
+    {
+      "source": "claude_settings_permissions_deny",
+      "target": "ref_bash_git_push_force",
+      "relation": "extends",
+      "confidence": "EXTRACTED",
+      "source_file": ".claude/settings.json",
+      "source_location": "L29",
+      "weight": 1.0,
+      "context": "import"
+    },
+    {
+      "source": "claude_settings_permissions_deny",
+      "target": "ref_bash_git_push_f",
+      "relation": "extends",
+      "confidence": "EXTRACTED",
+      "source_file": ".claude/settings.json",
+      "source_location": "L29",
+      "weight": 1.0,
+      "context": "import"
+    },
+    {
+      "source": "claude_settings_permissions_deny",
+      "target": "ref_bash_git_reset_hard",
+      "relation": "extends",
+      "confidence": "EXTRACTED",
+      "source_file": ".claude/settings.json",
+      "source_location": "L29",
+      "weight": 1.0,
+      "context": "import"
+    },
+    {
+      "source": "claude_settings_permissions_deny",
+      "target": "ref_bash_git_clean_fd",
+      "relation": "extends",
+      "confidence": "EXTRACTED",
+      "source_file": ".claude/settings.json",
+      "source_location": "L29",
+      "weight": 1.0,
+      "context": "import"
+    },
+    {
+      "source": "claude_settings_permissions_deny",
+      "target": "ref_bash_git_branch_d",
+      "relation": "extends",
+      "confidence": "EXTRACTED",
+      "source_file": ".claude/settings.json",
+      "source_location": "L29",
+      "weight": 1.0,
+      "context": "import"
+    },
+    {
+      "source": "claude_settings_permissions_deny",
+      "target": "ref_bash_rm_rf",
+      "relation": "extends",
+      "confidence": "EXTRACTED",
+      "source_file": ".claude/settings.json",
+      "source_location": "L29",
+      "weight": 1.0,
+      "context": "import"
+    },
+    {
+      "source": "claude_settings_permissions_deny",
+      "target": "ref_bash_psql",
+      "relation": "extends",
+      "confidence": "EXTRACTED",
+      "source_file": ".claude/settings.json",
+      "source_location": "L29",
+      "weight": 1.0,
+      "context": "import"
+    },
+    {
+      "source": "e_claude_hireorbitai_claude_settings_json",
+      "target": "claude_settings_hooks",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": ".claude/settings.json",
+      "source_location": "L39",
+      "weight": 1.0
+    },
+    {
+      "source": "claude_settings_hooks",
+      "target": "claude_settings_hooks_posttooluse",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": ".claude/settings.json",
+      "source_location": "L40",
+      "weight": 1.0
+    },
+    {
+      "source": "e_claude_hireorbitai_claude_settings_json",
+      "target": "claude_settings_env",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": ".claude/settings.json",
+      "source_location": "L53",
+      "weight": 1.0
+    },
+    {
+      "source": "claude_settings_env",
+      "target": "claude_settings_env_hireorbitai_strict_commits",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": ".claude/settings.json",
+      "source_location": "L54",
+      "weight": 1.0
+    },
+    {
+      "source": "claude_settings_env",
+      "target": "claude_settings_env_claude_code_experimental_agent_teams",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": ".claude/settings.json",
+      "source_location": "L55",
+      "weight": 1.0
+    },
+    {
+      "source": "claude_settings_env",
+      "target": "claude_settings_env_claude_flow_v3_enabled",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": ".claude/settings.json",
+      "source_location": "L56",
+      "weight": 1.0
+    },
+    {
+      "source": "claude_settings_env",
+      "target": "claude_settings_env_claude_flow_hooks_enabled",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": ".claude/settings.json",
+      "source_location": "L57",
+      "weight": 1.0
+    }
+  ]
+}

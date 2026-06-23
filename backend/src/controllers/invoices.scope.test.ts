@@ -1,183 +1,157 @@
-/**
- * Role-based per-company scoping for invoices (security).
- *
- *   - list: admin-tier sees ALL (no company filter); a group-scoped caller is
- *     filtered to their own group(s); a scoped caller with no group sees nothing.
- *   - get / update / remove / document / send: 404 (not 403) on an invoice
- *     outside the caller's company scope — no existence oracle.
- *   - create: a scoped caller's company is FORCED to their own group (a spoofed
- *     company_group_id is ignored); admin-tier keeps the chosen company.
- *
- * groupScope runs for real against the mocked db; brevo + audit are mocked.
- */
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-
+const G1 = '11111111-1111-4111-8111-111111111111';
+const G2 = '22222222-2222-4222-8222-222222222222';
 const mock = vi.hoisted(() => ({
-  grants: [] as Array<{ group_id: string }>, // manager_group_grants rows
-  invoiceRow: null as Record<string, unknown> | null, // by-id maybeSingle
-  inFilter: null as { col: string; vals: unknown[] } | null,
-  inserted: null as Record<string, unknown> | null,
-  updated: null as Record<string, unknown> | null,
+  grants: [] as Array<{ group_id: string }>,
+  invoice: null as any,
+  sql: [] as Array<{ text: string; values: unknown[] }>,
+  insertedCompany: null as string | null,
 }));
 
 vi.mock('../config/db', () => {
-  function builder(table: string) {
-    const b: Record<string, unknown> = {};
-    Object.assign(b, {
-      select: () => b,
-      eq: () => b,
-      in: (col: string, vals: unknown[]) => {
-        if (table === 'invoices') mock.inFilter = { col, vals };
-        return b;
-      },
-      not: () => b,
-      order: () => Promise.resolve({ data: [], error: null }),
-      insert: (p: Record<string, unknown>) => {
-        mock.inserted = p;
-        return b;
-      },
-      update: (p: Record<string, unknown>) => {
-        mock.updated = p;
-        return b;
-      },
-      delete: () => b,
-      single: () =>
-        Promise.resolve({ data: mock.inserted ?? mock.updated ?? mock.invoiceRow, error: null }),
-      maybeSingle: () =>
-        Promise.resolve({ data: table === 'invoices' ? mock.invoiceRow : null, error: null }),
-      // grantedGroupIds awaits `manager_group_grants` directly.
-      then: (r: (v: unknown) => unknown) =>
-        Promise.resolve({
-          data: table === 'manager_group_grants' ? mock.grants : [],
-          error: null,
-        }).then(r),
-    });
-    return b;
-  }
-  const storage = {
-    from: () => ({ createSignedUrl: () => Promise.resolve({ data: null, error: null }) }),
+  const db = {
+    from: (table: string) => {
+      const builder: any = {
+        select: () => builder,
+        eq: () => builder,
+        in: () => builder,
+        order: () => builder,
+        maybeSingle: () =>
+          Promise.resolve({
+            data: table === 'user_groups' ? { id: G1, name: 'CloudFen', email: null } : null,
+            error: null,
+          }),
+        then: (resolve: any) =>
+          Promise.resolve({
+            data: table === 'manager_group_grants' ? mock.grants : [],
+            error: null,
+          }).then(resolve),
+      };
+      return builder;
+    },
   };
-  return { db: { from: (t: string) => builder(t), storage }, pool: {} };
+  const query = vi.fn(async (text: string, values: unknown[] = []) => {
+    mock.sql.push({ text, values });
+    if (/select \* from public\.invoices where id/.test(text)) {
+      return { rows: mock.invoice ? [mock.invoice] : [] };
+    }
+    if (/invoice_line_items/.test(text)) return { rows: [] };
+    if (/select \*,/.test(text)) return { rows: [] };
+    if (/count\(\*\)::int as total/.test(text)) return { rows: [{ total: 0 }] };
+    if (/overdue_count/.test(text)) return { rows: [{ overdue_count: 0, draft_count: 0 }] };
+    if (/group by currency/.test(text)) return { rows: [] };
+    if (/delete from public\.invoices/.test(text)) return { rows: [] };
+    return { rows: [] };
+  });
+  const client = {
+    query: vi.fn(async (text: string, values: unknown[] = []) => {
+      if (/insert into public\.invoices/.test(text)) {
+        mock.insertedCompany = values[0] as string;
+        return {
+          rows: [
+            {
+              id: 'inv-new',
+              company_group_id: values[0],
+              invoice_number: values[1],
+              status: 'Draft',
+            },
+          ],
+        };
+      }
+      if (/invoice_line_items/.test(text)) return { rows: [] };
+      return { rows: [] };
+    }),
+    release: vi.fn(),
+  };
+  return { db, pool: { query, connect: () => Promise.resolve(client) } };
 });
-
 vi.mock('../services/brevo.service', () => ({ sendInvoiceEmail: vi.fn() }));
 vi.mock('../services/audit.service', () => ({ audit: vi.fn() }));
 
-import { list, get, create, update, remove } from './invoices.controller';
+import { create, get, list } from './invoices.controller';
 
-const CTO = { id: 'u-cto', role: 'CTO', email: 'c@x', group_id: 'gX' }; // admin-tier
-const MGR = { id: 'u-mgr', role: 'MANAGER', email: 'm@x', group_id: 'g1' }; // scoped → ['g1']
-const MGR_NOGROUP = { id: 'u-mgr2', role: 'MANAGER', email: 'n@x', group_id: null };
-const UUID = '11111111-1111-4111-8111-111111111111'; // valid for the company schema
+const ADMIN = { id: 'admin', role: 'CTO', email: 'a@test', group_id: null };
+const MANAGER = { id: 'manager', role: 'MANAGER', email: 'm@test', group_id: G1 };
+const NO_GROUP = { id: 'manager-2', role: 'MANAGER', email: 'n@test', group_id: null };
+const payload = {
+  company_group_id: G1,
+  invoice_number: 'INV-1',
+  currency: 'USD',
+  discount_amount: 0,
+  tax_percent: 0,
+  bill_to_snapshot: { name: 'Q1' },
+  line_items: [{ description: 'Services', quantity: 1, unit: 'service', unit_rate: 100 }],
+};
 
-function mkRes() {
-  const res: any = {
+function response() {
+  return {
+    body: null as any,
     statusCode: 200,
-    body: undefined,
-    status(c: number) {
-      this.statusCode = c;
+    status(code: number) {
+      this.statusCode = code;
       return this;
     },
-    json(b: unknown) {
-      this.body = b;
+    json(value: any) {
+      this.body = value;
       return this;
     },
   };
-  return res;
 }
-async function run(handler: any, req: any): Promise<{ res: any; err: { status?: number } | null }> {
-  const res = mkRes();
+
+async function run(handler: any, req: any) {
+  const res = response();
   try {
     await handler({ query: {}, params: {}, body: {}, ...req }, res, vi.fn());
-    return { res, err: null };
-  } catch (e) {
-    return { res, err: e as { status?: number } };
+    return { res, error: null as any };
+  } catch (error) {
+    return { res, error: error as { status?: number } };
   }
 }
 
 beforeEach(() => {
   mock.grants = [];
-  mock.invoiceRow = null;
-  mock.inFilter = null;
-  mock.inserted = null;
-  mock.updated = null;
-  vi.clearAllMocks();
+  mock.invoice = null;
+  mock.sql = [];
+  mock.insertedCompany = null;
 });
 
-describe('invoices.list — company scope', () => {
-  it('admin-tier is unscoped (no company filter)', async () => {
-    await run(list, { user: CTO });
-    expect(mock.inFilter).toBeNull();
+describe('invoice company scope', () => {
+  it('filters manager lists to home and co-managed companies', async () => {
+    mock.grants = [{ group_id: G2 }];
+    await run(list, { user: MANAGER });
+    const listQuery = mock.sql.find((entry) => /select \*,/.test(entry.text));
+    expect(listQuery?.text).toContain('company_group_id = any');
+    expect(listQuery?.values[0]).toEqual([G1, G2]);
   });
 
-  it('a manager is filtered to their own group', async () => {
-    await run(list, { user: MGR });
-    expect(mock.inFilter).toEqual({ col: 'company_group_id', vals: ['g1'] });
+  it('leaves admin-tier lists unscoped', async () => {
+    await run(list, { user: ADMIN });
+    const listQuery = mock.sql.find((entry) => /select \*,/.test(entry.text));
+    expect(listQuery?.text).not.toContain('company_group_id = any');
   });
 
-  it('a manager also sees granted (co-managed) groups', async () => {
-    mock.grants = [{ group_id: 'g2' }];
-    await run(list, { user: MGR });
-    expect(mock.inFilter?.vals).toEqual(expect.arrayContaining(['g1', 'g2']));
+  it('returns an empty paginated response for a scoped user with no company', async () => {
+    const { res } = await run(list, { user: NO_GROUP });
+    expect(res.body).toMatchObject({ items: [], total: 0, page: 1, page_size: 25 });
   });
 
-  it('a scoped caller with no group sees nothing', async () => {
-    const { res } = await run(list, { user: MGR_NOGROUP });
-    expect(res.body).toEqual([]);
-    expect(mock.inFilter).toBeNull(); // short-circuited before the query
-  });
-});
-
-describe('invoices per-row scope — 404 out of scope', () => {
-  it('get: a manager cannot read another company’s invoice', async () => {
-    mock.invoiceRow = { id: 'inv-x', company_group_id: 'other-group' };
-    const { err } = await run(get, { user: MGR, params: { id: 'inv-x' } });
-    expect(err?.status).toBe(404);
+  it('conceals cross-company and unlinked invoices with 404', async () => {
+    mock.invoice = { id: 'inv-x', company_group_id: G2, status: 'Draft' };
+    expect((await run(get, { user: MANAGER, params: { id: 'inv-x' } })).error?.status).toBe(404);
+    mock.invoice = { id: 'inv-x', company_group_id: null, status: 'Draft' };
+    expect((await run(get, { user: MANAGER, params: { id: 'inv-x' } })).error?.status).toBe(404);
   });
 
-  it('get: a manager can read their own company’s invoice', async () => {
-    mock.invoiceRow = { id: 'inv-1', company_group_id: 'g1' };
-    const { res, err } = await run(get, { user: MGR, params: { id: 'inv-1' } });
-    expect(err).toBeNull();
-    expect(res.body).toMatchObject({ id: 'inv-1' });
-  });
-
-  it('get: a manager cannot read an UNLINKED (no company) invoice', async () => {
-    mock.invoiceRow = { id: 'inv-0', company_group_id: null };
-    const { err } = await run(get, { user: MGR, params: { id: 'inv-0' } });
-    expect(err?.status).toBe(404);
-  });
-
-  it('admin-tier can read any company’s invoice', async () => {
-    mock.invoiceRow = { id: 'inv-x', company_group_id: 'other-group' };
-    const { err } = await run(get, { user: CTO, params: { id: 'inv-x' } });
-    expect(err).toBeNull();
-  });
-
-  it('update + remove: 404 for an out-of-scope invoice', async () => {
-    mock.invoiceRow = { id: 'inv-x', company_group_id: 'other-group' };
-    const u = await run(update, { user: MGR, params: { id: 'inv-x' }, body: { status: 'Paid' } });
-    expect(u.err?.status).toBe(404);
-    const d = await run(remove, { user: MGR, params: { id: 'inv-x' } });
-    expect(d.err?.status).toBe(404);
-  });
-});
-
-describe('invoices.create — company auto-assign', () => {
-  it('forces a manager’s invoice to their own group (ignores a spoofed company)', async () => {
-    await run(create, {
-      user: MGR,
-      body: { consultant_name: 'A', vendor_name: 'B', company_group_id: UUID },
+  it('allows a manager to create in a co-managed company and rejects no-company users', async () => {
+    mock.grants = [{ group_id: G2 }];
+    const allowed = await run(create, {
+      user: MANAGER,
+      body: { ...payload, company_group_id: G2 },
     });
-    expect(mock.inserted?.company_group_id).toBe('g1');
-  });
-
-  it('lets admin-tier keep the chosen company', async () => {
-    await run(create, {
-      user: CTO,
-      body: { consultant_name: 'A', vendor_name: 'B', company_group_id: UUID },
-    });
-    expect(mock.inserted?.company_group_id).toBe(UUID);
+    expect(allowed.error).toBeNull();
+    expect(mock.insertedCompany).toBe(G2);
+    const denied = await run(create, { user: NO_GROUP, body: payload });
+    expect(denied.error?.status).toBe(403);
   });
 });

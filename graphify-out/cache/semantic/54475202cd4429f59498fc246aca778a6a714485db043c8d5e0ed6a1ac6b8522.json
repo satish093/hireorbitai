@@ -1,0 +1,142 @@
+{
+  "nodes": [
+    {
+      "id": "changelog_product_changelog",
+      "label": "HireOrbit AI product changelog",
+      "file_type": "document",
+      "source_file": "docs/changelog.html",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "changelog_access_control_hardening",
+      "label": "Access-control hardening pass (7 fixes)",
+      "file_type": "concept",
+      "source_file": "docs/changelog.html",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "changelog_realtime_messaging_sse",
+      "label": "Realtime messaging via SSE + LISTEN/NOTIFY",
+      "file_type": "concept",
+      "source_file": "docs/changelog.html",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "changelog_permission_cache_view",
+      "label": "Permission cache + v_user_relationships view",
+      "file_type": "concept",
+      "source_file": "docs/changelog.html",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "changelog_messaging_permission_engine",
+      "label": "Centralized messaging permission engine",
+      "file_type": "concept",
+      "source_file": "docs/changelog.html",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "changelog_product_changelog",
+      "target": "changelog_access_control_hardening",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/changelog.html",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "changelog_product_changelog",
+      "target": "changelog_realtime_messaging_sse",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/changelog.html",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "changelog_product_changelog",
+      "target": "changelog_permission_cache_view",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/changelog.html",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "changelog_product_changelog",
+      "target": "changelog_messaging_permission_engine",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/changelog.html",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "changelog_messaging_permission_engine",
+      "target": "rbac_matrix_messages_permission_policy",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "docs/changelog.html",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "changelog_access_control_hardening",
+      "target": "rbac_matrix_two_layer_authz",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "docs/changelog.html",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "changelog_realtime_messaging_sse",
+      "target": "deployment_01_vps_cloudpanel_nginx_proxy",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "docs/changelog.html",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "changelog_permission_cache_view",
+      "target": "changelog_messaging_permission_engine",
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/changelog.html",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": []
+}

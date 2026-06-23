@@ -1,0 +1,75 @@
+{
+  "nodes": [
+    {
+      "id": "e_claude_hireorbitai_scripts_healthcheck_sh",
+      "label": "healthcheck.sh",
+      "file_type": "code",
+      "source_file": "scripts/healthcheck.sh",
+      "source_location": "L1",
+      "metadata": { "language": "bash", "kind": "file" }
+    },
+    {
+      "id": "e_claude_hireorbitai_scripts_healthcheck_sh__entry",
+      "label": "healthcheck.sh script",
+      "file_type": "code",
+      "source_file": "scripts/healthcheck.sh",
+      "source_location": "L1",
+      "metadata": { "language": "bash", "kind": "bash_entrypoint" }
+    },
+    {
+      "id": "scripts_healthcheck_results",
+      "label": "results",
+      "file_type": "code",
+      "source_file": "scripts/healthcheck.sh",
+      "source_location": "L17",
+      "metadata": { "language": "bash", "kind": "code" }
+    },
+    {
+      "id": "scripts_healthcheck_probe",
+      "label": "probe()",
+      "file_type": "code",
+      "source_file": "scripts/healthcheck.sh",
+      "source_location": "L20",
+      "metadata": { "language": "bash", "kind": "bash_function" }
+    }
+  ],
+  "edges": [
+    {
+      "source": "e_claude_hireorbitai_scripts_healthcheck_sh",
+      "target": "e_claude_hireorbitai_scripts_healthcheck_sh__entry",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/healthcheck.sh",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "e_claude_hireorbitai_scripts_healthcheck_sh",
+      "target": "scripts_healthcheck_results",
+      "relation": "defines",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/healthcheck.sh",
+      "source_location": "L17",
+      "weight": 1.0
+    },
+    {
+      "source": "e_claude_hireorbitai_scripts_healthcheck_sh",
+      "target": "scripts_healthcheck_probe",
+      "relation": "defines",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/healthcheck.sh",
+      "source_location": "L20",
+      "weight": 1.0
+    },
+    {
+      "source": "e_claude_hireorbitai_scripts_healthcheck_sh__entry",
+      "target": "scripts_healthcheck_probe",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/healthcheck.sh",
+      "source_location": "L35",
+      "weight": 1.0,
+      "context": "call"
+    }
+  ]
+}

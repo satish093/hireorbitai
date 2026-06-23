@@ -160,6 +160,7 @@ export function LessonViewer() {
   const [evals, setEvals] = useState<any[]>([]);
   const [activeLessonId, setActiveLessonId] = useState<string | null>(null);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [completing, setCompleting] = useState(false);
   const nav = useNavigate();
   const gates = useCompletionGates(id);
   const isConsultantOwner = !!(
@@ -312,6 +313,22 @@ export function LessonViewer() {
     }
   }
 
+  // Explicit course completion — only enabled once every gate is green
+  // (status READY_TO_COMPLETE). Replaces the old auto-flip to COMPLETED.
+  async function completeCourse() {
+    setCompleting(true);
+    try {
+      const r = await api.post(`/training/assignments/${id}/complete`);
+      setAssignment(r.data);
+      gates.refresh();
+      toast.success('Course completed 🎉');
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error ?? 'Not all requirements are met yet.');
+    } finally {
+      setCompleting(false);
+    }
+  }
+
   async function refreshAll() {
     if (!id) return;
     try {
@@ -426,6 +443,29 @@ export function LessonViewer() {
             )}
           </div>
         </div>
+
+        {/* Explicit completion CTA — shown once all requirements are met. The
+            course no longer auto-completes; the learner confirms here. */}
+        {assignment.status === 'READY_TO_COMPLETE' && (
+          <div className="mt-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl border border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 px-4 py-3">
+            <div className="text-sm text-emerald-800 dark:text-emerald-200">
+              <span className="font-semibold">All requirements met.</span> Mark this course complete
+              to finish it.
+            </div>
+            <Button variant="primary" onClick={completeCourse} loading={completing}>
+              {completing ? 'Completing…' : 'Complete course'}
+            </Button>
+          </div>
+        )}
+        {assignment.status === 'COMPLETED' && (
+          <div className="mt-5 rounded-xl border border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 px-4 py-3 text-sm font-medium text-emerald-800 dark:text-emerald-200">
+            ✓ Course completed
+            {assignment.completed_at
+              ? ` on ${new Date(assignment.completed_at).toLocaleDateString()}`
+              : ''}
+            .
+          </div>
+        )}
 
         <div className="grid md:grid-cols-3 gap-4 mt-5">
           <Stat label="Overall progress">

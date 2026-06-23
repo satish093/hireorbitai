@@ -1,0 +1,153 @@
+{
+  "nodes": [
+    {
+      "id": "dev_environment_dual_environment",
+      "label": "Dual-environment architecture (prod + dev)",
+      "file_type": "concept",
+      "source_file": "docs/DEV-ENVIRONMENT.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "dev_environment_dev_tools_flag",
+      "label": "env.devTools derived flag",
+      "file_type": "rationale",
+      "source_file": "docs/DEV-ENVIRONMENT.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "dev_environment_role_user_switching",
+      "label": "Dev role/user switching (no login)",
+      "file_type": "concept",
+      "source_file": "docs/DEV-ENVIRONMENT.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "dev_environment_dev_test_panel",
+      "label": "Super-Admin dev test panel (/dev)",
+      "file_type": "concept",
+      "source_file": "docs/DEV-ENVIRONMENT.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "dev_environment_mock_data_seed",
+      "label": "Mock data seeding (seed-mock-data.mjs)",
+      "file_type": "concept",
+      "source_file": "docs/DEV-ENVIRONMENT.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "dev_environment_tree_shaken_dev_code",
+      "label": "Tree-shaken dev code (prod build guarantee)",
+      "file_type": "rationale",
+      "source_file": "docs/DEV-ENVIRONMENT.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "dev_environment_dual_environment",
+      "target": "dev_environment_dev_tools_flag",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/DEV-ENVIRONMENT.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "dev_environment_dev_tools_flag",
+      "target": "dev_environment_role_user_switching",
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/DEV-ENVIRONMENT.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "dev_environment_dev_tools_flag",
+      "target": "dev_environment_dev_test_panel",
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/DEV-ENVIRONMENT.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "dev_environment_dev_tools_flag",
+      "target": "dev_environment_tree_shaken_dev_code",
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/DEV-ENVIRONMENT.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "dev_environment_role_user_switching",
+      "target": "rbac_matrix_two_layer_authz",
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "docs/DEV-ENVIRONMENT.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "dev_environment_dual_environment",
+      "target": "deployment_02_databases_db_guard",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/DEV-ENVIRONMENT.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "dev_environment_dual_environment",
+      "target": "deployment_02_databases_neon_dev",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/DEV-ENVIRONMENT.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "dev_environment_mock_data_seed",
+      "target": "deployment_06_fresh_reset_reset_dev",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "docs/DEV-ENVIRONMENT.md",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": []
+}

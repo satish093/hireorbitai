@@ -11,7 +11,7 @@ import { GroupBadge, useUserGroups, invalidateUserGroupsCache } from '../compone
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useEntityList } from '../hooks/useEntityList';
-import { ManagerCard, filterManagers } from '../components/ManagerCard';
+import { ManagerCard, filterManagers, isManagerActive } from '../components/ManagerCard';
 import { KpiCard } from '../components/KpiCard';
 import { EmptyState } from '../components/EmptyState';
 import { SkeletonCard } from '../components/Skeleton';
@@ -31,7 +31,10 @@ interface ManagerRow {
 }
 
 function StatusPill({ status }: { status?: string | null }) {
-  const active = (status ?? 'active') === 'active';
+  const active = isManagerActive(status);
+  // Surface non-active accounts as a single "Deactivated" label (inactive /
+  // suspended / banned all read as off the active roster on this page).
+  const label = active ? 'Active' : status === 'inactive' || !status ? 'Deactivated' : status;
   return (
     <span
       className={
@@ -45,8 +48,40 @@ function StatusPill({ status }: { status?: string | null }) {
           active ? 'size-1.5 rounded-full bg-emerald-500' : 'size-1.5 rounded-full bg-slate-400'
         }
       />
-      {status ?? 'active'}
+      {label}
     </span>
+  );
+}
+
+const STATUS_FILTER_OPTIONS = [
+  { value: 'ALL', label: 'All' },
+  { value: 'ACTIVE', label: 'Active' },
+  { value: 'DEACTIVATED', label: 'Deactivated' },
+];
+
+function ManagerStatusPills({
+  active,
+  onChange,
+}: {
+  active: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {STATUS_FILTER_OPTIONS.map((o) => (
+        <button
+          key={o.value}
+          onClick={() => onChange(o.value)}
+          className={
+            o.value === active
+              ? 'h-8 px-3 rounded-full text-[13px] font-semibold border bg-ink text-bg border-ink'
+              : 'h-8 px-3 rounded-full text-[13px] font-semibold border bg-surface text-ink-2 border-border hover:border-border-strong'
+          }
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -214,13 +249,19 @@ export function Managers() {
   const canEditGroup = !!profile && (ADMIN_TIER as readonly string[]).includes(profile.role);
   const [grantsFor, setGrantsFor] = useState<ManagerRow | null>(null);
 
-  const { query, setQuery } = useEntityList<Record<string, never>>({});
+  const { query, setQuery, filters, setFilter } = useEntityList<{ status: string }>({
+    status: 'ALL',
+  });
   const [rows, setRows] = useState<ManagerRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [picked, setPicked] = useState<ManagerRow | null>(null);
   const [selectedGroup, setSelectedGroup] = useState('');
   const [confirmGroupMoveOpen, setConfirmGroupMoveOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  // Account deactivation (reuses the admin lifecycle endpoint, which enforces
+  // outranking + last-super-admin guards server-side).
+  const [deactivateFor, setDeactivateFor] = useState<ManagerRow | null>(null);
+  const [statusBusy, setStatusBusy] = useState(false);
 
   function load() {
     setLoading(true);
@@ -266,6 +307,20 @@ export function Managers() {
     }
   }
 
+  async function applyStatus(m: ManagerRow, status: 'active' | 'inactive') {
+    setStatusBusy(true);
+    try {
+      await api.patch(`/admin/users/${m.id}/status`, { status });
+      toast.success(status === 'active' ? 'Manager reactivated' : 'Manager deactivated');
+      setDeactivateFor(null);
+      load();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error ?? 'Failed to update status');
+    } finally {
+      setStatusBusy(false);
+    }
+  }
+
   const totalRecruiters = rows.reduce((sum, r) => sum + (r.recruiter_count ?? 0), 0);
   const hrManagers = rows.filter((r) => r.role === 'HR_MANAGER').length;
   const managers = rows.filter((r) => r.role === 'MANAGER').length;
@@ -285,19 +340,22 @@ export function Managers() {
         <KpiCard label="Assigned recruiters" value={totalRecruiters} accent="green" />
       </div>
 
-      {/* ── Search bar (both breakpoints) ── */}
-      <div
-        className="flex items-center gap-2 h-10 px-3 rounded-xl mb-4"
-        style={{ background: 'var(--surface)', border: '1px solid var(--border)', maxWidth: 360 }}
-      >
-        <IconSearch size={15} className="text-muted shrink-0" />
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search managers…"
-          className="flex-1 bg-transparent outline-none text-ink placeholder:text-muted"
-          style={{ fontSize: 15 }}
-        />
+      {/* ── Search + status filter (both breakpoints) ── */}
+      <div className="flex flex-wrap items-center gap-3 mb-4">
+        <div
+          className="flex items-center gap-2 h-10 px-3 rounded-xl flex-1"
+          style={{ background: 'var(--surface)', border: '1px solid var(--border)', maxWidth: 360 }}
+        >
+          <IconSearch size={15} className="text-muted shrink-0" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search managers…"
+            className="flex-1 bg-transparent outline-none text-ink placeholder:text-muted"
+            style={{ fontSize: 15 }}
+          />
+        </div>
+        <ManagerStatusPills active={filters.status} onChange={(v) => setFilter('status', v)} />
       </div>
 
       {/* ── Mobile cards (< md) ── */}
@@ -307,20 +365,30 @@ export function Managers() {
             <SkeletonCard />
             <SkeletonCard />
           </>
-        ) : filterManagers(rows, query).length === 0 ? (
+        ) : filterManagers(rows, query, filters.status).length === 0 ? (
           <EmptyState
             icon={<IconUsers size={22} className="text-muted" />}
             title="No managers found"
-            description={query ? 'Try a different search.' : 'No managers yet.'}
+            description={
+              query || filters.status !== 'ALL'
+                ? 'Try clearing your search or filter.'
+                : 'No managers yet.'
+            }
             compact
           />
         ) : (
-          (filterManagers(rows, query) as ManagerRow[]).map((m) => (
+          (filterManagers(rows, query, filters.status) as ManagerRow[]).map((m) => (
             <ManagerCard
               key={m.id}
               manager={m}
               onMoveGroup={canEditGroup ? () => openGroupEdit(m) : undefined}
               onManageGrants={canEditGroup ? () => setGrantsFor(m) : undefined}
+              onDeactivate={
+                canEditGroup && profile?.id !== m.id ? () => setDeactivateFor(m) : undefined
+              }
+              onReactivate={
+                canEditGroup && profile?.id !== m.id ? () => applyStatus(m, 'active') : undefined
+              }
             />
           ))
         )}
@@ -329,7 +397,7 @@ export function Managers() {
       {/* ── Desktop DataTable (≥ md) ── */}
       <div className="hidden md:block">
         <DataTable
-          rows={filterManagers(rows, query) as ManagerRow[]}
+          rows={filterManagers(rows, query, filters.status) as ManagerRow[]}
           loading={loading}
           empty="No managers found."
           columns={[
@@ -405,6 +473,24 @@ export function Managers() {
                         <Button size="sm" variant="outline" onClick={() => openGroupEdit(m)}>
                           Move group
                         </Button>
+                        {profile?.id !== m.id &&
+                          (isManagerActive(m.status) ? (
+                            <Button
+                              size="sm"
+                              variant="danger-ghost"
+                              onClick={() => setDeactivateFor(m)}
+                            >
+                              Deactivate
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => applyStatus(m, 'active')}
+                            >
+                              Reactivate
+                            </Button>
+                          ))}
                       </div>
                     ),
                   },
@@ -470,6 +556,40 @@ export function Managers() {
           </p>
           <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-200">
             All Recruiters under this Manager will be unassigned.
+          </div>
+        </div>
+      </Modal>
+
+      {/* Confirm account deactivation */}
+      <Modal
+        open={!!deactivateFor}
+        onClose={() => setDeactivateFor(null)}
+        title={`Deactivate ${deactivateFor?.full_name ?? deactivateFor?.email ?? 'manager'}?`}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setDeactivateFor(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              loading={statusBusy}
+              onClick={() => deactivateFor && applyStatus(deactivateFor, 'inactive')}
+            >
+              {statusBusy ? 'Deactivating' : 'Deactivate'}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          <p className="text-sm text-ink">
+            This disables{' '}
+            <span className="font-semibold">
+              {deactivateFor?.full_name ?? deactivateFor?.email ?? 'this manager'}
+            </span>
+            ’s account — they’ll be signed out and unable to log in until reactivated.
+          </p>
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-200">
+            You can only deactivate accounts you outrank, and never the last active super-admin.
           </div>
         </div>
       </Modal>

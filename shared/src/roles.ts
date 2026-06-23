@@ -76,7 +76,7 @@ export const DEVELOPER_CAPABILITIES = [
  * regardless of role. An ADMIN_TIER user toggles them per-account, and
  * `hasCapability` honours them for EVERY role (not just DEVELOPER).
  */
-export const PAGE_ACCESS_CAPABILITIES = ['invoices'] as const;
+export const PAGE_ACCESS_CAPABILITIES = [] as const;
 export type PageAccessCapability = (typeof PAGE_ACCESS_CAPABILITIES)[number];
 
 /** Every grantable capability — admin powers + page access. Stored in users.capabilities. */

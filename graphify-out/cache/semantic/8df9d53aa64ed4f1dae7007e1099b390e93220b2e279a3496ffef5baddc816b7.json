@@ -1,0 +1,49 @@
+{
+  "nodes": [
+    {
+      "id": "agents_ui_test_writer",
+      "label": "ui-test-writer agent",
+      "file_type": "document",
+      "source_file": ".claude/agents/ui-test-writer.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "agents_ui_test_writer_mocked_backend_playwright",
+      "label": "Mocked-backend Playwright pattern",
+      "file_type": "rationale",
+      "source_file": ".claude/agents/ui-test-writer.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "agents_ui_test_writer",
+      "target": "agents_ui_test_writer_mocked_backend_playwright",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": ".claude/agents/ui-test-writer.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "agents_ui_test_writer",
+      "target": "rules_frontend_responsive_lazy_routes",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.75,
+      "source_file": ".claude/agents/ui-test-writer.md",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": []
+}

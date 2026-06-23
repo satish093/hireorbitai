@@ -29,3 +29,6 @@ recruitersRouter.post(
   c.setPrimaryManager,
 );
 recruitersRouter.post('/:id/move-group', requireRole(...MANAGER_TIER), c.moveGroup);
+// Marketing status is a directory label — manager-tier and above, same as the
+// recruiter list view. The controller confines a group lead to their group.
+recruitersRouter.post('/:id/marketing-status', requireRole(...MANAGER_TIER), c.setMarketingStatus);

@@ -1,0 +1,162 @@
+{
+  "nodes": [
+    {
+      "id": "rbac_overview_client_overview",
+      "label": "Roles, Groups & Permissions client overview",
+      "file_type": "document",
+      "source_file": "docs/rbac-overview.html",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "rbac_overview_groups_pods",
+      "label": "Groups (pods) team boundary",
+      "file_type": "concept",
+      "source_file": "docs/rbac-overview.html",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "rbac_overview_chat_policy",
+      "label": "Chat / messaging directory policy",
+      "file_type": "concept",
+      "source_file": "docs/rbac-overview.html",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "rbac_overview_super_admin_protection",
+      "label": "Super Admin absolute + last-super-admin protection",
+      "file_type": "rationale",
+      "source_file": "docs/rbac-overview.html",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "rbac_overview_developer_support_exception",
+      "label": "Developer DM support exception",
+      "file_type": "rationale",
+      "source_file": "docs/rbac-overview.html",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "rbac_overview_client_overview",
+      "target": "rbac_overview_groups_pods",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/rbac-overview.html",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "rbac_overview_client_overview",
+      "target": "rbac_overview_chat_policy",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/rbac-overview.html",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "rbac_overview_client_overview",
+      "target": "rbac_overview_super_admin_protection",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/rbac-overview.html",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "rbac_overview_client_overview",
+      "target": "rbac_overview_developer_support_exception",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/rbac-overview.html",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "rbac_overview_client_overview",
+      "target": "rbac_matrix_permission_matrix",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/rbac-overview.html",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "rbac_overview_chat_policy",
+      "target": "rbac_matrix_messages_permission_policy",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "docs/rbac-overview.html",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "rbac_overview_groups_pods",
+      "target": "rbac_matrix_group_scoping",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "docs/rbac-overview.html",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "rbac_overview_super_admin_protection",
+      "target": "rbac_matrix_two_layer_authz",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "docs/rbac-overview.html",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "rbac_overview_developer_support_exception",
+      "target": "rbac_matrix_developer_capability",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "docs/rbac-overview.html",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "rbac_overview_super_admin_protection",
+      "target": "changelog_access_control_hardening",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.75,
+      "source_file": "docs/rbac-overview.html",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": []
+}

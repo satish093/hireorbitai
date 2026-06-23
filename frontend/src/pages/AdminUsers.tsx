@@ -187,7 +187,11 @@ export function AdminUsers() {
           />
           {!a.loading && <Pager page={a.page} totalPages={totalPages} onPage={a.setPage} />}
         </div>
-        <div className="hidden md:block overflow-hidden">
+        {/* No `overflow-hidden` here: an overflow-clipped ancestor becomes the
+            sticky pane's scroll container and breaks `position: sticky`, so the
+            detail would render at the top of the page instead of pinning to the
+            viewport when a row far down the list is clicked. */}
+        <div className="hidden md:block">
           {!isMobile && selectedUserId && (
             <div className="sticky top-4 h-[calc(100dvh-8rem)] overflow-hidden rounded-xl border border-border">
               <UserDetailPane

@@ -1,0 +1,4087 @@
+{
+  "E:\\claude\\hireorbitai\\.claude\\settings.json": {
+    "mtime": 1781372742.1731236,
+    "ast_hash": "9a0029566f97cc283097f038635cc713",
+    "semantic_hash": "9a0029566f97cc283097f038635cc713"
+  },
+  "E:\\claude\\hireorbitai\\.claude\\skills\\code-reviewer\\scripts\\code_quality_checker.py": {
+    "mtime": 1781372742.1741228,
+    "ast_hash": "ed184dda187572767ee0c4933d2a4b58",
+    "semantic_hash": "ed184dda187572767ee0c4933d2a4b58"
+  },
+  "E:\\claude\\hireorbitai\\.claude\\skills\\code-reviewer\\scripts\\pr_analyzer.py": {
+    "mtime": 1781372742.175122,
+    "ast_hash": "5b241100cd494261614be5a57ad94e3f",
+    "semantic_hash": "5b241100cd494261614be5a57ad94e3f"
+  },
+  "E:\\claude\\hireorbitai\\.claude\\skills\\code-reviewer\\scripts\\review_report_generator.py": {
+    "mtime": 1781372742.175122,
+    "ast_hash": "6f53be30da0ced865c42359e9f69277e",
+    "semantic_hash": "6f53be30da0ced865c42359e9f69277e"
+  },
+  "E:\\claude\\hireorbitai\\.husky\\commit-msg": {
+    "mtime": 1781372742.1791198,
+    "ast_hash": "9eae8f338c0aca6e967161ff42bfe4da",
+    "semantic_hash": "9eae8f338c0aca6e967161ff42bfe4da"
+  },
+  "E:\\claude\\hireorbitai\\.husky\\pre-commit": {
+    "mtime": 1781372742.1791198,
+    "ast_hash": "575c1975c36c5024c85fba544374f8e2",
+    "semantic_hash": "575c1975c36c5024c85fba544374f8e2"
+  },
+  "E:\\claude\\hireorbitai\\.mcp.json": {
+    "mtime": 1781372742.1791198,
+    "ast_hash": "5fb5efee98d33fef198f83f5efe27273",
+    "semantic_hash": "5fb5efee98d33fef198f83f5efe27273"
+  },
+  "E:\\claude\\hireorbitai\\backend\\eslint.config.mjs": {
+    "mtime": 1781372742.1831176,
+    "ast_hash": "f8c1374a8d70fcfd80313c6e29051de4",
+    "semantic_hash": "f8c1374a8d70fcfd80313c6e29051de4"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1700000000000_baseline.sql": {
+    "mtime": 1781372742.1831176,
+    "ast_hash": "8618f76ed80de1d3ab7e36e6975905cd",
+    "semantic_hash": "8618f76ed80de1d3ab7e36e6975905cd"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1700000000001_user_groups_extended.sql": {
+    "mtime": 1781372742.1831176,
+    "ast_hash": "72dc6f1c78666fa0c61a1765a4ff0f3e",
+    "semantic_hash": "72dc6f1c78666fa0c61a1765a4ff0f3e"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1700000000002_daily_digest_flag.sql": {
+    "mtime": 1781372742.1831176,
+    "ast_hash": "29a4adead65a56e9a27d769324b7ead5",
+    "semantic_hash": "29a4adead65a56e9a27d769324b7ead5"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1700000000003_source_company_self_heal.sql": {
+    "mtime": 1781372742.184117,
+    "ast_hash": "69f2fa13ab4bf23e5930c49b2446a85c",
+    "semantic_hash": "69f2fa13ab4bf23e5930c49b2446a85c"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1700000000004_messages_soft_delete_edit.sql": {
+    "mtime": 1781372742.184117,
+    "ast_hash": "8835a183695602239abdac1c3d66440e",
+    "semantic_hash": "8835a183695602239abdac1c3d66440e"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1700000000005_v_user_relationships.sql": {
+    "mtime": 1781372742.184117,
+    "ast_hash": "4046f3a07e2caefbeda29ec7e3bcf3e0",
+    "semantic_hash": "4046f3a07e2caefbeda29ec7e3bcf3e0"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1700000000006_user_tour_completed.sql": {
+    "mtime": 1781372742.184117,
+    "ast_hash": "245ba6a14305ea91587034aa852953d7",
+    "semantic_hash": "245ba6a14305ea91587034aa852953d7"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1700000000007_user_job_alerts.sql": {
+    "mtime": 1781372742.1850479,
+    "ast_hash": "8c210ade30a607dc2e5c750d3151955e",
+    "semantic_hash": "8c210ade30a607dc2e5c750d3151955e"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1700000000008_training_generated_content.sql": {
+    "mtime": 1781372742.1852803,
+    "ast_hash": "2aaa5fa41310bc9f370bbe8b7b79c804",
+    "semantic_hash": "2aaa5fa41310bc9f370bbe8b7b79c804"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1700000000009_training_versioning.sql": {
+    "mtime": 1781372742.1854756,
+    "ast_hash": "323ecc6be95a6ef1d57c28c07dd09ae7",
+    "semantic_hash": "323ecc6be95a6ef1d57c28c07dd09ae7"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1700000000010_job_recruiter_note.sql": {
+    "mtime": 1781372742.1854756,
+    "ast_hash": "de76ebda0f9704f6ea2382fd1fd4ca8e",
+    "semantic_hash": "de76ebda0f9704f6ea2382fd1fd4ca8e"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1700000000011_recruiter_goals.sql": {
+    "mtime": 1781372742.1854756,
+    "ast_hash": "9963d217bc36d10f2e75e14b915a207b",
+    "semantic_hash": "9963d217bc36d10f2e75e14b915a207b"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1700000000012_application_offer_expiry.sql": {
+    "mtime": 1781372742.1854756,
+    "ast_hash": "c6a2a9167672914dd0fc7705f3fd219b",
+    "semantic_hash": "c6a2a9167672914dd0fc7705f3fd219b"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1700000000013_task_views.sql": {
+    "mtime": 1781372742.1854756,
+    "ast_hash": "ab4279cb5cebd253e640cf3b7e333555",
+    "semantic_hash": "ab4279cb5cebd253e640cf3b7e333555"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1700000000014_task_subtasks.sql": {
+    "mtime": 1781372742.1854756,
+    "ast_hash": "c32963c5af4f013664976613896d77ab",
+    "semantic_hash": "c32963c5af4f013664976613896d77ab"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1700000000015_task_activity.sql": {
+    "mtime": 1781372742.1854756,
+    "ast_hash": "ba3efcae7a5a6272203c1788e4c06d1f",
+    "semantic_hash": "ba3efcae7a5a6272203c1788e4c06d1f"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1748000000000_work-auth-documents.sql": {
+    "mtime": 1781372742.1864932,
+    "ast_hash": "2484cedc9efb5c440754d4f63f8b4ef4",
+    "semantic_hash": "2484cedc9efb5c440754d4f63f8b4ef4"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1748100000000_ai-usage-logs.sql": {
+    "mtime": 1781372742.1864932,
+    "ast_hash": "4e9246a993cc4469a48f667ae237f3b0",
+    "semantic_hash": "4e9246a993cc4469a48f667ae237f3b0"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1748200000000_resume-parsed-profile.sql": {
+    "mtime": 1781372742.1864932,
+    "ast_hash": "4aa292d742ee62b315de4025f05fa348",
+    "semantic_hash": "4aa292d742ee62b315de4025f05fa348"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1748300000000_consultant-onboarded-at.sql": {
+    "mtime": 1781372742.1864932,
+    "ast_hash": "3715b36256f97e8a5da6dd8c884afb57",
+    "semantic_hash": "3715b36256f97e8a5da6dd8c884afb57"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1749000000000_invitation_parent.sql": {
+    "mtime": 1781372742.1864932,
+    "ast_hash": "cd4025defcf214b8990d23ddfa9c8ea8",
+    "semantic_hash": "cd4025defcf214b8990d23ddfa9c8ea8"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1750000000000_dev-settings.sql": {
+    "mtime": 1781372742.1864932,
+    "ast_hash": "329b57fb7ca7d91694679f9f22c7c36a",
+    "semantic_hash": "329b57fb7ca7d91694679f9f22c7c36a"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1751000000000_developer-capabilities.sql": {
+    "mtime": 1781372742.1874924,
+    "ast_hash": "69906378edca5e340c7534d1aa53714d",
+    "semantic_hash": "69906378edca5e340c7534d1aa53714d"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1751500000000_free-drivers.sql": {
+    "mtime": 1781372742.1874924,
+    "ast_hash": "77c47fa3ed908445e73ef7b007630188",
+    "semantic_hash": "77c47fa3ed908445e73ef7b007630188"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1752000000000_auth-sessions-refresh-lookup.sql": {
+    "mtime": 1781372742.1874924,
+    "ast_hash": "f6c94f209e2f53f62b1939eb1779773d",
+    "semantic_hash": "f6c94f209e2f53f62b1939eb1779773d"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1752500000000_jooble-only.sql": {
+    "mtime": 1781372742.1874924,
+    "ast_hash": "761a7d8a8f7eecb805412a4b6bc530a0",
+    "semantic_hash": "761a7d8a8f7eecb805412a4b6bc530a0"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1753000000000_calls.sql": {
+    "mtime": 1781372742.1874924,
+    "ast_hash": "1a0f19d7f65c440444710721fa164907",
+    "semantic_hash": "1a0f19d7f65c440444710721fa164907"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1753500000000_message-attachments.sql": {
+    "mtime": 1781372742.1884923,
+    "ast_hash": "47dc43f0d2768bfbbecd654df65fd0eb",
+    "semantic_hash": "47dc43f0d2768bfbbecd654df65fd0eb"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1754000000000_message-reply-to.sql": {
+    "mtime": 1781372742.1884923,
+    "ast_hash": "737f10edf9403663478c8df447133b55",
+    "semantic_hash": "737f10edf9403663478c8df447133b55"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1755000000000_messages-internal-note.sql": {
+    "mtime": 1781372742.1884923,
+    "ast_hash": "b60f2a55bf1590e86e07870dfd8d41e8",
+    "semantic_hash": "b60f2a55bf1590e86e07870dfd8d41e8"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1756000000000_conversation-states.sql": {
+    "mtime": 1781372742.1884923,
+    "ast_hash": "bcd3661c551c53ec2064d32cbd811825",
+    "semantic_hash": "bcd3661c551c53ec2064d32cbd811825"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1757000000000_support-tickets.sql": {
+    "mtime": 1781372742.1884923,
+    "ast_hash": "e89938574f9867e093b3608b2cf5a5d8",
+    "semantic_hash": "e89938574f9867e093b3608b2cf5a5d8"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1758000000000_manager_group_grants.sql": {
+    "mtime": 1781372742.1884923,
+    "ast_hash": "e69477f284f75e82cee59f283aabc9fd",
+    "semantic_hash": "e69477f284f75e82cee59f283aabc9fd"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1759000000000_interviews-notes.sql": {
+    "mtime": 1781372742.1894917,
+    "ast_hash": "3691e17be926f463ee56cfea7e69ffdd",
+    "semantic_hash": "3691e17be926f463ee56cfea7e69ffdd"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1760000000000_invoices.sql": {
+    "mtime": 1781372742.1894917,
+    "ast_hash": "0b90e1abbc2b3bb4f58813f2cfc6782e",
+    "semantic_hash": "0b90e1abbc2b3bb4f58813f2cfc6782e"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1761000000000_backfill-consultant-skills.sql": {
+    "mtime": 1781372742.1894917,
+    "ast_hash": "0e5d864a94b211b9152a00fa5a32d0a8",
+    "semantic_hash": "0e5d864a94b211b9152a00fa5a32d0a8"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1762000000000_dismissed-jobs.sql": {
+    "mtime": 1781372742.1894917,
+    "ast_hash": "85f9d9d145630bfa36692f34280d8502",
+    "semantic_hash": "85f9d9d145630bfa36692f34280d8502"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1763000000000_job-alert-prefs.sql": {
+    "mtime": 1781372742.1894917,
+    "ast_hash": "663b671d3afc669180bcc192c17568fa",
+    "semantic_hash": "663b671d3afc669180bcc192c17568fa"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1764000000000_invoice-amounts.sql": {
+    "mtime": 1781372742.1894917,
+    "ast_hash": "1e3dbd40f5be4102226e70ffa90f0840",
+    "semantic_hash": "1e3dbd40f5be4102226e70ffa90f0840"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1765000000000_user_groups_logo.sql": {
+    "mtime": 1781372742.1904907,
+    "ast_hash": "b1c70f1436931619cffb7a9d0c8c6370",
+    "semantic_hash": "b1c70f1436931619cffb7a9d0c8c6370"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1766000000000_invoices_bill_to.sql": {
+    "mtime": 1781372742.1904907,
+    "ast_hash": "c130d51aa93ababe38ca3bac78ae2a61",
+    "semantic_hash": "c130d51aa93ababe38ca3bac78ae2a61"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1767000000000_invoices_company_group.sql": {
+    "mtime": 1781372742.1904907,
+    "ast_hash": "0d8e83f329563f9da6b320e3e0b436cd",
+    "semantic_hash": "0d8e83f329563f9da6b320e3e0b436cd"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1768000000000_user_groups_email.sql": {
+    "mtime": 1781372742.1904907,
+    "ast_hash": "d29746ca7b81a532da1136fe1c66ce17",
+    "semantic_hash": "d29746ca7b81a532da1136fe1c66ce17"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1769000000000_invoices_draft_status.sql": {
+    "mtime": 1781372742.1904907,
+    "ast_hash": "f15d2ca94fde834e688766f03757b6a3",
+    "semantic_hash": "f15d2ca94fde834e688766f03757b6a3"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1770000000000_task_filters.sql": {
+    "mtime": 1781372742.1914904,
+    "ast_hash": "ed6d96f1fae3a15579720a6028224770",
+    "semantic_hash": "ed6d96f1fae3a15579720a6028224770"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1771000000000_training_achievements.sql": {
+    "mtime": 1781372742.1914904,
+    "ast_hash": "de78a87623423c636de94d31de9ccc78",
+    "semantic_hash": "de78a87623423c636de94d31de9ccc78"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1772000000000_training_workspace.sql": {
+    "mtime": 1781372742.1914904,
+    "ast_hash": "44669d824f20baa5b3ad5cee220de385",
+    "semantic_hash": "44669d824f20baa5b3ad5cee220de385"
+  },
+  "E:\\claude\\hireorbitai\\backend\\package.json": {
+    "mtime": 1781372742.1914904,
+    "ast_hash": "bec11eb4cd5454c5a1e13c532f42a98e",
+    "semantic_hash": "bec11eb4cd5454c5a1e13c532f42a98e"
+  },
+  "E:\\claude\\hireorbitai\\backend\\scripts\\bootstrap-admin.mjs": {
+    "mtime": 1781372742.1914904,
+    "ast_hash": "6a1a1d42f7ec70b8f57036ed2437ab3c",
+    "semantic_hash": "6a1a1d42f7ec70b8f57036ed2437ab3c"
+  },
+  "E:\\claude\\hireorbitai\\backend\\scripts\\migrate.mjs": {
+    "mtime": 1781372742.1924899,
+    "ast_hash": "7821a0cd625401066b112c71a6f1b11f",
+    "semantic_hash": "7821a0cd625401066b112c71a6f1b11f"
+  },
+  "E:\\claude\\hireorbitai\\backend\\scripts\\seed-leadership.mjs": {
+    "mtime": 1781372742.1924899,
+    "ast_hash": "8059b42c70f1cf8ab1fd2be7b0f48204",
+    "semantic_hash": "8059b42c70f1cf8ab1fd2be7b0f48204"
+  },
+  "E:\\claude\\hireorbitai\\backend\\scripts\\seed-mock-data.mjs": {
+    "mtime": 1781372742.1924899,
+    "ast_hash": "0169d7ab3912a4688ce229ae4dc130c8",
+    "semantic_hash": "0169d7ab3912a4688ce229ae4dc130c8"
+  },
+  "E:\\claude\\hireorbitai\\backend\\scripts\\seed-users.mjs": {
+    "mtime": 1781372742.1924899,
+    "ast_hash": "3f1a6edcd6ce68ee3372fa94d10db013",
+    "semantic_hash": "3f1a6edcd6ce68ee3372fa94d10db013"
+  },
+  "E:\\claude\\hireorbitai\\backend\\scripts\\test-ai-courses.mjs": {
+    "mtime": 1781372742.1934893,
+    "ast_hash": "45e1feae5f6445a6ae497b06ccd2a60a",
+    "semantic_hash": "45e1feae5f6445a6ae497b06ccd2a60a"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\config\\anthropic.ts": {
+    "mtime": 1781372742.1934893,
+    "ast_hash": "8956542d1a11e468404103832c509c71",
+    "semantic_hash": "8956542d1a11e468404103832c509c71"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\config\\auth.local.ts": {
+    "mtime": 1781372742.1934893,
+    "ast_hash": "beada0877e773a02d9e0179643068ff9",
+    "semantic_hash": "beada0877e773a02d9e0179643068ff9"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\config\\bootstrap.ts": {
+    "mtime": 1781372742.1944885,
+    "ast_hash": "86082144bc6d1124c319277ba23887c8",
+    "semantic_hash": "86082144bc6d1124c319277ba23887c8"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\config\\db.ts": {
+    "mtime": 1781372742.1944885,
+    "ast_hash": "38d863917bc8c281d482f85e16da6df9",
+    "semantic_hash": "38d863917bc8c281d482f85e16da6df9"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\config\\env.ts": {
+    "mtime": 1781372742.1944885,
+    "ast_hash": "d4715b12a5ac3fd477c7f473955f80fe",
+    "semantic_hash": "d4715b12a5ac3fd477c7f473955f80fe"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\config\\gemini.ts": {
+    "mtime": 1781372742.1944885,
+    "ast_hash": "ace60ed63569ea8f06ccaed89167dd73",
+    "semantic_hash": "ace60ed63569ea8f06ccaed89167dd73"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\config\\groq.ts": {
+    "mtime": 1781372742.195488,
+    "ast_hash": "3cde89dc302c8e1806897d1e45fb9c15",
+    "semantic_hash": "3cde89dc302c8e1806897d1e45fb9c15"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\config\\llamaparse.ts": {
+    "mtime": 1781372742.195488,
+    "ast_hash": "3ae756baf319add2631ec743e4bd4242",
+    "semantic_hash": "3ae756baf319add2631ec743e4bd4242"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\config\\logger.ts": {
+    "mtime": 1781372742.195488,
+    "ast_hash": "cc762319adc9fe5594b8dd6c2f4bfc3b",
+    "semantic_hash": "cc762319adc9fe5594b8dd6c2f4bfc3b"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\config\\storage.local.ts": {
+    "mtime": 1781372742.195488,
+    "ast_hash": "bf25e923c855e3ec908ae705767018cd",
+    "semantic_hash": "bf25e923c855e3ec908ae705767018cd"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\config\\userColumns.ts": {
+    "mtime": 1781372742.1964872,
+    "ast_hash": "94359698b59e8e8d5d8a8e28e0feddb9",
+    "semantic_hash": "94359698b59e8e8d5d8a8e28e0feddb9"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\activity.controller.ts": {
+    "mtime": 1781372742.1964872,
+    "ast_hash": "d1c09a553b5f92280d84d9f92dc60a1e",
+    "semantic_hash": "d1c09a553b5f92280d84d9f92dc60a1e"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\adminAI.controller.ts": {
+    "mtime": 1781372742.1964872,
+    "ast_hash": "2230e9ec76c9cf7756198a7b23cf9d42",
+    "semantic_hash": "2230e9ec76c9cf7756198a7b23cf9d42"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\adminAI.submitCode.test.ts": {
+    "mtime": 1781372742.1964872,
+    "ast_hash": "f5bcaee474c54e1e5796d6c0e236a4ad",
+    "semantic_hash": "f5bcaee474c54e1e5796d6c0e236a4ad"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\adminUsers.controller.ts": {
+    "mtime": 1781372742.1974869,
+    "ast_hash": "eb71167c048b7aeef3a63e6806817029",
+    "semantic_hash": "eb71167c048b7aeef3a63e6806817029"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\adminUsers.developerMove.test.ts": {
+    "mtime": 1781372742.1974869,
+    "ast_hash": "913cd59e5a8258233dc1f9e38449587b",
+    "semantic_hash": "913cd59e5a8258233dc1f9e38449587b"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\adminUsers.guards.test.ts": {
+    "mtime": 1781372742.1974869,
+    "ast_hash": "8b0d9ca251f6afdf20fa58ea8eead0d6",
+    "semantic_hash": "8b0d9ca251f6afdf20fa58ea8eead0d6"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\adminUsers.pageAccess.test.ts": {
+    "mtime": 1781372742.198486,
+    "ast_hash": "48a496c23dd31de55b5a6c1555638c71",
+    "semantic_hash": "48a496c23dd31de55b5a6c1555638c71"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\adminUsers.searchEscape.test.ts": {
+    "mtime": 1781372742.198486,
+    "ast_hash": "e5b6b05f0a6dc4d4a6b2bb4776a3fda0",
+    "semantic_hash": "e5b6b05f0a6dc4d4a6b2bb4776a3fda0"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\ai.controller.ts": {
+    "mtime": 1781372742.198486,
+    "ast_hash": "c66596bd6efc4a627a76a501d8628f45",
+    "semantic_hash": "c66596bd6efc4a627a76a501d8628f45"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\aiUsage.controller.ts": {
+    "mtime": 1781372742.198486,
+    "ast_hash": "27bdb3361bca5534f8285826bb9fad5c",
+    "semantic_hash": "27bdb3361bca5534f8285826bb9fad5c"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\applications.controller.ts": {
+    "mtime": 1781372742.198486,
+    "ast_hash": "cd2233f55d40e3b1626174efd7f98d52",
+    "semantic_hash": "cd2233f55d40e3b1626174efd7f98d52"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\applications.create.test.ts": {
+    "mtime": 1781372742.199486,
+    "ast_hash": "ef0328dad7cce8b3588d69ea28df1069",
+    "semantic_hash": "ef0328dad7cce8b3588d69ea28df1069"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\applications.list.test.ts": {
+    "mtime": 1781372742.199486,
+    "ast_hash": "5656a7170e7dda620770e2c4a9bfeb5f",
+    "semantic_hash": "5656a7170e7dda620770e2c4a9bfeb5f"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\applications.listMine.test.ts": {
+    "mtime": 1781372742.199486,
+    "ast_hash": "09a4a0f19ee0025701d644935dde335e",
+    "semantic_hash": "09a4a0f19ee0025701d644935dde335e"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\auth.controller.ts": {
+    "mtime": 1781372742.199486,
+    "ast_hash": "d7ae62e1348b28c008cd4b35d2fba54b",
+    "semantic_hash": "d7ae62e1348b28c008cd4b35d2fba54b"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\auth.edge.test.ts": {
+    "mtime": 1781372742.200485,
+    "ast_hash": "6230a08d5496c8e499ce142f58037c1e",
+    "semantic_hash": "6230a08d5496c8e499ce142f58037c1e"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\auth.jobAlertPrefs.test.ts": {
+    "mtime": 1781372742.200485,
+    "ast_hash": "e778f9daa2d9a54f860f961471b5c453",
+    "semantic_hash": "e778f9daa2d9a54f860f961471b5c453"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\auth.userColumnLeak.test.ts": {
+    "mtime": 1781372742.200485,
+    "ast_hash": "4a1d7f14e542751e9784981bd75c2894",
+    "semantic_hash": "4a1d7f14e542751e9784981bd75c2894"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\calls.controller.ts": {
+    "mtime": 1781372742.200485,
+    "ast_hash": "db0c2952e0edf14b6fe91e49b5094024",
+    "semantic_hash": "db0c2952e0edf14b6fe91e49b5094024"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\calls.deniedAudit.test.ts": {
+    "mtime": 1781372742.2014844,
+    "ast_hash": "e1b1822702355fa74163774f33b31fe2",
+    "semantic_hash": "e1b1822702355fa74163774f33b31fe2"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\calls.end.test.ts": {
+    "mtime": 1781372742.2019527,
+    "ast_hash": "8bcc5bd5609b4518ca71486e7b9aab46",
+    "semantic_hash": "8bcc5bd5609b4518ca71486e7b9aab46"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\calls.monthlyCap.test.ts": {
+    "mtime": 1781372742.2021303,
+    "ast_hash": "a48111d4194f98febb27da8320fd14a1",
+    "semantic_hash": "a48111d4194f98febb27da8320fd14a1"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\calls.multiTab.test.ts": {
+    "mtime": 1781372742.2021303,
+    "ast_hash": "e1a2337a1b214e1caf423eea500173d8",
+    "semantic_hash": "e1a2337a1b214e1caf423eea500173d8"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\calls.turnCredentials.test.ts": {
+    "mtime": 1781372742.2021303,
+    "ast_hash": "d15109b0dcc7af1df01c38efc877dbb2",
+    "semantic_hash": "d15109b0dcc7af1df01c38efc877dbb2"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\calls.usage.test.ts": {
+    "mtime": 1781372742.2021303,
+    "ast_hash": "f430f020c57f0bda5465e4d4728088ab",
+    "semantic_hash": "f430f020c57f0bda5465e4d4728088ab"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\clients.controller.ts": {
+    "mtime": 1781372742.2021303,
+    "ast_hash": "4180ca5bab2c5cc143b2608993b56f57",
+    "semantic_hash": "4180ca5bab2c5cc143b2608993b56f57"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\clients.ownership.test.ts": {
+    "mtime": 1781372742.2031484,
+    "ast_hash": "31ed1bda433710237e00363eb5a12f90",
+    "semantic_hash": "31ed1bda433710237e00363eb5a12f90"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\consultants.assignrecruiter.test.ts": {
+    "mtime": 1781372742.2031484,
+    "ast_hash": "9b7baca60df8a47877f45f8674bc0b3d",
+    "semantic_hash": "9b7baca60df8a47877f45f8674bc0b3d"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\consultants.controller.ts": {
+    "mtime": 1781372742.2031484,
+    "ast_hash": "a081c1e0d8f47836267f00a7434de528",
+    "semantic_hash": "a081c1e0d8f47836267f00a7434de528"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\consultants.ownership.test.ts": {
+    "mtime": 1781372742.2041476,
+    "ast_hash": "dee196acb4df5534fe55e016d0525127",
+    "semantic_hash": "dee196acb4df5534fe55e016d0525127"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\consultants.statusownership.test.ts": {
+    "mtime": 1781372742.2041476,
+    "ast_hash": "4f2b5506b2126ad4cfe602042c6c73a5",
+    "semantic_hash": "4f2b5506b2126ad4cfe602042c6c73a5"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\devAuth.controller.ts": {
+    "mtime": 1781372742.2041476,
+    "ast_hash": "1e32ba3e7531ac2d87b1fea20dc47f5e",
+    "semantic_hash": "1e32ba3e7531ac2d87b1fea20dc47f5e"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\devAuth.test.ts": {
+    "mtime": 1781372742.2041476,
+    "ast_hash": "0fb1a203575cb12e30dbabf822ceec25",
+    "semantic_hash": "0fb1a203575cb12e30dbabf822ceec25"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\devTools.controller.ts": {
+    "mtime": 1781372742.205147,
+    "ast_hash": "58bde80013fed7f5c60d8b0f81eddff0",
+    "semantic_hash": "58bde80013fed7f5c60d8b0f81eddff0"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\devTools.test.ts": {
+    "mtime": 1781372742.205147,
+    "ast_hash": "7a26d4de3bc6eb50f6de1ad6d2dfb7d1",
+    "semantic_hash": "7a26d4de3bc6eb50f6de1ad6d2dfb7d1"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\featureFlags.audit.test.ts": {
+    "mtime": 1781372742.205147,
+    "ast_hash": "2e1a63993b4faf9279882fb31ca62ad3",
+    "semantic_hash": "2e1a63993b4faf9279882fb31ca62ad3"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\featureFlags.controller.ts": {
+    "mtime": 1781372742.205147,
+    "ast_hash": "90a7d7e0b5feb157ed2fd605250039ff",
+    "semantic_hash": "90a7d7e0b5feb157ed2fd605250039ff"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\glassdoor.controller.ts": {
+    "mtime": 1781372742.205147,
+    "ast_hash": "70e431ff5b56d65f7d529e9d7fa85f98",
+    "semantic_hash": "70e431ff5b56d65f7d529e9d7fa85f98"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\groupMove.test.ts": {
+    "mtime": 1781372742.206146,
+    "ast_hash": "09c352c49d5ded6f13cfb577ad9eede5",
+    "semantic_hash": "09c352c49d5ded6f13cfb577ad9eede5"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\interviews.controller.ts": {
+    "mtime": 1781372742.206146,
+    "ast_hash": "41a301e41651c7a4ace624a179682239",
+    "semantic_hash": "41a301e41651c7a4ace624a179682239"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\interviews.notes.test.ts": {
+    "mtime": 1781372742.206146,
+    "ast_hash": "da10a6c7b2e5a696f26a5bc0ef4f751d",
+    "semantic_hash": "da10a6c7b2e5a696f26a5bc0ef4f751d"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\interviews.ownership.test.ts": {
+    "mtime": 1781372742.206146,
+    "ast_hash": "4d573da0924f02d475085791c18b9ec1",
+    "semantic_hash": "4d573da0924f02d475085791c18b9ec1"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\invitations.controller.ts": {
+    "mtime": 1781372742.2071457,
+    "ast_hash": "2f1ce6766b055ffe4db5da0d2991861e",
+    "semantic_hash": "2f1ce6766b055ffe4db5da0d2991861e"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\invitations.groupDefault.test.ts": {
+    "mtime": 1781372742.2071457,
+    "ast_hash": "faf5572bc60a7ea6fe9ca0f746c78d1a",
+    "semantic_hash": "faf5572bc60a7ea6fe9ca0f746c78d1a"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\invitations.selfParent.test.ts": {
+    "mtime": 1781372742.2071457,
+    "ast_hash": "947e6b21c78b5935eab659d094ad838d",
+    "semantic_hash": "947e6b21c78b5935eab659d094ad838d"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\invoices.controller.ts": {
+    "mtime": 1781372742.2071457,
+    "ast_hash": "7a531bf9533d079402275750fcccf34e",
+    "semantic_hash": "7a531bf9533d079402275750fcccf34e"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\invoices.document.test.ts": {
+    "mtime": 1781372742.208145,
+    "ast_hash": "39e3cf6852e8b3ba38f2c2fb8258c03f",
+    "semantic_hash": "39e3cf6852e8b3ba38f2c2fb8258c03f"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\invoices.guards.test.ts": {
+    "mtime": 1781372742.208145,
+    "ast_hash": "08d1c5e686d5af241c920e7409d9964b",
+    "semantic_hash": "08d1c5e686d5af241c920e7409d9964b"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\invoices.scope.test.ts": {
+    "mtime": 1781372742.208145,
+    "ast_hash": "198557ac2ad5532a49b193695f95d6aa",
+    "semantic_hash": "198557ac2ad5532a49b193695f95d6aa"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\jobSources.controller.ts": {
+    "mtime": 1781372742.208145,
+    "ast_hash": "916cccc62e34eae4c82490c0f6209bc6",
+    "semantic_hash": "916cccc62e34eae4c82490c0f6209bc6"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\jobs.controller.ts": {
+    "mtime": 1781372742.2091444,
+    "ast_hash": "71c60b6577a723027f02860c673c8ee0",
+    "semantic_hash": "71c60b6577a723027f02860c673c8ee0"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\jobs.coverLetter.test.ts": {
+    "mtime": 1781372742.2091444,
+    "ast_hash": "e51cd45da07553ef6fdc3e51aa9f1f19",
+    "semantic_hash": "e51cd45da07553ef6fdc3e51aa9f1f19"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\jobs.enrichOne.test.ts": {
+    "mtime": 1781372742.2091444,
+    "ast_hash": "86d49e23351be25350c047125a817df4",
+    "semantic_hash": "86d49e23351be25350c047125a817df4"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\jobs.idor.test.ts": {
+    "mtime": 1781372742.210144,
+    "ast_hash": "b1e04ad6ef70ca949f282be6241e0526",
+    "semantic_hash": "b1e04ad6ef70ca949f282be6241e0526"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\jobs.noteOwnership.test.ts": {
+    "mtime": 1781372742.210144,
+    "ast_hash": "2f04a89307f38b5cb789359a814d5eee",
+    "semantic_hash": "2f04a89307f38b5cb789359a814d5eee"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\jobs.skillgap.idor.test.ts": {
+    "mtime": 1781372742.210144,
+    "ast_hash": "b63e7891cb7958de0a8dcf66a0dd40c8",
+    "semantic_hash": "b63e7891cb7958de0a8dcf66a0dd40c8"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\managerGrants.controller.test.ts": {
+    "mtime": 1781372742.210144,
+    "ast_hash": "db7920b6a2e528837694aadfa72e18ff",
+    "semantic_hash": "db7920b6a2e528837694aadfa72e18ff"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\managers.controller.ts": {
+    "mtime": 1781372742.2111433,
+    "ast_hash": "951dc1ce38d3aaf73180a77d711286a8",
+    "semantic_hash": "951dc1ce38d3aaf73180a77d711286a8"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\massAssignment.test.ts": {
+    "mtime": 1781372742.2111433,
+    "ast_hash": "ef723d994c582f353370bf46e05cc77b",
+    "semantic_hash": "ef723d994c582f353370bf46e05cc77b"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\messageAttachments.controller.ts": {
+    "mtime": 1781372742.2111433,
+    "ast_hash": "f91298b4305a4f5481d308cc32d5b09e",
+    "semantic_hash": "f91298b4305a4f5481d308cc32d5b09e"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\messageAttachments.idor.test.ts": {
+    "mtime": 1781372742.2111433,
+    "ast_hash": "1d42b672d9ccd0cfd1f3a8561cde8454",
+    "semantic_hash": "1d42b672d9ccd0cfd1f3a8561cde8454"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\messages.controller.ts": {
+    "mtime": 1781372742.2121432,
+    "ast_hash": "9202a35538e6dab79c821a4ebd93c206",
+    "semantic_hash": "9202a35538e6dab79c821a4ebd93c206"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\messages.idor.test.ts": {
+    "mtime": 1781372742.2121432,
+    "ast_hash": "8de8e7eec1170349c56df13f996ae4bb",
+    "semantic_hash": "8de8e7eec1170349c56df13f996ae4bb"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\messages.internalNote.test.ts": {
+    "mtime": 1781372742.2131422,
+    "ast_hash": "ee87c68a345945e05d3e86f01f1d996a",
+    "semantic_hash": "ee87c68a345945e05d3e86f01f1d996a"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\realtime.controller.ts": {
+    "mtime": 1781372742.2131422,
+    "ast_hash": "bda928117c1f50737cc0a3719a73b041",
+    "semantic_hash": "bda928117c1f50737cc0a3719a73b041"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\recruiterGoals.controller.ts": {
+    "mtime": 1781372742.2131422,
+    "ast_hash": "95f8526964e2f44636514264569aebd7",
+    "semantic_hash": "95f8526964e2f44636514264569aebd7"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\recruiterGoals.ownership.test.ts": {
+    "mtime": 1781372742.2131422,
+    "ast_hash": "91792bf47ad5c602a4c61154a77e6e4b",
+    "semantic_hash": "91792bf47ad5c602a4c61154a77e6e4b"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\recruiters.controller.ts": {
+    "mtime": 1781372742.2141416,
+    "ast_hash": "042ad1fe424b8c7cda4d7c0ba485b248",
+    "semantic_hash": "042ad1fe424b8c7cda4d7c0ba485b248"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\recruiters.enroll.test.ts": {
+    "mtime": 1781372742.2141416,
+    "ast_hash": "0a558cefd91d6b16fbcaf47801d178bd",
+    "semantic_hash": "0a558cefd91d6b16fbcaf47801d178bd"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\recruiters.onboardingSelfAssign.test.ts": {
+    "mtime": 1781372742.2141416,
+    "ast_hash": "63ddc02d8b6d5e266a37ffc52aa76682",
+    "semantic_hash": "63ddc02d8b6d5e266a37ffc52aa76682"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\reminders.controller.ts": {
+    "mtime": 1781372742.2141416,
+    "ast_hash": "6355a7defea9a44373b48668c9619b19",
+    "semantic_hash": "6355a7defea9a44373b48668c9619b19"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\reports.controller.ts": {
+    "mtime": 1781372742.2151415,
+    "ast_hash": "0bc9ee580981a27c7d036019fd51ed4a",
+    "semantic_hash": "0bc9ee580981a27c7d036019fd51ed4a"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\reports.submissions.test.ts": {
+    "mtime": 1781372742.2151415,
+    "ast_hash": "6aa219029712e9f19c88109ddbd524f5",
+    "semantic_hash": "6aa219029712e9f19c88109ddbd524f5"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\resumes.controller.ts": {
+    "mtime": 1781372742.2161405,
+    "ast_hash": "e9b70d2f574f4d97e247661820018014",
+    "semantic_hash": "e9b70d2f574f4d97e247661820018014"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\resumes.idor.test.ts": {
+    "mtime": 1781372742.2161405,
+    "ast_hash": "2de4a36994f493a5b38b0e9751e8c2cc",
+    "semantic_hash": "2de4a36994f493a5b38b0e9751e8c2cc"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\support.controller.test.ts": {
+    "mtime": 1781372742.2161405,
+    "ast_hash": "a8ea9ce59d5fcc4a1594882690224d22",
+    "semantic_hash": "a8ea9ce59d5fcc4a1594882690224d22"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\support.controller.ts": {
+    "mtime": 1781372742.2161405,
+    "ast_hash": "8ca6090f6eacdafc6d8bc2b42596bdce",
+    "semantic_hash": "8ca6090f6eacdafc6d8bc2b42596bdce"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\taskAttachments.controller.ts": {
+    "mtime": 1781372742.2171397,
+    "ast_hash": "a8f206d114fa0bfb6635a80d16c1fd83",
+    "semantic_hash": "a8f206d114fa0bfb6635a80d16c1fd83"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\taskComments.controller.ts": {
+    "mtime": 1781372742.2171397,
+    "ast_hash": "b428ace35143df738d6f61570a7f2d9a",
+    "semantic_hash": "b428ace35143df738d6f61570a7f2d9a"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\taskFilters.controller.ts": {
+    "mtime": 1781372742.2171397,
+    "ast_hash": "b29b39998414b4914f153219c610b6c5",
+    "semantic_hash": "b29b39998414b4914f153219c610b6c5"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\taskViews.controller.ts": {
+    "mtime": 1781372742.2171397,
+    "ast_hash": "e1bc933151701924f42f91c5fb7fd18c",
+    "semantic_hash": "e1bc933151701924f42f91c5fb7fd18c"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\tasks.controller.ts": {
+    "mtime": 1781372742.2181346,
+    "ast_hash": "aa3cae614247ec83a0d15670014529d0",
+    "semantic_hash": "aa3cae614247ec83a0d15670014529d0"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\tasks.ownership.test.ts": {
+    "mtime": 1781372742.2185702,
+    "ast_hash": "07188a2c3b20c1da7517aa678a9cde3d",
+    "semantic_hash": "07188a2c3b20c1da7517aa678a9cde3d"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\training.aiCredentialIsolation.test.ts": {
+    "mtime": 1781372742.2188897,
+    "ast_hash": "48cff3cebef7a9c0b14e534d7e181747",
+    "semantic_hash": "48cff3cebef7a9c0b14e534d7e181747"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\training.assignmentOwnership.test.ts": {
+    "mtime": 1781372742.2188897,
+    "ast_hash": "86a8c413a111859990912636766bdd86",
+    "semantic_hash": "86a8c413a111859990912636766bdd86"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\training.coach.test.ts": {
+    "mtime": 1781372742.2188897,
+    "ast_hash": "2596dace9ff067f38baf8dbed41f50fa",
+    "semantic_hash": "2596dace9ff067f38baf8dbed41f50fa"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\training.controller.ts": {
+    "mtime": 1781372742.219903,
+    "ast_hash": "fb352e99f039cf0c147b047b1b87e308",
+    "semantic_hash": "fb352e99f039cf0c147b047b1b87e308"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\training.getCourse.test.ts": {
+    "mtime": 1781372742.219903,
+    "ast_hash": "36eb81a328cee2d5cb0d9082a8231416",
+    "semantic_hash": "36eb81a328cee2d5cb0d9082a8231416"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\training.scope.test.ts": {
+    "mtime": 1781372742.219903,
+    "ast_hash": "72b9c46bf66bfd589a16d590f2ac6591",
+    "semantic_hash": "72b9c46bf66bfd589a16d590f2ac6591"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\training.urlValidation.test.ts": {
+    "mtime": 1781372742.219903,
+    "ast_hash": "4b666b520ccc7fd4bcbfd7210495a03f",
+    "semantic_hash": "4b666b520ccc7fd4bcbfd7210495a03f"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\trainingWorkspace.controller.ts": {
+    "mtime": 1781372742.2209022,
+    "ast_hash": "e57319f934ec2798c0a7a4313fda9c7b",
+    "semantic_hash": "e57319f934ec2798c0a7a4313fda9c7b"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\userGroups.controller.ts": {
+    "mtime": 1781372742.2209022,
+    "ast_hash": "0bb388f7ef94521ee8e5d8cbea0e8f40",
+    "semantic_hash": "0bb388f7ef94521ee8e5d8cbea0e8f40"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\userGroups.draft.test.ts": {
+    "mtime": 1781372742.2209022,
+    "ast_hash": "05d8a2c71a58702b34b955ba92f15c96",
+    "semantic_hash": "05d8a2c71a58702b34b955ba92f15c96"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\userGroups.listScope.test.ts": {
+    "mtime": 1781372742.2219012,
+    "ast_hash": "6d70458d320b970115d87ea50314566a",
+    "semantic_hash": "6d70458d320b970115d87ea50314566a"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\userGroups.logo.test.ts": {
+    "mtime": 1781372742.2219012,
+    "ast_hash": "cd05795cf323d2aa334b04b0b66f7e8d",
+    "semantic_hash": "cd05795cf323d2aa334b04b0b66f7e8d"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\userGroups.rank.test.ts": {
+    "mtime": 1781372742.2219012,
+    "ast_hash": "d2ae71d01c1589653a899b663c3e024f",
+    "semantic_hash": "d2ae71d01c1589653a899b663c3e024f"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\users.controller.ts": {
+    "mtime": 1781372742.2219012,
+    "ast_hash": "5a868ff57a90126bc7d8410f26748249",
+    "semantic_hash": "5a868ff57a90126bc7d8410f26748249"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\users.lifecycle.test.ts": {
+    "mtime": 1781372742.2219012,
+    "ast_hash": "f19378ec86aec0ad10fdf2ddb3478b91",
+    "semantic_hash": "f19378ec86aec0ad10fdf2ddb3478b91"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\vendors.controller.ts": {
+    "mtime": 1781372742.2229009,
+    "ast_hash": "fe59a7953710217188c533b93d82f414",
+    "semantic_hash": "fe59a7953710217188c533b93d82f414"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\vendors.ownership.test.ts": {
+    "mtime": 1781372742.2229009,
+    "ast_hash": "3dfd3fb929c6bff3551002a368eb7d68",
+    "semantic_hash": "3dfd3fb929c6bff3551002a368eb7d68"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\workAuthDocs.controller.ts": {
+    "mtime": 1781372742.2229009,
+    "ast_hash": "73f89e6886096730331de301459e16a4",
+    "semantic_hash": "73f89e6886096730331de301459e16a4"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\controllers\\workAuthDocs.ownership.test.ts": {
+    "mtime": 1781372742.2229009,
+    "ast_hash": "5303214ccf60b673d789df8def384152",
+    "semantic_hash": "5303214ccf60b673d789df8def384152"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\jobs\\attachments-purge.job.ts": {
+    "mtime": 1781372742.2239003,
+    "ast_hash": "bbfbfa065924e2f1e722849d7d9abe20",
+    "semantic_hash": "bbfbfa065924e2f1e722849d7d9abe20"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\jobs\\daily-digest.job.ts": {
+    "mtime": 1781372742.2239003,
+    "ast_hash": "684e9c6765861cf3123be4050a0a9329",
+    "semantic_hash": "684e9c6765861cf3123be4050a0a9329"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\jobs\\index.ts": {
+    "mtime": 1781372742.2239003,
+    "ast_hash": "0d37cbf435526d1b9ca197f917061b5c",
+    "semantic_hash": "0d37cbf435526d1b9ca197f917061b5c"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\jobs\\jobs-registry.test.ts": {
+    "mtime": 1781372742.2239003,
+    "ast_hash": "5d2190a08ab7ed999da212cd49a39e38",
+    "semantic_hash": "5d2190a08ab7ed999da212cd49a39e38"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\jobs\\jobs-sync.job.ts": {
+    "mtime": 1781372742.2239003,
+    "ast_hash": "7bc97f7a4dd4bf1e61662b481590bb93",
+    "semantic_hash": "7bc97f7a4dd4bf1e61662b481590bb93"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\jobs\\reminders.job.ts": {
+    "mtime": 1781372742.2248995,
+    "ast_hash": "a930db8c67ba4f0c25ab697d0eaed584",
+    "semantic_hash": "a930db8c67ba4f0c25ab697d0eaed584"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\jobs\\scheduler.ts": {
+    "mtime": 1781372742.2248995,
+    "ast_hash": "975faca044c64789d5a657acd272b1a5",
+    "semantic_hash": "975faca044c64789d5a657acd272b1a5"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\jobs\\sessions-purge.job.ts": {
+    "mtime": 1781372742.2248995,
+    "ast_hash": "7bf728084cd028910a6b266a73df8d03",
+    "semantic_hash": "7bf728084cd028910a6b266a73df8d03"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\jobs\\work-auth-expiry.job.ts": {
+    "mtime": 1781372742.2248995,
+    "ast_hash": "8039bb24ca17a2c2817ef6f529377607",
+    "semantic_hash": "8039bb24ca17a2c2817ef6f529377607"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\middleware\\auth.ts": {
+    "mtime": 1781372742.2258995,
+    "ast_hash": "9b0077e7faede14d116ef9f2932e490b",
+    "semantic_hash": "9b0077e7faede14d116ef9f2932e490b"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\middleware\\capability.guard.test.ts": {
+    "mtime": 1781372742.2258995,
+    "ast_hash": "44aec5d112114fa2172aa898927a011f",
+    "semantic_hash": "44aec5d112114fa2172aa898927a011f"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\middleware\\devtools.guard.test.ts": {
+    "mtime": 1781372742.2258995,
+    "ast_hash": "c1929186aa93f2c7437ffc6a6c98e9c4",
+    "semantic_hash": "c1929186aa93f2c7437ffc6a6c98e9c4"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\middleware\\errorHandler.ts": {
+    "mtime": 1781372742.2258995,
+    "ast_hash": "738ecda6bbaf553e83684d90c2ccb94b",
+    "semantic_hash": "738ecda6bbaf553e83684d90c2ccb94b"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\middleware\\featureFlag.ts": {
+    "mtime": 1781372742.2258995,
+    "ast_hash": "b83385164f62a36374b30f383fe580d4",
+    "semantic_hash": "b83385164f62a36374b30f383fe580d4"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\middleware\\rbac.aiCredentials.test.ts": {
+    "mtime": 1781372742.2268982,
+    "ast_hash": "f1898f2da4ae6470e57a84ff85719031",
+    "semantic_hash": "f1898f2da4ae6470e57a84ff85719031"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\middleware\\rbac.workspaceWide.test.ts": {
+    "mtime": 1781372742.2268982,
+    "ast_hash": "0b51b77b589b5fb71ab374e1efd95163",
+    "semantic_hash": "0b51b77b589b5fb71ab374e1efd95163"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\middleware\\upload.magic.test.ts": {
+    "mtime": 1781372742.2268982,
+    "ast_hash": "aac8760aaa16da7ccb0ae0b2cc74726c",
+    "semantic_hash": "aac8760aaa16da7ccb0ae0b2cc74726c"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\middleware\\upload.scan.test.ts": {
+    "mtime": 1781372742.2268982,
+    "ast_hash": "53d1b8f4ad471cf8a94391719db18a62",
+    "semantic_hash": "53d1b8f4ad471cf8a94391719db18a62"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\middleware\\upload.ts": {
+    "mtime": 1781372742.2268982,
+    "ast_hash": "c5fdac2d8b4e9710a5c9b989d07f6150",
+    "semantic_hash": "c5fdac2d8b4e9710a5c9b989d07f6150"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\repositories\\applications.repository.ts": {
+    "mtime": 1781372742.227898,
+    "ast_hash": "120e9eb1cfa0a2982a0578c87d338b8d",
+    "semantic_hash": "120e9eb1cfa0a2982a0578c87d338b8d"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\repositories\\authSessions.repository.ts": {
+    "mtime": 1781372742.227898,
+    "ast_hash": "34b28c73bdc4641bbcb9d7435ffa096f",
+    "semantic_hash": "34b28c73bdc4641bbcb9d7435ffa096f"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\repositories\\clients.repository.ts": {
+    "mtime": 1781372742.227898,
+    "ast_hash": "437ed0f662cb0ce9f13fbbd5948c5bee",
+    "semantic_hash": "437ed0f662cb0ce9f13fbbd5948c5bee"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\repositories\\consultants.repository.ts": {
+    "mtime": 1781372742.227898,
+    "ast_hash": "90372855f5c0c05854ea51671a2743dd",
+    "semantic_hash": "90372855f5c0c05854ea51671a2743dd"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\repositories\\jobs.repository.ts": {
+    "mtime": 1781372742.2288847,
+    "ast_hash": "ac258965ddb4e665aa1cc385471883bc",
+    "semantic_hash": "ac258965ddb4e665aa1cc385471883bc"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\repositories\\recruiters.repository.ts": {
+    "mtime": 1781372742.2288847,
+    "ast_hash": "b90f2198bd70b85294d67e2a33e1ecf7",
+    "semantic_hash": "b90f2198bd70b85294d67e2a33e1ecf7"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\repositories\\training.repository.ts": {
+    "mtime": 1781372742.2288847,
+    "ast_hash": "3dede82d9e529b5b9508708c398f49af",
+    "semantic_hash": "3dede82d9e529b5b9508708c398f49af"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\repositories\\users.repository.ts": {
+    "mtime": 1781372742.2288847,
+    "ast_hash": "0ca65d4fbabc81753c143fe31d195e65",
+    "semantic_hash": "0ca65d4fbabc81753c143fe31d195e65"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\repositories\\vendors.repository.ts": {
+    "mtime": 1781372742.2288847,
+    "ast_hash": "468a838269415b4a80a49dc58a5b26e4",
+    "semantic_hash": "468a838269415b4a80a49dc58a5b26e4"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\roles.test.ts": {
+    "mtime": 1781372742.2298965,
+    "ast_hash": "9c0dd5db41f3109d464390713cb2f5c1",
+    "semantic_hash": "9c0dd5db41f3109d464390713cb2f5c1"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\routes\\activity.routes.ts": {
+    "mtime": 1781372742.2298965,
+    "ast_hash": "eb77e0f571789342eccef16e2a3239d8",
+    "semantic_hash": "eb77e0f571789342eccef16e2a3239d8"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\routes\\adminUsers.routes.ts": {
+    "mtime": 1781372742.2298965,
+    "ast_hash": "9e8dfa85f1a0f217de66e1428192bdfc",
+    "semantic_hash": "9e8dfa85f1a0f217de66e1428192bdfc"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\routes\\ai.routes.ts": {
+    "mtime": 1781372742.2298965,
+    "ast_hash": "8132ec5816fb2f905e06f244c4a0b0f9",
+    "semantic_hash": "8132ec5816fb2f905e06f244c4a0b0f9"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\routes\\aiUsage.routes.ts": {
+    "mtime": 1781372742.2298965,
+    "ast_hash": "59bce8d91ace05f8a6262eaa694d67c6",
+    "semantic_hash": "59bce8d91ace05f8a6262eaa694d67c6"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\routes\\applications.routes.ts": {
+    "mtime": 1781372742.2298965,
+    "ast_hash": "fc59f1709c4a26c3045ea67728e0fa5b",
+    "semantic_hash": "fc59f1709c4a26c3045ea67728e0fa5b"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\routes\\auth.routes.ts": {
+    "mtime": 1781372742.2308962,
+    "ast_hash": "e74d9ae289e9f6fdf686190005e70cc8",
+    "semantic_hash": "e74d9ae289e9f6fdf686190005e70cc8"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\routes\\calls.routes.ts": {
+    "mtime": 1781372742.2308962,
+    "ast_hash": "01095fbca82ef4c6faf74b33c35a9f0b",
+    "semantic_hash": "01095fbca82ef4c6faf74b33c35a9f0b"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\routes\\clients.routes.ts": {
+    "mtime": 1781372742.2308962,
+    "ast_hash": "9060b25e47c03b84778c5272941b1995",
+    "semantic_hash": "9060b25e47c03b84778c5272941b1995"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\routes\\consultants.routes.ts": {
+    "mtime": 1781372742.2308962,
+    "ast_hash": "8bd5e1fa5223f9c611ffcb01f6891da6",
+    "semantic_hash": "8bd5e1fa5223f9c611ffcb01f6891da6"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\routes\\devAuth.routes.ts": {
+    "mtime": 1781372742.2308962,
+    "ast_hash": "36d63f176c3b8ae44542c7e4d40c6c6c",
+    "semantic_hash": "36d63f176c3b8ae44542c7e4d40c6c6c"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\routes\\devTools.routes.ts": {
+    "mtime": 1781372742.2318964,
+    "ast_hash": "40887a7596be3ff9727c546179765fcc",
+    "semantic_hash": "40887a7596be3ff9727c546179765fcc"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\routes\\featureFlags.routes.test.ts": {
+    "mtime": 1781372742.2318964,
+    "ast_hash": "dcebd0c10cf3cf6381031e5da2ccf607",
+    "semantic_hash": "dcebd0c10cf3cf6381031e5da2ccf607"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\routes\\featureFlags.routes.ts": {
+    "mtime": 1781372742.2318964,
+    "ast_hash": "e5a4fbb5342033442b4fec4ccd3f68c2",
+    "semantic_hash": "e5a4fbb5342033442b4fec4ccd3f68c2"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\routes\\files.routes.ts": {
+    "mtime": 1781372742.2318964,
+    "ast_hash": "1fdd81709716ecd903acc57114de54ce",
+    "semantic_hash": "1fdd81709716ecd903acc57114de54ce"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\routes\\glassdoor.routes.ts": {
+    "mtime": 1781372742.2318964,
+    "ast_hash": "77703562390d9d788c5e8719fd6b8fce",
+    "semantic_hash": "77703562390d9d788c5e8719fd6b8fce"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\routes\\index.ts": {
+    "mtime": 1781372742.2318964,
+    "ast_hash": "f9e32a0ab67af4310d3ef8d89fc78110",
+    "semantic_hash": "f9e32a0ab67af4310d3ef8d89fc78110"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\routes\\interviews.routes.ts": {
+    "mtime": 1781372742.2328956,
+    "ast_hash": "456ce995027c7f14e4e5eb22435141c0",
+    "semantic_hash": "456ce995027c7f14e4e5eb22435141c0"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\routes\\invitations.routes.ts": {
+    "mtime": 1781372742.2328956,
+    "ast_hash": "2c310bc5271ff11396b33f77afadf5af",
+    "semantic_hash": "2c310bc5271ff11396b33f77afadf5af"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\routes\\invoices.routes.ts": {
+    "mtime": 1781372742.2328956,
+    "ast_hash": "49e366b415bd47b427c819a8cc13b2b1",
+    "semantic_hash": "49e366b415bd47b427c819a8cc13b2b1"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\routes\\jobs.routes.ts": {
+    "mtime": 1781372742.2328956,
+    "ast_hash": "15a79537ae2d1ea28881e8695ffeb10d",
+    "semantic_hash": "15a79537ae2d1ea28881e8695ffeb10d"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\routes\\managers.routes.ts": {
+    "mtime": 1781372742.2328956,
+    "ast_hash": "247de2d74ae7471625c2f9c7a40232f9",
+    "semantic_hash": "247de2d74ae7471625c2f9c7a40232f9"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\routes\\messages.routes.ts": {
+    "mtime": 1781372742.2328956,
+    "ast_hash": "414dd7f361318bb1e7af97169d98728d",
+    "semantic_hash": "414dd7f361318bb1e7af97169d98728d"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\routes\\realtime.routes.ts": {
+    "mtime": 1781372742.2338946,
+    "ast_hash": "923dd948b03a15fc343476753d96cf36",
+    "semantic_hash": "923dd948b03a15fc343476753d96cf36"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\routes\\recruiterGoals.routes.ts": {
+    "mtime": 1781372742.2338946,
+    "ast_hash": "fc726cc958bcdd57326d9665a9f83e69",
+    "semantic_hash": "fc726cc958bcdd57326d9665a9f83e69"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\routes\\recruiters.routes.ts": {
+    "mtime": 1781372742.2338946,
+    "ast_hash": "9dfdbcdfb39f26ee730509d79cd8cc69",
+    "semantic_hash": "9dfdbcdfb39f26ee730509d79cd8cc69"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\routes\\reminders.routes.ts": {
+    "mtime": 1781372742.2338946,
+    "ast_hash": "993764b5f9011b5a9dc838ecf7ccd2be",
+    "semantic_hash": "993764b5f9011b5a9dc838ecf7ccd2be"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\routes\\reports.routes.ts": {
+    "mtime": 1781372742.2338946,
+    "ast_hash": "c0afaf5ed5aaa4ebd2c9f16385314a2a",
+    "semantic_hash": "c0afaf5ed5aaa4ebd2c9f16385314a2a"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\routes\\resumes.routes.ts": {
+    "mtime": 1781372742.2348807,
+    "ast_hash": "c085ea422e6f2de79b8d8ed403c4e52f",
+    "semantic_hash": "c085ea422e6f2de79b8d8ed403c4e52f"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\routes\\support.routes.ts": {
+    "mtime": 1781372742.2352097,
+    "ast_hash": "c0434b5ccc50256fb88c67c1d5b3a791",
+    "semantic_hash": "c0434b5ccc50256fb88c67c1d5b3a791"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\routes\\taskViews.routes.ts": {
+    "mtime": 1781372742.23533,
+    "ast_hash": "d6f41960c66cf0fcfc568b459bc3bb18",
+    "semantic_hash": "d6f41960c66cf0fcfc568b459bc3bb18"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\routes\\tasks.routes.ts": {
+    "mtime": 1781372742.2355034,
+    "ast_hash": "50fc9c3e641a050c68295b8be08f550d",
+    "semantic_hash": "50fc9c3e641a050c68295b8be08f550d"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\routes\\training.routes.ts": {
+    "mtime": 1781372742.2355034,
+    "ast_hash": "5800e1b6adda9ecfc010b83464ba8995",
+    "semantic_hash": "5800e1b6adda9ecfc010b83464ba8995"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\routes\\userGroups.routes.ts": {
+    "mtime": 1781372742.2355034,
+    "ast_hash": "7fbf0e6e7a1f24e25d6e0dfac126d49a",
+    "semantic_hash": "7fbf0e6e7a1f24e25d6e0dfac126d49a"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\routes\\users.routes.ts": {
+    "mtime": 1781372742.2355034,
+    "ast_hash": "0a5cef3950d8dbc0610e495ecea0d23c",
+    "semantic_hash": "0a5cef3950d8dbc0610e495ecea0d23c"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\routes\\vendors.routes.ts": {
+    "mtime": 1781372742.2355034,
+    "ast_hash": "db4c594a3a755f3f6678f755a2527c77",
+    "semantic_hash": "db4c594a3a755f3f6678f755a2527c77"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\routes\\workAuthDocs.routes.ts": {
+    "mtime": 1781372742.2365162,
+    "ast_hash": "02c1b4d3ad4702c315549337547d98aa",
+    "semantic_hash": "02c1b4d3ad4702c315549337547d98aa"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\security\\authLifecycle.atomicity.test.ts": {
+    "mtime": 1781372742.2365162,
+    "ast_hash": "c4ba76df6008648991604d24ace07f3b",
+    "semantic_hash": "c4ba76df6008648991604d24ace07f3b"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\security\\patterns.test.ts": {
+    "mtime": 1781372742.2365162,
+    "ast_hash": "c49ee7037ae67849e5f7fe3111906bfa",
+    "semantic_hash": "c49ee7037ae67849e5f7fe3111906bfa"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\server.ts": {
+    "mtime": 1781372742.2365162,
+    "ast_hash": "e464cc6af78d54f1136974c1b2422504",
+    "semantic_hash": "e464cc6af78d54f1136974c1b2422504"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\services\\ai.service.ts": {
+    "mtime": 1781372742.2375157,
+    "ast_hash": "012fd948cf4577a9254727d78b99f220",
+    "semantic_hash": "012fd948cf4577a9254727d78b99f220"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\services\\aiCache.ts": {
+    "mtime": 1781372742.2375157,
+    "ast_hash": "449ba6e11f9bce8c890bf7abef519718",
+    "semantic_hash": "449ba6e11f9bce8c890bf7abef519718"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\services\\aiLogo.service.test.ts": {
+    "mtime": 1781372742.238505,
+    "ast_hash": "5d13e4318ca623257b1080b42f1096b2",
+    "semantic_hash": "5d13e4318ca623257b1080b42f1096b2"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\services\\aiLogo.service.ts": {
+    "mtime": 1781372742.238505,
+    "ast_hash": "6983519c1b9a9a355c2e2c940fa42e0d",
+    "semantic_hash": "6983519c1b9a9a355c2e2c940fa42e0d"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\services\\aiPricing.test.ts": {
+    "mtime": 1781372742.238505,
+    "ast_hash": "25e6131aae8d267979c7a6426ed8e29f",
+    "semantic_hash": "25e6131aae8d267979c7a6426ed8e29f"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\services\\aiPricing.ts": {
+    "mtime": 1781372742.238505,
+    "ast_hash": "bcaa69a621eff0038be952b271f7c8e7",
+    "semantic_hash": "bcaa69a621eff0038be952b271f7c8e7"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\services\\aiUsage.ts": {
+    "mtime": 1781372742.238505,
+    "ast_hash": "d946fa5e9ab3268f8b588b2c5f21956e",
+    "semantic_hash": "d946fa5e9ab3268f8b588b2c5f21956e"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\services\\atsScore.service.ts": {
+    "mtime": 1781372742.238505,
+    "ast_hash": "6db3027cd18ac9d8b2e928851fdebb11",
+    "semantic_hash": "6db3027cd18ac9d8b2e928851fdebb11"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\services\\audit.service.ts": {
+    "mtime": 1781372742.2395144,
+    "ast_hash": "da71a9dc406138218cbe518279db4f49",
+    "semantic_hash": "da71a9dc406138218cbe518279db4f49"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\services\\auth.lifecycle.resetTokens.test.ts": {
+    "mtime": 1781372742.2395144,
+    "ast_hash": "c67e1347f72a336ca00dde61193aceb5",
+    "semantic_hash": "c67e1347f72a336ca00dde61193aceb5"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\services\\auth.service.ts": {
+    "mtime": 1781372742.2395144,
+    "ast_hash": "3b69f52ac515543b01e79a8a3ec34433",
+    "semantic_hash": "3b69f52ac515543b01e79a8a3ec34433"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\services\\brevo.service.ts": {
+    "mtime": 1781372742.2405138,
+    "ast_hash": "4e56a165171b9dc6e80449a60071e867",
+    "semantic_hash": "4e56a165171b9dc6e80449a60071e867"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\services\\callsBudget.service.test.ts": {
+    "mtime": 1781372742.2405138,
+    "ast_hash": "05176b948bd886687859cca3b7c036d7",
+    "semantic_hash": "05176b948bd886687859cca3b7c036d7"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\services\\callsBudget.service.ts": {
+    "mtime": 1781372742.2405138,
+    "ast_hash": "f6cb2105b7ad78d4dc8cccd653365d25",
+    "semantic_hash": "f6cb2105b7ad78d4dc8cccd653365d25"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\services\\clamav.service.ts": {
+    "mtime": 1781372742.2405138,
+    "ast_hash": "9af2b52210d9a8bb2db33d10e4c06af4",
+    "semantic_hash": "9af2b52210d9a8bb2db33d10e4c06af4"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\services\\digest.service.ts": {
+    "mtime": 1781372742.2405138,
+    "ast_hash": "094f9b82cbdab6868490818954f45bb9",
+    "semantic_hash": "094f9b82cbdab6868490818954f45bb9"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\services\\glassdoor.service.ts": {
+    "mtime": 1781372742.2415133,
+    "ast_hash": "00429a85ea86b19506027a002f6f0d5c",
+    "semantic_hash": "00429a85ea86b19506027a002f6f0d5c"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\services\\groupScope.grants.test.ts": {
+    "mtime": 1781372742.2415133,
+    "ast_hash": "1204d469482eff7fa34de5ec8d047558",
+    "semantic_hash": "1204d469482eff7fa34de5ec8d047558"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\services\\groupScope.guards.test.ts": {
+    "mtime": 1781372742.2415133,
+    "ast_hash": "0be534fa9c78faafe83a11319d09ee24",
+    "semantic_hash": "0be534fa9c78faafe83a11319d09ee24"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\services\\groupScope.test.ts": {
+    "mtime": 1781372742.2415133,
+    "ast_hash": "a23a5fcbe8708908e441e63091271ac2",
+    "semantic_hash": "a23a5fcbe8708908e441e63091271ac2"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\services\\groupScope.ts": {
+    "mtime": 1781372742.2415133,
+    "ast_hash": "d9b7b2ce8887596317fd78440f3257f5",
+    "semantic_hash": "d9b7b2ce8887596317fd78440f3257f5"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\services\\interviewReminders.service.ts": {
+    "mtime": 1781372742.242513,
+    "ast_hash": "6bacbe2b00313a3846241a930086dfb4",
+    "semantic_hash": "6bacbe2b00313a3846241a930086dfb4"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\services\\invitation.service.dedupe.test.ts": {
+    "mtime": 1781372742.242513,
+    "ast_hash": "febd0893d246300fa0d955b860779706",
+    "semantic_hash": "febd0893d246300fa0d955b860779706"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\services\\invitation.service.ts": {
+    "mtime": 1781372742.242513,
+    "ast_hash": "8db58bccbf4ee5a1f982785f58c405fa",
+    "semantic_hash": "8db58bccbf4ee5a1f982785f58c405fa"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\services\\invitationHierarchy.service.test.ts": {
+    "mtime": 1781372742.242513,
+    "ast_hash": "f0028f05f0e0008160a0ed7cbe2ce229",
+    "semantic_hash": "f0028f05f0e0008160a0ed7cbe2ce229"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\services\\invitationHierarchy.service.ts": {
+    "mtime": 1781372742.243517,
+    "ast_hash": "b8ada5520a4cbf28f1e2fb8d88e7da2c",
+    "semantic_hash": "b8ada5520a4cbf28f1e2fb8d88e7da2c"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\services\\invoicePdf.service.ts": {
+    "mtime": 1781372742.243517,
+    "ast_hash": "d8051d76c3cab4fbc059c25d024faf85",
+    "semantic_hash": "d8051d76c3cab4fbc059c25d024faf85"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\services\\jobIngestion.service.ts": {
+    "mtime": 1781372742.244512,
+    "ast_hash": "97652bce8c56cf3ac7b6be4f3e0b1b6d",
+    "semantic_hash": "97652bce8c56cf3ac7b6be4f3e0b1b6d"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\services\\jobIngestionMocks.ts": {
+    "mtime": 1781372742.244512,
+    "ast_hash": "e7460cd0c603d78899b10f023dc8d3a3",
+    "semantic_hash": "e7460cd0c603d78899b10f023dc8d3a3"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\services\\jobParser.service.ts": {
+    "mtime": 1781372742.244512,
+    "ast_hash": "71f099659508e72297a0b6c98d1ff919",
+    "semantic_hash": "71f099659508e72297a0b6c98d1ff919"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\services\\permission.extra.test.ts": {
+    "mtime": 1781372742.244512,
+    "ast_hash": "f0c45eba9dfd7e6559dba481c37df800",
+    "semantic_hash": "f0c45eba9dfd7e6559dba481c37df800"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\services\\permission.service.test.ts": {
+    "mtime": 1781372742.245511,
+    "ast_hash": "0cddd29d67254d8fb24d15fea2593c8b",
+    "semantic_hash": "0cddd29d67254d8fb24d15fea2593c8b"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\services\\permission.service.ts": {
+    "mtime": 1781372742.245511,
+    "ast_hash": "f6e5c6e83088cf72ba59e2f83d06f42a",
+    "semantic_hash": "f6e5c6e83088cf72ba59e2f83d06f42a"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\services\\realtime.cap.test.ts": {
+    "mtime": 1781372742.245511,
+    "ast_hash": "6ba8be4aafcbc3a9b59e4a6e629feb5b",
+    "semantic_hash": "6ba8be4aafcbc3a9b59e4a6e629feb5b"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\services\\realtime.service.ts": {
+    "mtime": 1781372742.245511,
+    "ast_hash": "d6c4caf09912a27d962338cd257ade9b",
+    "semantic_hash": "d6c4caf09912a27d962338cd257ade9b"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\services\\resumeRuleBased.service.ts": {
+    "mtime": 1781372742.2465105,
+    "ast_hash": "63bd1a42700ccd0a154cc5beba381f38",
+    "semantic_hash": "63bd1a42700ccd0a154cc5beba381f38"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\services\\resumeText.service.test.ts": {
+    "mtime": 1781372742.2465105,
+    "ast_hash": "4783c0c8df9598157fe25b4ab3c88aca",
+    "semantic_hash": "4783c0c8df9598157fe25b4ab3c88aca"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\services\\resumeText.service.ts": {
+    "mtime": 1781372742.2465105,
+    "ast_hash": "240af6a0a3b89f89fbacf3088560a245",
+    "semantic_hash": "240af6a0a3b89f89fbacf3088560a245"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\services\\skillNorm.ts": {
+    "mtime": 1781372742.2465105,
+    "ast_hash": "f7fa7e84cb86fdd41bdfec823e59f43a",
+    "semantic_hash": "f7fa7e84cb86fdd41bdfec823e59f43a"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\services\\storage.service.ts": {
+    "mtime": 1781372742.2475097,
+    "ast_hash": "5e3040491d220048a9f895f54eb0ab1d",
+    "semantic_hash": "5e3040491d220048a9f895f54eb0ab1d"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\services\\taskAccess.test.ts": {
+    "mtime": 1781372742.2475097,
+    "ast_hash": "b3ee895c2607ac0a6a6a16b97294ad4c",
+    "semantic_hash": "b3ee895c2607ac0a6a6a16b97294ad4c"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\services\\taskAccess.ts": {
+    "mtime": 1781372742.2475097,
+    "ast_hash": "ed227615bb94cac953cd88a016838593",
+    "semantic_hash": "ed227615bb94cac953cd88a016838593"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\services\\training.service.test.ts": {
+    "mtime": 1781372742.2475097,
+    "ast_hash": "095294d1b283a50f8c43ae34c06b6713",
+    "semantic_hash": "095294d1b283a50f8c43ae34c06b6713"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\services\\training.service.ts": {
+    "mtime": 1781372742.2485096,
+    "ast_hash": "5d7423c9aa394fb8a08ecebcc0cdf56d",
+    "semantic_hash": "5d7423c9aa394fb8a08ecebcc0cdf56d"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\services\\trainingAI.service.ts": {
+    "mtime": 1781372742.2485096,
+    "ast_hash": "afb0c65aaa90330297c6117946790037",
+    "semantic_hash": "afb0c65aaa90330297c6117946790037"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\services\\trainingAchievements.service.ts": {
+    "mtime": 1781372742.2485096,
+    "ast_hash": "6ba840acd2a44b06de524873255f15e6",
+    "semantic_hash": "6ba840acd2a44b06de524873255f15e6"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\types\\index.ts": {
+    "mtime": 1781372742.2495089,
+    "ast_hash": "df8bd59d3b9d4ca5e208a625a0b55e23",
+    "semantic_hash": "df8bd59d3b9d4ca5e208a625a0b55e23"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\types\\word-extractor.d.ts": {
+    "mtime": 1781372742.2495089,
+    "ast_hash": "0c94899b93aa0e558dcda48db2ca7abb",
+    "semantic_hash": "0c94899b93aa0e558dcda48db2ca7abb"
+  },
+  "E:\\claude\\hireorbitai\\backend\\start.prod.sh": {
+    "mtime": 1781372742.2495089,
+    "ast_hash": "58b05ca10213f64b56d2a1fb9ae20ade",
+    "semantic_hash": "58b05ca10213f64b56d2a1fb9ae20ade"
+  },
+  "E:\\claude\\hireorbitai\\backend\\tsconfig.json": {
+    "mtime": 1781372742.2495089,
+    "ast_hash": "f72e88e8a8960806e00b582023d1860a",
+    "semantic_hash": "f72e88e8a8960806e00b582023d1860a"
+  },
+  "E:\\claude\\hireorbitai\\backend\\vitest.config.ts": {
+    "mtime": 1781372742.2504961,
+    "ast_hash": "9920d9960d1c7b94c88866682d2129f0",
+    "semantic_hash": "9920d9960d1c7b94c88866682d2129f0"
+  },
+  "E:\\claude\\hireorbitai\\backend\\vitest.setup.ts": {
+    "mtime": 1781372742.2504961,
+    "ast_hash": "96d793676c96216707447bc2306e50ee",
+    "semantic_hash": "96d793676c96216707447bc2306e50ee"
+  },
+  "E:\\claude\\hireorbitai\\database\\accounts-teardown.sql": {
+    "mtime": 1781372742.2504961,
+    "ast_hash": "2fc44f28934fa97081e1c2ea7e4b01d3",
+    "semantic_hash": "2fc44f28934fa97081e1c2ea7e4b01d3"
+  },
+  "E:\\claude\\hireorbitai\\database\\admin-user-management.sql": {
+    "mtime": 1781372742.2504961,
+    "ast_hash": "19554cfc840fc2b2a4492ac882ebe5d0",
+    "semantic_hash": "19554cfc840fc2b2a4492ac882ebe5d0"
+  },
+  "E:\\claude\\hireorbitai\\database\\ai-job-search-and-apply.sql": {
+    "mtime": 1781372742.2504961,
+    "ast_hash": "4df70f32a0b8b1919c73b70f4d4c7de3",
+    "semantic_hash": "4df70f32a0b8b1919c73b70f4d4c7de3"
+  },
+  "E:\\claude\\hireorbitai\\database\\all-sources-seed.sql": {
+    "mtime": 1781372742.2515128,
+    "ast_hash": "7eb207b45e262941aa47fb074f218201",
+    "semantic_hash": "7eb207b45e262941aa47fb074f218201"
+  },
+  "E:\\claude\\hireorbitai\\database\\applications-archived-status.sql": {
+    "mtime": 1781372742.251983,
+    "ast_hash": "065216a690fd14890f3bb554fe058214",
+    "semantic_hash": "065216a690fd14890f3bb554fe058214"
+  },
+  "E:\\claude\\hireorbitai\\database\\apply-flow-tables.sql": {
+    "mtime": 1781372742.2521503,
+    "ast_hash": "282715f70e913a4888fe90ee31c2b3ad",
+    "semantic_hash": "282715f70e913a4888fe90ee31c2b3ad"
+  },
+  "E:\\claude\\hireorbitai\\database\\auth-hardening.sql": {
+    "mtime": 1781372742.2526479,
+    "ast_hash": "7cf69aa8c91415996a7f23a76077ccd6",
+    "semantic_hash": "7cf69aa8c91415996a7f23a76077ccd6"
+  },
+  "E:\\claude\\hireorbitai\\database\\calendar-events-view.sql": {
+    "mtime": 1781372742.2526479,
+    "ast_hash": "daefc3169db44196cde6a56240e53dff",
+    "semantic_hash": "daefc3169db44196cde6a56240e53dff"
+  },
+  "E:\\claude\\hireorbitai\\database\\calls-duration.sql": {
+    "mtime": 1781372742.2526479,
+    "ast_hash": "c16d0dd4e0e91c4e9238917e81565cec",
+    "semantic_hash": "c16d0dd4e0e91c4e9238917e81565cec"
+  },
+  "E:\\claude\\hireorbitai\\database\\consultant-desired-positions.sql": {
+    "mtime": 1781372742.2526479,
+    "ast_hash": "5e9524e6a1b93c5e19614cc64410ef16",
+    "semantic_hash": "5e9524e6a1b93c5e19614cc64410ef16"
+  },
+  "E:\\claude\\hireorbitai\\database\\consultant-skills.sql": {
+    "mtime": 1781372742.2533429,
+    "ast_hash": "2cb69a4bb47f0d1e0fff924496a25b2a",
+    "semantic_hash": "2cb69a4bb47f0d1e0fff924496a25b2a"
+  },
+  "E:\\claude\\hireorbitai\\database\\enable-jobs-plan-b.sql": {
+    "mtime": 1781372742.2533429,
+    "ast_hash": "dddd977e8bcf88c2ac703397a8594427",
+    "semantic_hash": "dddd977e8bcf88c2ac703397a8594427"
+  },
+  "E:\\claude\\hireorbitai\\database\\feature-flags-daily-digest.sql": {
+    "mtime": 1781372742.2533429,
+    "ast_hash": "c3f0271baa6d5bb0af8c9d3101664d6c",
+    "semantic_hash": "c3f0271baa6d5bb0af8c9d3101664d6c"
+  },
+  "E:\\claude\\hireorbitai\\database\\feature-flags.sql": {
+    "mtime": 1781372742.2533429,
+    "ast_hash": "aebeb67d735a76f62b0d19550929a9cf",
+    "semantic_hash": "aebeb67d735a76f62b0d19550929a9cf"
+  },
+  "E:\\claude\\hireorbitai\\database\\init.sql": {
+    "mtime": 1781372742.2557604,
+    "ast_hash": "ca68d4e8d08313f180b8ce3de171473e",
+    "semantic_hash": "ca68d4e8d08313f180b8ce3de171473e"
+  },
+  "E:\\claude\\hireorbitai\\database\\job-ingestion-extra-sources.sql": {
+    "mtime": 1781372742.2557604,
+    "ast_hash": "e76c3bf39f2f751a7d7db07dbf7fe504",
+    "semantic_hash": "e76c3bf39f2f751a7d7db07dbf7fe504"
+  },
+  "E:\\claude\\hireorbitai\\database\\job-ingestion.sql": {
+    "mtime": 1781372742.2557604,
+    "ast_hash": "0d84aac6448f0896dba4eb0bbd7429c3",
+    "semantic_hash": "0d84aac6448f0896dba4eb0bbd7429c3"
+  },
+  "E:\\claude\\hireorbitai\\database\\jobs-apply-url-backfill.sql": {
+    "mtime": 1781372742.2557604,
+    "ast_hash": "a3a4c6ab4fb13acdab6fabfd3b81b753",
+    "semantic_hash": "a3a4c6ab4fb13acdab6fabfd3b81b753"
+  },
+  "E:\\claude\\hireorbitai\\database\\jobs-extras.sql": {
+    "mtime": 1781372742.2565398,
+    "ast_hash": "70fb0a67cd7eba1c09a76105be0dab7d",
+    "semantic_hash": "70fb0a67cd7eba1c09a76105be0dab7d"
+  },
+  "E:\\claude\\hireorbitai\\database\\jobs-publisher.sql": {
+    "mtime": 1781372742.2565398,
+    "ast_hash": "10b4b98e680536e93d0a2fe5dff13338",
+    "semantic_hash": "10b4b98e680536e93d0a2fe5dff13338"
+  },
+  "E:\\claude\\hireorbitai\\database\\jobs-strict-4-sources.sql": {
+    "mtime": 1781372742.2565398,
+    "ast_hash": "d5bb9eced3daa8e8ba72dd695e4ff573",
+    "semantic_hash": "d5bb9eced3daa8e8ba72dd695e4ff573"
+  },
+  "E:\\claude\\hireorbitai\\database\\jobs-unique-fix.sql": {
+    "mtime": 1781372742.2565398,
+    "ast_hash": "24d8502cec900ab601c88ec4777c002a",
+    "semantic_hash": "24d8502cec900ab601c88ec4777c002a"
+  },
+  "E:\\claude\\hireorbitai\\database\\jsearch-source-expansion.sql": {
+    "mtime": 1781372742.2572732,
+    "ast_hash": "f7bce8a8c059c418986cd9097fb461ab",
+    "semantic_hash": "f7bce8a8c059c418986cd9097fb461ab"
+  },
+  "E:\\claude\\hireorbitai\\database\\jsearch-source.sql": {
+    "mtime": 1781372742.2572732,
+    "ast_hash": "c084738bb15fb0b82debb20095257322",
+    "semantic_hash": "c084738bb15fb0b82debb20095257322"
+  },
+  "E:\\claude\\hireorbitai\\database\\linkedin-source.sql": {
+    "mtime": 1781372742.2572732,
+    "ast_hash": "21868340b5b764ca96236922e6bc6307",
+    "semantic_hash": "21868340b5b764ca96236922e6bc6307"
+  },
+  "E:\\claude\\hireorbitai\\database\\lowercase-existing-emails.sql": {
+    "mtime": 1781372742.2572732,
+    "ast_hash": "42573b9e9dda1bab46324d932bb4f812",
+    "semantic_hash": "42573b9e9dda1bab46324d932bb4f812"
+  },
+  "E:\\claude\\hireorbitai\\database\\messages-soft-delete.sql": {
+    "mtime": 1781372742.2579806,
+    "ast_hash": "880b2f9177edc34b104f173fe503b092",
+    "semantic_hash": "880b2f9177edc34b104f173fe503b092"
+  },
+  "E:\\claude\\hireorbitai\\database\\messages.sql": {
+    "mtime": 1781372742.2579806,
+    "ast_hash": "03ed80b05a80d20b6c9f4c0327fdc05d",
+    "semantic_hash": "03ed80b05a80d20b6c9f4c0327fdc05d"
+  },
+  "E:\\claude\\hireorbitai\\database\\monster-source.sql": {
+    "mtime": 1781372742.2579806,
+    "ast_hash": "cd9446c93b86fde1f51be49968b32be1",
+    "semantic_hash": "cd9446c93b86fde1f51be49968b32be1"
+  },
+  "E:\\claude\\hireorbitai\\database\\recruiter-managers.sql": {
+    "mtime": 1781372742.2579806,
+    "ast_hash": "1ab9a5272b77581c9444b185b7b89932",
+    "semantic_hash": "1ab9a5272b77581c9444b185b7b89932"
+  },
+  "E:\\claude\\hireorbitai\\database\\reminders-delivery-tracking.sql": {
+    "mtime": 1781372742.2587514,
+    "ast_hash": "0d925aba1a2b9bea187782031ba92d16",
+    "semantic_hash": "0d925aba1a2b9bea187782031ba92d16"
+  },
+  "E:\\claude\\hireorbitai\\database\\resume-tailor-sessions.sql": {
+    "mtime": 1781372742.2589934,
+    "ast_hash": "92871935262b83731191d860b6c1f072",
+    "semantic_hash": "92871935262b83731191d860b6c1f072"
+  },
+  "E:\\claude\\hireorbitai\\database\\revert-scrape-to-plan-b.sql": {
+    "mtime": 1781372742.2589934,
+    "ast_hash": "6394895d6810df5e79272d78d001a9e3",
+    "semantic_hash": "6394895d6810df5e79272d78d001a9e3"
+  },
+  "E:\\claude\\hireorbitai\\database\\roles-developer-hr.sql": {
+    "mtime": 1781372742.2589934,
+    "ast_hash": "461588999304418124cf45fa6ccaf93b",
+    "semantic_hash": "461588999304418124cf45fa6ccaf93b"
+  },
+  "E:\\claude\\hireorbitai\\database\\roles-hierarchy.sql": {
+    "mtime": 1781372742.2595444,
+    "ast_hash": "db13cbc2cfd9774ea1d846e87bf95ffa",
+    "semantic_hash": "db13cbc2cfd9774ea1d846e87bf95ffa"
+  },
+  "E:\\claude\\hireorbitai\\database\\schema.sql": {
+    "mtime": 1781372742.2595444,
+    "ast_hash": "18bb08b7f8ed044bf696d5d1c749a052",
+    "semantic_hash": "18bb08b7f8ed044bf696d5d1c749a052"
+  },
+  "E:\\claude\\hireorbitai\\database\\searchapi-source.sql": {
+    "mtime": 1781372742.2595444,
+    "ast_hash": "160b9fe66eb090e54077d5d501610316",
+    "semantic_hash": "160b9fe66eb090e54077d5d501610316"
+  },
+  "E:\\claude\\hireorbitai\\database\\seed-default-admin.sql": {
+    "mtime": 1781372742.2595444,
+    "ast_hash": "839720cff50bcdb9b1ae2f458554c34e",
+    "semantic_hash": "839720cff50bcdb9b1ae2f458554c34e"
+  },
+  "E:\\claude\\hireorbitai\\database\\source-companies-self-heal.sql": {
+    "mtime": 1781372742.2604172,
+    "ast_hash": "bb66468b512ddeb640233fbdb4debeef",
+    "semantic_hash": "bb66468b512ddeb640233fbdb4debeef"
+  },
+  "E:\\claude\\hireorbitai\\database\\task-filters.sql": {
+    "mtime": 1781372742.2604172,
+    "ast_hash": "ed6d96f1fae3a15579720a6028224770",
+    "semantic_hash": "ed6d96f1fae3a15579720a6028224770"
+  },
+  "E:\\claude\\hireorbitai\\database\\tasks-tags.sql": {
+    "mtime": 1781372742.2604172,
+    "ast_hash": "e1da47da2a0d682fb2c9286f9d4ab101",
+    "semantic_hash": "e1da47da2a0d682fb2c9286f9d4ab101"
+  },
+  "E:\\claude\\hireorbitai\\database\\tasks.sql": {
+    "mtime": 1781372742.2604172,
+    "ast_hash": "252c7c22494028cc4194e10d5c981177",
+    "semantic_hash": "252c7c22494028cc4194e10d5c981177"
+  },
+  "E:\\claude\\hireorbitai\\database\\training-achievements.sql": {
+    "mtime": 1781372742.2611325,
+    "ast_hash": "de78a87623423c636de94d31de9ccc78",
+    "semantic_hash": "de78a87623423c636de94d31de9ccc78"
+  },
+  "E:\\claude\\hireorbitai\\database\\training-ai-data-detail.sql": {
+    "mtime": 1781372742.2611325,
+    "ast_hash": "15773961dddf3ea3b156b13fe41a349a",
+    "semantic_hash": "15773961dddf3ea3b156b13fe41a349a"
+  },
+  "E:\\claude\\hireorbitai\\database\\training-ai-data.sql": {
+    "mtime": 1781372742.2621338,
+    "ast_hash": "96ec55148e985838487bc7c87666672f",
+    "semantic_hash": "96ec55148e985838487bc7c87666672f"
+  },
+  "E:\\claude\\hireorbitai\\database\\training-completion-gates.sql": {
+    "mtime": 1781372742.2631333,
+    "ast_hash": "eff2e8a08bcb7bb4d752186892d1f921",
+    "semantic_hash": "eff2e8a08bcb7bb4d752186892d1f921"
+  },
+  "E:\\claude\\hireorbitai\\database\\training-content-detail.sql": {
+    "mtime": 1781372742.2638576,
+    "ast_hash": "8fdfd4a3a2b475a5e1b0ee5e6ad49a5d",
+    "semantic_hash": "8fdfd4a3a2b475a5e1b0ee5e6ad49a5d"
+  },
+  "E:\\claude\\hireorbitai\\database\\training-content.sql": {
+    "mtime": 1781372742.2643943,
+    "ast_hash": "8823a8a1214fcc141ec19f08d53ae367",
+    "semantic_hash": "8823a8a1214fcc141ec19f08d53ae367"
+  },
+  "E:\\claude\\hireorbitai\\database\\training-cybersecurity.sql": {
+    "mtime": 1781372742.2643943,
+    "ast_hash": "42b0f58a69881365ff2da38f57b94420",
+    "semantic_hash": "42b0f58a69881365ff2da38f57b94420"
+  },
+  "E:\\claude\\hireorbitai\\database\\training-generated-content.sql": {
+    "mtime": 1781372742.2643943,
+    "ast_hash": "a6bcbbc8c2ef0c33afef31ceb78d170e",
+    "semantic_hash": "a6bcbbc8c2ef0c33afef31ceb78d170e"
+  },
+  "E:\\claude\\hireorbitai\\database\\training-i983.sql": {
+    "mtime": 1781372742.2652557,
+    "ast_hash": "5c8edf302e452f6d697f2d3d3d84cc4d",
+    "semantic_hash": "5c8edf302e452f6d697f2d3d3d84cc4d"
+  },
+  "E:\\claude\\hireorbitai\\database\\training-security-detail.sql": {
+    "mtime": 1781372742.2652557,
+    "ast_hash": "5976342eb74e0ce8d1807b8ab45fe04b",
+    "semantic_hash": "5976342eb74e0ce8d1807b8ab45fe04b"
+  },
+  "E:\\claude\\hireorbitai\\database\\training-security.sql": {
+    "mtime": 1781372742.2652557,
+    "ast_hash": "14b095a9a34138be10df7a329221080d",
+    "semantic_hash": "14b095a9a34138be10df7a329221080d"
+  },
+  "E:\\claude\\hireorbitai\\database\\training-versioning.sql": {
+    "mtime": 1781372742.266257,
+    "ast_hash": "8d54ca8bcd886fecaf49dd4dd34fda19",
+    "semantic_hash": "8d54ca8bcd886fecaf49dd4dd34fda19"
+  },
+  "E:\\claude\\hireorbitai\\database\\training-workspace.sql": {
+    "mtime": 1781372742.266257,
+    "ast_hash": "44669d824f20baa5b3ad5cee220de385",
+    "semantic_hash": "44669d824f20baa5b3ad5cee220de385"
+  },
+  "E:\\claude\\hireorbitai\\database\\training.sql": {
+    "mtime": 1781372742.266257,
+    "ast_hash": "e019cec49951e9fb2baf7a49858231c8",
+    "semantic_hash": "e019cec49951e9fb2baf7a49858231c8"
+  },
+  "E:\\claude\\hireorbitai\\database\\user-activity-tracking.sql": {
+    "mtime": 1781372742.266257,
+    "ast_hash": "73eaa59974915e063283153ce5fea05c",
+    "semantic_hash": "73eaa59974915e063283153ce5fea05c"
+  },
+  "E:\\claude\\hireorbitai\\database\\user-groups-and-presence.sql": {
+    "mtime": 1781372742.266257,
+    "ast_hash": "0a77ea067d6c1384c014afe771e23ab7",
+    "semantic_hash": "0a77ea067d6c1384c014afe771e23ab7"
+  },
+  "E:\\claude\\hireorbitai\\database\\user-groups-extended.sql": {
+    "mtime": 1781372742.2672572,
+    "ast_hash": "0bce9a6cc3f76ae967876064e9b856f9",
+    "semantic_hash": "0bce9a6cc3f76ae967876064e9b856f9"
+  },
+  "E:\\claude\\hireorbitai\\database\\user-profile-fields.sql": {
+    "mtime": 1781372742.2672572,
+    "ast_hash": "15f2f984b0bbfae99097c253d184465c",
+    "semantic_hash": "15f2f984b0bbfae99097c253d184465c"
+  },
+  "E:\\claude\\hireorbitai\\database\\users-lower-email-index.sql": {
+    "mtime": 1781372742.2672572,
+    "ast_hash": "0f4ad2f5c47aaaddb14fca9f5d269626",
+    "semantic_hash": "0f4ad2f5c47aaaddb14fca9f5d269626"
+  },
+  "E:\\claude\\hireorbitai\\database\\v-user-relationships.sql": {
+    "mtime": 1781372742.2672572,
+    "ast_hash": "30e07a32038d6b6d3ef623717395d15c",
+    "semantic_hash": "30e07a32038d6b6d3ef623717395d15c"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\e2e\\_helpers.ts": {
+    "mtime": 1781372742.2929835,
+    "ast_hash": "f270e6f52f034253fdde3a0a9a67ffbb",
+    "semantic_hash": "f270e6f52f034253fdde3a0a9a67ffbb"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\e2e\\_mock-data.ts": {
+    "mtime": 1781372742.2929835,
+    "ast_hash": "0e1685bc73762c64e24ad8b84eec823e",
+    "semantic_hash": "0e1685bc73762c64e24ad8b84eec823e"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\e2e\\a11y-contrast.spec.ts": {
+    "mtime": 1781372742.2929835,
+    "ast_hash": "08332c891f535ea82ec45d7452c7b735",
+    "semantic_hash": "08332c891f535ea82ec45d7452c7b735"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\e2e\\admin-pages.spec.ts": {
+    "mtime": 1781372742.2940638,
+    "ast_hash": "703a0a794c4fd514df6ed8250b69fbb0",
+    "semantic_hash": "703a0a794c4fd514df6ed8250b69fbb0"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\e2e\\admin-users.spec.ts": {
+    "mtime": 1781372742.2940638,
+    "ast_hash": "68700f814be959e99615f16fd06acf90",
+    "semantic_hash": "68700f814be959e99615f16fd06acf90"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\e2e\\auth-flow.spec.ts": {
+    "mtime": 1781372742.2944934,
+    "ast_hash": "ddfb41cc6abb03f5365daae2cf612edd",
+    "semantic_hash": "ddfb41cc6abb03f5365daae2cf612edd"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\e2e\\auth-pages.spec.ts": {
+    "mtime": 1781372742.2944934,
+    "ast_hash": "816397b7002d9bedee7f5e976a294d21",
+    "semantic_hash": "816397b7002d9bedee7f5e976a294d21"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\e2e\\calendar-interactions.spec.ts": {
+    "mtime": 1781372742.2944934,
+    "ast_hash": "8ef9091def89d28f68739515e29da8f4",
+    "semantic_hash": "8ef9091def89d28f68739515e29da8f4"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\e2e\\console-errors.spec.ts": {
+    "mtime": 1781372742.2944934,
+    "ast_hash": "af51e4247e842483c77049952af9cbb8",
+    "semantic_hash": "af51e4247e842483c77049952af9cbb8"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\e2e\\dark-mode-audit.spec.ts": {
+    "mtime": 1781372742.2954946,
+    "ast_hash": "4da19f193e4fea8ac8e4cf7e95bbf538",
+    "semantic_hash": "4da19f193e4fea8ac8e4cf7e95bbf538"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\e2e\\dashboard-nav.spec.ts": {
+    "mtime": 1781372742.2954946,
+    "ast_hash": "d513964287ee1e13de9b59590cb0ee89",
+    "semantic_hash": "d513964287ee1e13de9b59590cb0ee89"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\e2e\\detail-pages.spec.ts": {
+    "mtime": 1781372742.2954946,
+    "ast_hash": "2f793982e22dfbf143b743ec2b0690e4",
+    "semantic_hash": "2f793982e22dfbf143b743ec2b0690e4"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\e2e\\dropdown-layering.spec.ts": {
+    "mtime": 1781372742.2954946,
+    "ast_hash": "06b8ffe449f1c1577c295d7561b962dc",
+    "semantic_hash": "06b8ffe449f1c1577c295d7561b962dc"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\e2e\\feature-guard.spec.ts": {
+    "mtime": 1781372742.2954946,
+    "ast_hash": "e75e933bb8ce4c3fb60482f63dec10fe",
+    "semantic_hash": "e75e933bb8ce4c3fb60482f63dec10fe"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\e2e\\fixtures\\rbacMatrix.ts": {
+    "mtime": 1781372742.296494,
+    "ast_hash": "3ed7be7fdf4099f6718707d1b264ddd1",
+    "semantic_hash": "3ed7be7fdf4099f6718707d1b264ddd1"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\e2e\\form-validation.spec.ts": {
+    "mtime": 1781372742.296494,
+    "ast_hash": "993762961887784df73e620583bcc022",
+    "semantic_hash": "993762961887784df73e620583bcc022"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\e2e\\full-interaction-desktop.spec.ts": {
+    "mtime": 1781372742.296494,
+    "ast_hash": "6769197a6cdd4bf65fedf56ec258b4ab",
+    "semantic_hash": "6769197a6cdd4bf65fedf56ec258b4ab"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\e2e\\full-interaction.spec.ts": {
+    "mtime": 1781372742.2974937,
+    "ast_hash": "3ff45d7fadece6a640725cfed79e4eab",
+    "semantic_hash": "3ff45d7fadece6a640725cfed79e4eab"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\e2e\\full-ui-audit.spec.ts": {
+    "mtime": 1781372742.2974937,
+    "ast_hash": "cb1117f40a0456143dc70ab0379c4690",
+    "semantic_hash": "cb1117f40a0456143dc70ab0379c4690"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\e2e\\invoice-document-and-group-logo.spec.ts": {
+    "mtime": 1781372742.2974937,
+    "ast_hash": "c93fa9fe40f443e1195e297385a5952a",
+    "semantic_hash": "c93fa9fe40f443e1195e297385a5952a"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\e2e\\job-search.spec.ts": {
+    "mtime": 1781372742.2974937,
+    "ast_hash": "91759073e1aba5ee67aa8cc762c6a676",
+    "semantic_hash": "91759073e1aba5ee67aa8cc762c6a676"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\e2e\\login.spec.ts": {
+    "mtime": 1781372742.298493,
+    "ast_hash": "834a8c82e022c245f3242a9c63508ab6",
+    "semantic_hash": "834a8c82e022c245f3242a9c63508ab6"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\e2e\\messages-audit.spec.ts": {
+    "mtime": 1781372742.298493,
+    "ast_hash": "810363f19f75f25eca689b175eedfe2a",
+    "semantic_hash": "810363f19f75f25eca689b175eedfe2a"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\e2e\\messages-chat.spec.ts": {
+    "mtime": 1781372742.298493,
+    "ast_hash": "faac7778118ea937b73c72f045da4545",
+    "semantic_hash": "faac7778118ea937b73c72f045da4545"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\e2e\\mobile-admin-pages.spec.ts": {
+    "mtime": 1781372742.298493,
+    "ast_hash": "ab44543dbef816bd53b7af63fedfce5a",
+    "semantic_hash": "ab44543dbef816bd53b7af63fedfce5a"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\e2e\\mobile-audit.spec.ts": {
+    "mtime": 1781372742.2994921,
+    "ast_hash": "dce6b69ff4b30b01547ac064220082f4",
+    "semantic_hash": "dce6b69ff4b30b01547ac064220082f4"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\e2e\\mobile-auth-pages.spec.ts": {
+    "mtime": 1781372742.2994921,
+    "ast_hash": "6d80463c0e3d3d64f481b76d3205d29e",
+    "semantic_hash": "6d80463c0e3d3d64f481b76d3205d29e"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\e2e\\mobile-detail-pages.spec.ts": {
+    "mtime": 1781372742.2994921,
+    "ast_hash": "cbe3572a5c5c9693fc90d17ae7b51d81",
+    "semantic_hash": "cbe3572a5c5c9693fc90d17ae7b51d81"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\e2e\\mobile-layout-audit.spec.ts": {
+    "mtime": 1781372742.2994921,
+    "ast_hash": "25128688e803c3c420b2fcf3b92322ac",
+    "semantic_hash": "25128688e803c3c420b2fcf3b92322ac"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\e2e\\mobile-screenshots.spec.ts": {
+    "mtime": 1781372742.3004916,
+    "ast_hash": "06bd118af7b6288290bb69f2b74f4b2f",
+    "semantic_hash": "06bd118af7b6288290bb69f2b74f4b2f"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\e2e\\modal-overlay.spec.ts": {
+    "mtime": 1781372742.3004916,
+    "ast_hash": "4cfca657137d40bd055276d44ddb7133",
+    "semantic_hash": "4cfca657137d40bd055276d44ddb7133"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\e2e\\responsive.spec.ts": {
+    "mtime": 1781372742.3010235,
+    "ast_hash": "050061ad45e3fb68243e6198b5bec48c",
+    "semantic_hash": "050061ad45e3fb68243e6198b5bec48c"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\e2e\\resumes.spec.ts": {
+    "mtime": 1781372742.3010235,
+    "ast_hash": "08804c0968ca2a6c3d3a3af0da467482",
+    "semantic_hash": "08804c0968ca2a6c3d3a3af0da467482"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\e2e\\role-access.spec.ts": {
+    "mtime": 1781372742.3010235,
+    "ast_hash": "995f1418445b2c15e8638ffc2c9b512c",
+    "semantic_hash": "995f1418445b2c15e8638ffc2c9b512c"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\e2e\\route-guards.spec.ts": {
+    "mtime": 1781372742.3010235,
+    "ast_hash": "32d079aa03274c2ff7a107aeb411fa5e",
+    "semantic_hash": "32d079aa03274c2ff7a107aeb411fa5e"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\e2e\\sidebar-nav.spec.ts": {
+    "mtime": 1781372742.3020952,
+    "ast_hash": "268157c2afd1d331ef27b8ea00a1b88e",
+    "semantic_hash": "268157c2afd1d331ef27b8ea00a1b88e"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\e2e\\smoke-coverage.spec.ts": {
+    "mtime": 1781372742.3024228,
+    "ast_hash": "577a57ba8ed1c5f5787bc7337eaf0581",
+    "semantic_hash": "577a57ba8ed1c5f5787bc7337eaf0581"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\e2e\\task-flows.spec.ts": {
+    "mtime": 1781372742.3024228,
+    "ast_hash": "cc6c23dafa58814da2561d853a987d77",
+    "semantic_hash": "cc6c23dafa58814da2561d853a987d77"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\e2e\\training-flow.spec.ts": {
+    "mtime": 1781372742.3024228,
+    "ast_hash": "e7bb5047dbeef278373c2c621cdd4546",
+    "semantic_hash": "e7bb5047dbeef278373c2c621cdd4546"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\e2e\\tsconfig.json": {
+    "mtime": 1781372742.3024228,
+    "ast_hash": "948b6aeb958785b8ec59ea27e87955a9",
+    "semantic_hash": "948b6aeb958785b8ec59ea27e87955a9"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\eslint.config.mjs": {
+    "mtime": 1781372742.3024228,
+    "ast_hash": "34514452433ea84952cbd888d4489d80",
+    "semantic_hash": "34514452433ea84952cbd888d4489d80"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\package.json": {
+    "mtime": 1781372742.3034894,
+    "ast_hash": "a365b586b0ef99c1cd0a9f7a2512c343",
+    "semantic_hash": "a365b586b0ef99c1cd0a9f7a2512c343"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\playwright.config.ts": {
+    "mtime": 1781372742.3034894,
+    "ast_hash": "95ea6bebc86006cc6f2886d324b2cb2d",
+    "semantic_hash": "95ea6bebc86006cc6f2886d324b2cb2d"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\postcss.config.js": {
+    "mtime": 1781372742.3034894,
+    "ast_hash": "33fad9c02cb0ec6d6030369ef6347d57",
+    "semantic_hash": "33fad9c02cb0ec6d6030369ef6347d57"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\scripts\\check-dist-clean.mjs": {
+    "mtime": 1781372742.304505,
+    "ast_hash": "3345fe4bfa5b1abb8f09813c7fe74fe8",
+    "semantic_hash": "3345fe4bfa5b1abb8f09813c7fe74fe8"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\App.tsx": {
+    "mtime": 1781372742.304505,
+    "ast_hash": "99035050518794b0c283aa62ec6714a8",
+    "semantic_hash": "99035050518794b0c283aa62ec6714a8"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\AIProviderModal.tsx": {
+    "mtime": 1781372742.304505,
+    "ast_hash": "d27271606495215e29790d25ce8c72e4",
+    "semantic_hash": "d27271606495215e29790d25ce8c72e4"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\AiProgressCard.tsx": {
+    "mtime": 1781372742.3055038,
+    "ast_hash": "3179e1088b8b36b9e3d4aa615db8d110",
+    "semantic_hash": "3179e1088b8b36b9e3d4aa615db8d110"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\AppChrome.tsx": {
+    "mtime": 1781372742.3055038,
+    "ast_hash": "1015e19e3b58adbbf48d988a8ddbeef7",
+    "semantic_hash": "1015e19e3b58adbbf48d988a8ddbeef7"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\ApplicationCard.tsx": {
+    "mtime": 1781372742.3055038,
+    "ast_hash": "0d05d9e2de894c35d74a7c2e1a1d15f5",
+    "semantic_hash": "0d05d9e2de894c35d74a7c2e1a1d15f5"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\ApplyInterceptModal.tsx": {
+    "mtime": 1781372742.3055038,
+    "ast_hash": "b1fbc188ec7e89b481992ba795e2ccca",
+    "semantic_hash": "b1fbc188ec7e89b481992ba795e2ccca"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\BottomSheet.tsx": {
+    "mtime": 1781372742.3064907,
+    "ast_hash": "bf0e78e0fc579d76b7718eafead6b805",
+    "semantic_hash": "bf0e78e0fc579d76b7718eafead6b805"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\Brand.tsx": {
+    "mtime": 1781372742.3064907,
+    "ast_hash": "1afe5b71167a1ffcd44957fc9eebf0ab",
+    "semantic_hash": "1afe5b71167a1ffcd44957fc9eebf0ab"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\Button.tsx": {
+    "mtime": 1781372742.3064907,
+    "ast_hash": "8d74b14fbdc53c78b5ac9a919e0c95eb",
+    "semantic_hash": "8d74b14fbdc53c78b5ac9a919e0c95eb"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\ButtonGroup.tsx": {
+    "mtime": 1781372742.3064907,
+    "ast_hash": "2c24b152812214b6f2bf844ce9ad824b",
+    "semantic_hash": "2c24b152812214b6f2bf844ce9ad824b"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\CallModal.tsx": {
+    "mtime": 1781372742.3064907,
+    "ast_hash": "631c9eb7cc1158460e020228594d36c0",
+    "semantic_hash": "631c9eb7cc1158460e020228594d36c0"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\CallPill.tsx": {
+    "mtime": 1781372742.3075025,
+    "ast_hash": "c27464921e4eaebb8a61ee0f029acf0e",
+    "semantic_hash": "c27464921e4eaebb8a61ee0f029acf0e"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\Card.tsx": {
+    "mtime": 1781372742.3075025,
+    "ast_hash": "f0dad38e985e14809f15512d82b565b9",
+    "semantic_hash": "f0dad38e985e14809f15512d82b565b9"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\CommandPalette.tsx": {
+    "mtime": 1781372742.3075025,
+    "ast_hash": "1ecb1182dc76a8a70d754f2af9e7bba7",
+    "semantic_hash": "1ecb1182dc76a8a70d754f2af9e7bba7"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\ConsultantCard.tsx": {
+    "mtime": 1781372742.3075025,
+    "ast_hash": "4aa90fe5942bb8d7557387f3f99572b5",
+    "semantic_hash": "4aa90fe5942bb8d7557387f3f99572b5"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\CustomizeResumeWizard.tsx": {
+    "mtime": 1781372742.3075025,
+    "ast_hash": "42d298f4a09aefa8ab7736f20ce15d24",
+    "semantic_hash": "42d298f4a09aefa8ab7736f20ce15d24"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\DashboardCard.tsx": {
+    "mtime": 1781372742.3085017,
+    "ast_hash": "9db4c5b4f69df893bc14af5c876f32a9",
+    "semantic_hash": "9db4c5b4f69df893bc14af5c876f32a9"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\DataTable.tsx": {
+    "mtime": 1781372742.3085017,
+    "ast_hash": "971349757d4bdddbcc250645e762ca9a",
+    "semantic_hash": "971349757d4bdddbcc250645e762ca9a"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\DateTimePicker.tsx": {
+    "mtime": 1781372742.3085017,
+    "ast_hash": "7c32804bb741d04878c20151c1b40436",
+    "semantic_hash": "7c32804bb741d04878c20151c1b40436"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\DeactivatedCard.tsx": {
+    "mtime": 1781372742.3085017,
+    "ast_hash": "d36df3b48183f1e14ca78cf3a94ace34",
+    "semantic_hash": "d36df3b48183f1e14ca78cf3a94ace34"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\Drawer.tsx": {
+    "mtime": 1781372742.3085017,
+    "ast_hash": "5a2dd88f5cc8447eecbd9cfbd3a29d96",
+    "semantic_hash": "5a2dd88f5cc8447eecbd9cfbd3a29d96"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\DuplicateSubmissionModal.tsx": {
+    "mtime": 1781372742.3095014,
+    "ast_hash": "dfa92767e9f3d98246a4618ee930817a",
+    "semantic_hash": "dfa92767e9f3d98246a4618ee930817a"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\EmptyState.tsx": {
+    "mtime": 1781372742.3095014,
+    "ast_hash": "dac60614d301ade3370510d190eaec75",
+    "semantic_hash": "dac60614d301ade3370510d190eaec75"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\ErrorBoundary.tsx": {
+    "mtime": 1781372742.3095014,
+    "ast_hash": "327481ec7637ec85addc635d00f9ffad",
+    "semantic_hash": "327481ec7637ec85addc635d00f9ffad"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\FileUpload.tsx": {
+    "mtime": 1781372742.3095014,
+    "ast_hash": "09b35baa7f9f76c53db2b9a4308f922a",
+    "semantic_hash": "09b35baa7f9f76c53db2b9a4308f922a"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\FormInput.tsx": {
+    "mtime": 1781372742.3095014,
+    "ast_hash": "5692281f9e2009157e1f53e8192c7a5d",
+    "semantic_hash": "5692281f9e2009157e1f53e8192c7a5d"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\GroupBadge.tsx": {
+    "mtime": 1781372742.3105009,
+    "ast_hash": "067d02e8d72497c691674bd2cd42e4d9",
+    "semantic_hash": "067d02e8d72497c691674bd2cd42e4d9"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\Header.tsx": {
+    "mtime": 1781372742.3105009,
+    "ast_hash": "9d2f65a7826f1d38becc399bcc25f3a2",
+    "semantic_hash": "9d2f65a7826f1d38becc399bcc25f3a2"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\Icons.tsx": {
+    "mtime": 1781372742.3105009,
+    "ast_hash": "7104e59564083c59274f27e08069ae13",
+    "semantic_hash": "7104e59564083c59274f27e08069ae13"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\InvitationCard.tsx": {
+    "mtime": 1781372742.3105009,
+    "ast_hash": "1f07fa883f3d4c59d3c5db5f0093e7b6",
+    "semantic_hash": "1f07fa883f3d4c59d3c5db5f0093e7b6"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\JobDetailView.tsx": {
+    "mtime": 1781372742.3115,
+    "ast_hash": "3d20244b96ff960c7a45b6d4d71a4309",
+    "semantic_hash": "3d20244b96ff960c7a45b6d4d71a4309"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\KpiCard.tsx": {
+    "mtime": 1781372742.3115,
+    "ast_hash": "bc1b5ac05883fbad93aa4e869806ae94",
+    "semantic_hash": "bc1b5ac05883fbad93aa4e869806ae94"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\Layout.tsx": {
+    "mtime": 1781372742.3115,
+    "ast_hash": "8ef17b31036eb3e00cd5d95ba5757a02",
+    "semantic_hash": "8ef17b31036eb3e00cd5d95ba5757a02"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\LoadingScreen.tsx": {
+    "mtime": 1781372742.3115,
+    "ast_hash": "85e9c3090a8221cbad7b9e18197bcb2d",
+    "semantic_hash": "85e9c3090a8221cbad7b9e18197bcb2d"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\ManagerCard.tsx": {
+    "mtime": 1781372742.3115,
+    "ast_hash": "75efea81c110d7acf7f720e219037160",
+    "semantic_hash": "75efea81c110d7acf7f720e219037160"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\MediaViewerModal.tsx": {
+    "mtime": 1781372742.3125,
+    "ast_hash": "f489d96422a8a97001eec29375c869ce",
+    "semantic_hash": "f489d96422a8a97001eec29375c869ce"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\MobileBottomNav.tsx": {
+    "mtime": 1781372742.3125,
+    "ast_hash": "279756a53a90f81080db0509dac8913b",
+    "semantic_hash": "279756a53a90f81080db0509dac8913b"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\MobileMoreSheet.tsx": {
+    "mtime": 1781372742.3125,
+    "ast_hash": "e9bcc00fbe4d4f30e52e188d6f6fd753",
+    "semantic_hash": "e9bcc00fbe4d4f30e52e188d6f6fd753"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\Modal.tsx": {
+    "mtime": 1781372742.3125,
+    "ast_hash": "bd49a171c75e6f99dc5ce1d92c75ab13",
+    "semantic_hash": "bd49a171c75e6f99dc5ce1d92c75ab13"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\NewSubmissionModal.tsx": {
+    "mtime": 1781372742.313499,
+    "ast_hash": "5fe37d31d9ac95040d65e1644a510f3c",
+    "semantic_hash": "5fe37d31d9ac95040d65e1644a510f3c"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\NotificationToggle.tsx": {
+    "mtime": 1781372742.313499,
+    "ast_hash": "d8612b2e8231a53866172e0d2a22e2d6",
+    "semantic_hash": "d8612b2e8231a53866172e0d2a22e2d6"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\PageHeader.tsx": {
+    "mtime": 1781372742.313499,
+    "ast_hash": "763a9331c3ee7eb80d060420014f3209",
+    "semantic_hash": "763a9331c3ee7eb80d060420014f3209"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\PasswordField.tsx": {
+    "mtime": 1781372742.313499,
+    "ast_hash": "e70e6888fb8bf56e009523e83335e5fe",
+    "semantic_hash": "e70e6888fb8bf56e009523e83335e5fe"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\Pill.tsx": {
+    "mtime": 1781372742.313499,
+    "ast_hash": "789f9bbf573178e67288ca42e100e854",
+    "semantic_hash": "789f9bbf573178e67288ca42e100e854"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\PresenceDot.tsx": {
+    "mtime": 1781372742.3144984,
+    "ast_hash": "971ccecc6dd361c4849dc4fbdc2735eb",
+    "semantic_hash": "971ccecc6dd361c4849dc4fbdc2735eb"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\ProductTour.tsx": {
+    "mtime": 1781372742.3144984,
+    "ast_hash": "a2702a715010ac787d3cd8dd7f7b96a8",
+    "semantic_hash": "a2702a715010ac787d3cd8dd7f7b96a8"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\ProtectedRoute.tsx": {
+    "mtime": 1781372742.3144984,
+    "ast_hash": "7518a2a7e79dec134a7fdf4b55a3b3c4",
+    "semantic_hash": "7518a2a7e79dec134a7fdf4b55a3b3c4"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\RealtimeNotifications.tsx": {
+    "mtime": 1781372742.3144984,
+    "ast_hash": "4e46183cbec9e38d3a77091ea4fc37e4",
+    "semantic_hash": "4e46183cbec9e38d3a77091ea4fc37e4"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\RecruiterCard.tsx": {
+    "mtime": 1781372742.3144984,
+    "ast_hash": "64e8e80929f5f97f401083273eef63de",
+    "semantic_hash": "64e8e80929f5f97f401083273eef63de"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\ReminderCard.tsx": {
+    "mtime": 1781372742.3154979,
+    "ast_hash": "de7b937eb4771e92073a108a2e036094",
+    "semantic_hash": "de7b937eb4771e92073a108a2e036094"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\SavedTaskFilters.tsx": {
+    "mtime": 1781372742.3154979,
+    "ast_hash": "3be6ab3587111ef0e71c58c27792e02c",
+    "semantic_hash": "3be6ab3587111ef0e71c58c27792e02c"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\ScrollToTop.tsx": {
+    "mtime": 1781372742.3154979,
+    "ast_hash": "ae463c260066f3310420d2b5e411a2d7",
+    "semantic_hash": "ae463c260066f3310420d2b5e411a2d7"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\SearchSelect.tsx": {
+    "mtime": 1781372742.3154979,
+    "ast_hash": "a6ef9fe307ff8a7a65f7be570d1f6c72",
+    "semantic_hash": "a6ef9fe307ff8a7a65f7be570d1f6c72"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\SelectInput.tsx": {
+    "mtime": 1781372742.3164861,
+    "ast_hash": "75eba910d48844c7f2dc0f3aa0cf3926",
+    "semantic_hash": "75eba910d48844c7f2dc0f3aa0cf3926"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\Sidebar.tsx": {
+    "mtime": 1781372742.3164861,
+    "ast_hash": "51baa92f68f2c64f4cccd06d1e98cfa9",
+    "semantic_hash": "51baa92f68f2c64f4cccd06d1e98cfa9"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\Skeleton.tsx": {
+    "mtime": 1781372742.3164861,
+    "ast_hash": "eda5af0da72cc18d6a262ba33d9f52bd",
+    "semantic_hash": "eda5af0da72cc18d6a262ba33d9f52bd"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\SkillGap.tsx": {
+    "mtime": 1781372742.3164861,
+    "ast_hash": "f4064375a77e0b00e56d7e2ac5e2e267",
+    "semantic_hash": "f4064375a77e0b00e56d7e2ac5e2e267"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\StatusBadge.tsx": {
+    "mtime": 1781372742.3164861,
+    "ast_hash": "cec7fac78d02223bb4feb8b70c38a08f",
+    "semantic_hash": "cec7fac78d02223bb4feb8b70c38a08f"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\StemOptDisclaimer.tsx": {
+    "mtime": 1781372742.317497,
+    "ast_hash": "238269dc3eabb78c9c8979f52234f961",
+    "semantic_hash": "238269dc3eabb78c9c8979f52234f961"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\StickyActionBar.tsx": {
+    "mtime": 1781372742.317497,
+    "ast_hash": "8ffb32fdff4651e78e1bddb049eb54ab",
+    "semantic_hash": "8ffb32fdff4651e78e1bddb049eb54ab"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\TaskBits.tsx": {
+    "mtime": 1781372742.317497,
+    "ast_hash": "873b56dda99d323af0475e2baafba4f5",
+    "semantic_hash": "873b56dda99d323af0475e2baafba4f5"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\TaskCard.tsx": {
+    "mtime": 1781372742.318483,
+    "ast_hash": "fc303b3ea37774c4f1f1d73d424103ee",
+    "semantic_hash": "fc303b3ea37774c4f1f1d73d424103ee"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\TourOverlay.tsx": {
+    "mtime": 1781372742.318826,
+    "ast_hash": "a1da3807dc51424d7d885867a2eacf3d",
+    "semantic_hash": "a1da3807dc51424d7d885867a2eacf3d"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\Training.tsx": {
+    "mtime": 1781372742.3190193,
+    "ast_hash": "b54a7aec5ac42d5f90094fb25504a1f4",
+    "semantic_hash": "b54a7aec5ac42d5f90094fb25504a1f4"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\TrainingAuthoring.tsx": {
+    "mtime": 1781372742.3190193,
+    "ast_hash": "52ebacc3c42bb1be719611da12ecca8c",
+    "semantic_hash": "52ebacc3c42bb1be719611da12ecca8c"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\TrainingCompliance.tsx": {
+    "mtime": 1781372742.320032,
+    "ast_hash": "f5801ca583a1c86a866a2b4b1331d06e",
+    "semantic_hash": "f5801ca583a1c86a866a2b4b1331d06e"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\ViewTransition.tsx": {
+    "mtime": 1781372742.320032,
+    "ast_hash": "e00e97cafb29cfeb5addb0dda6076a81",
+    "semantic_hash": "e00e97cafb29cfeb5addb0dda6076a81"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\WorkAuthDocs.tsx": {
+    "mtime": 1781372742.320032,
+    "ast_hash": "c06742d1c625467d9b7e42d0128c1515",
+    "semantic_hash": "c06742d1c625467d9b7e42d0128c1515"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\admin\\AdminKpiStrip.tsx": {
+    "mtime": 1781372742.320032,
+    "ast_hash": "cc10966594193b21cb1fffccac1882f7",
+    "semantic_hash": "cc10966594193b21cb1fffccac1882f7"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\admin\\ConfirmDialog.tsx": {
+    "mtime": 1781372742.320032,
+    "ast_hash": "285b4676f88a33449e5205e7c4b8fdbf",
+    "semantic_hash": "285b4676f88a33449e5205e7c4b8fdbf"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\admin\\SuperAdminBanner.tsx": {
+    "mtime": 1781372742.3210313,
+    "ast_hash": "56aeaff19bf75a3b1ab21e1bd1e963b7",
+    "semantic_hash": "56aeaff19bf75a3b1ab21e1bd1e963b7"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\admin\\UserBits.tsx": {
+    "mtime": 1781372742.3210313,
+    "ast_hash": "0f02ae4afa2660a6133682c681fa6cea",
+    "semantic_hash": "0f02ae4afa2660a6133682c681fa6cea"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\admin\\UserBulkBar.tsx": {
+    "mtime": 1781372742.3210313,
+    "ast_hash": "b0be3f3fff62f00eab99fd05306dc452",
+    "semantic_hash": "b0be3f3fff62f00eab99fd05306dc452"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\admin\\UserDetailPane.tsx": {
+    "mtime": 1781372742.3210313,
+    "ast_hash": "e639ce69a6d248c1d71803e727bdec51",
+    "semantic_hash": "e639ce69a6d248c1d71803e727bdec51"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\admin\\UserFilterBar.tsx": {
+    "mtime": 1781372742.322031,
+    "ast_hash": "e50acbeae7edbadca7c64d31d93b4c7f",
+    "semantic_hash": "e50acbeae7edbadca7c64d31d93b4c7f"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\admin\\UserSegments.tsx": {
+    "mtime": 1781372742.322031,
+    "ast_hash": "f8256d972f744da4173ebf0ccb5b958c",
+    "semantic_hash": "f8256d972f744da4173ebf0ccb5b958c"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\admin\\UserTable.tsx": {
+    "mtime": 1781372742.322031,
+    "ast_hash": "b8f44fc0da58243925a680a5c792cd58",
+    "semantic_hash": "b8f44fc0da58243925a680a5c792cd58"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\admin\\types.ts": {
+    "mtime": 1781372742.322031,
+    "ast_hash": "bc74301f4d554c164b2c852ba2eda0f4",
+    "semantic_hash": "bc74301f4d554c164b2c852ba2eda0f4"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\admin\\useAdminUsers.ts": {
+    "mtime": 1781372742.322031,
+    "ast_hash": "a4a76cd697c5133f60c6884967200e6e",
+    "semantic_hash": "a4a76cd697c5133f60c6884967200e6e"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\admin\\useUserDetail.ts": {
+    "mtime": 1781372742.3230302,
+    "ast_hash": "bd96dd45b2eb59381c8c280e337a23b9",
+    "semantic_hash": "bd96dd45b2eb59381c8c280e337a23b9"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\admin\\useUserSegments.ts": {
+    "mtime": 1781372742.3230302,
+    "ast_hash": "0e92572db0281a2a6a84bacfc83e1055",
+    "semantic_hash": "0e92572db0281a2a6a84bacfc83e1055"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\calendar\\AddReminderModal.tsx": {
+    "mtime": 1781372742.3230302,
+    "ast_hash": "5625604a4c9f3b0362761f4ce9a37e03",
+    "semantic_hash": "5625604a4c9f3b0362761f4ce9a37e03"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\calendar\\AgendaView.tsx": {
+    "mtime": 1781372742.3240302,
+    "ast_hash": "bfb51293ab845088844fbb7b6678e05e",
+    "semantic_hash": "bfb51293ab845088844fbb7b6678e05e"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\calendar\\CalendarSidebar.tsx": {
+    "mtime": 1781372742.3240302,
+    "ast_hash": "72edef833290b9d11102aaaac0443c4f",
+    "semantic_hash": "72edef833290b9d11102aaaac0443c4f"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\calendar\\DayView.tsx": {
+    "mtime": 1781372742.3240302,
+    "ast_hash": "0a50fd2735825b8080bccae2a3db4dca",
+    "semantic_hash": "0a50fd2735825b8080bccae2a3db4dca"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\calendar\\EventDetailBar.tsx": {
+    "mtime": 1781372742.3240302,
+    "ast_hash": "3e1abc6c4f101f9e44256f25390dca2c",
+    "semantic_hash": "3e1abc6c4f101f9e44256f25390dca2c"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\calendar\\EventHoverCard.tsx": {
+    "mtime": 1781372742.3250566,
+    "ast_hash": "de6182eda5815c55e1886ea56cd4363d",
+    "semantic_hash": "de6182eda5815c55e1886ea56cd4363d"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\calendar\\FeedbackModal.tsx": {
+    "mtime": 1781372742.3250566,
+    "ast_hash": "03d5ced677e965d364a4556aeb73628e",
+    "semantic_hash": "03d5ced677e965d364a4556aeb73628e"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\calendar\\MonthView.tsx": {
+    "mtime": 1781372742.3250566,
+    "ast_hash": "d12830a426e3f440dff4af8dc67d9cd6",
+    "semantic_hash": "d12830a426e3f440dff4af8dc67d9cd6"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\calendar\\ScheduleModal.tsx": {
+    "mtime": 1781372742.3250566,
+    "ast_hash": "7085acb80937727e25672457c2cb7b1f",
+    "semantic_hash": "7085acb80937727e25672457c2cb7b1f"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\calendar\\WeekView.tsx": {
+    "mtime": 1781372742.3260577,
+    "ast_hash": "4490dc4b8a9102c2dc3b936ca0613dba",
+    "semantic_hash": "4490dc4b8a9102c2dc3b936ca0613dba"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\calendar\\types.ts": {
+    "mtime": 1781372742.3260577,
+    "ast_hash": "3934a9cbf3985499bb9e5e8762df1e75",
+    "semantic_hash": "3934a9cbf3985499bb9e5e8762df1e75"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\calendar\\useCalendarData.ts": {
+    "mtime": 1781372742.3260577,
+    "ast_hash": "ca1549b09924fafa51decd41171060f1",
+    "semantic_hash": "ca1549b09924fafa51decd41171060f1"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\calendar\\useDragReschedule.ts": {
+    "mtime": 1781372742.3260577,
+    "ast_hash": "1d335d4182d51274f37a990741869283",
+    "semantic_hash": "1d335d4182d51274f37a990741869283"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\calendar\\useVisibleCalendars.ts": {
+    "mtime": 1781372742.3260577,
+    "ast_hash": "27e3767e9fc0fc32a0c3089304e6da94",
+    "semantic_hash": "27e3767e9fc0fc32a0c3089304e6da94"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\dashboard\\ActivityStream.tsx": {
+    "mtime": 1781372742.3270574,
+    "ast_hash": "d3aadc42ed652e860fb2a5b39080646a",
+    "semantic_hash": "d3aadc42ed652e860fb2a5b39080646a"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\dashboard\\MetricRow.tsx": {
+    "mtime": 1781372742.3270574,
+    "ast_hash": "78ef933eb5ab907cd7c94ef898b2ebf2",
+    "semantic_hash": "78ef933eb5ab907cd7c94ef898b2ebf2"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\dashboard\\NeedsAttentionStrip.tsx": {
+    "mtime": 1781372742.3270574,
+    "ast_hash": "193cae2d3d060921172b5c7d6216c512",
+    "semantic_hash": "193cae2d3d060921172b5c7d6216c512"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\dashboard\\PipelineCard.tsx": {
+    "mtime": 1781372742.3270574,
+    "ast_hash": "270e6f58494837b583f807edf544eceb",
+    "semantic_hash": "270e6f58494837b583f807edf544eceb"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\dashboard\\TodaysFocus.tsx": {
+    "mtime": 1781372742.3270574,
+    "ast_hash": "901c620c89a0f688521a5338f83f6ee4",
+    "semantic_hash": "901c620c89a0f688521a5338f83f6ee4"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\dashboard\\UrgentRibbon.tsx": {
+    "mtime": 1781372742.3281987,
+    "ast_hash": "2a9043546f1f8a2d6eb9e3bcd6c0fdf1",
+    "semantic_hash": "2a9043546f1f8a2d6eb9e3bcd6c0fdf1"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\dashboard\\WeeklyGoals.tsx": {
+    "mtime": 1781372742.3281987,
+    "ast_hash": "c1e50921707eb2444a06506a7d3306cb",
+    "semantic_hash": "c1e50921707eb2444a06506a7d3306cb"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\dashboard\\types.ts": {
+    "mtime": 1781372742.3281987,
+    "ast_hash": "34c8c6e62a20cd3829be27c3f619244f",
+    "semantic_hash": "34c8c6e62a20cd3829be27c3f619244f"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\dashboard\\useDashboardData.ts": {
+    "mtime": 1781372742.3281987,
+    "ast_hash": "40b902ef6a35dc1e1fa17374f432f510",
+    "semantic_hash": "40b902ef6a35dc1e1fa17374f432f510"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\dashboard\\useUrgentItems.ts": {
+    "mtime": 1781372742.3281987,
+    "ast_hash": "4a805b3303ec07f4a332c50e6a4bd692",
+    "semantic_hash": "4a805b3303ec07f4a332c50e6a4bd692"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\jobs\\AlertFilters.tsx": {
+    "mtime": 1781372742.3292,
+    "ast_hash": "7b8b9169703929fc266eeb3993a9399e",
+    "semantic_hash": "7b8b9169703929fc266eeb3993a9399e"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\jobs\\AlertsToggle.tsx": {
+    "mtime": 1781372742.3292,
+    "ast_hash": "2c3e4afd1f40adfb8521cd2752148293",
+    "semantic_hash": "2c3e4afd1f40adfb8521cd2752148293"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\jobs\\AppliedSubTabs.tsx": {
+    "mtime": 1781372742.3292,
+    "ast_hash": "decb88c90e96f4dad8f9e1a594a9244a",
+    "semantic_hash": "decb88c90e96f4dad8f9e1a594a9244a"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\jobs\\ApplyConfirmModal.tsx": {
+    "mtime": 1781372742.3292,
+    "ast_hash": "d85f030392b16eccda2dcce4f45a1a3e",
+    "semantic_hash": "d85f030392b16eccda2dcce4f45a1a3e"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\jobs\\BenchMatchesCard.tsx": {
+    "mtime": 1781372742.3292,
+    "ast_hash": "405bc042a220fbe3620f53b8f1f189a9",
+    "semantic_hash": "405bc042a220fbe3620f53b8f1f189a9"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\jobs\\CompanyLogo.tsx": {
+    "mtime": 1781372742.3302736,
+    "ast_hash": "ce09ebf42b2d618aeb2058ac7f120271",
+    "semantic_hash": "ce09ebf42b2d618aeb2058ac7f120271"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\jobs\\EmptyState.tsx": {
+    "mtime": 1781372742.3302736,
+    "ast_hash": "66aad534d8442f4cfe6e246389fe4954",
+    "semantic_hash": "66aad534d8442f4cfe6e246389fe4954"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\jobs\\JobCard.tsx": {
+    "mtime": 1781372742.3302736,
+    "ast_hash": "5f784c77c3f3c577943315dd758433a1",
+    "semantic_hash": "5f784c77c3f3c577943315dd758433a1"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\jobs\\JobDetailPane.tsx": {
+    "mtime": 1781372742.3302736,
+    "ast_hash": "f0c91bb9ab43b905d26d3438df1fef6a",
+    "semantic_hash": "f0c91bb9ab43b905d26d3438df1fef6a"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\jobs\\JobFilterBar.tsx": {
+    "mtime": 1781372742.3302736,
+    "ast_hash": "fd02b92658d7a671af477d6f309001d5",
+    "semantic_hash": "fd02b92658d7a671af477d6f309001d5"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\jobs\\JobModals.tsx": {
+    "mtime": 1781372742.331275,
+    "ast_hash": "8af4d2e1d4ecc08ed5f2818e5d85ff6f",
+    "semantic_hash": "8af4d2e1d4ecc08ed5f2818e5d85ff6f"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\jobs\\JobPreviewDrawer.tsx": {
+    "mtime": 1781372742.331275,
+    "ast_hash": "767f66f0c543213195cf7c2f563766fa",
+    "semantic_hash": "767f66f0c543213195cf7c2f563766fa"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\jobs\\JobSearchHero.tsx": {
+    "mtime": 1781372742.331275,
+    "ast_hash": "ebeee7b6d6c9fbfa3be4e19fac3e47c0",
+    "semantic_hash": "ebeee7b6d6c9fbfa3be4e19fac3e47c0"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\jobs\\JobTabsBar.tsx": {
+    "mtime": 1781372742.331275,
+    "ast_hash": "c91c63f5f3840e70f356b0c25c222b2d",
+    "semantic_hash": "c91c63f5f3840e70f356b0c25c222b2d"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\jobs\\MatchExplain.tsx": {
+    "mtime": 1781372742.331275,
+    "ast_hash": "1d49f549b4d89895d7437d47738d0607",
+    "semantic_hash": "1d49f549b4d89895d7437d47738d0607"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\jobs\\MatchModeChip.tsx": {
+    "mtime": 1781372742.3322742,
+    "ast_hash": "54f53de9172690678298afd669fa8d8c",
+    "semantic_hash": "54f53de9172690678298afd669fa8d8c"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\jobs\\MatchRing.tsx": {
+    "mtime": 1781372742.3322742,
+    "ast_hash": "7c9b5c0312084949c8255bf87b249cd5",
+    "semantic_hash": "7c9b5c0312084949c8255bf87b249cd5"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\jobs\\PillSelect.tsx": {
+    "mtime": 1781372742.3322742,
+    "ast_hash": "46a5cc58d5430fa0a73a6ab229db1d85",
+    "semantic_hash": "46a5cc58d5430fa0a73a6ab229db1d85"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\jobs\\RecruiterNoteCard.tsx": {
+    "mtime": 1781372742.3322742,
+    "ast_hash": "8af0af8fec4ac1719e965cd2303b0f6b",
+    "semantic_hash": "8af0af8fec4ac1719e965cd2303b0f6b"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\jobs\\RecruiterTargetingBar.tsx": {
+    "mtime": 1781372742.3322742,
+    "ast_hash": "caeab5677f6c599a8bf60af6fdb3cee4",
+    "semantic_hash": "caeab5677f6c599a8bf60af6fdb3cee4"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\jobs\\RequirementRow.tsx": {
+    "mtime": 1781372742.3332736,
+    "ast_hash": "d96cb0b6bb45422ac68e21a8ae61aeac",
+    "semantic_hash": "d96cb0b6bb45422ac68e21a8ae61aeac"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\jobs\\SkillsPicker.tsx": {
+    "mtime": 1781372742.3332736,
+    "ast_hash": "a9b45792c9b01c4b5834bb24912d13b2",
+    "semantic_hash": "a9b45792c9b01c4b5834bb24912d13b2"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\jobs\\SourceBreakdown.tsx": {
+    "mtime": 1781372742.3332736,
+    "ast_hash": "d8d51127f629b9a99c67fbb519f1bbad",
+    "semantic_hash": "d8d51127f629b9a99c67fbb519f1bbad"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\jobs\\SourcesDrawer.tsx": {
+    "mtime": 1781372742.3332736,
+    "ast_hash": "db78f1db97debea4060aa5a7ed6c6a7c",
+    "semantic_hash": "db78f1db97debea4060aa5a7ed6c6a7c"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\jobs\\helpers.ts": {
+    "mtime": 1781372742.3332736,
+    "ast_hash": "d1ec37e032a694bdd9da9cb7bd2680f8",
+    "semantic_hash": "d1ec37e032a694bdd9da9cb7bd2680f8"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\jobs\\jobTags.ts": {
+    "mtime": 1781372742.3332736,
+    "ast_hash": "e26d41bb84e295f41f6cca06adfdf072",
+    "semantic_hash": "e26d41bb84e295f41f6cca06adfdf072"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\jobs\\jobsApi.ts": {
+    "mtime": 1781372742.334273,
+    "ast_hash": "a57c15d80787626d75c3d657699c7b24",
+    "semantic_hash": "a57c15d80787626d75c3d657699c7b24"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\jobs\\sourceTokens.tsx": {
+    "mtime": 1781372742.334273,
+    "ast_hash": "682b58aace751fda3e6fdaff85529ed6",
+    "semantic_hash": "682b58aace751fda3e6fdaff85529ed6"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\jobs\\types.ts": {
+    "mtime": 1781372742.334273,
+    "ast_hash": "f6be8083de23456757117807aad9c22d",
+    "semantic_hash": "f6be8083de23456757117807aad9c22d"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\jobs\\useJobSearch.ts": {
+    "mtime": 1781372742.335798,
+    "ast_hash": "c9228d3309df612082582e7e1f3fba29",
+    "semantic_hash": "c9228d3309df612082582e7e1f3fba29"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\messages\\BugReportModal.tsx": {
+    "mtime": 1781372742.335836,
+    "ast_hash": "3b2ca15b612cff8caf3f09fa8d6e91e8",
+    "semantic_hash": "3b2ca15b612cff8caf3f09fa8d6e91e8"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\messages\\ContactPanel.tsx": {
+    "mtime": 1781372742.335836,
+    "ast_hash": "114113f5036e299d22a869319dd78b05",
+    "semantic_hash": "114113f5036e299d22a869319dd78b05"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\messages\\QuickReplyMenu.tsx": {
+    "mtime": 1781372742.335836,
+    "ast_hash": "633f0deae3a507c972fe3eb0f44e002e",
+    "semantic_hash": "633f0deae3a507c972fe3eb0f44e002e"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\reports\\ConsultantReport.tsx": {
+    "mtime": 1781372742.3368359,
+    "ast_hash": "06a584338c3e6106e0cc1dc9f55ec9df",
+    "semantic_hash": "06a584338c3e6106e0cc1dc9f55ec9df"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\reports\\DailyActivityReport.tsx": {
+    "mtime": 1781372742.3368359,
+    "ast_hash": "00f31d6ad85e05fc094ac5b3a8c7360a",
+    "semantic_hash": "00f31d6ad85e05fc094ac5b3a8c7360a"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\reports\\EmptyChart.tsx": {
+    "mtime": 1781372742.3368359,
+    "ast_hash": "9f2cf5c976306df87bce83e5d9ed188f",
+    "semantic_hash": "9f2cf5c976306df87bce83e5d9ed188f"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\reports\\KpiCard.tsx": {
+    "mtime": 1781372742.3368359,
+    "ast_hash": "ce67a01d61d203ec194b80b286c5ecb2",
+    "semantic_hash": "ce67a01d61d203ec194b80b286c5ecb2"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\reports\\PipelineReport.tsx": {
+    "mtime": 1781372742.3368359,
+    "ast_hash": "1f824c5eab084eb3ef6c06ebcc951bd5",
+    "semantic_hash": "1f824c5eab084eb3ef6c06ebcc951bd5"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\reports\\PlacementsReport.tsx": {
+    "mtime": 1781372742.337796,
+    "ast_hash": "9ca36fe56052225a4e0c8ee660024ca8",
+    "semantic_hash": "9ca36fe56052225a4e0c8ee660024ca8"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\reports\\RecruiterReport.tsx": {
+    "mtime": 1781372742.337796,
+    "ast_hash": "39adca194ee597c93d6742f8c4bf1bed",
+    "semantic_hash": "39adca194ee597c93d6742f8c4bf1bed"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\reports\\ReportContext.tsx": {
+    "mtime": 1781372742.337796,
+    "ast_hash": "a2e5b69a4cecdabd224f57eb498a7904",
+    "semantic_hash": "a2e5b69a4cecdabd224f57eb498a7904"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\reports\\ReportControls.tsx": {
+    "mtime": 1781372742.337796,
+    "ast_hash": "f68d826791494965b79c8bf65487f7ac",
+    "semantic_hash": "f68d826791494965b79c8bf65487f7ac"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\reports\\ReportTabs.tsx": {
+    "mtime": 1781372742.337796,
+    "ast_hash": "33d8976dce58a4eb396768e4bbd5eca4",
+    "semantic_hash": "33d8976dce58a4eb396768e4bbd5eca4"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\reports\\SourcesReport.tsx": {
+    "mtime": 1781372742.338811,
+    "ast_hash": "58a151f2ac6ff484fa8bd90a3bf16df1",
+    "semantic_hash": "58a151f2ac6ff484fa8bd90a3bf16df1"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\reports\\SubmissionsReport.tsx": {
+    "mtime": 1781372742.338811,
+    "ast_hash": "44fce958a647eef74005f2fc8f72a765",
+    "semantic_hash": "44fce958a647eef74005f2fc8f72a765"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\reports\\TimeInAppReport.tsx": {
+    "mtime": 1781372742.338811,
+    "ast_hash": "80224d5442fb0d2df436df70a178574d",
+    "semantic_hash": "80224d5442fb0d2df436df70a178574d"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\reports\\charts\\CohortHeatmap.tsx": {
+    "mtime": 1781372742.338811,
+    "ast_hash": "c1d582d5725fb71f59a68782c65b9b47",
+    "semantic_hash": "c1d582d5725fb71f59a68782c65b9b47"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\reports\\charts\\DonutBreakdown.tsx": {
+    "mtime": 1781372742.3398104,
+    "ast_hash": "66f2eaffa2fa5760856eea7e92672972",
+    "semantic_hash": "66f2eaffa2fa5760856eea7e92672972"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\reports\\charts\\FunnelLarge.tsx": {
+    "mtime": 1781372742.3398104,
+    "ast_hash": "01764b7c98e1b90a22adae9c836e01a0",
+    "semantic_hash": "01764b7c98e1b90a22adae9c836e01a0"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\reports\\charts\\HorizontalBars.tsx": {
+    "mtime": 1781372742.3398104,
+    "ast_hash": "be2d7123784f29d6613d216d1ce499cf",
+    "semantic_hash": "be2d7123784f29d6613d216d1ce499cf"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\reports\\charts\\StackedAreaChart.tsx": {
+    "mtime": 1781372742.3398104,
+    "ast_hash": "17fd121c2589b5cdb57a03c3581e1cb5",
+    "semantic_hash": "17fd121c2589b5cdb57a03c3581e1cb5"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\reports\\exportUtils.ts": {
+    "mtime": 1781372742.3398104,
+    "ast_hash": "b509ef73823ab202594c72ee7fa42ef2",
+    "semantic_hash": "b509ef73823ab202594c72ee7fa42ef2"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\reports\\types.ts": {
+    "mtime": 1781372742.3408098,
+    "ast_hash": "468149878035e9ce78ed8a507bcc4c99",
+    "semantic_hash": "468149878035e9ce78ed8a507bcc4c99"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\reports\\useReportData.ts": {
+    "mtime": 1781372742.3408098,
+    "ast_hash": "d67f5ddac4fb8b6ca69d91e62d3a04aa",
+    "semantic_hash": "d67f5ddac4fb8b6ca69d91e62d3a04aa"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\resumes\\AtsBits.tsx": {
+    "mtime": 1781372742.3408098,
+    "ast_hash": "e61420ffcfce74d7886e151b1edff6c3",
+    "semantic_hash": "e61420ffcfce74d7886e151b1edff6c3"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\resumes\\AtsBreakdownRail.tsx": {
+    "mtime": 1781372742.3408098,
+    "ast_hash": "bc0be43601467c81483c95736b85ffb2",
+    "semantic_hash": "bc0be43601467c81483c95736b85ffb2"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\resumes\\CenterPane.tsx": {
+    "mtime": 1781372742.3408098,
+    "ast_hash": "6c8f8677a2fa84cbb6825d8d34172aba",
+    "semantic_hash": "6c8f8677a2fa84cbb6825d8d34172aba"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\resumes\\MyResumeCard.tsx": {
+    "mtime": 1781372742.3418095,
+    "ast_hash": "ba0ebc2f84482c6aa0a845970823e8bd",
+    "semantic_hash": "ba0ebc2f84482c6aa0a845970823e8bd"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\resumes\\ResumeDiff.tsx": {
+    "mtime": 1781372742.3418095,
+    "ast_hash": "9d6e1a3efb2fd5701df61459b0071d42",
+    "semantic_hash": "9d6e1a3efb2fd5701df61459b0071d42"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\resumes\\ResumeEditor.tsx": {
+    "mtime": 1781372742.3418095,
+    "ast_hash": "42d15cfadf3ca0b5b70a6d3eebf43b7c",
+    "semantic_hash": "42d15cfadf3ca0b5b70a6d3eebf43b7c"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\resumes\\ResumePreview.tsx": {
+    "mtime": 1781372742.3418095,
+    "ast_hash": "34369ddf68333085364a93de4112e0c2",
+    "semantic_hash": "34369ddf68333085364a93de4112e0c2"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\resumes\\ResumeProfileCard.tsx": {
+    "mtime": 1781372742.3428092,
+    "ast_hash": "615450097cefbefdf19c563a72071e91",
+    "semantic_hash": "615450097cefbefdf19c563a72071e91"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\resumes\\ResumeVersionStrip.tsx": {
+    "mtime": 1781372742.3433702,
+    "ast_hash": "d5f902ff3e46e9a2474eafb4efebe704",
+    "semantic_hash": "d5f902ff3e46e9a2474eafb4efebe704"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\resumes\\TailorHistory.tsx": {
+    "mtime": 1781372742.3433702,
+    "ast_hash": "6b08ed298ab0843af49dec74898f79ae",
+    "semantic_hash": "6b08ed298ab0843af49dec74898f79ae"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\resumes\\TailorLauncher.tsx": {
+    "mtime": 1781372742.3433702,
+    "ast_hash": "befc921e53a5590eedba80fd991ee5c7",
+    "semantic_hash": "befc921e53a5590eedba80fd991ee5c7"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\resumes\\markdown.tsx": {
+    "mtime": 1781372742.3433702,
+    "ast_hash": "084644a08fc60256ef4aaf0b56a91343",
+    "semantic_hash": "084644a08fc60256ef4aaf0b56a91343"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\resumes\\types.ts": {
+    "mtime": 1781372742.3433702,
+    "ast_hash": "68977d16672d89a9feaff20c3e77416c",
+    "semantic_hash": "68977d16672d89a9feaff20c3e77416c"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\resumes\\useResumeWorkspace.ts": {
+    "mtime": 1781372742.3443718,
+    "ast_hash": "33f7422ca3a9c6f75724835840864866",
+    "semantic_hash": "33f7422ca3a9c6f75724835840864866"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\tasks\\CreateTaskModal.tsx": {
+    "mtime": 1781372742.3443718,
+    "ast_hash": "842543e870dc163a4bcb23bbfa998e0c",
+    "semantic_hash": "842543e870dc163a4bcb23bbfa998e0c"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\tasks\\TaskCard.tsx": {
+    "mtime": 1781372742.3443718,
+    "ast_hash": "75dc896877f2809e390c99f4ab5f5660",
+    "semantic_hash": "75dc896877f2809e390c99f4ab5f5660"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\tasks\\TaskDetailPane.tsx": {
+    "mtime": 1781372742.3453712,
+    "ast_hash": "5c81f6118cfb81e846c91f821f9759e4",
+    "semantic_hash": "5c81f6118cfb81e846c91f821f9759e4"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\tasks\\TaskFilterBar.tsx": {
+    "mtime": 1781372742.3453712,
+    "ast_hash": "3206307034704454f2fcbff8cc386be9",
+    "semantic_hash": "3206307034704454f2fcbff8cc386be9"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\tasks\\TaskKanban.tsx": {
+    "mtime": 1781372742.3453712,
+    "ast_hash": "477014a96a4392b79e8b7586be82105a",
+    "semantic_hash": "477014a96a4392b79e8b7586be82105a"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\tasks\\TaskTable.tsx": {
+    "mtime": 1781372742.3460624,
+    "ast_hash": "35d5242ba2a06fb7d2f833dbc3b34b59",
+    "semantic_hash": "35d5242ba2a06fb7d2f833dbc3b34b59"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\tasks\\TaskTimeline.tsx": {
+    "mtime": 1781372742.3460624,
+    "ast_hash": "05fae5a81f95b923c5d3e57e8216c0be",
+    "semantic_hash": "05fae5a81f95b923c5d3e57e8216c0be"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\tasks\\types.ts": {
+    "mtime": 1781372742.3460624,
+    "ast_hash": "a202e12eba4d3fb752ff4d1d6aa6153f",
+    "semantic_hash": "a202e12eba4d3fb752ff4d1d6aa6153f"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\tasks\\useSavedTaskViews.ts": {
+    "mtime": 1781372742.3460624,
+    "ast_hash": "a49444fe30000ca94b897df46e227760",
+    "semantic_hash": "a49444fe30000ca94b897df46e227760"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\tasks\\useTasksData.ts": {
+    "mtime": 1781372742.3460624,
+    "ast_hash": "6ebb616b1313c355c819f1f763fdf0e1",
+    "semantic_hash": "6ebb616b1313c355c819f1f763fdf0e1"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\training\\AchievementsView.tsx": {
+    "mtime": 1781372742.3470736,
+    "ast_hash": "6d14950090c5f864472a325b9cda4599",
+    "semantic_hash": "6d14950090c5f864472a325b9cda4599"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\training\\CatalogView.tsx": {
+    "mtime": 1781372742.3470736,
+    "ast_hash": "da0985eda75f56fc758cec3a57aabfab",
+    "semantic_hash": "da0985eda75f56fc758cec3a57aabfab"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\training\\ComplianceCard.tsx": {
+    "mtime": 1781372742.3470736,
+    "ast_hash": "3f1521fe94483fd2e6417e4f89d6669a",
+    "semantic_hash": "3f1521fe94483fd2e6417e4f89d6669a"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\training\\ContinueLearningHero.tsx": {
+    "mtime": 1781372742.3470736,
+    "ast_hash": "241790c7dfb34a95b7fae9af07083174",
+    "semantic_hash": "241790c7dfb34a95b7fae9af07083174"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\training\\CourseGroup.tsx": {
+    "mtime": 1781372742.3470736,
+    "ast_hash": "acb9f9993a0d940b4d93649ac2a9e763",
+    "semantic_hash": "acb9f9993a0d940b4d93649ac2a9e763"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\training\\CourseRow.tsx": {
+    "mtime": 1781372742.3482196,
+    "ast_hash": "e2d4b559a7f739fc27ebec62888004aa",
+    "semantic_hash": "e2d4b559a7f739fc27ebec62888004aa"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\training\\MyTrainingView.tsx": {
+    "mtime": 1781372742.3482196,
+    "ast_hash": "4a714cb0fcd2869432ba2549e1624db8",
+    "semantic_hash": "4a714cb0fcd2869432ba2549e1624db8"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\training\\StreakCard.tsx": {
+    "mtime": 1781372742.3482196,
+    "ast_hash": "42667a561d70adf5b5c0d55a5bb481a5",
+    "semantic_hash": "42667a561d70adf5b5c0d55a5bb481a5"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\training\\StudyPlanView.tsx": {
+    "mtime": 1781372742.3482196,
+    "ast_hash": "d63f03c5c6b1e2fa73500f1e63acefd6",
+    "semantic_hash": "d63f03c5c6b1e2fa73500f1e63acefd6"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\training\\TrainingTabs.tsx": {
+    "mtime": 1781372742.3482196,
+    "ast_hash": "73165a93618db06e18cecc6ab8a2a95c",
+    "semantic_hash": "73165a93618db06e18cecc6ab8a2a95c"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\training\\types.ts": {
+    "mtime": 1781372742.349221,
+    "ast_hash": "954548725d14244e7806173e0173bc62",
+    "semantic_hash": "954548725d14244e7806173e0173bc62"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\ui\\Popover.tsx": {
+    "mtime": 1781372742.349221,
+    "ast_hash": "bb620811ac9365cf2a69507939a3e44a",
+    "semantic_hash": "bb620811ac9365cf2a69507939a3e44a"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\ui\\curtain-theme-toggle.demo.tsx": {
+    "mtime": 1781372742.349221,
+    "ast_hash": "24900fa4f4eb3e807f36cc4773c16f07",
+    "semantic_hash": "24900fa4f4eb3e807f36cc4773c16f07"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\ui\\curtain-theme-toggle.tsx": {
+    "mtime": 1781372742.349221,
+    "ast_hash": "be09796d58126fd7fd933fccc9004824",
+    "semantic_hash": "be09796d58126fd7fd933fccc9004824"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\components\\ui\\useAnchoredPosition.ts": {
+    "mtime": 1781372742.349221,
+    "ast_hash": "01fd1cec1d5c493acef29d6aea30a75e",
+    "semantic_hash": "01fd1cec1d5c493acef29d6aea30a75e"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\config\\env.ts": {
+    "mtime": 1781372742.3502204,
+    "ast_hash": "67219564943ceb94ff667b3b115faae6",
+    "semantic_hash": "67219564943ceb94ff667b3b115faae6"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\context\\AuthContext.tsx": {
+    "mtime": 1781372742.3502204,
+    "ast_hash": "89d902b21618ebc0bbf767ab70313c24",
+    "semantic_hash": "89d902b21618ebc0bbf767ab70313c24"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\context\\CallContext.tsx": {
+    "mtime": 1781372742.3502204,
+    "ast_hash": "fefc892bc701d10875a57a997ef87a7d",
+    "semantic_hash": "fefc892bc701d10875a57a997ef87a7d"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\dev\\DevPanel.tsx": {
+    "mtime": 1781372742.35122,
+    "ast_hash": "80aeee3ed3c14fd24e1b5dce54e2c0fe",
+    "semantic_hash": "80aeee3ed3c14fd24e1b5dce54e2c0fe"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\dev\\DevToolbar.tsx": {
+    "mtime": 1781372742.35122,
+    "ast_hash": "4ee811222c08a130ad5cd742c8eefd92",
+    "semantic_hash": "4ee811222c08a130ad5cd742c8eefd92"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\dev\\devSession.ts": {
+    "mtime": 1781372742.35122,
+    "ast_hash": "609cd8fa17745fdc9568799cc684dabd",
+    "semantic_hash": "609cd8fa17745fdc9568799cc684dabd"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\hooks\\useBadgeCounts.ts": {
+    "mtime": 1781372742.35122,
+    "ast_hash": "4973b55fb7d3e2d48d1e80205cbc0c46",
+    "semantic_hash": "4973b55fb7d3e2d48d1e80205cbc0c46"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\hooks\\useCall.ts": {
+    "mtime": 1781372742.3522193,
+    "ast_hash": "fd9284ab0750d8d6b24d724e2f993195",
+    "semantic_hash": "fd9284ab0750d8d6b24d724e2f993195"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\hooks\\useEntityList.ts": {
+    "mtime": 1781372742.3522193,
+    "ast_hash": "bdb0fa5687c07690aede5363d11d77f8",
+    "semantic_hash": "bdb0fa5687c07690aede5363d11d77f8"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\hooks\\useFeatureFlags.tsx": {
+    "mtime": 1781372742.3522193,
+    "ast_hash": "7e9abf83bf428e4ffa6d41c521de56f4",
+    "semantic_hash": "7e9abf83bf428e4ffa6d41c521de56f4"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\hooks\\useInboxNotifications.ts": {
+    "mtime": 1781372742.3532186,
+    "ast_hash": "38f9d0387de6c7a0ce9c67dd231d0f51",
+    "semantic_hash": "38f9d0387de6c7a0ce9c67dd231d0f51"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\hooks\\useInvalidate.ts": {
+    "mtime": 1781372742.3534367,
+    "ast_hash": "06c72d1379fe1e155e726a1ca19b95dd",
+    "semantic_hash": "06c72d1379fe1e155e726a1ca19b95dd"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\hooks\\useIsMobile.ts": {
+    "mtime": 1781372742.3534367,
+    "ast_hash": "8b2bfdd1540bc334ba64ca1979d29cda",
+    "semantic_hash": "8b2bfdd1540bc334ba64ca1979d29cda"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\hooks\\useMediaViewer.ts": {
+    "mtime": 1781372742.3534367,
+    "ast_hash": "120d806d60256b1bcf4f42a1bd393607",
+    "semantic_hash": "120d806d60256b1bcf4f42a1bd393607"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\hooks\\useRealtime.ts": {
+    "mtime": 1781372742.3534367,
+    "ast_hash": "4109018552e2cf51ca6b437608493bf3",
+    "semantic_hash": "4109018552e2cf51ca6b437608493bf3"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\hooks\\useSessionRevoke.ts": {
+    "mtime": 1781372742.3534367,
+    "ast_hash": "575b6540fe1a7d68345336fbd5b782a1",
+    "semantic_hash": "575b6540fe1a7d68345336fbd5b782a1"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\hooks\\useTheme.ts": {
+    "mtime": 1781372742.3534367,
+    "ast_hash": "3c77914fb3414388540d298139ef7347",
+    "semantic_hash": "3c77914fb3414388540d298139ef7347"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\lib\\canMessage.ts": {
+    "mtime": 1781372742.354805,
+    "ast_hash": "484931c3f741edc0111fd999fe688ad2",
+    "semantic_hash": "484931c3f741edc0111fd999fe688ad2"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\lib\\jobFormat.ts": {
+    "mtime": 1781372742.354805,
+    "ast_hash": "264ca7a70a9273e34239408be4bb3f75",
+    "semantic_hash": "264ca7a70a9273e34239408be4bb3f75"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\lib\\theme.ts": {
+    "mtime": 1781372742.354805,
+    "ast_hash": "7581bfa23832e85db570b8dd5f40fc73",
+    "semantic_hash": "7581bfa23832e85db570b8dd5f40fc73"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\main.tsx": {
+    "mtime": 1781372742.354805,
+    "ast_hash": "2a0922885a8b6d63ffff82d95d8a1b8b",
+    "semantic_hash": "2a0922885a8b6d63ffff82d95d8a1b8b"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\mocks\\reports\\consultants.json": {
+    "mtime": 1781372742.3558064,
+    "ast_hash": "5a0e10c08f7981031f522a45ccb82bb0",
+    "semantic_hash": "5a0e10c08f7981031f522a45ccb82bb0"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\mocks\\reports\\pipeline.json": {
+    "mtime": 1781372742.3558064,
+    "ast_hash": "8bb9d61decb6b2f132fbc27cce5df649",
+    "semantic_hash": "8bb9d61decb6b2f132fbc27cce5df649"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\mocks\\reports\\placements.json": {
+    "mtime": 1781372742.3558064,
+    "ast_hash": "fd90148a637ae3c239bcc1e0446cfd41",
+    "semantic_hash": "fd90148a637ae3c239bcc1e0446cfd41"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\mocks\\reports\\recruiters.json": {
+    "mtime": 1781372742.3558064,
+    "ast_hash": "c49027c9a431106aab904b823122d5a4",
+    "semantic_hash": "c49027c9a431106aab904b823122d5a4"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\mocks\\reports\\sources.json": {
+    "mtime": 1781372742.3558064,
+    "ast_hash": "a14857843573fffe4e1bd43456ab9a13",
+    "semantic_hash": "a14857843573fffe4e1bd43456ab9a13"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\pages\\AIEmail.tsx": {
+    "mtime": 1781372742.3568058,
+    "ast_hash": "e6e5bdc7ea8d0cb7a4f5b5139e9a0988",
+    "semantic_hash": "e6e5bdc7ea8d0cb7a4f5b5139e9a0988"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\pages\\AIUsage.tsx": {
+    "mtime": 1781372742.3568058,
+    "ast_hash": "1835d5bd786328cd608631999b4d71b1",
+    "semantic_hash": "1835d5bd786328cd608631999b4d71b1"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\pages\\AcceptInvitation.tsx": {
+    "mtime": 1781372742.3568058,
+    "ast_hash": "a279f6d980581b47d6a335975a549c63",
+    "semantic_hash": "a279f6d980581b47d6a335975a549c63"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\pages\\AdminAISettings.tsx": {
+    "mtime": 1781372742.3568058,
+    "ast_hash": "07c4b7c4352e1cfb95d25d3aa5af6a08",
+    "semantic_hash": "07c4b7c4352e1cfb95d25d3aa5af6a08"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\pages\\AdminAuditLog.tsx": {
+    "mtime": 1781372742.3578055,
+    "ast_hash": "40da9f5e471e4e0328b560c6cfaa4ad4",
+    "semantic_hash": "40da9f5e471e4e0328b560c6cfaa4ad4"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\pages\\AdminCallsUsage.tsx": {
+    "mtime": 1781372742.3581371,
+    "ast_hash": "5fe0cd8d46f1bfc4578b62c4e8e73048",
+    "semantic_hash": "5fe0cd8d46f1bfc4578b62c4e8e73048"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\pages\\AdminUsers.tsx": {
+    "mtime": 1781372742.3581371,
+    "ast_hash": "caf083216390e24e5a13f1097eb14703",
+    "semantic_hash": "caf083216390e24e5a13f1097eb14703"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\pages\\Applications.tsx": {
+    "mtime": 1781372742.3581371,
+    "ast_hash": "71293424167f882765612023207687ae",
+    "semantic_hash": "71293424167f882765612023207687ae"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\pages\\Calendar.tsx": {
+    "mtime": 1781372742.3581371,
+    "ast_hash": "09e4a3691506d740e1c12b58b8fd92fc",
+    "semantic_hash": "09e4a3691506d740e1c12b58b8fd92fc"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\pages\\ChangePassword.tsx": {
+    "mtime": 1781372742.3591385,
+    "ast_hash": "c20f4be080b1281c3fd2571ceb794d20",
+    "semantic_hash": "c20f4be080b1281c3fd2571ceb794d20"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\pages\\Clients.tsx": {
+    "mtime": 1781372742.3591385,
+    "ast_hash": "223c147425173d3adaf5c42dab6b3c67",
+    "semantic_hash": "223c147425173d3adaf5c42dab6b3c67"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\pages\\ConsultantDashboard.tsx": {
+    "mtime": 1781372742.3591385,
+    "ast_hash": "b56f270fe18820b508aa23189ac85a2d",
+    "semantic_hash": "b56f270fe18820b508aa23189ac85a2d"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\pages\\ConsultantOnboarding.tsx": {
+    "mtime": 1781372742.3591385,
+    "ast_hash": "ca78e4623f25f4c0a295f6cf3b3ef6a9",
+    "semantic_hash": "ca78e4623f25f4c0a295f6cf3b3ef6a9"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\pages\\Consultants.tsx": {
+    "mtime": 1781372742.3601377,
+    "ast_hash": "89d58fc2addc83bab242f33cf753561d",
+    "semantic_hash": "89d58fc2addc83bab242f33cf753561d"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\pages\\CreateTrainingCourse.tsx": {
+    "mtime": 1781372742.3601377,
+    "ast_hash": "ca52edc3c7bbe7ab41dfdfc5db3c66d1",
+    "semantic_hash": "ca52edc3c7bbe7ab41dfdfc5db3c66d1"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\pages\\DeactivatedAccounts.tsx": {
+    "mtime": 1781372742.3601377,
+    "ast_hash": "8041fae730559b588d5749c29b6f483c",
+    "semantic_hash": "8041fae730559b588d5749c29b6f483c"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\pages\\EditTrainingCourse.tsx": {
+    "mtime": 1781372742.3601377,
+    "ast_hash": "67fd85e6e043bb49fa09a93c7c22f68a",
+    "semantic_hash": "67fd85e6e043bb49fa09a93c7c22f68a"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\pages\\FeatureFlags.tsx": {
+    "mtime": 1781372742.3611372,
+    "ast_hash": "504e62be9bdc5da6cf6bb958745bf0b2",
+    "semantic_hash": "504e62be9bdc5da6cf6bb958745bf0b2"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\pages\\ForgotPassword.tsx": {
+    "mtime": 1781372742.3611372,
+    "ast_hash": "39232ea7d3f589e8f6d5bec7c4f633fd",
+    "semantic_hash": "39232ea7d3f589e8f6d5bec7c4f633fd"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\pages\\Interviews.tsx": {
+    "mtime": 1781372742.3611372,
+    "ast_hash": "370d70e56a85d58229299f7bd72f4cf1",
+    "semantic_hash": "370d70e56a85d58229299f7bd72f4cf1"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\pages\\Invitations.tsx": {
+    "mtime": 1781372742.3611372,
+    "ast_hash": "37a2fbd804b19ec0244dcea5715a4156",
+    "semantic_hash": "37a2fbd804b19ec0244dcea5715a4156"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\pages\\Invoices.tsx": {
+    "mtime": 1781372742.362137,
+    "ast_hash": "49507ffdab02706f6f67d2cfba97086e",
+    "semantic_hash": "49507ffdab02706f6f67d2cfba97086e"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\pages\\JobDetail.tsx": {
+    "mtime": 1781372742.362137,
+    "ast_hash": "01f7ee2fd522afdea1adb6d484d8d8a2",
+    "semantic_hash": "01f7ee2fd522afdea1adb6d484d8d8a2"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\pages\\JobSearch.tsx": {
+    "mtime": 1781372742.362137,
+    "ast_hash": "80d250e319b87603616dfc06ec20a8a4",
+    "semantic_hash": "80d250e319b87603616dfc06ec20a8a4"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\pages\\LessonViewer.tsx": {
+    "mtime": 1781372742.362137,
+    "ast_hash": "55b49ca9447d816bbbb3fa408003473a",
+    "semantic_hash": "55b49ca9447d816bbbb3fa408003473a"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\pages\\Login.tsx": {
+    "mtime": 1781372742.363136,
+    "ast_hash": "37db4394a06b532d6a07e78d8dc591ff",
+    "semantic_hash": "37db4394a06b532d6a07e78d8dc591ff"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\pages\\ManagerDashboard.tsx": {
+    "mtime": 1781372742.363136,
+    "ast_hash": "297a8ec54080901345063ec63a906b6d",
+    "semantic_hash": "297a8ec54080901345063ec63a906b6d"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\pages\\Managers.tsx": {
+    "mtime": 1781372742.363136,
+    "ast_hash": "be591257a775dbb9f4030abf4446e363",
+    "semantic_hash": "be591257a775dbb9f4030abf4446e363"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\pages\\Messages.tsx": {
+    "mtime": 1781372742.3641355,
+    "ast_hash": "5dc737ffcccf9b5fb23daa69146be3ae",
+    "semantic_hash": "5dc737ffcccf9b5fb23daa69146be3ae"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\pages\\MyResume.tsx": {
+    "mtime": 1781372742.3641355,
+    "ast_hash": "fd3c0039edac8be00bad91dfc0a37a66",
+    "semantic_hash": "fd3c0039edac8be00bad91dfc0a37a66"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\pages\\MyTraining.tsx": {
+    "mtime": 1781372742.365135,
+    "ast_hash": "c11a52bc4346f807fb3d76dfedddb5d5",
+    "semantic_hash": "c11a52bc4346f807fb3d76dfedddb5d5"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\pages\\QuizPage.tsx": {
+    "mtime": 1781372742.365135,
+    "ast_hash": "8f84fa6d8eaa393b475f0b700a538035",
+    "semantic_hash": "8f84fa6d8eaa393b475f0b700a538035"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\pages\\RecruiterDashboard.tsx": {
+    "mtime": 1781372742.365135,
+    "ast_hash": "02649feee69bcaac6c3dd2a88d65cf26",
+    "semantic_hash": "02649feee69bcaac6c3dd2a88d65cf26"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\pages\\RecruiterOnboarding.tsx": {
+    "mtime": 1781372742.365135,
+    "ast_hash": "00a8db400cafb4623e28d7f9c7574b78",
+    "semantic_hash": "00a8db400cafb4623e28d7f9c7574b78"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\pages\\Recruiters.tsx": {
+    "mtime": 1781372742.3661342,
+    "ast_hash": "202e89b7bd49e2a421876f6d5b750671",
+    "semantic_hash": "202e89b7bd49e2a421876f6d5b750671"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\pages\\Reminders.tsx": {
+    "mtime": 1781372742.3661342,
+    "ast_hash": "64d7ebbb046bb059832918ae9574f6a3",
+    "semantic_hash": "64d7ebbb046bb059832918ae9574f6a3"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\pages\\Reports.tsx": {
+    "mtime": 1781372742.3661342,
+    "ast_hash": "5986ec8b436ce9d8912e5c287b1c8d12",
+    "semantic_hash": "5986ec8b436ce9d8912e5c287b1c8d12"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\pages\\ResetPassword.tsx": {
+    "mtime": 1781372742.3661342,
+    "ast_hash": "032df00f505a57f1acdc6a05f9790c9f",
+    "semantic_hash": "032df00f505a57f1acdc6a05f9790c9f"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\pages\\Resumes.tsx": {
+    "mtime": 1781372742.3671343,
+    "ast_hash": "335604d75bb797d1f7f4e0b4b958c98a",
+    "semantic_hash": "335604d75bb797d1f7f4e0b4b958c98a"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\pages\\TaskDetail.tsx": {
+    "mtime": 1781372742.3671343,
+    "ast_hash": "3009364ea538e0fd6732bc031d7be6af",
+    "semantic_hash": "3009364ea538e0fd6732bc031d7be6af"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\pages\\Tasks.tsx": {
+    "mtime": 1781372742.3671343,
+    "ast_hash": "ef4081ec9d8aaf8d32176f02a29bc2e7",
+    "semantic_hash": "ef4081ec9d8aaf8d32176f02a29bc2e7"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\pages\\TasksAssignedToMe.tsx": {
+    "mtime": 1781372742.368133,
+    "ast_hash": "3da264de0dbb81dc6122406bb5064e5a",
+    "semantic_hash": "3da264de0dbb81dc6122406bb5064e5a"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\pages\\TrainingAIActivity.tsx": {
+    "mtime": 1781372742.368133,
+    "ast_hash": "c8a4457eba6d803675befc7bdb4b9a77",
+    "semantic_hash": "c8a4457eba6d803675befc7bdb4b9a77"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\pages\\TrainingAssignments.tsx": {
+    "mtime": 1781372742.368133,
+    "ast_hash": "b9940f4d1ce764fbe836a06133286e64",
+    "semantic_hash": "b9940f4d1ce764fbe836a06133286e64"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\pages\\TrainingCourseDetails.tsx": {
+    "mtime": 1781372742.3691325,
+    "ast_hash": "5dc515e518604ab4e30db70ebd118ddd",
+    "semantic_hash": "5dc515e518604ab4e30db70ebd118ddd"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\pages\\TrainingCourses.tsx": {
+    "mtime": 1781372742.3691325,
+    "ast_hash": "096864e9e302532ad28d84ccdbc21af0",
+    "semantic_hash": "096864e9e302532ad28d84ccdbc21af0"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\pages\\TrainingPlanView.tsx": {
+    "mtime": 1781372742.3691325,
+    "ast_hash": "dcb558bdf95a5ffc018566caa0cde2d4",
+    "semantic_hash": "dcb558bdf95a5ffc018566caa0cde2d4"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\pages\\TrainingReports.tsx": {
+    "mtime": 1781372742.3691325,
+    "ast_hash": "cdb6e209797b0e91c70e107a76234b0a",
+    "semantic_hash": "cdb6e209797b0e91c70e107a76234b0a"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\pages\\Unauthorized.tsx": {
+    "mtime": 1781372742.3691325,
+    "ast_hash": "e271a674464589f1deed4ec217416ba9",
+    "semantic_hash": "e271a674464589f1deed4ec217416ba9"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\pages\\UserGroups.tsx": {
+    "mtime": 1781372742.370132,
+    "ast_hash": "afa3e7d880dde523f58711fba1188e6b",
+    "semantic_hash": "afa3e7d880dde523f58711fba1188e6b"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\pages\\UserProfile.tsx": {
+    "mtime": 1781372742.370132,
+    "ast_hash": "4af7512e932eb6af53f07702c2a585a8",
+    "semantic_hash": "4af7512e932eb6af53f07702c2a585a8"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\pages\\Vendors.tsx": {
+    "mtime": 1781372742.3710096,
+    "ast_hash": "d3b9a173deaf1ab4d97181240ea2a48a",
+    "semantic_hash": "d3b9a173deaf1ab4d97181240ea2a48a"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\services\\api.ts": {
+    "mtime": 1781372742.3710096,
+    "ast_hash": "3e2fa5db2a80f3ae482023b2a68a51a0",
+    "semantic_hash": "3e2fa5db2a80f3ae482023b2a68a51a0"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\services\\session.ts": {
+    "mtime": 1781372742.3710096,
+    "ast_hash": "fcd563c98d8795f5dd8f5a2795d6500c",
+    "semantic_hash": "fcd563c98d8795f5dd8f5a2795d6500c"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\types\\index.ts": {
+    "mtime": 1781372742.3720112,
+    "ast_hash": "15b05e66405f2d6b80f175f068ecdd36",
+    "semantic_hash": "15b05e66405f2d6b80f175f068ecdd36"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\utils\\callSounds.ts": {
+    "mtime": 1781372742.3720112,
+    "ast_hash": "5a2268dc3475b8b126c29d89af9ed65f",
+    "semantic_hash": "5a2268dc3475b8b126c29d89af9ed65f"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\utils\\fileUrl.ts": {
+    "mtime": 1781372742.3720112,
+    "ast_hash": "7f682ed2c8f67ce8d489b52bdd5196a9",
+    "semantic_hash": "7f682ed2c8f67ce8d489b52bdd5196a9"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\utils\\safeUrl.ts": {
+    "mtime": 1781372742.3720112,
+    "ast_hash": "9a621880ce067dc50c6d0e5c4292210e",
+    "semantic_hash": "9a621880ce067dc50c6d0e5c4292210e"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\utils\\urgency.ts": {
+    "mtime": 1781372742.3730104,
+    "ast_hash": "510e394c9fe2f3a6fa3208c979ac2093",
+    "semantic_hash": "510e394c9fe2f3a6fa3208c979ac2093"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\vite-env.d.ts": {
+    "mtime": 1781372742.3730104,
+    "ast_hash": "8f68c27c3fc38817b2726b20e2d4f1ee",
+    "semantic_hash": "8f68c27c3fc38817b2726b20e2d4f1ee"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\tailwind.config.js": {
+    "mtime": 1781372742.3730104,
+    "ast_hash": "44a00b9969fee50b2e3343092c4cea00",
+    "semantic_hash": "44a00b9969fee50b2e3343092c4cea00"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\tsconfig.json": {
+    "mtime": 1781372742.3730104,
+    "ast_hash": "e1e520242e770f7b5c777a70fd78713f",
+    "semantic_hash": "e1e520242e770f7b5c777a70fd78713f"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\vite.config.ts": {
+    "mtime": 1781372742.3730104,
+    "ast_hash": "9f99703bf4b57b2082c069fe60abaa3d",
+    "semantic_hash": "9f99703bf4b57b2082c069fe60abaa3d"
+  },
+  "E:\\claude\\hireorbitai\\infrastructure\\bootstrap-vps.sh": {
+    "mtime": 1781372742.3740098,
+    "ast_hash": "aa57a0f06fe77912d1635421295a91cd",
+    "semantic_hash": "aa57a0f06fe77912d1635421295a91cd"
+  },
+  "E:\\claude\\hireorbitai\\package.json": {
+    "mtime": 1781372742.377008,
+    "ast_hash": "52c8433cd6eb174d3a4f3fd4cc44fe42",
+    "semantic_hash": "52c8433cd6eb174d3a4f3fd4cc44fe42"
+  },
+  "E:\\claude\\hireorbitai\\scripts\\auto-pull.sh": {
+    "mtime": 1781372742.3780077,
+    "ast_hash": "79fd5c351227ec6d850dcc901b822cb3",
+    "semantic_hash": "79fd5c351227ec6d850dcc901b822cb3"
+  },
+  "E:\\claude\\hireorbitai\\scripts\\backfill-courses.mjs": {
+    "mtime": 1781372742.3780077,
+    "ast_hash": "31e28d28051f300c6d43ae8472acc535",
+    "semantic_hash": "31e28d28051f300c6d43ae8472acc535"
+  },
+  "E:\\claude\\hireorbitai\\scripts\\backup.sh": {
+    "mtime": 1781372742.3780077,
+    "ast_hash": "c147a609c06298a45ca0691c55afa9f7",
+    "semantic_hash": "c147a609c06298a45ca0691c55afa9f7"
+  },
+  "E:\\claude\\hireorbitai\\scripts\\build-init-sql.mjs": {
+    "mtime": 1781372742.3780077,
+    "ast_hash": "f80e44f94ef517359c234a40bf80f7be",
+    "semantic_hash": "f80e44f94ef517359c234a40bf80f7be"
+  },
+  "E:\\claude\\hireorbitai\\scripts\\db-bootstrap.mjs": {
+    "mtime": 1781372742.3787942,
+    "ast_hash": "d9d88927319558382c92ab0d7065ae89",
+    "semantic_hash": "d9d88927319558382c92ab0d7065ae89"
+  },
+  "E:\\claude\\hireorbitai\\scripts\\deploy-rowcounts.sql": {
+    "mtime": 1781372742.3787942,
+    "ast_hash": "5ac1093959cf7cebc01a9b05909528a8",
+    "semantic_hash": "5ac1093959cf7cebc01a9b05909528a8"
+  },
+  "E:\\claude\\hireorbitai\\scripts\\deploy.sh": {
+    "mtime": 1781372742.3787942,
+    "ast_hash": "252ac93f3d38614736aa100539ef0e31",
+    "semantic_hash": "252ac93f3d38614736aa100539ef0e31"
+  },
+  "E:\\claude\\hireorbitai\\scripts\\dev-windows.ps1": {
+    "mtime": 1781372742.3787942,
+    "ast_hash": "c452a180c71a2343b6bf15629575f309",
+    "semantic_hash": "c452a180c71a2343b6bf15629575f309"
+  },
+  "E:\\claude\\hireorbitai\\scripts\\healthcheck.sh": {
+    "mtime": 1781372742.3787942,
+    "ast_hash": "41a74ecd9646e39c79ea2355ce465402",
+    "semantic_hash": "41a74ecd9646e39c79ea2355ce465402"
+  },
+  "E:\\claude\\hireorbitai\\scripts\\lib-env.sh": {
+    "mtime": 1781372742.3797956,
+    "ast_hash": "e629e333f9e40773c3c1d3841e29f53f",
+    "semantic_hash": "e629e333f9e40773c3c1d3841e29f53f"
+  },
+  "E:\\claude\\hireorbitai\\scripts\\ops.sh": {
+    "mtime": 1781372742.3797956,
+    "ast_hash": "7ca932f66cf8261834a3ab0f2fdda12c",
+    "semantic_hash": "7ca932f66cf8261834a3ab0f2fdda12c"
+  },
+  "E:\\claude\\hireorbitai\\scripts\\postdeploy-verify.sql": {
+    "mtime": 1781372742.3797956,
+    "ast_hash": "ebe654bc2a12d2875bda8e28c7d2f870",
+    "semantic_hash": "ebe654bc2a12d2875bda8e28c7d2f870"
+  },
+  "E:\\claude\\hireorbitai\\scripts\\release.sh": {
+    "mtime": 1781372742.3797956,
+    "ast_hash": "376b6902b296b0f0ba1c345eb3c3ccf3",
+    "semantic_hash": "376b6902b296b0f0ba1c345eb3c3ccf3"
+  },
+  "E:\\claude\\hireorbitai\\scripts\\reset-dev.mjs": {
+    "mtime": 1781372742.380795,
+    "ast_hash": "eb719f5ce39cbcee936994cbc7184f73",
+    "semantic_hash": "eb719f5ce39cbcee936994cbc7184f73"
+  },
+  "E:\\claude\\hireorbitai\\scripts\\reset-prod.sh": {
+    "mtime": 1781372742.380795,
+    "ast_hash": "047ce83d463b69bca5c9ae018646f27a",
+    "semantic_hash": "047ce83d463b69bca5c9ae018646f27a"
+  },
+  "E:\\claude\\hireorbitai\\scripts\\restore.sh": {
+    "mtime": 1781372742.380795,
+    "ast_hash": "2e26657090d4455dc39984d879004891",
+    "semantic_hash": "2e26657090d4455dc39984d879004891"
+  },
+  "E:\\claude\\hireorbitai\\scripts\\setup-claude-auth.sh": {
+    "mtime": 1781372742.380795,
+    "ast_hash": "d57fb4ff5fb75cc5f3aeb073c36539a4",
+    "semantic_hash": "d57fb4ff5fb75cc5f3aeb073c36539a4"
+  },
+  "E:\\claude\\hireorbitai\\scripts\\stop-dev-windows.ps1": {
+    "mtime": 1781372742.380795,
+    "ast_hash": "e352e93c555ca92e441a800cdd7325dc",
+    "semantic_hash": "e352e93c555ca92e441a800cdd7325dc"
+  },
+  "E:\\claude\\hireorbitai\\scripts\\test-models.mjs": {
+    "mtime": 1781372742.3817947,
+    "ast_hash": "28fb25e2f49ad4e1321dd269d956b88a",
+    "semantic_hash": "28fb25e2f49ad4e1321dd269d956b88a"
+  },
+  "E:\\claude\\hireorbitai\\scripts\\update-dev.sh": {
+    "mtime": 1781372742.3817947,
+    "ast_hash": "486d25759801f937013c32b6e5ed908b",
+    "semantic_hash": "486d25759801f937013c32b6e5ed908b"
+  },
+  "E:\\claude\\hireorbitai\\scripts\\update.sh": {
+    "mtime": 1781372742.3817947,
+    "ast_hash": "69008e93863298d2a055b74041a9f5ec",
+    "semantic_hash": "69008e93863298d2a055b74041a9f5ec"
+  },
+  "E:\\claude\\hireorbitai\\scripts\\zap-baseline.ps1": {
+    "mtime": 1781372742.3817947,
+    "ast_hash": "df4e04121564f9e2375b63aa21381f96",
+    "semantic_hash": "df4e04121564f9e2375b63aa21381f96"
+  },
+  "E:\\claude\\hireorbitai\\scripts\\zap-baseline.sh": {
+    "mtime": 1781372742.3817947,
+    "ast_hash": "fb2143ad6fb7bbb315105633f26912ce",
+    "semantic_hash": "fb2143ad6fb7bbb315105633f26912ce"
+  },
+  "E:\\claude\\hireorbitai\\shared\\package.json": {
+    "mtime": 1781372742.382794,
+    "ast_hash": "b9e80e3f671dd7e9b54a0cd5835a4731",
+    "semantic_hash": "b9e80e3f671dd7e9b54a0cd5835a4731"
+  },
+  "E:\\claude\\hireorbitai\\shared\\scripts\\fix-cjs.mjs": {
+    "mtime": 1781372742.382794,
+    "ast_hash": "b67c057ee5018dc0696c3787ae7c45a9",
+    "semantic_hash": "b67c057ee5018dc0696c3787ae7c45a9"
+  },
+  "E:\\claude\\hireorbitai\\shared\\src\\index.ts": {
+    "mtime": 1781372742.383793,
+    "ast_hash": "2ef3e0f826ab4eea72ef6fdd1bbe3b09",
+    "semantic_hash": "2ef3e0f826ab4eea72ef6fdd1bbe3b09"
+  },
+  "E:\\claude\\hireorbitai\\shared\\src\\roles.ts": {
+    "mtime": 1781372742.383793,
+    "ast_hash": "1f74918932bad47b605dcf7c3f576f54",
+    "semantic_hash": "1f74918932bad47b605dcf7c3f576f54"
+  },
+  "E:\\claude\\hireorbitai\\shared\\src\\tasks.ts": {
+    "mtime": 1781372742.383793,
+    "ast_hash": "18710c135058119e6ffa68945421bd8a",
+    "semantic_hash": "18710c135058119e6ffa68945421bd8a"
+  },
+  "E:\\claude\\hireorbitai\\shared\\tsconfig.cjs.json": {
+    "mtime": 1781372742.383793,
+    "ast_hash": "b655b6743a516221e971381580cb0c1a",
+    "semantic_hash": "b655b6743a516221e971381580cb0c1a"
+  },
+  "E:\\claude\\hireorbitai\\shared\\tsconfig.json": {
+    "mtime": 1781372742.383793,
+    "ast_hash": "637a4f14a09ec4c71fddb77359627f99",
+    "semantic_hash": "637a4f14a09ec4c71fddb77359627f99"
+  },
+  "E:\\claude\\hireorbitai\\.claude\\agents\\backend-test-writer.md": {
+    "mtime": 1781372742.1701252,
+    "ast_hash": "92226fcff7c7046175bfcd856ca13bf6",
+    "semantic_hash": "92226fcff7c7046175bfcd856ca13bf6"
+  },
+  "E:\\claude\\hireorbitai\\.claude\\agents\\controller-auditor.md": {
+    "mtime": 1781372742.1701252,
+    "ast_hash": "c079bc628bd791ba11d8dab2a9d3d0b9",
+    "semantic_hash": "c079bc628bd791ba11d8dab2a9d3d0b9"
+  },
+  "E:\\claude\\hireorbitai\\.claude\\agents\\release-notes-writer.md": {
+    "mtime": 1781372742.1701252,
+    "ast_hash": "fa603241f6608ce82d73dd394e78d7f6",
+    "semantic_hash": "fa603241f6608ce82d73dd394e78d7f6"
+  },
+  "E:\\claude\\hireorbitai\\.claude\\agents\\ui-test-writer.md": {
+    "mtime": 1781372742.1701252,
+    "ast_hash": "6111fe3b81e5aa9fe2eb14b952be2d1d",
+    "semantic_hash": "6111fe3b81e5aa9fe2eb14b952be2d1d"
+  },
+  "E:\\claude\\hireorbitai\\.claude\\commands\\audit-controllers.md": {
+    "mtime": 1781372742.1701252,
+    "ast_hash": "6fed0da11f8a03b58d3bf502e6ec6983",
+    "semantic_hash": "6fed0da11f8a03b58d3bf502e6ec6983"
+  },
+  "E:\\claude\\hireorbitai\\.claude\\commands\\check-deploy.md": {
+    "mtime": 1781372742.1711247,
+    "ast_hash": "ea53831847a03117cc70a8c11934c588",
+    "semantic_hash": "ea53831847a03117cc70a8c11934c588"
+  },
+  "E:\\claude\\hireorbitai\\.claude\\commands\\release-checklist.md": {
+    "mtime": 1781372742.1711247,
+    "ast_hash": "1b81ebcd0cd389761e2c3e0891ae173e",
+    "semantic_hash": "1b81ebcd0cd389761e2c3e0891ae173e"
+  },
+  "E:\\claude\\hireorbitai\\.claude\\commands\\rollback.md": {
+    "mtime": 1781372742.1711247,
+    "ast_hash": "f35dc75259f91e0113c496deaeb4f775",
+    "semantic_hash": "f35dc75259f91e0113c496deaeb4f775"
+  },
+  "E:\\claude\\hireorbitai\\.claude\\commands\\verify.md": {
+    "mtime": 1781372742.1711247,
+    "ast_hash": "aca1ebfc6fbc9274b3fa125949fe1a76",
+    "semantic_hash": "aca1ebfc6fbc9274b3fa125949fe1a76"
+  },
+  "E:\\claude\\hireorbitai\\.claude\\output-styles\\terse.md": {
+    "mtime": 1781372742.1711247,
+    "ast_hash": "981f7502d161b6d326b4403bb07413a5",
+    "semantic_hash": "981f7502d161b6d326b4403bb07413a5"
+  },
+  "E:\\claude\\hireorbitai\\.claude\\rules\\database.md": {
+    "mtime": 1781372742.172124,
+    "ast_hash": "73b9f7fbc7f0fc9acce91a2b71026db6",
+    "semantic_hash": "73b9f7fbc7f0fc9acce91a2b71026db6"
+  },
+  "E:\\claude\\hireorbitai\\.claude\\rules\\deploy.md": {
+    "mtime": 1781372742.172124,
+    "ast_hash": "00a0fd6bf1cd1fe084d3f05c10dbe566",
+    "semantic_hash": "00a0fd6bf1cd1fe084d3f05c10dbe566"
+  },
+  "E:\\claude\\hireorbitai\\.claude\\rules\\frontend-responsive.md": {
+    "mtime": 1781372742.172124,
+    "ast_hash": "9ea45df65550e8de2414f3d912d39e55",
+    "semantic_hash": "9ea45df65550e8de2414f3d912d39e55"
+  },
+  "E:\\claude\\hireorbitai\\.claude\\rules\\security.md": {
+    "mtime": 1781372742.172124,
+    "ast_hash": "13cda1ac822afdd863eef0ac44a97a3d",
+    "semantic_hash": "13cda1ac822afdd863eef0ac44a97a3d"
+  },
+  "E:\\claude\\hireorbitai\\.claude\\skills\\apply-migration\\SKILL.md": {
+    "mtime": 1781372742.1731236,
+    "ast_hash": "1a88ef3754e9ddc477188b48fcbadaf1",
+    "semantic_hash": "1a88ef3754e9ddc477188b48fcbadaf1"
+  },
+  "E:\\claude\\hireorbitai\\.claude\\skills\\code-reviewer\\SKILL.md": {
+    "mtime": 1781372742.1741228,
+    "ast_hash": "a957180394528a434c64da141c2d4be8",
+    "semantic_hash": "a957180394528a434c64da141c2d4be8"
+  },
+  "E:\\claude\\hireorbitai\\.claude\\skills\\code-reviewer\\references\\code_review_checklist.md": {
+    "mtime": 1781372742.1741228,
+    "ast_hash": "5b21c6eecfbc0cf050b59e6bc47fa2da",
+    "semantic_hash": "5b21c6eecfbc0cf050b59e6bc47fa2da"
+  },
+  "E:\\claude\\hireorbitai\\.claude\\skills\\code-reviewer\\references\\coding_standards.md": {
+    "mtime": 1781372742.1741228,
+    "ast_hash": "c9ab3c4f56c5ec6b9b944af571d26e65",
+    "semantic_hash": "c9ab3c4f56c5ec6b9b944af571d26e65"
+  },
+  "E:\\claude\\hireorbitai\\.claude\\skills\\code-reviewer\\references\\common_antipatterns.md": {
+    "mtime": 1781372742.1741228,
+    "ast_hash": "8f4d80431ce5d2de935aa932ce0068a7",
+    "semantic_hash": "8f4d80431ce5d2de935aa932ce0068a7"
+  },
+  "E:\\claude\\hireorbitai\\.claude\\skills\\idor-audit\\SKILL.md": {
+    "mtime": 1781372742.175122,
+    "ast_hash": "a944c51380c7478f152b1c0f53062f40",
+    "semantic_hash": "a944c51380c7478f152b1c0f53062f40"
+  },
+  "E:\\claude\\hireorbitai\\.github\\ISSUE_TEMPLATE\\bug_report.yml": {
+    "mtime": 1781372742.1761222,
+    "ast_hash": "17bc54632c95f0d7b03ba423f23335bd",
+    "semantic_hash": "17bc54632c95f0d7b03ba423f23335bd"
+  },
+  "E:\\claude\\hireorbitai\\.github\\ISSUE_TEMPLATE\\config.yml": {
+    "mtime": 1781372742.1761222,
+    "ast_hash": "0348e3c91b26e694b2f53f10a27b5b53",
+    "semantic_hash": "0348e3c91b26e694b2f53f10a27b5b53"
+  },
+  "E:\\claude\\hireorbitai\\.github\\ISSUE_TEMPLATE\\feature_request.yml": {
+    "mtime": 1781372742.1761222,
+    "ast_hash": "edb70ce5d8e4c457c4d3fa84c5484e5f",
+    "semantic_hash": "edb70ce5d8e4c457c4d3fa84c5484e5f"
+  },
+  "E:\\claude\\hireorbitai\\.github\\PULL_REQUEST_TEMPLATE.md": {
+    "mtime": 1781372742.1761222,
+    "ast_hash": "a88b800f536ac481631d1fa1743b66d8",
+    "semantic_hash": "a88b800f536ac481631d1fa1743b66d8"
+  },
+  "E:\\claude\\hireorbitai\\.github\\dependabot.yml": {
+    "mtime": 1781372742.1761222,
+    "ast_hash": "0acfce0543d2f3042289d3dea3ff932a",
+    "semantic_hash": "0acfce0543d2f3042289d3dea3ff932a"
+  },
+  "E:\\claude\\hireorbitai\\.github\\workflows\\ci.yml": {
+    "mtime": 1781372742.177121,
+    "ast_hash": "da8c2217b37c633d91c1e686a2cf1d96",
+    "semantic_hash": "da8c2217b37c633d91c1e686a2cf1d96"
+  },
+  "E:\\claude\\hireorbitai\\.github\\workflows\\deploy-production.yml": {
+    "mtime": 1781372742.177121,
+    "ast_hash": "680fc221547e6dc1eb5ad996dccd9933",
+    "semantic_hash": "680fc221547e6dc1eb5ad996dccd9933"
+  },
+  "E:\\claude\\hireorbitai\\.github\\workflows\\deploy-staging.yml": {
+    "mtime": 1781372742.177121,
+    "ast_hash": "5eab57eab19da9945b2048ad4d66ef55",
+    "semantic_hash": "5eab57eab19da9945b2048ad4d66ef55"
+  },
+  "E:\\claude\\hireorbitai\\.github\\workflows\\dev.yml": {
+    "mtime": 1781372742.177121,
+    "ast_hash": "6ea1aee594031468f8cd7cd51619b6a6",
+    "semantic_hash": "6ea1aee594031468f8cd7cd51619b6a6"
+  },
+  "E:\\claude\\hireorbitai\\.github\\workflows\\release.yml": {
+    "mtime": 1781372742.177121,
+    "ast_hash": "5ae63a74a395e014607d8179aef9d637",
+    "semantic_hash": "5ae63a74a395e014607d8179aef9d637"
+  },
+  "E:\\claude\\hireorbitai\\.github\\workflows\\rollback.yml": {
+    "mtime": 1781372742.1781209,
+    "ast_hash": "303361bf10ac0e8fcd09d33536198b29",
+    "semantic_hash": "303361bf10ac0e8fcd09d33536198b29"
+  },
+  "E:\\claude\\hireorbitai\\.github\\workflows\\security-scan.yml": {
+    "mtime": 1781372742.1781209,
+    "ast_hash": "eab0173ced706c2849cfe3a1dd00f28a",
+    "semantic_hash": "eab0173ced706c2849cfe3a1dd00f28a"
+  },
+  "E:\\claude\\hireorbitai\\CHANGELOG.md": {
+    "mtime": 1781372742.1801195,
+    "ast_hash": "608979f3cdcc9977aa0c72790e42cca5",
+    "semantic_hash": "608979f3cdcc9977aa0c72790e42cca5"
+  },
+  "E:\\claude\\hireorbitai\\CLAUDE.md": {
+    "mtime": 1781372742.1801195,
+    "ast_hash": "5036fc241e279e55b94236ebb1ac1ce8",
+    "semantic_hash": "5036fc241e279e55b94236ebb1ac1ce8"
+  },
+  "E:\\claude\\hireorbitai\\CONTRIBUTING.md": {
+    "mtime": 1781372742.1801195,
+    "ast_hash": "0ab801ab6cfa49b1c803a6b639328217",
+    "semantic_hash": "0ab801ab6cfa49b1c803a6b639328217"
+  },
+  "E:\\claude\\hireorbitai\\DEPLOY.md": {
+    "mtime": 1781372742.1801195,
+    "ast_hash": "5529565352317bcef5cddd49da5fa190",
+    "semantic_hash": "5529565352317bcef5cddd49da5fa190"
+  },
+  "E:\\claude\\hireorbitai\\README.md": {
+    "mtime": 1781372742.181119,
+    "ast_hash": "ad02464b4189864a5ee7bb99b8e27dcf",
+    "semantic_hash": "ad02464b4189864a5ee7bb99b8e27dcf"
+  },
+  "E:\\claude\\hireorbitai\\RELEASE_NOTES.md": {
+    "mtime": 1781372742.181119,
+    "ast_hash": "4e33cd7f011f8d0ff6033742233ed087",
+    "semantic_hash": "4e33cd7f011f8d0ff6033742233ed087"
+  },
+  "E:\\claude\\hireorbitai\\SECURITY.md": {
+    "mtime": 1781372742.181119,
+    "ast_hash": "33e5dd035020c232c5d953264e6b6929",
+    "semantic_hash": "33e5dd035020c232c5d953264e6b6929"
+  },
+  "E:\\claude\\hireorbitai\\SETUP.md": {
+    "mtime": 1781372742.181119,
+    "ast_hash": "8d865f8c8d6b4a23e2f899df5314b6cb",
+    "semantic_hash": "8d865f8c8d6b4a23e2f899df5314b6cb"
+  },
+  "E:\\claude\\hireorbitai\\backend\\MIGRATIONS.md": {
+    "mtime": 1781372742.1821182,
+    "ast_hash": "ca870d483c8e01fe0e721a0db52d5a20",
+    "semantic_hash": "ca870d483c8e01fe0e721a0db52d5a20"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\repositories\\README.md": {
+    "mtime": 1781372742.227898,
+    "ast_hash": "150d4c6bd6a186d7b9b4e04fcd1c602b",
+    "semantic_hash": "150d4c6bd6a186d7b9b4e04fcd1c602b"
+  },
+  "E:\\claude\\hireorbitai\\docker\\docker-compose.yml": {
+    "mtime": 1781372742.268669,
+    "ast_hash": "3e3e9617b520335829279e5d43727cad",
+    "semantic_hash": "3e3e9617b520335829279e5d43727cad"
+  },
+  "E:\\claude\\hireorbitai\\docs\\DEV-ENVIRONMENT.md": {
+    "mtime": 1781372742.2690034,
+    "ast_hash": "10ae712850f1b793b7399d871eb56d68",
+    "semantic_hash": "10ae712850f1b793b7399d871eb56d68"
+  },
+  "E:\\claude\\hireorbitai\\docs\\api-conventions.md": {
+    "mtime": 1781372742.2690034,
+    "ast_hash": "f9fbfd1f22870c4a00582e8f136bfcc7",
+    "semantic_hash": "f9fbfd1f22870c4a00582e8f136bfcc7"
+  },
+  "E:\\claude\\hireorbitai\\docs\\architecture.md": {
+    "mtime": 1781372742.2700064,
+    "ast_hash": "1a7938bf9f78c39cf16302bf6de3b77d",
+    "semantic_hash": "1a7938bf9f78c39cf16302bf6de3b77d"
+  },
+  "E:\\claude\\hireorbitai\\docs\\branching.md": {
+    "mtime": 1781372742.2700064,
+    "ast_hash": "fa58d8302e186c971bfb7510023849b1",
+    "semantic_hash": "fa58d8302e186c971bfb7510023849b1"
+  },
+  "E:\\claude\\hireorbitai\\docs\\changelog.html": {
+    "mtime": 1781372742.2700064,
+    "ast_hash": "dcfac58e5dc521690f704313991eda33",
+    "semantic_hash": "dcfac58e5dc521690f704313991eda33"
+  },
+  "E:\\claude\\hireorbitai\\docs\\deployment\\00-production-runbook.md": {
+    "mtime": 1781372742.2710063,
+    "ast_hash": "14bfa15c234e7f5e5fca47fc06d31c14",
+    "semantic_hash": "14bfa15c234e7f5e5fca47fc06d31c14"
+  },
+  "E:\\claude\\hireorbitai\\docs\\deployment\\01-vps-cloudpanel.md": {
+    "mtime": 1781372742.2710063,
+    "ast_hash": "1ba81bd79b1967d98355db4c805af851",
+    "semantic_hash": "1ba81bd79b1967d98355db4c805af851"
+  },
+  "E:\\claude\\hireorbitai\\docs\\deployment\\02-databases.md": {
+    "mtime": 1781372742.2710063,
+    "ast_hash": "97e5822eb63eab1297884b8c5940cdad",
+    "semantic_hash": "97e5822eb63eab1297884b8c5940cdad"
+  },
+  "E:\\claude\\hireorbitai\\docs\\deployment\\03-render-dev-hosting.md": {
+    "mtime": 1781372742.2710063,
+    "ast_hash": "06fd8c22c79330dcb144d31c81e7229a",
+    "semantic_hash": "06fd8c22c79330dcb144d31c81e7229a"
+  },
+  "E:\\claude\\hireorbitai\\docs\\deployment\\04-github-actions.md": {
+    "mtime": 1781372742.2710063,
+    "ast_hash": "ae0962878bc509d879e8053331fc706a",
+    "semantic_hash": "ae0962878bc509d879e8053331fc706a"
+  },
+  "E:\\claude\\hireorbitai\\docs\\deployment\\05-deploy-and-rollback.md": {
+    "mtime": 1781372742.2720053,
+    "ast_hash": "9eddcee846982c4f9f4b1cd6dce1d758",
+    "semantic_hash": "9eddcee846982c4f9f4b1cd6dce1d758"
+  },
+  "E:\\claude\\hireorbitai\\docs\\deployment\\06-fresh-reset.md": {
+    "mtime": 1781372742.2720053,
+    "ast_hash": "ba5875e8666f57037317e0e3e967d38f",
+    "semantic_hash": "ba5875e8666f57037317e0e3e967d38f"
+  },
+  "E:\\claude\\hireorbitai\\docs\\deployment\\07-weekend-release-checklist.md": {
+    "mtime": 1781372742.2720053,
+    "ast_hash": "02ffb05e9d9f9d4df70fbaf7f23b6c52",
+    "semantic_hash": "02ffb05e9d9f9d4df70fbaf7f23b6c52"
+  },
+  "E:\\claude\\hireorbitai\\docs\\deployment\\README.md": {
+    "mtime": 1781372742.2720053,
+    "ast_hash": "6924587c42eaf4231e90308bc1822ad8",
+    "semantic_hash": "6924587c42eaf4231e90308bc1822ad8"
+  },
+  "E:\\claude\\hireorbitai\\docs\\deployment\\auto-deploy.md": {
+    "mtime": 1781372742.2730048,
+    "ast_hash": "04629b4231b22273cb2c4cde465f9672",
+    "semantic_hash": "04629b4231b22273cb2c4cde465f9672"
+  },
+  "E:\\claude\\hireorbitai\\docs\\deployment\\cloudpanel.md": {
+    "mtime": 1781372742.2730048,
+    "ast_hash": "5b7a61c21ccac15beb19f52a1f70bf49",
+    "semantic_hash": "5b7a61c21ccac15beb19f52a1f70bf49"
+  },
+  "E:\\claude\\hireorbitai\\docs\\deployment\\email-deliverability.md": {
+    "mtime": 1781372742.2730048,
+    "ast_hash": "67f94457fdac864ac5f980ccf9bd980e",
+    "semantic_hash": "67f94457fdac864ac5f980ccf9bd980e"
+  },
+  "E:\\claude\\hireorbitai\\docs\\deployment\\local.md": {
+    "mtime": 1781372742.2730048,
+    "ast_hash": "25403590ba3d2a568c70d6f8ad787471",
+    "semantic_hash": "25403590ba3d2a568c70d6f8ad787471"
+  },
+  "E:\\claude\\hireorbitai\\docs\\deployment\\prod-deploy-safety.md": {
+    "mtime": 1781372742.274004,
+    "ast_hash": "4a3668c75edd779a6b1bc6887be5a651",
+    "semantic_hash": "4a3668c75edd779a6b1bc6887be5a651"
+  },
+  "E:\\claude\\hireorbitai\\docs\\deployment\\production.md": {
+    "mtime": 1781372742.274004,
+    "ast_hash": "c0f61513c6316dc3faa03fc37a7a590e",
+    "semantic_hash": "c0f61513c6316dc3faa03fc37a7a590e"
+  },
+  "E:\\claude\\hireorbitai\\docs\\env-vars.md": {
+    "mtime": 1781372742.2748158,
+    "ast_hash": "e65023e310d31cae0a73783647ae0445",
+    "semantic_hash": "e65023e310d31cae0a73783647ae0445"
+  },
+  "E:\\claude\\hireorbitai\\docs\\rbac-matrix.md": {
+    "mtime": 1781372742.2748158,
+    "ast_hash": "2221f2cef6ccf91995b97db8e167b16f",
+    "semantic_hash": "2221f2cef6ccf91995b97db8e167b16f"
+  },
+  "E:\\claude\\hireorbitai\\docs\\rbac-overview.html": {
+    "mtime": 1781372742.2748158,
+    "ast_hash": "2a7eb6406868394e39703f245e1645b2",
+    "semantic_hash": "2a7eb6406868394e39703f245e1645b2"
+  },
+  "E:\\claude\\hireorbitai\\docs\\test-plan-b.md": {
+    "mtime": 1781372742.2748158,
+    "ast_hash": "42de40e8ba47f91e74d332f1ac2a7611",
+    "semantic_hash": "42de40e8ba47f91e74d332f1ac2a7611"
+  },
+  "E:\\claude\\hireorbitai\\docs\\testing.md": {
+    "mtime": 1781372742.2763047,
+    "ast_hash": "c3ae52846ec1d792e847aba3e000c4ec",
+    "semantic_hash": "c3ae52846ec1d792e847aba3e000c4ec"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\index.html": {
+    "mtime": 1781372742.3034894,
+    "ast_hash": "07374601885b2e742025df4848853810",
+    "semantic_hash": "07374601885b2e742025df4848853810"
+  },
+  "E:\\claude\\hireorbitai\\infrastructure\\README.md": {
+    "mtime": 1781372742.3740098,
+    "ast_hash": "de45776d1fd133992fcd4506abfbfd81",
+    "semantic_hash": "de45776d1fd133992fcd4506abfbfd81"
+  },
+  "E:\\claude\\hireorbitai\\infrastructure\\cloud-init.example.yaml": {
+    "mtime": 1781372742.3740098,
+    "ast_hash": "52f975369ab50c4077dc336a768cc843",
+    "semantic_hash": "52f975369ab50c4077dc336a768cc843"
+  },
+  "E:\\claude\\hireorbitai\\render.yaml": {
+    "mtime": 1781372742.377008,
+    "ast_hash": "7a20a9538e99535759bdebdf402f36ef",
+    "semantic_hash": "7a20a9538e99535759bdebdf402f36ef"
+  },
+  "E:\\claude\\hireorbitai\\scripts\\SECURITY-SCAN.md": {
+    "mtime": 1781372742.377008,
+    "ast_hash": "2411753562618beda92f423607a90268",
+    "semantic_hash": "2411753562618beda92f423607a90268"
+  },
+  "E:\\claude\\hireorbitai\\shared\\README.md": {
+    "mtime": 1781372742.382794,
+    "ast_hash": "bb419576d45325c842b4372b42d2c230",
+    "semantic_hash": "bb419576d45325c842b4372b42d2c230"
+  },
+  "E:\\claude\\hireorbitai\\e2e-results\\audit-ai-email.png": {
+    "mtime": 1781372742.2763047,
+    "ast_hash": "f9bf54fe00a889b311d7ff53bb047183",
+    "semantic_hash": "f9bf54fe00a889b311d7ff53bb047183"
+  },
+  "E:\\claude\\hireorbitai\\e2e-results\\audit-ai-usage.png": {
+    "mtime": 1781372742.277306,
+    "ast_hash": "189a55a0a2946bf155a9a03fdf2c0d4f",
+    "semantic_hash": "189a55a0a2946bf155a9a03fdf2c0d4f"
+  },
+  "E:\\claude\\hireorbitai\\e2e-results\\audit-clients.png": {
+    "mtime": 1781372742.2783055,
+    "ast_hash": "aeca380bcc6381c03f878df570192823",
+    "semantic_hash": "aeca380bcc6381c03f878df570192823"
+  },
+  "E:\\claude\\hireorbitai\\e2e-results\\audit-dashboard.png": {
+    "mtime": 1781372742.2793047,
+    "ast_hash": "75d78f4f3a213dafe20147f15aec7f4d",
+    "semantic_hash": "75d78f4f3a213dafe20147f15aec7f4d"
+  },
+  "E:\\claude\\hireorbitai\\e2e-results\\audit-feature-flags.png": {
+    "mtime": 1781372742.2793047,
+    "ast_hash": "cbbbb751f77b2b0be8e70fb9d4c82cbc",
+    "semantic_hash": "cbbbb751f77b2b0be8e70fb9d4c82cbc"
+  },
+  "E:\\claude\\hireorbitai\\e2e-results\\audit-resumes.png": {
+    "mtime": 1781372742.2808118,
+    "ast_hash": "18cb4c15508bbdf221d18817705c3bc6",
+    "semantic_hash": "18cb4c15508bbdf221d18817705c3bc6"
+  },
+  "E:\\claude\\hireorbitai\\e2e-results\\audit-tasks.png": {
+    "mtime": 1781372742.2808118,
+    "ast_hash": "a00cffc3f1e9d14bef429a78a608db32",
+    "semantic_hash": "a00cffc3f1e9d14bef429a78a608db32"
+  },
+  "E:\\claude\\hireorbitai\\e2e-results\\audit-user-groups.png": {
+    "mtime": 1781372742.2818131,
+    "ast_hash": "a43cc6b522f56e5f7fad335beec59c1a",
+    "semantic_hash": "a43cc6b522f56e5f7fad335beec59c1a"
+  },
+  "E:\\claude\\hireorbitai\\e2e-results\\audit-user-profile.png": {
+    "mtime": 1781372742.2818131,
+    "ast_hash": "5d2aeccd8a50b2ca5b6be25e0ad8da9f",
+    "semantic_hash": "5d2aeccd8a50b2ca5b6be25e0ad8da9f"
+  },
+  "E:\\claude\\hireorbitai\\e2e-results\\audit-vendors.png": {
+    "mtime": 1781372742.2828126,
+    "ast_hash": "06bbf7d0e472013bb7d37cc8d684af80",
+    "semantic_hash": "06bbf7d0e472013bb7d37cc8d684af80"
+  },
+  "E:\\claude\\hireorbitai\\e2e-results\\full-interaction-desktop\\01-tasks-list.png": {
+    "mtime": 1781372742.283812,
+    "ast_hash": "8fcb1365b65b25a1a41eaaac96bbf047",
+    "semantic_hash": "8fcb1365b65b25a1a41eaaac96bbf047"
+  },
+  "E:\\claude\\hireorbitai\\e2e-results\\full-interaction-desktop\\02-tasks-modal-open.png": {
+    "mtime": 1781372742.285404,
+    "ast_hash": "82db37c45145029074610032bab62046",
+    "semantic_hash": "82db37c45145029074610032bab62046"
+  },
+  "E:\\claude\\hireorbitai\\e2e-results\\full-interaction-desktop\\03-tasks-modal-filled.png": {
+    "mtime": 1781372742.2856953,
+    "ast_hash": "328b5068205cac27bb0f21f8eef6e0d7",
+    "semantic_hash": "328b5068205cac27bb0f21f8eef6e0d7"
+  },
+  "E:\\claude\\hireorbitai\\e2e-results\\full-interaction-desktop\\04-tasks-after-submit.png": {
+    "mtime": 1781372742.2866952,
+    "ast_hash": "8f6ae4c9c873445820538a16cb740f7f",
+    "semantic_hash": "8f6ae4c9c873445820538a16cb740f7f"
+  },
+  "E:\\claude\\hireorbitai\\e2e-results\\full-interaction-desktop\\33-messages-loaded.png": {
+    "mtime": 1781372742.2879705,
+    "ast_hash": "4f3efe25eea7c4db4808a9f96b81708b",
+    "semantic_hash": "4f3efe25eea7c4db4808a9f96b81708b"
+  },
+  "E:\\claude\\hireorbitai\\e2e-results\\full-interaction-desktop\\34-messages-thread-open.png": {
+    "mtime": 1781372742.2879705,
+    "ast_hash": "09b8995b857aa0e85417f215114af31e",
+    "semantic_hash": "09b8995b857aa0e85417f215114af31e"
+  },
+  "E:\\claude\\hireorbitai\\e2e-results\\full-interaction-desktop\\35-messages-composed.png": {
+    "mtime": 1781372742.2889857,
+    "ast_hash": "c030273a265ddfcf92cc62d1a291c51d",
+    "semantic_hash": "c030273a265ddfcf92cc62d1a291c51d"
+  },
+  "E:\\claude\\hireorbitai\\e2e-results\\full-interaction-desktop\\36-messages-after-send.png": {
+    "mtime": 1781372742.2899852,
+    "ast_hash": "2294492061ca0a9a83ff4851d2df8b29",
+    "semantic_hash": "2294492061ca0a9a83ff4851d2df8b29"
+  },
+  "E:\\claude\\hireorbitai\\e2e-results\\mobile-admin-clients.png": {
+    "mtime": 1781372742.290985,
+    "ast_hash": "b5dc06ccf332417d1ff538d002e10d2f",
+    "semantic_hash": "b5dc06ccf332417d1ff538d002e10d2f"
+  },
+  "E:\\claude\\hireorbitai\\e2e-results\\mobile-admin-vendors.png": {
+    "mtime": 1781372742.291984,
+    "ast_hash": "fbbeb5b38918f4429dd589f72832010c",
+    "semantic_hash": "fbbeb5b38918f4429dd589f72832010c"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\public\\favicon.svg": {
+    "mtime": 1781372742.3034894,
+    "ast_hash": "b8cac4ab415535626f6318ad7037a7cc",
+    "semantic_hash": "b8cac4ab415535626f6318ad7037a7cc"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\public\\logo-mark.svg": {
+    "mtime": 1781372742.3034894,
+    "ast_hash": "68d99cc4ebdf9af8085cfff9e6ba4ecb",
+    "semantic_hash": "68d99cc4ebdf9af8085cfff9e6ba4ecb"
+  }
+}

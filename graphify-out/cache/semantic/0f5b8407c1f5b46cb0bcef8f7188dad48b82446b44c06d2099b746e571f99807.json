@@ -1,0 +1,99 @@
+{
+  "nodes": [
+    {
+      "id": "deployment_auto_deploy_push_to_deploy",
+      "label": "Continuous push-to-deploy (main)",
+      "file_type": "concept",
+      "source_file": "docs/deployment/auto-deploy.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "deployment_auto_deploy_deploy_keys",
+      "label": "SSH deploy keys (CI + VPS read-only)",
+      "file_type": "rationale",
+      "source_file": "docs/deployment/auto-deploy.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "deployment_auto_deploy_push_to_deploy",
+      "target": "deployment_04_github_actions_deploy_production_yml",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/auto-deploy.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "deployment_auto_deploy_push_to_deploy",
+      "target": "deployment_05_deploy_and_rollback_update_sh",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/auto-deploy.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "deployment_auto_deploy_push_to_deploy",
+      "target": "deployment_auto_deploy_deploy_keys",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/auto-deploy.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "deployment_auto_deploy_push_to_deploy",
+      "target": "deployment_cloudpanel_hostinger_vps_deploy",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/auto-deploy.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "deployment_auto_deploy_push_to_deploy",
+      "target": "deployment_production_runbook_ops",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/auto-deploy.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "deployment_auto_deploy_push_to_deploy",
+      "target": "branching_two_branch_model",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/auto-deploy.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "deployment_auto_deploy_deploy_keys",
+      "target": "deployment_auto_deploy_push_to_deploy",
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/auto-deploy.md",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": []
+}

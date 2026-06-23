@@ -88,6 +88,8 @@ trainingRouter.get('/my-training', c.myTraining); // any authed user
 trainingRouter.get('/assignments/:id', c.getAssignment);
 trainingRouter.put('/assignments/:id', requireRole(...MANAGER_TIER), c.updateAssignment); // I-983 attestation block
 trainingRouter.put('/assignments/:id/progress', c.updateProgress);
+// Explicit learner completion — ownership/scope checked in the controller.
+trainingRouter.post('/assignments/:id/complete', c.completeAssignment);
 trainingRouter.put('/assignments/:id/viewed', c.markLessonViewed);
 // Grounded AI learning coach — learner route, ownership checked in the controller.
 trainingRouter.post('/assignments/:id/coach', c.lessonCoach);

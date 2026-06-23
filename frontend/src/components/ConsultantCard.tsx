@@ -14,7 +14,7 @@ export interface ConsultantRow {
   primary_skill?: string | null;
   visa_status?: string | null;
   total_experience_years?: number | null;
-  marketing_status: 'ACTIVE' | 'PAUSED' | 'PLACED';
+  marketing_status: 'ACTIVE' | 'PAUSED' | 'PLACED' | 'DEACTIVATED';
   current_location?: string | null;
   recruiter_id?: string | null;
   user?: {

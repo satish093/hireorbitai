@@ -362,7 +362,9 @@ export const assignRecruiter: RequestHandler = async (req, res) => {
 
 export const setMarketingStatus: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
-  const schema = z.object({ marketing_status: z.enum(['ACTIVE', 'PAUSED', 'PLACED']) });
+  const schema = z.object({
+    marketing_status: z.enum(['ACTIVE', 'PAUSED', 'PLACED', 'DEACTIVATED']),
+  });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid status');
 

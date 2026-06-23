@@ -144,6 +144,44 @@ export const get: RequestHandler = async (req, res) => {
   res.json(withCount);
 };
 
+/**
+ * POST /recruiters/:id/marketing-status — flip a recruiter's marketing status
+ * (ACTIVE / PAUSED / PLACED / DEACTIVATED). Mirrors the consultant status flow.
+ * It's a label only — no account/login side effects. Admin tier is unscoped; a
+ * group lead may only touch a recruiter whose owning user is in their group.
+ */
+export const setMarketingStatus: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const schema = z
+    .object({ marketing_status: z.enum(['ACTIVE', 'PAUSED', 'PLACED', 'DEACTIVATED']) })
+    .strict();
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) throw httpError(400, 'Invalid status');
+
+  const { data: rec } = await db
+    .from('recruiters')
+    .select('id, user_id')
+    .eq('id', req.params.id)
+    .maybeSingle();
+  const row = rec as { id: string; user_id: string | null } | null;
+  if (!row) throw httpError(404, 'Recruiter not found');
+  await assertRecruiterInScope(req.user, row.user_id);
+
+  const { data, error } = await db
+    .from('recruiters')
+    .update({ marketing_status: parsed.data.marketing_status })
+    .eq('id', req.params.id)
+    .select()
+    .single();
+  // The marketing_status column is a late-arrival migration; if it isn't applied
+  // yet, surface a clear 503 rather than a raw 500 (deploys run migrate:up).
+  if (error && /schema cache|column .* does not exist/i.test(error.message)) {
+    throw httpError(503, 'Recruiter status is not available yet — apply the latest migration.');
+  }
+  if (error) throw httpError(500, 'Database error');
+  res.json(data);
+};
+
 export const onboard: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   const parsed = onboardingSchema.safeParse(req.body);

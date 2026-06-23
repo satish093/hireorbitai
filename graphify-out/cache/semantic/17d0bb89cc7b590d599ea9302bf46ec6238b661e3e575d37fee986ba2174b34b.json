@@ -1,0 +1,95 @@
+{
+  "nodes": [
+    {
+      "id": "infrastructure_readme_bootstrap_vps",
+      "label": "bootstrap-vps.sh (idempotent VPS provisioning)",
+      "file_type": "concept",
+      "source_file": "infrastructure/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "infrastructure_readme_cloud_init",
+      "label": "cloud-init.example.yaml (first-boot user-data)",
+      "file_type": "concept",
+      "source_file": "infrastructure/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "infrastructure_readme_no_terraform",
+      "label": "No-Terraform / Single-VPS Provisioning Decision",
+      "file_type": "rationale",
+      "source_file": "infrastructure/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "infrastructure_readme_cloudpanel",
+      "label": "CloudPanel Control Plane",
+      "file_type": "concept",
+      "source_file": "infrastructure/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "infrastructure_readme_cloud_init",
+      "target": "infrastructure_readme_bootstrap_vps",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "infrastructure/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "infrastructure_readme_no_terraform",
+      "target": "infrastructure_readme_bootstrap_vps",
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "infrastructure/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "infrastructure_readme_no_terraform",
+      "target": "infrastructure_readme_cloudpanel",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "infrastructure/README.md",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "vps_provisioning_flow",
+      "label": "VPS provisioning flow: cloud-init runs bootstrap then CloudPanel",
+      "nodes": [
+        "infrastructure_readme_cloud_init",
+        "infrastructure_readme_bootstrap_vps",
+        "infrastructure_readme_cloudpanel"
+      ],
+      "relation": "form",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "infrastructure/README.md"
+    }
+  ]
+}
