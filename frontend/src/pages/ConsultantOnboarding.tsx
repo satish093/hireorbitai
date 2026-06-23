@@ -92,6 +92,7 @@ export function ConsultantOnboarding() {
               { value: 'GC', label: 'Green Card' },
               { value: 'H1B', label: 'H-1B' },
               { value: 'OPT', label: 'OPT/CPT' },
+              { value: 'STEM OPT', label: 'STEM OPT' },
               { value: 'OTHER', label: 'Other' },
             ]}
             placeholder="Select…"
