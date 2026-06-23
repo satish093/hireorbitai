@@ -41,7 +41,7 @@ export const list: RequestHandler = async (req, res) => {
   let q = db
     .from('consultants')
     .select(
-      '*, user:users(id, email, full_name, phone, group_id),' +
+      '*, user:users(id, email, full_name, phone, group_id, role),' +
         'recruiter:recruiters!recruiter_id(id, team, user:users!user_id(id, email, full_name, group_id))',
     )
     .order('created_at', { ascending: false });
@@ -81,16 +81,24 @@ export const list: RequestHandler = async (req, res) => {
   const { data, error } = await q;
   if (error) throw httpError(500, 'Database error');
 
+  // A role change (e.g. CONSULTANT → RECRUITER) leaves the old consultants row
+  // behind — deleting it would cascade-delete the person's applications and
+  // interviews. So we KEEP the row but stop surfacing it on the bench: only
+  // users who are still CONSULTANTs appear (and count) here.
+  const rows = ((data ?? []) as any[]).filter(
+    (c) => (c?.user?.role ?? 'CONSULTANT') === 'CONSULTANT',
+  );
+
   // Bench matches: `?matchFor=:jobId` scores the (already role-scoped) list of
   // consultants against a job's required skills and returns the strong matches.
   // No extra IDOR surface — scoring is layered on top of the same scoped rows.
   const matchFor = req.query.matchFor as string | undefined;
   if (matchFor) {
-    res.json(await scoreConsultantsForJob(data ?? [], matchFor));
+    res.json(await scoreConsultantsForJob(rows, matchFor));
     return;
   }
 
-  res.json(data);
+  res.json(rows);
 };
 
 /** Lowercase + trim a skills array; tolerates non-arrays. */

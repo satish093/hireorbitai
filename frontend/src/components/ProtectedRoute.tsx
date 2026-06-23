@@ -3,6 +3,7 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { LoadingScreen } from './LoadingScreen';
 import { Role, hasCapability, type DeveloperCapability } from '../types';
+import { mustCompleteProfile } from '../utils/profileComplete';
 
 interface Props {
   children: ReactNode;
@@ -14,6 +15,8 @@ interface Props {
   bypassOnboarding?: boolean;
   /** Skip the must_change_password redirect — used on /change-password itself. */
   bypassPasswordChange?: boolean;
+  /** Skip the mandatory profile-completion redirect — used on /profile/complete itself. */
+  bypassProfileCompletion?: boolean;
 }
 
 /**
@@ -40,6 +43,7 @@ export function ProtectedRoute({
   capability,
   bypassOnboarding,
   bypassPasswordChange,
+  bypassProfileCompletion,
 }: Props) {
   const { session, profile, loading } = useAuth();
   const loc = useLocation();
@@ -68,6 +72,19 @@ export function ProtectedRoute({
     !(capability && hasCapability(profile, capability))
   ) {
     return <Navigate to="/unauthorized" replace />;
+  }
+
+  // Mandatory profile-completion gate. Every non-admin user must fill the
+  // required personal fields (name, phone, address, LinkedIn) before using the
+  // app — existing users with blank fields are caught here on login/refresh.
+  // Derived from the profile data itself, so no flag/backfill is needed; the
+  // /profile/complete page sets bypassProfileCompletion to avoid a loop.
+  if (
+    !bypassProfileCompletion &&
+    mustCompleteProfile(profile) &&
+    loc.pathname !== '/profile/complete'
+  ) {
+    return <Navigate to="/profile/complete" replace />;
   }
 
   // Role-specific onboarding gates (existing behavior, preserved).

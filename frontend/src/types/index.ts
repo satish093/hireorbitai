@@ -97,6 +97,17 @@ export interface UserProfile {
   job_alerts?: boolean;
   /** DEVELOPER capability grants (the "scoped super-admin" toggles). */
   capabilities?: DeveloperCapability[];
+  /** Extended profile fields — drive the mandatory profile-completion gate. */
+  first_name?: string | null;
+  last_name?: string | null;
+  address_line1?: string | null;
+  address_line2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postal_code?: string | null;
+  country?: string | null;
+  timezone?: string | null;
+  linkedin_url?: string | null;
 }
 
 /**

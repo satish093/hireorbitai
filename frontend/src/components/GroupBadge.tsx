@@ -120,38 +120,20 @@ export function GroupBadge({ groupId, compact, hideEmpty, className }: GroupBadg
   }
   const color = g.color ?? '#6366F1';
   const title = `${g.name}${g.unique_group_id ? ` (${g.unique_group_id})` : ''}`;
+  // Company logos are intentionally NOT shown in directory badges — the uploaded
+  // logo is used only on invoices. Everywhere a group is referenced in-app we
+  // show the company NAME (with a small colored dot), never the logo image.
   if (compact) {
-    // A logo, when present, replaces the colored dot in dense cells.
-    if (g.logo_url) {
-      return (
-        <img
-          src={g.logo_url}
-          alt=""
-          className={`inline-block w-4 h-4 rounded object-cover ring-1 ring-border animate-fade-in ${className ?? ''}`.trim()}
-          title={title}
-        />
-      );
-    }
     return (
       <span
-        className={`inline-block w-2 h-2 rounded-full animate-fade-in ${className ?? ''}`.trim()}
-        style={{ background: color }}
+        className={`inline-flex items-center gap-1 text-[11px] font-medium text-ink-2 animate-fade-in ${className ?? ''}`.trim()}
         title={title}
-      />
+      >
+        <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: color }} />
+        {g.name}
+      </span>
     );
   }
-  // With a logo, show the logo ONLY (no company-name text) — the name is on hover.
-  if (g.logo_url) {
-    return (
-      <img
-        src={g.logo_url}
-        alt={g.name}
-        title={title}
-        className={`inline-block h-4 w-auto max-w-[96px] object-contain align-middle animate-fade-in ${className ?? ''}`.trim()}
-      />
-    );
-  }
-  // No logo → colored chip with the dot + name.
   return (
     <span
       className={`inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded text-[11px] font-medium animate-fade-in ${className ?? ''}`.trim()}

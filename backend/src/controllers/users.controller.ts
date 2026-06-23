@@ -34,7 +34,7 @@ const PROFILE_COLS_FULL =
   'id, email, full_name, first_name, last_name, phone, role, avatar_url, is_active, ' +
   'last_seen_at, group_id, reports_to, ' +
   'address_line1, address_line2, city, state, postal_code, country, timezone, linkedin_url, ' +
-  'created_at, updated_at';
+  'self_notes, created_at, updated_at';
 const PROFILE_COLS_LEGACY =
   'id, email, full_name, phone, role, avatar_url, is_active, created_at, updated_at';
 
@@ -152,6 +152,10 @@ export const get: RequestHandler = async (req, res) => {
     if (rec) context.recruiter = rec;
   }
 
+  // self_notes is a private personal scratchpad — only ever return it to the
+  // owner, even though manager-tier users can otherwise view the full profile.
+  if (req.user.id !== data.id && 'self_notes' in data) delete data.self_notes;
+
   res.json({ ...data, context });
 };
 
@@ -186,6 +190,8 @@ export const update: RequestHandler = async (req, res) => {
       country: z.string().max(60).optional().nullable(),
       timezone: z.string().max(60).optional().nullable(),
       linkedin_url: httpUrl.optional().or(z.literal('')).nullable(),
+      // Personal scratchpad shown only on the user's own profile.
+      self_notes: z.string().max(5000).optional().nullable(),
     })
     .strict(); // reject unknown fields outright instead of silently stripping
   const parsed = schema.safeParse(req.body);
@@ -203,6 +209,9 @@ export const update: RequestHandler = async (req, res) => {
   // We need access to the existing first/last to compute "did either field
   // change" correctly when only one of them is in the patch.
   const patch: Record<string, unknown> = { ...parsed.data, updated_at: new Date().toISOString() };
+  // self_notes is private to its owner — never let a manager-tier editor write
+  // another user's personal notes, even though they can edit the rest.
+  if ('self_notes' in patch && req.user.id !== req.params.id) delete patch.self_notes;
   const sentFirst = parsed.data.first_name !== undefined;
   const sentLast = parsed.data.last_name !== undefined;
   if (sentFirst || sentLast) {
@@ -234,6 +243,7 @@ export const update: RequestHandler = async (req, res) => {
     'country',
     'timezone',
     'linkedin_url',
+    'self_notes',
   ];
   let { data, error } = await db
     .from('users')

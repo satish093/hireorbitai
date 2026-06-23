@@ -57,6 +57,9 @@ const ConsultantOnboarding = lazy(() =>
 const RecruiterOnboarding = lazy(() =>
   import('./pages/RecruiterOnboarding').then((m) => ({ default: m.RecruiterOnboarding })),
 );
+const CompleteProfile = lazy(() =>
+  import('./pages/CompleteProfile').then((m) => ({ default: m.CompleteProfile })),
+);
 const ManagerDashboard = lazy(() =>
   import('./pages/ManagerDashboard').then((m) => ({ default: m.ManagerDashboard })),
 );
@@ -308,6 +311,14 @@ export default function App() {
               element={
                 <ProtectedRoute allow={['RECRUITER']} bypassOnboarding>
                   <RecruiterOnboarding />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/profile/complete"
+              element={
+                <ProtectedRoute bypassProfileCompletion bypassOnboarding>
+                  <CompleteProfile />
                 </ProtectedRoute>
               }
             />
