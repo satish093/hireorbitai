@@ -47,19 +47,38 @@ async function attachConsultantCounts<T extends { id?: string }>(rows: T[]): Pro
   if (ids.length === 0) return rows.map((r) => ({ ...r, consultant_count: 0 }));
   const { data: cons } = await db
     .from('consultants')
-    .select('recruiter_id')
+    .select('recruiter_id, user:users!user_id(role)')
     .in('recruiter_id', ids);
   const counts = new Map<string, number>();
-  for (const c of (cons ?? []) as Array<{ recruiter_id: string | null }>) {
-    if (c.recruiter_id) counts.set(c.recruiter_id, (counts.get(c.recruiter_id) ?? 0) + 1);
+  for (const c of (cons ?? []) as Array<{
+    recruiter_id: string | null;
+    user?: { role?: string | null } | null;
+  }>) {
+    // Don't count consultants whose user left the CONSULTANT role (their stale
+    // consultants row lingers but they're no longer on the bench).
+    if (c.recruiter_id && (c.user?.role ?? 'CONSULTANT') === 'CONSULTANT') {
+      counts.set(c.recruiter_id, (counts.get(c.recruiter_id) ?? 0) + 1);
+    }
   }
   return rows.map((r) => ({ ...r, consultant_count: r.id ? (counts.get(r.id) ?? 0) : 0 }));
 }
 
 const SELECT_WITH_JOINS =
-  '*, user:users!user_id(id, email, full_name, group_id), ' +
+  '*, user:users!user_id(id, email, full_name, group_id, role), ' +
   'manager:users!manager_id(id, email, full_name, group_id), ' +
   'managers:recruiter_managers(is_primary, assigned_at, manager:users!manager_id(id, email, full_name, role, group_id))';
+
+/**
+ * A recruiters row is legitimate when its owning user is a real RECRUITER or a
+ * manager-tier user moonlighting as one. A user demoted out of those roles
+ * (e.g. RECRUITER → CONSULTANT) leaves a stale row behind that must NOT keep
+ * surfacing on the recruiters directory — mirror of the consultants-list fix.
+ */
+function isStaleRecruiterRow(r: { user?: { role?: string | null } | null }): boolean {
+  const role = r?.user?.role;
+  if (!role) return false; // unknown role (missing join) — keep, fail-open on display
+  return role !== 'RECRUITER' && !(MANAGER_TIER as readonly string[]).includes(role);
+}
 
 // .strict() rejects unknown keys at parse time — mass-assignment guard, per
 // .claude/rules/security.md. `manager_id` is INTENTIONALLY OMITTED here:
@@ -102,17 +121,23 @@ export const list: RequestHandler = async (req, res) => {
     let fq = db
       .from('recruiters')
       .select(
-        '*, user:users!user_id(id, email, full_name, group_id), manager:users!manager_id(id, email, full_name, group_id)',
+        '*, user:users!user_id(id, email, full_name, group_id, role), manager:users!manager_id(id, email, full_name, group_id)',
       )
       .order('created_at', { ascending: false });
     if (groupUserIds !== null) fq = fq.in('user_id', groupUserIds);
     const fallback = await fq;
     if (fallback.error) throw httpError(500, fallback.error.message);
-    res.json(await attachConsultantCounts((fallback.data ?? []) as Array<{ id?: string }>));
+    const fbRows = (
+      (fallback.data ?? []) as Array<{ id?: string; user?: { role?: string | null } | null }>
+    ).filter((r) => !isStaleRecruiterRow(r));
+    res.json(await attachConsultantCounts(fbRows));
     return;
   }
   if (error) throw httpError(500, 'Database error');
-  res.json(await attachConsultantCounts((data ?? []) as Array<{ id?: string }>));
+  const rows = (
+    (data ?? []) as Array<{ id?: string; user?: { role?: string | null } | null }>
+  ).filter((r) => !isStaleRecruiterRow(r));
+  res.json(await attachConsultantCounts(rows));
 };
 
 export const get: RequestHandler = async (req, res) => {

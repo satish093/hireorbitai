@@ -1,7 +1,7 @@
 import { RequestHandler } from 'express';
 import { z } from 'zod';
 import { db } from '../config/db';
-import { httpError, outranks, type Role } from '../types';
+import { httpError, outranks, MANAGER_TIER, type Role } from '../types';
 import { invalidatePermissionCache } from '../services/permission.service';
 import { isAdminTier, managerGroupUserIds } from '../services/groupScope';
 import { audit } from '../services/audit.service';
@@ -84,6 +84,32 @@ export const list: RequestHandler = async (req, res) => {
     if (!linkErr) {
       for (const l of (links ?? []) as Array<{ recruiter_id: string; manager_id: string }>) {
         add(l.manager_id, l.recruiter_id);
+      }
+    }
+
+    // Drop stale recruiters from the counts: a recruiter demoted out of the
+    // RECRUITER / manager-tier roles leaves a recruiters row behind that must
+    // not keep inflating their old manager's recruiter_count.
+    const allRecruiterIds = Array.from(
+      new Set(Array.from(byManager.values()).flatMap((s) => Array.from(s))),
+    );
+    if (allRecruiterIds.length > 0) {
+      const { data: rRoles } = await db
+        .from('recruiters')
+        .select('id, user:users!user_id(role)')
+        .in('id', allRecruiterIds);
+      const valid = new Set(
+        ((rRoles ?? []) as Array<{ id: string; user?: { role?: string | null } | null }>)
+          .filter((r) => {
+            const role = r.user?.role;
+            return (
+              !role || role === 'RECRUITER' || (MANAGER_TIER as readonly string[]).includes(role)
+            );
+          })
+          .map((r) => r.id),
+      );
+      for (const set of byManager.values()) {
+        for (const rid of Array.from(set)) if (!valid.has(rid)) set.delete(rid);
       }
     }
 

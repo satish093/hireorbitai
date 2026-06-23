@@ -13,6 +13,7 @@ import {
   DeveloperCapability,
 } from '../types';
 import { audit } from '../services/audit.service';
+import { invalidatePermissionCache } from '../services/permission.service';
 import { requestPasswordReset } from '../services/auth.service';
 import { logger } from '../config/logger';
 import { SAFE_USER_ADMIN_DETAIL_COLUMNS } from '../config/userColumns';
@@ -686,6 +687,10 @@ export const setStatus: RequestHandler = async (req, res) => {
     });
   }
 
+  // Flush this user's cached permission set so other users' 30s-cached views
+  // stop treating a now-inactive (or reactivated) account as reachable.
+  invalidatePermissionCache(id);
+
   // Audit. Different action verbs based on direction so the audit log
   // reads naturally.
   audit({
@@ -939,6 +944,7 @@ export const bulk: RequestHandler = async (req, res) => {
         }
         const { error } = await db.from('users').update({ role: newRole }).eq('id', id);
         if (error) throw httpError(500, 'Database error');
+        invalidatePermissionCache(id);
         audit({
           action: 'admin_role_changed',
           user_id: id,
@@ -981,6 +987,7 @@ export const bulk: RequestHandler = async (req, res) => {
           .eq('id', id);
         if (error) throw httpError(500, 'Database error');
         await db.auth.admin.signOut(id, 'global').catch(() => {});
+        invalidatePermissionCache(id);
         audit({
           action: 'admin_user_deactivated',
           user_id: id,
@@ -1069,6 +1076,10 @@ export const setRole: RequestHandler = async (req, res) => {
   const prev = row.role;
   const { error } = await db.from('users').update({ role: newRole }).eq('id', targetId);
   if (error) throw httpError(500, 'Database error');
+
+  // A role change rewrites who this user may message/view — flush their cached
+  // permission set so the 30s TTL window can't serve stale, wrong-role access.
+  invalidatePermissionCache(targetId);
 
   audit({
     action: 'admin_role_changed',
