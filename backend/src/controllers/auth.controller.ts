@@ -11,7 +11,24 @@ import { SAFE_USER_SELF_COLUMNS } from '../config/userColumns';
 // the missing one and retry instead of 500-ing the whole /auth/me bootstrap,
 // since a no-profile response cascades into every user hitting /unauthorized.
 // Convention matches users.controller / messages.controller / tasks.controller.
-const OPTIONAL_SELF_COLUMNS = ['tour_completed_at', 'job_alerts', 'last_seen_at', 'capabilities'];
+const OPTIONAL_SELF_COLUMNS = [
+  'tour_completed_at',
+  'job_alerts',
+  'last_seen_at',
+  'capabilities',
+  // Extended profile fields — peelable so a pre-migration host degrades to a
+  // usable /auth/me instead of a hard 500.
+  'first_name',
+  'last_name',
+  'address_line1',
+  'address_line2',
+  'city',
+  'state',
+  'postal_code',
+  'country',
+  'timezone',
+  'linkedin_url',
+];
 
 function stripMissingColumn(cols: string, msg: string): string | null {
   for (const c of OPTIONAL_SELF_COLUMNS) {
