@@ -15,6 +15,21 @@ import { managerGroupConsultantIds, isAdminTier, isGroupLead } from '../services
 // "Your group" label in the UI.
 // ---------------------------------------------------------------------------
 
+// Stale-row guards: a role change / deactivation leaves the consultants /
+// recruiters row behind (we never cascade-delete it). Analytics must not count
+// those — fetch the owning user's role + is_active via an embed and filter.
+// `user:users!user_id(role, is_active)` on the select feeds these predicates.
+type UserRoleLite = { role?: string | null; is_active?: boolean | null } | null | undefined;
+function isLiveConsultant(c: { user?: UserRoleLite }): boolean {
+  if (c.user?.is_active === false) return false;
+  return (c.user?.role ?? 'CONSULTANT') === 'CONSULTANT';
+}
+function isLiveRecruiter(r: { user?: UserRoleLite }): boolean {
+  if (r.user?.is_active === false) return false;
+  const role = r.user?.role;
+  return !role || role === 'RECRUITER' || (MANAGER_TIER as readonly string[]).includes(role);
+}
+
 const upsertDailySchema = z
   .object({
     recruiter_id: z.string().uuid(),
@@ -97,8 +112,8 @@ export const listDaily: RequestHandler = async (req, res) => {
 
 export const managerSummary: RequestHandler = async (_req, res) => {
   const [consultants, recruiters, jobs, apps] = await Promise.all([
-    db.from('consultants').select('marketing_status', { count: 'exact', head: false }),
-    db.from('recruiters').select('id', { count: 'exact', head: true }),
+    db.from('consultants').select('marketing_status, user:users!user_id(role, is_active)'),
+    db.from('recruiters').select('id, user:users!user_id(role, is_active)'),
     db.from('jobs').select('id', { count: 'exact', head: true }).eq('is_active', true),
     db
       .from('applications')
@@ -107,15 +122,19 @@ export const managerSummary: RequestHandler = async (_req, res) => {
   ]);
 
   const byStatus: Record<string, number> = { ACTIVE: 0, PAUSED: 0, PLACED: 0 };
-  for (const c of consultants.data ?? [])
+  for (const c of (consultants.data ?? []) as any[]) {
+    if (!isLiveConsultant(c)) continue;
     byStatus[c.marketing_status] = (byStatus[c.marketing_status] ?? 0) + 1;
+  }
+
+  const recruitersCount = ((recruiters.data ?? []) as any[]).filter(isLiveRecruiter).length;
 
   const appStatus: Record<string, number> = {};
   for (const a of apps.data ?? []) appStatus[a.status] = (appStatus[a.status] ?? 0) + 1;
 
   res.json({
     consultants_by_status: byStatus,
-    recruiters_count: recruiters.count ?? 0,
+    recruiters_count: recruitersCount,
     active_jobs: jobs.count ?? 0,
     last_7_day_applications: apps.data?.length ?? 0,
     applications_by_status: appStatus,
@@ -140,14 +159,16 @@ function rangeFromQuery(req: { query: Record<string, any> }): { from: string; to
 export const recruiterPerformance: RequestHandler = async (req, res) => {
   const { from, to } = rangeFromQuery(req);
 
-  const [{ data: recruiters }, { data: consultants }, { data: apps }, { data: interviews }] =
+  const [{ data: recruitersRaw }, { data: consultantsRaw }, { data: apps }, { data: interviews }] =
     await Promise.all([
       db
         .from('recruiters')
         .select(
-          'id, team, target_submissions_per_week, user:users!user_id(id, email, full_name, group_id)',
+          'id, team, target_submissions_per_week, user:users!user_id(id, email, full_name, group_id, role, is_active)',
         ),
-      db.from('consultants').select('id, recruiter_id, marketing_status'),
+      db
+        .from('consultants')
+        .select('id, recruiter_id, marketing_status, user:users!user_id(role, is_active)'),
       db
         .from('applications')
         .select('id, recruiter_id, status, submitted_at')
@@ -159,6 +180,10 @@ export const recruiterPerformance: RequestHandler = async (req, res) => {
         .gte('scheduled_at', from)
         .lte('scheduled_at', to),
     ]);
+
+  // Exclude rows whose owning user changed role or was deactivated.
+  const recruiters = ((recruitersRaw ?? []) as any[]).filter(isLiveRecruiter);
+  const consultants = ((consultantsRaw ?? []) as any[]).filter(isLiveConsultant);
 
   // Map consultant_id → recruiter_id so we can attribute interviews back to
   // the recruiter who placed the consultant.
@@ -237,7 +262,7 @@ export const consultantPipeline: RequestHandler = async (req, res) => {
       .from('consultants')
       .select(
         'id, marketing_status, primary_skill, total_experience_years, recruiter_id,' +
-          ' user:users!user_id(id, email, full_name, group_id),' +
+          ' user:users!user_id(id, email, full_name, group_id, role, is_active),' +
           ' recruiter:recruiters!recruiter_id(id, team, user:users!user_id(id, full_name, email, group_id))',
       ),
     db
@@ -269,6 +294,7 @@ export const consultantPipeline: RequestHandler = async (req, res) => {
   };
   const map = new Map<string, ConAgg>();
   for (const c of (consultants ?? []) as any[]) {
+    if (!isLiveConsultant(c)) continue;
     map.set(c.id, {
       consultant_id: c.id,
       name: c.user?.full_name ?? c.user?.email ?? 'Unknown',
@@ -331,7 +357,9 @@ export const placementAnalytics: RequestHandler = async (req, res) => {
         .select('id, status, consultant_id, scheduled_at')
         .gte('scheduled_at', from)
         .lte('scheduled_at', to),
-      db.from('consultants').select('id, marketing_status, created_at'),
+      db
+        .from('consultants')
+        .select('id, marketing_status, created_at, user:users!user_id(role, is_active)'),
       db.from('vendors').select('id, company_name'),
     ]);
 
@@ -339,7 +367,9 @@ export const placementAnalytics: RequestHandler = async (req, res) => {
   const submissions = apps?.length ?? 0;
   const interviewCount = interviews?.length ?? 0;
   const offers = (apps ?? []).filter((a: any) => a.status === 'OFFER').length;
-  const placements = (consultants ?? []).filter((c: any) => c.marketing_status === 'PLACED').length;
+  const placements = (consultants ?? []).filter(
+    (c: any) => isLiveConsultant(c) && c.marketing_status === 'PLACED',
+  ).length;
 
   const conv = (a: number, b: number): number => (b === 0 ? 0 : Math.round((a / b) * 100));
 
@@ -615,30 +645,26 @@ export const pipelineReport: RequestHandler = async (req, res) => {
   // consultants.marketing_status = 'PLACED'. So the "Placed" funnel stage is
   // sourced from consultants, not from an application status.
   async function funnelFor(win: Window) {
-    const [{ data: apps }, consultantsCount, placedCount] = await Promise.all([
+    const [{ data: apps }, { data: consultantRows }] = await Promise.all([
       db
         .from('applications')
         .select('status')
         .gte('submitted_at', win.from.toISOString())
         .lte('submitted_at', win.to.toISOString()),
-      // Sourced = distinct consultants overall (the candidate base we can market).
-      // Could instead be "distinct consultants with an application in window";
-      // we use the total consultant headcount as the top-of-funnel base.
-      db.from('consultants').select('id', { count: 'exact', head: true }),
-      db
-        .from('consultants')
-        .select('id', { count: 'exact', head: true })
-        .eq('marketing_status', 'PLACED'),
+      // Sourced = the candidate base we can market: current, active consultants
+      // only (a role-changed / deactivated row no longer counts).
+      db.from('consultants').select('id, marketing_status, user:users!user_id(role, is_active)'),
     ]);
+    const liveCons = ((consultantRows ?? []) as any[]).filter(isLiveConsultant);
     const byStatus: Record<string, number> = {};
     for (const a of apps ?? []) byStatus[a.status] = (byStatus[a.status] ?? 0) + 1;
     return {
-      sourced: consultantsCount.count ?? 0,
+      sourced: liveCons.length,
       submitted: apps?.length ?? 0,
       screening: byStatus.SCREENING ?? 0,
       interview: byStatus.INTERVIEW ?? 0,
       offer: byStatus.OFFER ?? 0,
-      placed: placedCount.count ?? 0,
+      placed: liveCons.filter((c) => c.marketing_status === 'PLACED').length,
     };
   }
 
@@ -835,7 +861,9 @@ export const recruitersReport: RequestHandler = async (req, res) => {
   // Adapted from recruiterPerformance — per-recruiter rollup.
   async function aggFor(win: Window) {
     const [{ data: recruiters }, { data: apps }] = await Promise.all([
-      db.from('recruiters').select('id, team, user:users!user_id(id, email, full_name)'),
+      db
+        .from('recruiters')
+        .select('id, team, user:users!user_id(id, email, full_name, role, is_active)'),
       db
         .from('applications')
         .select('id, recruiter_id, status, match_score, submitted_at')
@@ -855,6 +883,7 @@ export const recruitersReport: RequestHandler = async (req, res) => {
     };
     const map = new Map<string, Row>();
     for (const r of (recruiters ?? []) as any[]) {
+      if (!isLiveRecruiter(r)) continue;
       map.set(r.id, {
         id: r.id,
         name: r.user?.full_name ?? r.user?.email ?? 'Unknown',
@@ -1030,12 +1059,13 @@ export const consultantsReport: RequestHandler = async (req, res) => {
 
   const { data: consultants } = await db
     .from('consultants')
-    .select('id, visa_status, marketing_status');
+    .select('id, visa_status, marketing_status, user:users!user_id(role, is_active)');
 
   // visaMix / statusMix (REAL) ---------------------------------------------
   const visaCounts = new Map<string, number>();
   const statusCounts = new Map<string, number>();
   for (const c of (consultants ?? []) as any[]) {
+    if (!isLiveConsultant(c)) continue;
     const visa = c.visa_status ?? 'Unknown';
     const status = c.marketing_status ?? 'ACTIVE';
     visaCounts.set(visa, (visaCounts.get(visa) ?? 0) + 1);
@@ -1049,7 +1079,9 @@ export const consultantsReport: RequestHandler = async (req, res) => {
   const statusMix = toMix(statusCounts);
 
   // KPIs --------------------------------------------------------------------
-  const active = (consultants ?? []).filter((c: any) => c.marketing_status === 'ACTIVE').length;
+  const active = (consultants ?? []).filter(
+    (c: any) => isLiveConsultant(c) && c.marketing_status === 'ACTIVE',
+  ).length;
 
   // Bench (REAL): active consultants with no application in the last 14 days.
   let bench = 0;
@@ -1057,7 +1089,10 @@ export const consultantsReport: RequestHandler = async (req, res) => {
     const r = await pool.query<{ bench: string }>(
       `select count(*)::int as bench
        from public.consultants c
+       join public.users u on u.id = c.user_id
        where c.marketing_status = 'ACTIVE'
+         and u.role = 'CONSULTANT'
+         and coalesce(u.is_active, true) = true
          and not exists (
            select 1 from public.applications a
            where a.consultant_id = c.id
@@ -1099,7 +1134,10 @@ export const consultantsReport: RequestHandler = async (req, res) => {
     const r = await pool.query<{ avg_days: string | null }>(
       `SELECT extract(epoch from avg(c.updated_at - c.onboarded_at)) / 86400 AS avg_days
        FROM public.consultants c
+       JOIN public.users u ON u.id = c.user_id
        WHERE c.marketing_status = 'PLACED'
+         AND u.role = 'CONSULTANT'
+         AND coalesce(u.is_active, true) = true
          AND c.onboarded_at IS NOT NULL
          AND c.updated_at > c.onboarded_at`,
       [],

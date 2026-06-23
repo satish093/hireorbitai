@@ -13,6 +13,7 @@ import {
   DeveloperCapability,
 } from '../types';
 import { audit } from '../services/audit.service';
+import { invalidatePermissionCache } from '../services/permission.service';
 import { requestPasswordReset } from '../services/auth.service';
 import { logger } from '../config/logger';
 import { SAFE_USER_ADMIN_DETAIL_COLUMNS } from '../config/userColumns';
@@ -686,6 +687,10 @@ export const setStatus: RequestHandler = async (req, res) => {
     });
   }
 
+  // Flush this user's cached permission set so other users' 30s-cached views
+  // stop treating a now-inactive (or reactivated) account as reachable.
+  invalidatePermissionCache(id);
+
   // Audit. Different action verbs based on direction so the audit log
   // reads naturally.
   audit({
@@ -939,6 +944,9 @@ export const bulk: RequestHandler = async (req, res) => {
         }
         const { error } = await db.from('users').update({ role: newRole }).eq('id', id);
         if (error) throw httpError(500, 'Database error');
+        invalidatePermissionCache(id);
+        await cleanupRoleTransition(id, row.role, newRole);
+        await ensureRoleRow(id, newRole);
         audit({
           action: 'admin_role_changed',
           user_id: id,
@@ -981,6 +989,7 @@ export const bulk: RequestHandler = async (req, res) => {
           .eq('id', id);
         if (error) throw httpError(500, 'Database error');
         await db.auth.admin.signOut(id, 'global').catch(() => {});
+        invalidatePermissionCache(id);
         audit({
           action: 'admin_user_deactivated',
           user_id: id,
@@ -1016,6 +1025,109 @@ export const bulk: RequestHandler = async (req, res) => {
  *  - MANAGER_TIER (non-admin) → same rank check PLUS both users must be in
  *    the same group (group-scoped delegation)
  */
+/**
+ * Detach the role-specific EDGES a user held under their OLD role when their
+ * role changes, mirroring the unenroll / move-group cleanup paths. The
+ * role-specific ROW (consultants/recruiters) is intentionally preserved —
+ * deleting it would cascade-delete the person's applications/interviews — and
+ * list endpoints already filter it out by current role. Best-effort: the
+ * recruiter_managers table may not be migrated on older hosts.
+ */
+async function cleanupRoleTransition(
+  targetId: string,
+  fromRole: Role,
+  toRole: Role,
+): Promise<void> {
+  if (fromRole === toRole) return;
+
+  // Leaving RECRUITER → unassign their consultants + drop their manager edges.
+  if (fromRole === 'RECRUITER') {
+    const { data: rec } = await db
+      .from('recruiters')
+      .select('id')
+      .eq('user_id', targetId)
+      .maybeSingle();
+    const recId = (rec as { id?: string } | null)?.id;
+    if (recId) {
+      const { data: assigned } = await db
+        .from('consultants')
+        .select('user_id')
+        .eq('recruiter_id', recId);
+      await db.from('consultants').update({ recruiter_id: null }).eq('recruiter_id', recId);
+      for (const c of (assigned ?? []) as Array<{ user_id: string | null }>) {
+        if (c.user_id) invalidatePermissionCache(c.user_id);
+      }
+      await db
+        .from('recruiter_managers')
+        .delete()
+        .eq('recruiter_id', recId)
+        .then(
+          () => undefined,
+          () => undefined,
+        );
+    }
+  }
+
+  // Leaving MANAGER/HR_MANAGER → detach the recruiters who reported to them.
+  if (fromRole === 'MANAGER' || fromRole === 'HR_MANAGER') {
+    const { data: managed } = await db
+      .from('recruiters')
+      .select('user_id')
+      .eq('manager_id', targetId);
+    await db.from('recruiters').update({ manager_id: null }).eq('manager_id', targetId);
+    for (const r of (managed ?? []) as Array<{ user_id: string | null }>) {
+      if (r.user_id) invalidatePermissionCache(r.user_id);
+    }
+    await db
+      .from('recruiter_managers')
+      .delete()
+      .eq('manager_id', targetId)
+      .then(
+        () => undefined,
+        () => undefined,
+      );
+  }
+
+  // Leaving CONSULTANT → unassign them from their recruiter.
+  if (fromRole === 'CONSULTANT') {
+    const { data: cons } = await db
+      .from('consultants')
+      .select('id, recruiter_id')
+      .eq('user_id', targetId)
+      .maybeSingle();
+    const c = cons as { id?: string; recruiter_id?: string | null } | null;
+    if (c?.id && c.recruiter_id) {
+      const { data: oldRec } = await db
+        .from('recruiters')
+        .select('user_id')
+        .eq('id', c.recruiter_id)
+        .maybeSingle();
+      await db.from('consultants').update({ recruiter_id: null }).eq('id', c.id);
+      const ru = (oldRec as { user_id?: string | null } | null)?.user_id;
+      if (ru) invalidatePermissionCache(ru);
+    }
+  }
+}
+
+/**
+ * When a user MOVES INTO the RECRUITER role, make sure they have a `recruiters`
+ * row so they show up on the Recruiters directory immediately — that list is
+ * built from the recruiters table, not from users.role, so without this a
+ * promoted recruiter is invisible until they log in and self-onboard.
+ * Idempotent via the recruiters.user_id unique constraint. (CONSULTANT is left
+ * to the existing self-onboarding flow, which collects visa/skills/location.)
+ */
+async function ensureRoleRow(targetId: string, toRole: Role): Promise<void> {
+  if (toRole !== 'RECRUITER') return;
+  await db
+    .from('recruiters')
+    .upsert({ user_id: targetId }, { onConflict: 'user_id' })
+    .then(
+      () => undefined,
+      () => undefined,
+    );
+}
+
 export const setRole: RequestHandler = async (req, res) => {
   const actor = req.user!;
   const targetId = req.params.id;
@@ -1069,6 +1181,13 @@ export const setRole: RequestHandler = async (req, res) => {
   const prev = row.role;
   const { error } = await db.from('users').update({ role: newRole }).eq('id', targetId);
   if (error) throw httpError(500, 'Database error');
+
+  // A role change rewrites who this user may message/view — flush their cached
+  // permission set so the 30s TTL window can't serve stale, wrong-role access,
+  // and detach the edges they held under the old role.
+  invalidatePermissionCache(targetId);
+  await cleanupRoleTransition(targetId, prev, newRole);
+  await ensureRoleRow(targetId, newRole);
 
   audit({
     action: 'admin_role_changed',

@@ -153,13 +153,24 @@ export async function runDailyDigest(): Promise<DigestReport> {
   // 2. Every ACTIVE consultant with at least one skill or a primary_skill.
   const { data: consultants, error: cErr } = await db
     .from('consultants')
-    .select('id, user_id, primary_skill, skills, total_experience_years, preferred_locations')
+    .select(
+      'id, user_id, primary_skill, skills, total_experience_years, preferred_locations,' +
+        ' user:users!user_id(role, is_active)',
+    )
     .eq('marketing_status', 'ACTIVE');
   if (cErr) {
     logger.error({ err: cErr }, 'daily-digest: failed to load consultants');
     throw new Error(`daily-digest: ${cErr.message}`);
   }
-  const consultantRows = (consultants ?? []) as ConsultantRow[];
+  // Don't email people whose user left the CONSULTANT role or was deactivated —
+  // their consultants row lingers but they're no longer on the bench.
+  const consultantRows = (
+    (consultants ?? []) as Array<
+      ConsultantRow & { user?: { role?: string | null; is_active?: boolean | null } | null }
+    >
+  )
+    .filter((c) => c.user?.is_active !== false && (c.user?.role ?? 'CONSULTANT') === 'CONSULTANT')
+    .map(({ user: _user, ...c }) => c as ConsultantRow);
   if (consultantRows.length === 0) {
     logger.info('daily-digest: no ACTIVE consultants — skipping run');
     return report;
