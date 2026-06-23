@@ -21,6 +21,14 @@ interface Props {
   onMoveGroup?: () => void;
   /** Mobile parity with the desktop "Co-managed groups" action (admin-tier only). */
   onManageGrants?: () => void;
+  /** Deactivate / reactivate the manager's account (admin-tier only). */
+  onDeactivate?: () => void;
+  onReactivate?: () => void;
+}
+
+/** A manager account counts as active unless it carries a non-active status. */
+export function isManagerActive(status?: string | null): boolean {
+  return (status ?? 'active') === 'active';
 }
 
 /**
@@ -29,9 +37,16 @@ interface Props {
  * Tapping the header opens the profile; the "Move group" footer mirrors the
  * desktop row action (rendered only when the caller has the permission).
  */
-export function ManagerCard({ manager: m, onMoveGroup, onManageGrants }: Props) {
+export function ManagerCard({
+  manager: m,
+  onMoveGroup,
+  onManageGrants,
+  onDeactivate,
+  onReactivate,
+}: Props) {
   const name = m.full_name ?? m.email;
   const roleLabel = ROLE_LABEL[m.role as keyof typeof ROLE_LABEL] ?? m.role;
+  const active = isManagerActive(m.status);
 
   return (
     <div
@@ -74,8 +89,11 @@ export function ManagerCard({ manager: m, onMoveGroup, onManageGrants }: Props) 
         </div>
       </Link>
 
-      {(onMoveGroup || onManageGrants) && (
-        <div className="flex gap-2 mt-3 pt-3 border-t" style={{ borderColor: 'var(--border)' }}>
+      {(onMoveGroup || onManageGrants || onDeactivate || onReactivate) && (
+        <div
+          className="flex flex-wrap gap-2 mt-3 pt-3 border-t"
+          style={{ borderColor: 'var(--border)' }}
+        >
           {onManageGrants && (
             <Button size="sm" variant="ghost" className="flex-1" onClick={onManageGrants}>
               Co-managed groups
@@ -86,15 +104,34 @@ export function ManagerCard({ manager: m, onMoveGroup, onManageGrants }: Props) 
               Move group
             </Button>
           )}
+          {active && onDeactivate && (
+            <Button size="sm" variant="danger-ghost" className="flex-1" onClick={onDeactivate}>
+              Deactivate
+            </Button>
+          )}
+          {!active && onReactivate && (
+            <Button size="sm" variant="ghost" className="flex-1" onClick={onReactivate}>
+              Reactivate
+            </Button>
+          )}
         </div>
       )}
     </div>
   );
 }
 
-/** Client-side filter for managers. */
-export function filterManagers(rows: ManagerCardRow[], query: string): ManagerCardRow[] {
-  if (!query) return rows;
+/** Client-side filter for managers (search + optional account-status). */
+export function filterManagers(
+  rows: ManagerCardRow[],
+  query: string,
+  status: string = 'ALL',
+): ManagerCardRow[] {
   const q = query.toLowerCase();
-  return rows.filter((m) => (m.full_name ?? m.email ?? '').toLowerCase().includes(q));
+  return rows.filter((m) => {
+    const active = isManagerActive(m.status);
+    if (status === 'ACTIVE' && !active) return false;
+    if (status === 'DEACTIVATED' && active) return false;
+    if (q && !(m.full_name ?? m.email ?? '').toLowerCase().includes(q)) return false;
+    return true;
+  });
 }
