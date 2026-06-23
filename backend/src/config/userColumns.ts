@@ -44,6 +44,18 @@ export const SAFE_USER_SELF_COLUMNS = [
   'last_seen_at',
   'created_at',
   'updated_at',
+  // Extended profile fields — surfaced so the client can enforce mandatory
+  // profile completion (see ProtectedRoute's profile-completion gate).
+  'first_name',
+  'last_name',
+  'address_line1',
+  'address_line2',
+  'city',
+  'state',
+  'postal_code',
+  'country',
+  'timezone',
+  'linkedin_url',
 ].join(', ');
 
 /**
