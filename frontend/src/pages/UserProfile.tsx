@@ -35,6 +35,7 @@ interface UserProfile {
   country?: string | null;
   timezone?: string | null;
   linkedin_url?: string | null;
+  self_notes?: string | null;
   context?: {
     consultant?: {
       id: string;
@@ -537,6 +538,9 @@ export function UserProfile() {
             />
           </Card>
 
+          {/* Personal notes — only on your own profile, private to you. */}
+          {isSelf && <SelfNotesCard userId={user.id} initial={user.self_notes ?? ''} />}
+
           {/* Consultant / Recruiter context */}
           {user.context?.consultant && (
             <Card title="Consultant details">
@@ -799,5 +803,56 @@ function Field({
         {value || <span className="text-muted italic">Not set</span>}
       </div>
     </div>
+  );
+}
+
+/**
+ * Private personal notes card — shown only on your own profile. Saves directly
+ * via the self-update endpoint; the server strips self_notes from any other
+ * viewer's response and refuses writes from anyone but the owner.
+ */
+function SelfNotesCard({ userId, initial }: { userId: string; initial: string }) {
+  const [text, setText] = useState(initial);
+  const [saved, setSaved] = useState(initial);
+  const [saving, setSaving] = useState(false);
+  const dirty = text !== saved;
+
+  async function save() {
+    setSaving(true);
+    try {
+      await api.patch(`/users/${userId}`, { self_notes: text.trim() ? text : null });
+      toast.success('Notes saved');
+      setSaved(text); // keep the card "clean" after a successful save
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error ?? 'Failed to save notes');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card title="My notes">
+      <p className="text-xs text-muted mb-2">
+        A private space to jot notes about yourself. Only you can see and edit this.
+      </p>
+      <textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        rows={5}
+        placeholder="Write anything you want to remember…"
+        className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500"
+      />
+      <div className="flex justify-end mt-2">
+        <Button
+          size="sm"
+          variant="primary"
+          onClick={save}
+          loading={saving}
+          disabled={!dirty || saving}
+        >
+          {saving ? 'Saving' : 'Save notes'}
+        </Button>
+      </div>
+    </Card>
   );
 }
