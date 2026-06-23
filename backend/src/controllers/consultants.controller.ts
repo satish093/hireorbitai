@@ -41,7 +41,7 @@ export const list: RequestHandler = async (req, res) => {
   let q = db
     .from('consultants')
     .select(
-      '*, user:users(id, email, full_name, phone, group_id, role),' +
+      '*, user:users(id, email, full_name, phone, group_id, role, is_active),' +
         'recruiter:recruiters!recruiter_id(id, team, user:users!user_id(id, email, full_name, group_id))',
     )
     .order('created_at', { ascending: false });
@@ -86,7 +86,7 @@ export const list: RequestHandler = async (req, res) => {
   // interviews. So we KEEP the row but stop surfacing it on the bench: only
   // users who are still CONSULTANTs appear (and count) here.
   const rows = ((data ?? []) as any[]).filter(
-    (c) => (c?.user?.role ?? 'CONSULTANT') === 'CONSULTANT',
+    (c) => (c?.user?.role ?? 'CONSULTANT') === 'CONSULTANT' && c?.user?.is_active !== false,
   );
 
   // Bench matches: `?matchFor=:jobId` scores the (already role-scoped) list of

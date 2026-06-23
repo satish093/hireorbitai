@@ -47,16 +47,20 @@ async function attachConsultantCounts<T extends { id?: string }>(rows: T[]): Pro
   if (ids.length === 0) return rows.map((r) => ({ ...r, consultant_count: 0 }));
   const { data: cons } = await db
     .from('consultants')
-    .select('recruiter_id, user:users!user_id(role)')
+    .select('recruiter_id, user:users!user_id(role, is_active)')
     .in('recruiter_id', ids);
   const counts = new Map<string, number>();
   for (const c of (cons ?? []) as Array<{
     recruiter_id: string | null;
-    user?: { role?: string | null } | null;
+    user?: { role?: string | null; is_active?: boolean | null } | null;
   }>) {
-    // Don't count consultants whose user left the CONSULTANT role (their stale
-    // consultants row lingers but they're no longer on the bench).
-    if (c.recruiter_id && (c.user?.role ?? 'CONSULTANT') === 'CONSULTANT') {
+    // Don't count consultants whose user left the CONSULTANT role or was
+    // deactivated (their stale consultants row lingers but they're off the bench).
+    if (
+      c.recruiter_id &&
+      (c.user?.role ?? 'CONSULTANT') === 'CONSULTANT' &&
+      c.user?.is_active !== false
+    ) {
       counts.set(c.recruiter_id, (counts.get(c.recruiter_id) ?? 0) + 1);
     }
   }
@@ -64,17 +68,20 @@ async function attachConsultantCounts<T extends { id?: string }>(rows: T[]): Pro
 }
 
 const SELECT_WITH_JOINS =
-  '*, user:users!user_id(id, email, full_name, group_id, role), ' +
+  '*, user:users!user_id(id, email, full_name, group_id, role, is_active), ' +
   'manager:users!manager_id(id, email, full_name, group_id), ' +
   'managers:recruiter_managers(is_primary, assigned_at, manager:users!manager_id(id, email, full_name, role, group_id))';
 
 /**
  * A recruiters row is legitimate when its owning user is a real RECRUITER or a
- * manager-tier user moonlighting as one. A user demoted out of those roles
- * (e.g. RECRUITER → CONSULTANT) leaves a stale row behind that must NOT keep
- * surfacing on the recruiters directory — mirror of the consultants-list fix.
+ * manager-tier user moonlighting as one, AND the account is still active. A user
+ * demoted out of those roles (e.g. RECRUITER → CONSULTANT) or deactivated leaves
+ * a stale row behind that must NOT keep surfacing — mirror of the consultants fix.
  */
-function isStaleRecruiterRow(r: { user?: { role?: string | null } | null }): boolean {
+function isStaleRecruiterRow(r: {
+  user?: { role?: string | null; is_active?: boolean | null } | null;
+}): boolean {
+  if (r?.user?.is_active === false) return true; // deactivated account
   const role = r?.user?.role;
   if (!role) return false; // unknown role (missing join) — keep, fail-open on display
   return role !== 'RECRUITER' && !(MANAGER_TIER as readonly string[]).includes(role);
@@ -121,21 +128,27 @@ export const list: RequestHandler = async (req, res) => {
     let fq = db
       .from('recruiters')
       .select(
-        '*, user:users!user_id(id, email, full_name, group_id, role), manager:users!manager_id(id, email, full_name, group_id)',
+        '*, user:users!user_id(id, email, full_name, group_id, role, is_active), manager:users!manager_id(id, email, full_name, group_id)',
       )
       .order('created_at', { ascending: false });
     if (groupUserIds !== null) fq = fq.in('user_id', groupUserIds);
     const fallback = await fq;
     if (fallback.error) throw httpError(500, fallback.error.message);
     const fbRows = (
-      (fallback.data ?? []) as Array<{ id?: string; user?: { role?: string | null } | null }>
+      (fallback.data ?? []) as Array<{
+        id?: string;
+        user?: { role?: string | null; is_active?: boolean | null } | null;
+      }>
     ).filter((r) => !isStaleRecruiterRow(r));
     res.json(await attachConsultantCounts(fbRows));
     return;
   }
   if (error) throw httpError(500, 'Database error');
   const rows = (
-    (data ?? []) as Array<{ id?: string; user?: { role?: string | null } | null }>
+    (data ?? []) as Array<{
+      id?: string;
+      user?: { role?: string | null; is_active?: boolean | null } | null;
+    }>
   ).filter((r) => !isStaleRecruiterRow(r));
   res.json(await attachConsultantCounts(rows));
 };

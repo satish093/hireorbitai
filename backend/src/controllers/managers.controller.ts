@@ -96,11 +96,17 @@ export const list: RequestHandler = async (req, res) => {
     if (allRecruiterIds.length > 0) {
       const { data: rRoles } = await db
         .from('recruiters')
-        .select('id, user:users!user_id(role)')
+        .select('id, user:users!user_id(role, is_active)')
         .in('id', allRecruiterIds);
       const valid = new Set(
-        ((rRoles ?? []) as Array<{ id: string; user?: { role?: string | null } | null }>)
+        (
+          (rRoles ?? []) as Array<{
+            id: string;
+            user?: { role?: string | null; is_active?: boolean | null } | null;
+          }>
+        )
           .filter((r) => {
+            if (r.user?.is_active === false) return false;
             const role = r.user?.role;
             return (
               !role || role === 'RECRUITER' || (MANAGER_TIER as readonly string[]).includes(role)
