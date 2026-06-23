@@ -491,6 +491,18 @@ export const updateProgress: RequestHandler = async (req, res) => {
   res.json(fresh.data);
 };
 
+// POST /assignments/:id/complete — explicit learner completion. The status
+// machine no longer auto-flips to COMPLETED when the last gate passes; the
+// learner (or an in-scope reviewer) presses Complete, and the service re-checks
+// every gate before finalizing, returning the fresh assignment row.
+export const completeAssignment: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  await assertAssignmentInScope(req.user, req.params.id);
+  await svc.completeAssignment(req.params.id);
+  const fresh = await repo.assignments.get(req.params.id);
+  res.json(fresh.data);
+};
+
 // ---------------------------------------------------------------------------
 // UPLOADS — records the file URL; the file itself rides on local filesystem storage.
 // ---------------------------------------------------------------------------

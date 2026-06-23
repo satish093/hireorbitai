@@ -9,7 +9,14 @@ export function CourseRow({ a }: { a: MyAssignment & { updated_at?: string | nul
   const required = !!a.course?.compliance_category;
   const pct = Math.round(a.progress_percentage || 0);
   const urgency = done ? null : dueUrgency(a.due_date);
-  const cta = a.status === 'NOT_STARTED' ? 'Start' : done ? 'Review' : 'Resume';
+  const cta =
+    a.status === 'NOT_STARTED'
+      ? 'Start'
+      : done
+        ? 'Review'
+        : a.status === 'READY_TO_COMPLETE'
+          ? 'Finish'
+          : 'Resume';
 
   return (
     <Link
