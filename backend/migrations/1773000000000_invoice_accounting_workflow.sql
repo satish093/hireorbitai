@@ -44,6 +44,16 @@ update public.invoices
 set cancelled_at = coalesce(cancelled_at, updated_at, created_at)
 where status = 'Cancelled';
 
+-- Normalize legacy data-entry errors before enforcing the dates check below:
+-- a due_date that falls BEFORE its invoice_date is invalid, so clamp it up to
+-- the invoice date ("due on issue"). Without this the ADD CONSTRAINT fails on
+-- pre-existing rows and the whole migration rolls back.
+update public.invoices
+set due_date = invoice_date
+where due_date is not null
+  and invoice_date is not null
+  and due_date < invoice_date;
+
 alter table public.invoices
   add constraint invoices_status_check
   check (status in ('Draft', 'Submitted', 'Approved', 'Paid', 'Cancelled')),
