@@ -275,6 +275,7 @@ export const get: RequestHandler = async (req, res) => {
 // allowlist pattern in applications.controller.ts.
 const jobWritable = {
   title: z.string().min(1),
+  company_name: z.string().max(200).optional().nullable(),
   client_id: z.string().uuid().optional().nullable(),
   vendor_id: z.string().uuid().optional().nullable(),
   location: z.string().optional().nullable(),

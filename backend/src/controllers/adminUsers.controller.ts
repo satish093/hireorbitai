@@ -946,6 +946,7 @@ export const bulk: RequestHandler = async (req, res) => {
         if (error) throw httpError(500, 'Database error');
         invalidatePermissionCache(id);
         await cleanupRoleTransition(id, row.role, newRole);
+        await ensureRoleRow(id, newRole);
         audit({
           action: 'admin_role_changed',
           user_id: id,
@@ -1108,6 +1109,25 @@ async function cleanupRoleTransition(
   }
 }
 
+/**
+ * When a user MOVES INTO the RECRUITER role, make sure they have a `recruiters`
+ * row so they show up on the Recruiters directory immediately — that list is
+ * built from the recruiters table, not from users.role, so without this a
+ * promoted recruiter is invisible until they log in and self-onboard.
+ * Idempotent via the recruiters.user_id unique constraint. (CONSULTANT is left
+ * to the existing self-onboarding flow, which collects visa/skills/location.)
+ */
+async function ensureRoleRow(targetId: string, toRole: Role): Promise<void> {
+  if (toRole !== 'RECRUITER') return;
+  await db
+    .from('recruiters')
+    .upsert({ user_id: targetId }, { onConflict: 'user_id' })
+    .then(
+      () => undefined,
+      () => undefined,
+    );
+}
+
 export const setRole: RequestHandler = async (req, res) => {
   const actor = req.user!;
   const targetId = req.params.id;
@@ -1167,6 +1187,7 @@ export const setRole: RequestHandler = async (req, res) => {
   // and detach the edges they held under the old role.
   invalidatePermissionCache(targetId);
   await cleanupRoleTransition(targetId, prev, newRole);
+  await ensureRoleRow(targetId, newRole);
 
   audit({
     action: 'admin_role_changed',

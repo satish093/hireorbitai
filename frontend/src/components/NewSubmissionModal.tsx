@@ -187,6 +187,47 @@ function Step2({
   resumeVersions: ResumeVersion[];
   vendors: any[];
 }) {
+  // Custom job: when the opening isn't in the ingested list, the user can add it
+  // inline. It's created as a normal manual job (POST /jobs, source=NULL) and the
+  // application links to it by id like any other.
+  const [showCustom, setShowCustom] = useState(false);
+  const [cTitle, setCTitle] = useState('');
+  const [cCompany, setCCompany] = useState('');
+  const [cLocation, setCLocation] = useState('');
+  const [creating, setCreating] = useState(false);
+
+  async function createCustomJob() {
+    if (!cTitle.trim()) {
+      toast.error('Enter a job title');
+      return;
+    }
+    setCreating(true);
+    try {
+      const r = await api.post('/jobs', {
+        title: cTitle.trim(),
+        company_name: cCompany.trim() || null,
+        location: cLocation.trim() || null,
+      });
+      const job = r.data;
+      const item = {
+        value: job.id,
+        label: job.title,
+        sublabel: job.company_name ?? undefined,
+      };
+      setSelJob(item);
+      setForm((f) => ({ ...f, job_id: job.id }));
+      setShowCustom(false);
+      setCTitle('');
+      setCCompany('');
+      setCLocation('');
+      toast.success('Custom job added');
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error ?? 'Could not add the job');
+    } finally {
+      setCreating(false);
+    }
+  }
+
   return (
     <div className="space-y-4">
       <SearchSelect
@@ -212,6 +253,54 @@ function Step2({
         }}
         emptyText="No jobs found"
       />
+
+      {/* Custom job — add an opening that isn't in the ingested list. */}
+      {!showCustom ? (
+        <button
+          type="button"
+          onClick={() => setShowCustom(true)}
+          className="text-xs font-medium text-brand-700 hover:underline"
+        >
+          + Can’t find the job? Add a custom job
+        </button>
+      ) : (
+        <div
+          className="rounded-xl border border-border p-3 space-y-3"
+          style={{ background: 'var(--surface-2)' }}
+        >
+          <div className="text-[10.5px] font-semibold uppercase tracking-wide text-muted">
+            Custom job
+          </div>
+          <FormInput
+            label="Job title *"
+            placeholder="e.g. Senior Java Developer"
+            value={cTitle}
+            onChange={(e) => setCTitle(e.target.value)}
+          />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <FormInput
+              label="Company"
+              placeholder="e.g. Acme Corp"
+              value={cCompany}
+              onChange={(e) => setCCompany(e.target.value)}
+            />
+            <FormInput
+              label="Location"
+              placeholder="e.g. Remote / New York"
+              value={cLocation}
+              onChange={(e) => setCLocation(e.target.value)}
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button size="sm" variant="ghost" onClick={() => setShowCustom(false)}>
+              Cancel
+            </Button>
+            <Button size="sm" variant="primary" loading={creating} onClick={createCustomJob}>
+              {creating ? 'Adding…' : 'Add & use'}
+            </Button>
+          </div>
+        </div>
+      )}
 
       <SearchSelect
         label="Vendor"
