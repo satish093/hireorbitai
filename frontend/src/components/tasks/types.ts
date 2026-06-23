@@ -7,6 +7,8 @@ export interface FilterState {
   status?: TaskStatus | '';
   priority?: TaskPriority | '';
   assignee_id?: string;
+  /** Filter by the assignee's group (company). '' / undefined = any group. */
+  group_id?: string;
   consultant_id?: string;
   recruiter_id?: string;
   q?: string;
@@ -20,6 +22,7 @@ export function toCriteria(f: FilterState): Record<string, string> {
   if (f.status) out.status = f.status;
   if (f.priority) out.priority = f.priority;
   if (f.assignee_id) out.assignee_id = f.assignee_id;
+  if (f.group_id) out.group_id = f.group_id;
   if (f.consultant_id) out.consultant_id = f.consultant_id;
   if (f.recruiter_id) out.recruiter_id = f.recruiter_id;
   if (f.q) out.q = f.q;
@@ -37,6 +40,7 @@ export function filterTasks(tasks: TaskRow[], f: FilterState): TaskRow[] {
     if (f.status && t.status !== f.status) return false;
     if (f.priority && t.priority !== f.priority) return false;
     if (f.assignee_id && t.assignee_id !== f.assignee_id) return false;
+    if (f.group_id && (t.assignee?.group_id ?? '') !== f.group_id) return false;
     if (f.consultant_id && t.related_consultant_id !== f.consultant_id) return false;
     if (f.recruiter_id && t.related_recruiter_id !== f.recruiter_id) return false;
     if (tag && !(t.tags ?? []).some((x) => x.toLowerCase() === tag)) return false;

@@ -4,6 +4,7 @@ import { Button } from '../Button';
 import { ButtonGroup, ButtonGroupItem } from '../ButtonGroup';
 import { SelectInput } from '../SelectInput';
 import { Popover } from '../ui/Popover';
+import { useUserGroups } from '../GroupBadge';
 import { TASK_PRIORITIES, type TaskPriority } from '../../types';
 import { type FilterState, type SavedView, type ViewMode, type TaskUser } from './types';
 
@@ -11,7 +12,7 @@ const titleCase = (s: string) => s.charAt(0) + s.slice(1).toLowerCase();
 
 /** Count of advanced filters in effect (search is shown separately). */
 function activeCount(f: FilterState): number {
-  return [f.priority, f.assignee_id, f.tag, f.overdue, f.status].filter(Boolean).length;
+  return [f.priority, f.assignee_id, f.group_id, f.tag, f.overdue, f.status].filter(Boolean).length;
 }
 
 /**
@@ -54,10 +55,12 @@ export function TaskFilterBar({
   canCreate: boolean;
 }): JSX.Element {
   const nActive = activeCount(filters);
+  const { groups } = useUserGroups();
   const userName = (id?: string) => {
     const u = users.find((x) => x.id === id);
     return u?.full_name ?? u?.email ?? 'Someone';
   };
+  const groupName = (id?: string) => groups.find((g) => g.id === id)?.name ?? 'Group';
 
   // Removable chips for whatever's applied.
   const chips: { key: string; label: string; clear: () => void }[] = [];
@@ -75,6 +78,12 @@ export function TaskFilterBar({
           ? 'Assigned to me'
           : `Assignee: ${userName(filters.assignee_id)}`,
       clear: () => onChange({ assignee_id: undefined }),
+    });
+  if (filters.group_id)
+    chips.push({
+      key: 'group',
+      label: `Group: ${groupName(filters.group_id)}`,
+      clear: () => onChange({ group_id: undefined }),
     });
   if (filters.tag)
     chips.push({ key: 'tag', label: `#${filters.tag}`, clear: () => onChange({ tag: undefined }) });
@@ -166,6 +175,18 @@ export function TaskFilterBar({
                 ...users.map((u) => ({ value: u.id, label: u.full_name ?? u.email })),
               ]}
             />
+
+            {groups.length > 0 && (
+              <SelectInput
+                label="Group"
+                value={filters.group_id ?? ''}
+                onChange={(e) => onChange({ group_id: e.target.value || undefined })}
+                options={[
+                  { value: '', label: 'Any group' },
+                  ...groups.map((g) => ({ value: g.id, label: g.name })),
+                ]}
+              />
+            )}
 
             <label className="block">
               <span className="block text-xs font-medium text-ink mb-1.5">Tag</span>
