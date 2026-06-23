@@ -15,6 +15,21 @@ import './config/env';
 import './styles/tokens.css';
 import './index.css';
 
+// Recover from stale chunk loads after a deploy. When a lazily-imported route
+// chunk 404s — its content-hash was replaced by a newer build and the old file
+// removed by `rsync --delete` — Vite dispatches `vite:preloadError`. Reload once
+// to fetch the fresh index.html + correct chunk hashes. The time guard prevents
+// an infinite reload loop if the asset is genuinely unreachable, while still
+// allowing recovery across multiple deploys in one long-lived session.
+window.addEventListener('vite:preloadError', (event) => {
+  event.preventDefault();
+  const KEY = 'vite-preload-reload-at';
+  const last = Number(sessionStorage.getItem(KEY) || 0);
+  if (Date.now() - last < 10_000) return;
+  sessionStorage.setItem(KEY, String(Date.now()));
+  window.location.reload();
+});
+
 // DEV-ONLY toolbar. The `VITE_DEV_TOOLS === 'true'` guard is statically
 // evaluated by Vite — in a production build the flag is unset, so the condition
 // is a constant `false`, the dynamic import lands in a dead branch, and the
