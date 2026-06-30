@@ -864,7 +864,18 @@ export function Invoices() {
             // date / Paid live in the click-through detail panel.
             columns={[
               { key: 'invoice_number', header: 'Invoice #' },
-              { key: 'name', header: 'Name', render: (row) => row.name || '—' },
+              {
+                key: 'name',
+                header: 'Name',
+                render: (row) => (
+                  <div className="min-w-0">
+                    <div className="text-ink">{row.name || '—'}</div>
+                    {row.description && (
+                      <div className="truncate text-xs text-muted">{row.description}</div>
+                    )}
+                  </div>
+                ),
+              },
               {
                 key: 'bill_to',
                 header: 'Bill to',
@@ -1039,10 +1050,10 @@ export function Invoices() {
               />
             </div>
             <label className="mt-3 block">
-              <span className="mb-1.5 block text-xs font-medium text-ink">Description</span>
+              <span className="mb-1.5 block text-xs font-medium text-ink">Tenure</span>
               <textarea
                 rows={2}
-                placeholder="Optional summary shown on the invoice"
+                placeholder="e.g. Monthly — 1 Year Tenure (leave blank if none)"
                 value={form.description}
                 onChange={(event) => setForm({ ...form, description: event.target.value })}
                 className="w-full rounded-md border border-border-strong bg-surface px-3 py-2 text-[13px] text-ink focus:outline-none focus-visible:border-accent focus-visible:ring-2"
@@ -1294,7 +1305,7 @@ export function Invoices() {
               <table className="w-full min-w-[620px] text-sm">
                 <thead className="bg-hover text-left text-[10px] uppercase tracking-widest text-muted">
                   <tr>
-                    <th className="px-3 py-2">Description</th>
+                    <th className="px-3 py-2">Tenure</th>
                     <th className="px-3 py-2">Period</th>
                     <th className="px-3 py-2 text-right">Quantity</th>
                     <th className="px-3 py-2 text-right">Rate</th>
