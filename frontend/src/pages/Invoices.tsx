@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Layout } from '../components/Layout';
-import { DataTable } from '../components/DataTable';
+import { DataTable, type Column } from '../components/DataTable';
 import { Modal } from '../components/Modal';
 import { FormInput } from '../components/FormInput';
 import { SelectInput } from '../components/SelectInput';
@@ -10,6 +10,8 @@ import { Pill, PillTone } from '../components/Pill';
 import { ConfirmDialog, type ConfirmSpec } from '../components/admin/ConfirmDialog';
 import { api } from '../services/api';
 import { invalidate, useInvalidationListener } from '../hooks/useInvalidate';
+import { useAuth } from '../context/AuthContext';
+import { isAdmin } from '../types';
 import toast from 'react-hot-toast';
 
 type LifecycleStatus = 'Draft' | 'Submitted' | 'Approved' | 'Partially Paid' | 'Paid' | 'Cancelled';
@@ -75,6 +77,8 @@ interface Invoice {
   id: string;
   company_group_id: string;
   invoice_number: string;
+  name?: string | null;
+  description?: string | null;
   invoice_date?: string | null;
   due_date?: string | null;
   net_terms_days?: number | null;
@@ -137,6 +141,8 @@ interface InvoiceListResponse {
 interface InvoiceForm {
   company_group_id: string;
   invoice_number: string;
+  name: string;
+  description: string;
   invoice_date: string;
   due_date: string;
   net_terms_days: string;
@@ -178,6 +184,8 @@ const EMPTY_PAYMENT: PaymentForm = {
 const EMPTY_FORM: InvoiceForm = {
   company_group_id: '',
   invoice_number: '',
+  name: '',
+  description: '',
   invoice_date: new Date().toISOString().slice(0, 10),
   due_date: '',
   net_terms_days: '30',
@@ -258,6 +266,26 @@ function dueOf(invoice: Invoice) {
   return round2(Number(invoice.total_amount ?? 0) - Number(invoice.amount_paid ?? 0));
 }
 
+function fmtDateTime(value?: string | null) {
+  if (!value) return '—';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+}
+
+interface ActivityRow {
+  id: string;
+  action: string;
+  email: string | null;
+  created_at: string;
+  metadata: {
+    invoice_number?: string | null;
+    amount?: number | string;
+    currency?: string;
+    method?: string;
+    new_status?: string;
+  } | null;
+}
+
 function fmtDate(value?: string | null) {
   if (!value) return '—';
   const date = new Date(value.includes('T') ? value : `${value}T00:00:00`);
@@ -307,6 +335,15 @@ export function Invoices() {
   const [payOpen, setPayOpen] = useState(false);
   const [paySaving, setPaySaving] = useState(false);
   const [payForm, setPayForm] = useState<PaymentForm>(EMPTY_PAYMENT);
+  // The invoice a payment is being recorded against — set from either the
+  // detail panel or the inline list-row "Record payment" action.
+  const [payFor, setPayFor] = useState<Invoice | null>(null);
+  // Admin-only "Payment activity" subview.
+  const { profile } = useAuth();
+  const isAdminUser = isAdmin(profile?.role);
+  const [view, setView] = useState<'invoices' | 'activity'>('invoices');
+  const [activity, setActivity] = useState<ActivityRow[]>([]);
+  const [activityLoading, setActivityLoading] = useState(false);
   const pageSize = 25;
 
   async function loadCompanies() {
@@ -345,10 +382,13 @@ export function Invoices() {
     void loadCompanies();
   }, []);
   useEffect(() => {
+    // Don't fetch the invoice list while the admin Payment-activity view is up;
+    // refetch when switching back (view is a dep).
+    if (view !== 'invoices') return;
     const timer = window.setTimeout(() => void load(), query ? 250 : 0);
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, query, companyFilter, statusFilter, archivedFilter]);
+  }, [page, query, companyFilter, statusFilter, archivedFilter, view]);
   useInvalidationListener('invoices', load);
 
   const totals = useMemo(() => {
@@ -400,6 +440,8 @@ export function Invoices() {
     setForm({
       company_group_id: invoice.company_group_id,
       invoice_number: invoice.invoice_number,
+      name: invoice.name ?? '',
+      description: invoice.description ?? '',
       invoice_date: invoice.invoice_date ?? '',
       due_date: invoice.due_date ?? '',
       net_terms_days: invoice.net_terms_days == null ? '' : String(invoice.net_terms_days),
@@ -448,7 +490,6 @@ export function Invoices() {
 
   async function save() {
     if (!form.company_group_id) return toast.error('Company is required');
-    if (!form.invoice_number.trim()) return toast.error('Invoice number is required');
     if (!form.bill_to_snapshot.name.trim()) return toast.error('Bill-to name is required');
     if (form.line_items.some((item) => !item.description.trim())) {
       return toast.error('Every line item needs a description');
@@ -456,7 +497,10 @@ export function Invoices() {
     setSaving(true);
     const payload = {
       ...form,
-      invoice_number: form.invoice_number.trim(),
+      // Blank → omit so the server auto-generates (INV-0001 …) on create.
+      invoice_number: form.invoice_number.trim() || undefined,
+      name: form.name.trim() || null,
+      description: form.description.trim() || null,
       invoice_date: form.invoice_date || null,
       due_date: form.due_date || null,
       net_terms_days: form.net_terms_days === '' ? null : Number(form.net_terms_days),
@@ -491,6 +535,9 @@ export function Invoices() {
   }
 
   async function openDetail(id: string) {
+    // Clear any previously-open invoice so the panel shows the loading state
+    // instead of the prior invoice's data while the fetch is in flight.
+    setSelected(null);
     setDetailLoading(true);
     try {
       const response = await api.get<Invoice>(`/invoices/${id}`);
@@ -599,9 +646,23 @@ export function Invoices() {
     }
   }
 
-  function openRecordPayment() {
-    if (!selected) return;
-    const due = dueOf(selected);
+  async function loadActivity() {
+    setActivityLoading(true);
+    try {
+      const response = await api.get<ActivityRow[]>('/invoices/payment-activity', {
+        params: { limit: 100 },
+      });
+      setActivity(response.data ?? []);
+    } catch (error: any) {
+      toast.error(error?.response?.data?.error ?? 'Failed to load payment activity');
+    } finally {
+      setActivityLoading(false);
+    }
+  }
+
+  function openRecordPayment(invoice: Invoice) {
+    const due = dueOf(invoice);
+    setPayFor(invoice);
     setPayForm({
       ...EMPTY_PAYMENT,
       amount: due > 0 ? String(round2(due)) : '',
@@ -611,12 +672,13 @@ export function Invoices() {
   }
 
   async function savePayment() {
-    if (!selected) return;
+    const target = payFor;
+    if (!target) return;
     const amount = Number(payForm.amount);
     if (!Number.isFinite(amount) || amount <= 0) return toast.error('Enter a payment amount');
     setPaySaving(true);
     try {
-      const response = await api.post<Invoice>(`/invoices/${selected.id}/payments`, {
+      const response = await api.post<Invoice>(`/invoices/${target.id}/payments`, {
         amount,
         paid_on: payForm.paid_on || undefined,
         method: payForm.method,
@@ -625,7 +687,14 @@ export function Invoices() {
       });
       toast.success('Payment recorded');
       setPayOpen(false);
-      await refreshAfterAction(response.data);
+      setPayFor(null);
+      invalidate('invoices');
+      await load();
+      // Keep the admin Payment-activity feed current if it's the active view.
+      if (view === 'activity') await loadActivity();
+      // If the detail panel is open for this invoice, refresh it in place;
+      // otherwise leave it closed (inline list-row payment).
+      if (selected?.id === target.id) setSelected(response.data);
     } catch (error: any) {
       toast.error(error?.response?.data?.error ?? 'Failed to record payment');
     } finally {
@@ -681,173 +750,213 @@ export function Invoices() {
         action={<Button onClick={openCreate}>+ New invoice</Button>}
       />
 
-      <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Metric label="Total invoiced" value={joinMoney(summary.total_by_currency)} />
-        <Metric label="Paid" value={joinMoney(summary.paid_by_currency)} tone="success" />
-        <Metric
-          label="Outstanding"
-          value={joinMoney(summary.due_by_currency)}
-          sub={
-            summary.draft_count
-              ? `${summary.draft_count} draft${summary.draft_count === 1 ? '' : 's'}`
-              : undefined
-          }
-        />
-        <Metric
-          label="Overdue"
-          value={joinMoney(summary.overdue_by_currency)}
-          tone="danger"
-          sub={
-            summary.overdue_count
-              ? `${summary.overdue_count} invoice${summary.overdue_count === 1 ? '' : 's'}`
-              : undefined
-          }
-        />
-      </div>
-
-      <div className="mb-3 grid grid-cols-1 gap-2 rounded-xl border border-border bg-surface p-3 md:grid-cols-4">
-        <FormInput
-          aria-label="Search invoices"
-          placeholder="Search number or party…"
-          value={query}
-          onChange={(event) => {
-            setPage(1);
-            setQuery(event.target.value);
-          }}
-        />
-        <SelectInput
-          aria-label="Filter by company"
-          value={companyFilter}
-          onChange={(event) => {
-            setPage(1);
-            setCompanyFilter(event.target.value);
-          }}
-          options={[
-            { value: '', label: 'All companies' },
-            ...companies.map((company) => ({ value: company.id, label: company.name })),
-          ]}
-        />
-        <SelectInput
-          aria-label="Filter by status"
-          value={statusFilter}
-          onChange={(event) => {
-            setPage(1);
-            setStatusFilter(event.target.value);
-          }}
-          options={[
-            { value: '', label: 'All statuses' },
-            ...(
-              [
-                'Draft',
-                'Submitted',
-                'Approved',
-                'Partially Paid',
-                'Overdue',
-                'Paid',
-                'Cancelled',
-              ] as const
-            ).map((status) => ({ value: status, label: status })),
-          ]}
-        />
-        <SelectInput
-          aria-label="Filter archived invoices"
-          value={archivedFilter}
-          onChange={(event) => {
-            setPage(1);
-            setArchivedFilter(event.target.value);
-          }}
-          options={[
-            { value: 'false', label: 'Active invoices' },
-            { value: 'true', label: 'Archived invoices' },
-            { value: 'all', label: 'Active + archived' },
-          ]}
-        />
-      </div>
-
-      <DataTable
-        loading={loading}
-        empty="No invoices match these filters."
-        rows={rows}
-        onRowClick={(row) => void openDetail(row.id)}
-        columns={[
-          { key: 'invoice_number', header: 'Invoice #' },
-          {
-            key: 'bill_to',
-            header: 'Bill to',
-            render: (row) => row.bill_to_snapshot?.name || '—',
-          },
-          {
-            key: 'company',
-            header: 'Issuer',
-            render: (row) => row.issuer_snapshot?.name || '—',
-            hideOnMobile: true,
-          },
-          {
-            key: 'invoice_date',
-            header: 'Invoice date',
-            render: (row) => fmtDate(row.invoice_date),
-            hideOnMobile: true,
-          },
-          { key: 'due_date', header: 'Due date', render: (row) => fmtDate(row.due_date) },
-          {
-            key: 'total_amount',
-            header: 'Total',
-            align: 'right',
-            render: (row) => fmtMoney(row.total_amount, row.currency),
-          },
-          {
-            key: 'amount_paid',
-            header: 'Paid',
-            align: 'right',
-            hideOnMobile: true,
-            render: (row) => fmtMoney(row.amount_paid ?? 0, row.currency),
-          },
-          {
-            key: 'amount_due',
-            header: 'Due',
-            align: 'right',
-            render: (row) => fmtMoney(dueOf(row), row.currency),
-          },
-          {
-            key: 'status',
-            header: 'Status',
-            render: (row) => (
-              <Pill tone={STATUS_TONES[row.display_status ?? row.status]}>
-                {row.display_status ?? row.status}
-              </Pill>
-            ),
-          },
-        ]}
-      />
-
-      <div className="mt-3 flex items-center justify-between text-xs text-muted">
-        <span>
-          {total
-            ? `${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, total)} of ${total}`
-            : '0 invoices'}
-        </span>
-        <div className="flex gap-2">
-          <Button
-            size="sm"
-            variant="secondary"
-            disabled={page <= 1}
-            onClick={() => setPage(page - 1)}
-          >
-            Previous
-          </Button>
-          <span className="self-center">
-            Page {page} of {pageCount}
-          </span>
-          <Button
-            size="sm"
-            variant="secondary"
-            disabled={page >= pageCount}
-            onClick={() => setPage(page + 1)}
-          >
-            Next
-          </Button>
+      {isAdminUser && (
+        <div className="mb-4 max-w-xs">
+          <SelectInput
+            aria-label="Invoice view"
+            value={view}
+            onChange={(event) => {
+              const next = event.target.value as 'invoices' | 'activity';
+              setView(next);
+              if (next === 'activity') void loadActivity();
+            }}
+            options={[
+              { value: 'invoices', label: 'Invoices' },
+              { value: 'activity', label: 'Payment activity (admin)' },
+            ]}
+          />
         </div>
-      </div>
+      )}
+
+      {view === 'activity' ? (
+        <PaymentActivity rows={activity} loading={activityLoading} />
+      ) : (
+        <>
+          <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <Metric label="Total invoiced" value={joinMoney(summary.total_by_currency)} />
+            <Metric label="Paid" value={joinMoney(summary.paid_by_currency)} tone="success" />
+            <Metric
+              label="Outstanding"
+              value={joinMoney(summary.due_by_currency)}
+              sub={
+                summary.draft_count
+                  ? `${summary.draft_count} draft${summary.draft_count === 1 ? '' : 's'}`
+                  : undefined
+              }
+            />
+            <Metric
+              label="Overdue"
+              value={joinMoney(summary.overdue_by_currency)}
+              tone="danger"
+              sub={
+                summary.overdue_count
+                  ? `${summary.overdue_count} invoice${summary.overdue_count === 1 ? '' : 's'}`
+                  : undefined
+              }
+            />
+          </div>
+
+          <div className="mb-3 grid grid-cols-1 gap-2 rounded-xl border border-border bg-surface p-3 md:grid-cols-4">
+            <FormInput
+              aria-label="Search invoices"
+              placeholder="Search number or party…"
+              value={query}
+              onChange={(event) => {
+                setPage(1);
+                setQuery(event.target.value);
+              }}
+            />
+            <SelectInput
+              aria-label="Filter by company"
+              value={companyFilter}
+              onChange={(event) => {
+                setPage(1);
+                setCompanyFilter(event.target.value);
+              }}
+              options={[
+                { value: '', label: 'All companies' },
+                ...companies.map((company) => ({ value: company.id, label: company.name })),
+              ]}
+            />
+            <SelectInput
+              aria-label="Filter by status"
+              value={statusFilter}
+              onChange={(event) => {
+                setPage(1);
+                setStatusFilter(event.target.value);
+              }}
+              options={[
+                { value: '', label: 'All statuses' },
+                ...(
+                  [
+                    'Draft',
+                    'Submitted',
+                    'Approved',
+                    'Partially Paid',
+                    'Overdue',
+                    'Paid',
+                    'Cancelled',
+                  ] as const
+                ).map((status) => ({ value: status, label: status })),
+              ]}
+            />
+            <SelectInput
+              aria-label="Filter archived invoices"
+              value={archivedFilter}
+              onChange={(event) => {
+                setPage(1);
+                setArchivedFilter(event.target.value);
+              }}
+              options={[
+                { value: 'false', label: 'Active invoices' },
+                { value: 'true', label: 'Archived invoices' },
+                { value: 'all', label: 'Active + archived' },
+              ]}
+            />
+          </div>
+
+          <DataTable
+            loading={loading}
+            empty="No invoices match these filters."
+            rows={rows}
+            onRowClick={(row) => void openDetail(row.id)}
+            columns={[
+              { key: 'invoice_number', header: 'Invoice #' },
+              { key: 'name', header: 'Name', render: (row) => row.name || '—' },
+              {
+                key: 'bill_to',
+                header: 'Bill to',
+                render: (row) => row.bill_to_snapshot?.name || '—',
+              },
+              {
+                key: 'company',
+                header: 'Issuer',
+                render: (row) => row.issuer_snapshot?.name || '—',
+                hideOnMobile: true,
+              },
+              {
+                key: 'invoice_date',
+                header: 'Invoice date',
+                render: (row) => fmtDate(row.invoice_date),
+                hideOnMobile: true,
+              },
+              { key: 'due_date', header: 'Due date', render: (row) => fmtDate(row.due_date) },
+              {
+                key: 'total_amount',
+                header: 'Total',
+                align: 'right',
+                render: (row) => fmtMoney(row.total_amount, row.currency),
+              },
+              {
+                key: 'amount_paid',
+                header: 'Paid',
+                align: 'right',
+                hideOnMobile: true,
+                render: (row) => fmtMoney(row.amount_paid ?? 0, row.currency),
+              },
+              {
+                key: 'amount_due',
+                header: 'Due',
+                align: 'right',
+                render: (row) => fmtMoney(dueOf(row), row.currency),
+              },
+              {
+                key: 'status',
+                header: 'Status',
+                render: (row) => (
+                  <Pill tone={STATUS_TONES[row.display_status ?? row.status]}>
+                    {row.display_status ?? row.status}
+                  </Pill>
+                ),
+              },
+              {
+                key: 'actions',
+                header: '',
+                align: 'right',
+                render: (row) =>
+                  row.permitted_actions?.record_payment ? (
+                    // Stop the row click (which opens the detail panel) so the
+                    // quick action opens the payment modal directly.
+                    <span className="inline-flex" onClick={(event) => event.stopPropagation()}>
+                      <Button size="sm" variant="secondary" onClick={() => openRecordPayment(row)}>
+                        Record payment
+                      </Button>
+                    </span>
+                  ) : null,
+              },
+            ]}
+          />
+
+          <div className="mt-3 flex items-center justify-between text-xs text-muted">
+            <span>
+              {total
+                ? `${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, total)} of ${total}`
+                : '0 invoices'}
+            </span>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={page <= 1}
+                onClick={() => setPage(page - 1)}
+              >
+                Previous
+              </Button>
+              <span className="self-center">
+                Page {page} of {pageCount}
+              </span>
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={page >= pageCount}
+                onClick={() => setPage(page + 1)}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        </>
+      )}
 
       <Modal
         open={formOpen}
@@ -880,9 +989,16 @@ export function Invoices() {
                 ]}
               />
               <FormInput
-                label="Invoice number *"
+                label="Invoice number"
+                placeholder="Auto-generated (INV-0001)"
                 value={form.invoice_number}
                 onChange={(event) => setForm({ ...form, invoice_number: event.target.value })}
+              />
+              <FormInput
+                label="Name"
+                placeholder="e.g. March retainer"
+                value={form.name}
+                onChange={(event) => setForm({ ...form, name: event.target.value })}
               />
               <FormInput
                 label="Invoice date"
@@ -929,6 +1045,16 @@ export function Invoices() {
                 onChange={(event) => setForm({ ...form, tax_percent: event.target.value })}
               />
             </div>
+            <label className="mt-3 block">
+              <span className="mb-1.5 block text-xs font-medium text-ink">Description</span>
+              <textarea
+                rows={2}
+                placeholder="Optional summary shown on the invoice"
+                value={form.description}
+                onChange={(event) => setForm({ ...form, description: event.target.value })}
+                className="w-full rounded-md border border-border-strong bg-surface px-3 py-2 text-[13px] text-ink focus:outline-none focus-visible:border-accent focus-visible:ring-2"
+              />
+            </label>
           </section>
 
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
@@ -1091,6 +1217,18 @@ export function Invoices() {
       >
         {selected ? (
           <div className="space-y-5">
+            {(selected.name || selected.description) && (
+              <div className="rounded-xl border border-border bg-hover/30 p-3">
+                {selected.name && (
+                  <div className="text-base font-semibold text-ink">{selected.name}</div>
+                )}
+                {selected.description && (
+                  <div className="mt-1 whitespace-pre-line text-sm text-muted">
+                    {selected.description}
+                  </div>
+                )}
+              </div>
+            )}
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-hover/30 p-3">
               <div>
                 <Pill tone={STATUS_TONES[selected.display_status]}>{selected.display_status}</Pill>
@@ -1112,7 +1250,7 @@ export function Invoices() {
                   </Button>
                 )}
                 {selected.permitted_actions?.record_payment && (
-                  <Button size="sm" onClick={openRecordPayment}>
+                  <Button size="sm" onClick={() => openRecordPayment(selected)}>
                     Record payment
                   </Button>
                 )}
@@ -1232,45 +1370,49 @@ export function Invoices() {
                     </div>
                   </div>
                   {selected.permitted_actions?.record_payment && (
-                    <Button size="sm" onClick={openRecordPayment}>
+                    <Button size="sm" onClick={() => openRecordPayment(selected)}>
                       + Record payment
                     </Button>
                   )}
                 </div>
-                {selected.payments?.length ? (
-                  <div className="space-y-2">
-                    {selected.payments.map((payment) => (
-                      <div
-                        key={payment.id}
-                        className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-hover/30 px-3 py-2 text-sm"
-                      >
-                        <div className="min-w-0">
-                          <span className="font-medium text-ink">
-                            {fmtMoney(payment.amount, selected.currency)}
-                          </span>
-                          <span className="text-muted">
-                            {' '}
-                            · {methodLabel(payment.method)} · {fmtDate(payment.paid_on)}
-                          </span>
-                          {payment.reference ? (
-                            <span className="text-muted"> · {payment.reference}</span>
-                          ) : null}
-                        </div>
-                        {!selected.archived_at && (
-                          <button
-                            type="button"
-                            onClick={() => requestVoidPayment(payment)}
-                            className="text-xs font-medium text-danger hover:underline"
-                          >
-                            Void
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-sm text-muted">No payments recorded yet.</div>
-                )}
+                <DataTable
+                  rows={selected.payments ?? []}
+                  empty="No payments recorded yet."
+                  columns={[
+                    { key: 'paid_on', header: 'Date', render: (p) => fmtDate(p.paid_on) },
+                    { key: 'method', header: 'Method', render: (p) => methodLabel(p.method) },
+                    {
+                      key: 'reference',
+                      header: 'Reference',
+                      render: (p) => p.reference || '—',
+                      hideOnMobile: true,
+                    },
+                    {
+                      key: 'amount',
+                      header: 'Amount',
+                      align: 'right',
+                      render: (p) => fmtMoney(p.amount, selected.currency),
+                    },
+                    ...(selected.archived_at
+                      ? []
+                      : [
+                          {
+                            key: 'void',
+                            header: '',
+                            align: 'right' as const,
+                            render: (p: Payment) => (
+                              <button
+                                type="button"
+                                onClick={() => requestVoidPayment(p)}
+                                className="text-xs font-medium text-danger hover:underline"
+                              >
+                                Void
+                              </button>
+                            ),
+                          },
+                        ]),
+                  ]}
+                />
               </div>
             )}
 
@@ -1352,7 +1494,7 @@ export function Invoices() {
         open={payOpen}
         onClose={() => setPayOpen(false)}
         size="md"
-        title={selected ? `Record payment · #${selected.invoice_number}` : 'Record payment'}
+        title={payFor ? `Record payment · #${payFor.invoice_number}` : 'Record payment'}
         description="Logs a payment against this invoice and updates its balance."
         footer={
           <>
@@ -1365,20 +1507,20 @@ export function Invoices() {
           </>
         }
       >
-        {selected && (
+        {payFor && (
           <div className="space-y-4">
             <div className="rounded-xl border border-border bg-hover/30 p-3 text-sm">
               <TotalRow
                 label="Invoice total"
-                value={fmtMoney(selected.total_amount, selected.currency)}
+                value={fmtMoney(payFor.total_amount, payFor.currency)}
               />
               <TotalRow
                 label="Already paid"
-                value={fmtMoney(selected.amount_paid ?? 0, selected.currency)}
+                value={fmtMoney(payFor.amount_paid ?? 0, payFor.currency)}
               />
               <TotalRow
                 label="Balance due"
-                value={fmtMoney(dueOf(selected), selected.currency)}
+                value={fmtMoney(dueOf(payFor), payFor.currency)}
                 strong
               />
             </div>
@@ -1427,6 +1569,51 @@ export function Invoices() {
 
       <ConfirmDialog spec={confirm} onClose={() => setConfirm(null)} />
     </Layout>
+  );
+}
+
+function PaymentActivity({ rows, loading }: { rows: ActivityRow[]; loading: boolean }) {
+  const columns: Column<ActivityRow>[] = [
+    {
+      key: 'created_at',
+      header: 'When',
+      render: (row) => fmtDateTime(row.created_at),
+    },
+    {
+      key: 'action',
+      header: 'Action',
+      render: (row) => {
+        const voided = row.action === 'invoice_payment_voided';
+        return (
+          <Pill tone={voided ? STATUS_TONES.Cancelled : STATUS_TONES.Paid}>
+            {voided ? 'Voided' : 'Recorded'}
+          </Pill>
+        );
+      },
+    },
+    { key: 'invoice', header: 'Invoice #', render: (row) => row.metadata?.invoice_number || '—' },
+    {
+      key: 'amount',
+      header: 'Amount',
+      align: 'right',
+      render: (row) => fmtMoney(row.metadata?.amount ?? 0, row.metadata?.currency || 'USD'),
+    },
+    {
+      key: 'method',
+      header: 'Method',
+      render: (row) => (row.metadata?.method ? methodLabel(row.metadata.method) : '—'),
+      hideOnMobile: true,
+    },
+    { key: 'new_status', header: 'New status', render: (row) => row.metadata?.new_status || '—' },
+    { key: 'by', header: 'By', render: (row) => row.email || '—', hideOnMobile: true },
+  ];
+  return (
+    <DataTable
+      columns={columns}
+      rows={rows}
+      loading={loading}
+      empty="No payment activity yet. Recorded and voided payments across all invoices appear here."
+    />
   );
 }
 

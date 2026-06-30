@@ -84,7 +84,10 @@ const lineItemSchema = z
 
 const writable = {
   company_group_id: z.string().uuid(),
-  invoice_number: z.string().trim().min(1).max(100),
+  // Optional — auto-generated server-side (INV-0001 …) when omitted/blank.
+  invoice_number: z.string().trim().min(1).max(100).optional(),
+  name: nullableText(200),
+  description: nullableText(5000),
   invoice_date: isoDate.optional().nullable(),
   due_date: isoDate.optional().nullable(),
   net_terms_days: z.coerce.number().int().min(0).max(3650).optional().nullable(),
@@ -190,8 +193,9 @@ function displayStatus(invoice: InvoiceRow): InvoiceStatus | 'Overdue' {
 function permittedActions(invoice: InvoiceRow) {
   const archived = !!invoice.archived_at;
   const due = invoiceAmountDue(invoice);
-  const collectible =
-    !archived && (invoice.status === 'Approved' || invoice.status === 'Partially Paid') && due > 0;
+  // Payments can be recorded on any sent-but-unpaid invoice (Submitted /
+  // Approved / Partially Paid) — no separate Approve step required.
+  const collectible = !archived && isUnpaid(invoice.status) && due > 0;
   return {
     edit: !archived && (invoice.status === 'Draft' || invoice.status === 'Submitted'),
     submit: !archived && invoice.status === 'Draft',
@@ -490,6 +494,22 @@ export const get: RequestHandler = async (req, res) => {
   res.json(await enrich(await loadInvoiceScopedOr404(req.params.id, req.user)));
 };
 
+/**
+ * Next zero-padded sequential invoice number (INV-0001 …) across all invoices.
+ * Caller must hold the auto-number advisory lock (see persistInvoice) so two
+ * concurrent creates can't read the same max. Only 1–9 digit INV-#### values
+ * feed the max — bounding the digits keeps the `::int` cast from overflowing on
+ * a manually-entered INV-<hugenumber>.
+ */
+async function nextInvoiceNumber(client: PoolClient): Promise<string> {
+  const { rows } = await client.query<{ n: number }>(
+    `select coalesce(max(substring(invoice_number from '^INV-([0-9]{1,9})$')::int), 0) as n
+       from public.invoices
+      where invoice_number ~ '^INV-[0-9]{1,9}$'`,
+  );
+  return `INV-${String(Number(rows[0]?.n ?? 0) + 1).padStart(4, '0')}`;
+}
+
 async function persistInvoice(
   mode: 'create' | 'update',
   invoiceId: string | null,
@@ -504,10 +524,29 @@ async function persistInvoice(
   const client = await pool.connect();
   try {
     await client.query('begin');
+    // Resolve the invoice number: use the supplied one, else auto-generate on
+    // create / keep the existing one on update.
+    let invoiceNumber = input.invoice_number?.trim() || '';
+    if (!invoiceNumber) {
+      if (mode === 'create') {
+        // Serialize auto-numbering so concurrent creates can't generate the same
+        // INV-#### (the unique index is per-company; this keeps the sequence
+        // globally unique and avoids a confusing 23505 on a number the user
+        // never typed). Released automatically at commit/rollback.
+        await client.query("select pg_advisory_xact_lock(hashtext('invoice_auto_number'))");
+        invoiceNumber = await nextInvoiceNumber(client);
+      } else {
+        const cur = await client.query<{ invoice_number: string | null }>(
+          'select invoice_number from public.invoices where id=$1',
+          [invoiceId],
+        );
+        invoiceNumber = cur.rows[0]?.invoice_number ?? '';
+      }
+    }
     let invoice: InvoiceRow;
     const common = [
       companyId,
-      input.invoice_number,
+      invoiceNumber,
       input.invoice_date ?? null,
       input.due_date ?? null,
       input.net_terms_days ?? null,
@@ -526,6 +565,8 @@ async function persistInvoice(
       first.service_period ?? null,
       totals.total_amount,
       input.bill_to_snapshot.email ?? null,
+      input.name ?? null,
+      input.description ?? null,
     ];
     if (mode === 'create') {
       const result = await client.query(
@@ -533,10 +574,10 @@ async function persistInvoice(
           company_group_id, invoice_number, invoice_date, due_date, net_terms_days,
           currency, discount_amount, tax_percent, subtotal, tax_amount, total_amount,
           issuer_snapshot, bill_to_snapshot, notes, consultant_name, vendor_name,
-          pay_rate, billing_month, invoice_amount, bill_to_email, status, created_by
+          pay_rate, billing_month, invoice_amount, bill_to_email, name, description, status, created_by
         ) values (
           $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13::jsonb,$14,$15,$16,
-          $17,$18,$19,$20,'Draft',$21
+          $17,$18,$19,$20,$21,$22,'Draft',$23
         ) returning *`,
         [...common, req.user.id],
       );
@@ -555,8 +596,8 @@ async function persistInvoice(
           subtotal=$9, tax_amount=$10, total_amount=$11, issuer_snapshot=$12::jsonb,
           bill_to_snapshot=$13::jsonb, notes=$14, consultant_name=$15, vendor_name=$16,
           pay_rate=$17, billing_month=$18, invoice_amount=$19, bill_to_email=$20,
-          updated_at=now()
-         where id=$21 returning *`,
+          name=$21, description=$22, updated_at=now()
+         where id=$23 returning *`,
         [...common, invoiceId],
       );
       invoice = result.rows[0];
@@ -623,7 +664,9 @@ const transitionSchema = z.object({
 });
 const TRANSITIONS: Record<InvoiceStatus, InvoiceStatus[]> = {
   Draft: ['Submitted'],
-  Submitted: ['Approved', 'Cancelled'],
+  // Submitted → Paid is the "mark paid in full" shortcut (payments can be
+  // recorded straight from Submitted, no Approve step required).
+  Submitted: ['Approved', 'Paid', 'Cancelled'],
   // Approved → Paid is the "mark paid in full" shortcut (reconciled into the
   // payment ledger). Partial collection happens via POST /:id/payments instead.
   Approved: ['Paid', 'Cancelled'],
@@ -653,7 +696,11 @@ export const transition: RequestHandler = async (req, res) => {
   // Marking Paid in full also settles the balance: set amount_paid = total and
   // drop a reconciling payment into the ledger so the two never diverge.
   const paidInFull = to === 'Paid';
-  const setExtra = paidInFull ? ', amount_paid=total_amount' : '';
+  // Paid in full also settles the balance and guarantees an approval timestamp
+  // (a Paid invoice should never have a NULL approved_at, even via Submitted→Paid).
+  const setExtra = paidInFull
+    ? ', amount_paid=total_amount, approved_at=coalesce(approved_at, now())'
+    : '';
   const client = await pool.connect();
   try {
     await client.query('begin');
@@ -851,9 +898,13 @@ async function reconcileFromLedger(
   );
   const total = round2(Number(invoice.total_amount ?? 0));
   const newPaid = round2(Number((sumRow.rows[0] as { paid?: string })?.paid ?? 0));
-  // No payments → back to Approved (payments are only ever taken after approval).
+  // Recording a payment implies the invoice is approved (money accepted), so we
+  // stamp approved_at below. When the ledger is emptied (last payment voided) we
+  // fall back to Approved if it was ever approved, else Submitted — never
+  // silently "approve" an invoice that was never approved and never paid.
+  const hasPayment = newPaid > 0;
   let newStatus: InvoiceStatus;
-  if (newPaid <= 0) newStatus = 'Approved';
+  if (!hasPayment) newStatus = invoice.approved_at ? 'Approved' : 'Submitted';
   else if (newPaid >= total - 0.005) newStatus = 'Paid';
   else newStatus = 'Partially Paid';
   const fullyPaid = newStatus === 'Paid';
@@ -861,11 +912,12 @@ async function reconcileFromLedger(
     `update public.invoices set
         amount_paid=$1,
         status=$2,
-        paid_at = case when $3 then coalesce(paid_at, now()) else null end,
+        approved_at = case when $3 then coalesce(approved_at, now()) else approved_at end,
+        paid_at = case when $4 then coalesce(paid_at, now()) else null end,
         updated_at=now()
-      where id=$4
+      where id=$5
       returning *`,
-    [newPaid, newStatus, fullyPaid, invoice.id],
+    [newPaid, newStatus, hasPayment, fullyPaid, invoice.id],
   );
   if (newStatus !== invoice.status) {
     await client.query(
@@ -885,9 +937,10 @@ export const recordPayment: RequestHandler = async (req, res) => {
   const invoice = await loadInvoiceScopedOr404(req.params.id, req.user);
   if (invoice.archived_at) throw httpError(409, 'Restore the invoice before recording a payment');
   // Coarse fast-fail on the snapshot; the authoritative checks run under the
-  // row lock below (the snapshot can be stale under concurrency).
-  if (invoice.status !== 'Approved' && invoice.status !== 'Partially Paid') {
-    throw httpError(409, 'Only approved invoices can take payments');
+  // row lock below (the snapshot can be stale under concurrency). Payments are
+  // allowed on any sent-but-unpaid invoice (Submitted / Approved / Partially Paid).
+  if (!isUnpaid(invoice.status)) {
+    throw httpError(409, 'Only sent (unpaid) invoices can take payments');
   }
   const amount = round2(parsed.data.amount);
 
@@ -906,8 +959,8 @@ export const recordPayment: RequestHandler = async (req, res) => {
       | { status: string; total_amount: string; amount_paid: string }
       | undefined;
     if (!row) throw httpError(404, 'Invoice not found');
-    if (row.status !== 'Approved' && row.status !== 'Partially Paid') {
-      throw httpError(409, 'Only approved invoices can take payments');
+    if (!isUnpaid(row.status)) {
+      throw httpError(409, 'Only sent (unpaid) invoices can take payments');
     }
     const due = round2(Number(row.total_amount ?? 0) - Number(row.amount_paid ?? 0));
     if (due <= 0) throw httpError(409, 'Invoice is already paid in full');
@@ -941,6 +994,7 @@ export const recordPayment: RequestHandler = async (req, res) => {
     const updated = await enrich(updatedRow);
     auditInvoice('invoice_payment_recorded', req, updated, {
       amount,
+      currency: updated.currency,
       method: parsed.data.method,
       amount_paid: updated.amount_paid,
       new_status: updated.status,
@@ -998,6 +1052,7 @@ export const voidPayment: RequestHandler = async (req, res) => {
     auditInvoice('invoice_payment_voided', req, updated, {
       payment_id: payment.id,
       amount: Number(payment.amount),
+      currency: updated.currency,
       amount_paid: updated.amount_paid,
       new_status: updated.status,
     });
@@ -1057,4 +1112,27 @@ export const remind: RequestHandler = async (req, res) => {
     },
   });
   res.json({ ok: true, ...result, last_overdue_alert_at: stamp });
+};
+
+// ---------------------------------------------------------------------------
+// Admin-only payment activity feed — every payment recorded or voided across
+// ALL invoices, newest first. Sourced from the audit log so voided/edited
+// payments still appear (the invoice_payments row itself is hard-deleted on
+// void). Route-gated to ADMIN_TIER.
+// ---------------------------------------------------------------------------
+export const paymentActivity: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const limit = Math.min(Math.max(Number((req.query.limit as string) ?? 100), 1), 200);
+  const offset = Math.max(0, Number((req.query.offset as string) ?? 0));
+  let q = db
+    .from('auth_audit_logs')
+    .select('id, action, email, metadata, created_at')
+    .in('action', ['invoice_payment_recorded', 'invoice_payment_voided'])
+    .order('created_at', { ascending: false });
+  // Use range for pagination, else a plain limit — never both (the shim would
+  // otherwise emit two LIMIT clauses → invalid SQL).
+  q = offset > 0 ? q.range(offset, offset + limit - 1) : q.limit(limit);
+  const { data, error } = await q;
+  if (error) throw httpError(500, 'Database error');
+  res.json(data ?? []);
 };
