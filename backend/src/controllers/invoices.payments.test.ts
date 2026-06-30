@@ -164,9 +164,17 @@ describe('invoice partial payments', () => {
     expect((await run(recordPayment, { body: { amount: 150 } })).error?.status).toBe(400);
   });
 
-  it('refuses payments on invoices that are not yet approved', async () => {
-    mock.invoice.status = 'Submitted';
+  it('refuses payments on Draft invoices (must be sent first)', async () => {
+    mock.invoice.status = 'Draft';
     expect((await run(recordPayment, { body: { amount: 10 } })).error?.status).toBe(409);
+  });
+
+  it('allows recording a payment directly on a Submitted invoice (no Approve step)', async () => {
+    mock.invoice.status = 'Submitted';
+    const res = await run(recordPayment, { body: { amount: 40 } });
+    expect(res.error).toBeNull();
+    expect(res.res.body.status).toBe('Partially Paid');
+    expect(Number(res.res.body.amount_paid)).toBe(40);
   });
 
   it('voiding the only payment reverts the invoice to Approved', async () => {

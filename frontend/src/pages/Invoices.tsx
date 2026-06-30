@@ -307,6 +307,9 @@ export function Invoices() {
   const [payOpen, setPayOpen] = useState(false);
   const [paySaving, setPaySaving] = useState(false);
   const [payForm, setPayForm] = useState<PaymentForm>(EMPTY_PAYMENT);
+  // The invoice a payment is being recorded against — set from either the
+  // detail panel or the inline list-row "Record payment" action.
+  const [payFor, setPayFor] = useState<Invoice | null>(null);
   const pageSize = 25;
 
   async function loadCompanies() {
@@ -599,9 +602,9 @@ export function Invoices() {
     }
   }
 
-  function openRecordPayment() {
-    if (!selected) return;
-    const due = dueOf(selected);
+  function openRecordPayment(invoice: Invoice) {
+    const due = dueOf(invoice);
+    setPayFor(invoice);
     setPayForm({
       ...EMPTY_PAYMENT,
       amount: due > 0 ? String(round2(due)) : '',
@@ -611,12 +614,13 @@ export function Invoices() {
   }
 
   async function savePayment() {
-    if (!selected) return;
+    const target = payFor;
+    if (!target) return;
     const amount = Number(payForm.amount);
     if (!Number.isFinite(amount) || amount <= 0) return toast.error('Enter a payment amount');
     setPaySaving(true);
     try {
-      const response = await api.post<Invoice>(`/invoices/${selected.id}/payments`, {
+      const response = await api.post<Invoice>(`/invoices/${target.id}/payments`, {
         amount,
         paid_on: payForm.paid_on || undefined,
         method: payForm.method,
@@ -625,7 +629,12 @@ export function Invoices() {
       });
       toast.success('Payment recorded');
       setPayOpen(false);
-      await refreshAfterAction(response.data);
+      setPayFor(null);
+      invalidate('invoices');
+      await load();
+      // If the detail panel is open for this invoice, refresh it in place;
+      // otherwise leave it closed (inline list-row payment).
+      if (selected?.id === target.id) setSelected(response.data);
     } catch (error: any) {
       toast.error(error?.response?.data?.error ?? 'Failed to record payment');
     } finally {
@@ -816,6 +825,21 @@ export function Invoices() {
                 {row.display_status ?? row.status}
               </Pill>
             ),
+          },
+          {
+            key: 'actions',
+            header: '',
+            align: 'right',
+            render: (row) =>
+              row.permitted_actions?.record_payment ? (
+                // Stop the row click (which opens the detail panel) so the
+                // quick action opens the payment modal directly.
+                <span className="inline-flex" onClick={(event) => event.stopPropagation()}>
+                  <Button size="sm" variant="secondary" onClick={() => openRecordPayment(row)}>
+                    Record payment
+                  </Button>
+                </span>
+              ) : null,
           },
         ]}
       />
@@ -1112,7 +1136,7 @@ export function Invoices() {
                   </Button>
                 )}
                 {selected.permitted_actions?.record_payment && (
-                  <Button size="sm" onClick={openRecordPayment}>
+                  <Button size="sm" onClick={() => openRecordPayment(selected)}>
                     Record payment
                   </Button>
                 )}
@@ -1232,41 +1256,49 @@ export function Invoices() {
                     </div>
                   </div>
                   {selected.permitted_actions?.record_payment && (
-                    <Button size="sm" onClick={openRecordPayment}>
+                    <Button size="sm" onClick={() => openRecordPayment(selected)}>
                       + Record payment
                     </Button>
                   )}
                 </div>
                 {selected.payments?.length ? (
-                  <div className="space-y-2">
-                    {selected.payments.map((payment) => (
-                      <div
-                        key={payment.id}
-                        className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-hover/30 px-3 py-2 text-sm"
-                      >
-                        <div className="min-w-0">
-                          <span className="font-medium text-ink">
-                            {fmtMoney(payment.amount, selected.currency)}
-                          </span>
-                          <span className="text-muted">
-                            {' '}
-                            · {methodLabel(payment.method)} · {fmtDate(payment.paid_on)}
-                          </span>
-                          {payment.reference ? (
-                            <span className="text-muted"> · {payment.reference}</span>
-                          ) : null}
-                        </div>
-                        {!selected.archived_at && (
-                          <button
-                            type="button"
-                            onClick={() => requestVoidPayment(payment)}
-                            className="text-xs font-medium text-danger hover:underline"
-                          >
-                            Void
-                          </button>
-                        )}
-                      </div>
-                    ))}
+                  <div className="overflow-x-auto rounded-xl border border-border">
+                    <table className="w-full min-w-[480px] text-sm">
+                      <thead className="bg-hover text-left text-[10px] uppercase tracking-widest text-muted">
+                        <tr>
+                          <th className="px-3 py-2">Date</th>
+                          <th className="px-3 py-2">Method</th>
+                          <th className="px-3 py-2">Reference</th>
+                          <th className="px-3 py-2 text-right">Amount</th>
+                          {!selected.archived_at && (
+                            <th className="px-3 py-2 text-right">Action</th>
+                          )}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selected.payments.map((payment) => (
+                          <tr key={payment.id} className="border-t border-border">
+                            <td className="px-3 py-2 text-ink">{fmtDate(payment.paid_on)}</td>
+                            <td className="px-3 py-2 text-muted">{methodLabel(payment.method)}</td>
+                            <td className="px-3 py-2 text-muted">{payment.reference || '—'}</td>
+                            <td className="px-3 py-2 text-right font-medium text-ink">
+                              {fmtMoney(payment.amount, selected.currency)}
+                            </td>
+                            {!selected.archived_at && (
+                              <td className="px-3 py-2 text-right">
+                                <button
+                                  type="button"
+                                  onClick={() => requestVoidPayment(payment)}
+                                  className="text-xs font-medium text-danger hover:underline"
+                                >
+                                  Void
+                                </button>
+                              </td>
+                            )}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 ) : (
                   <div className="text-sm text-muted">No payments recorded yet.</div>
@@ -1352,7 +1384,7 @@ export function Invoices() {
         open={payOpen}
         onClose={() => setPayOpen(false)}
         size="md"
-        title={selected ? `Record payment · #${selected.invoice_number}` : 'Record payment'}
+        title={payFor ? `Record payment · #${payFor.invoice_number}` : 'Record payment'}
         description="Logs a payment against this invoice and updates its balance."
         footer={
           <>
@@ -1365,20 +1397,20 @@ export function Invoices() {
           </>
         }
       >
-        {selected && (
+        {payFor && (
           <div className="space-y-4">
             <div className="rounded-xl border border-border bg-hover/30 p-3 text-sm">
               <TotalRow
                 label="Invoice total"
-                value={fmtMoney(selected.total_amount, selected.currency)}
+                value={fmtMoney(payFor.total_amount, payFor.currency)}
               />
               <TotalRow
                 label="Already paid"
-                value={fmtMoney(selected.amount_paid ?? 0, selected.currency)}
+                value={fmtMoney(payFor.amount_paid ?? 0, payFor.currency)}
               />
               <TotalRow
                 label="Balance due"
-                value={fmtMoney(dueOf(selected), selected.currency)}
+                value={fmtMoney(dueOf(payFor), payFor.currency)}
                 strong
               />
             </div>

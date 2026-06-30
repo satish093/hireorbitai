@@ -190,8 +190,9 @@ function displayStatus(invoice: InvoiceRow): InvoiceStatus | 'Overdue' {
 function permittedActions(invoice: InvoiceRow) {
   const archived = !!invoice.archived_at;
   const due = invoiceAmountDue(invoice);
-  const collectible =
-    !archived && (invoice.status === 'Approved' || invoice.status === 'Partially Paid') && due > 0;
+  // Payments can be recorded on any sent-but-unpaid invoice (Submitted /
+  // Approved / Partially Paid) — no separate Approve step required.
+  const collectible = !archived && isUnpaid(invoice.status) && due > 0;
   return {
     edit: !archived && (invoice.status === 'Draft' || invoice.status === 'Submitted'),
     submit: !archived && invoice.status === 'Draft',
@@ -623,7 +624,9 @@ const transitionSchema = z.object({
 });
 const TRANSITIONS: Record<InvoiceStatus, InvoiceStatus[]> = {
   Draft: ['Submitted'],
-  Submitted: ['Approved', 'Cancelled'],
+  // Submitted → Paid is the "mark paid in full" shortcut (payments can be
+  // recorded straight from Submitted, no Approve step required).
+  Submitted: ['Approved', 'Paid', 'Cancelled'],
   // Approved → Paid is the "mark paid in full" shortcut (reconciled into the
   // payment ledger). Partial collection happens via POST /:id/payments instead.
   Approved: ['Paid', 'Cancelled'],
@@ -885,9 +888,10 @@ export const recordPayment: RequestHandler = async (req, res) => {
   const invoice = await loadInvoiceScopedOr404(req.params.id, req.user);
   if (invoice.archived_at) throw httpError(409, 'Restore the invoice before recording a payment');
   // Coarse fast-fail on the snapshot; the authoritative checks run under the
-  // row lock below (the snapshot can be stale under concurrency).
-  if (invoice.status !== 'Approved' && invoice.status !== 'Partially Paid') {
-    throw httpError(409, 'Only approved invoices can take payments');
+  // row lock below (the snapshot can be stale under concurrency). Payments are
+  // allowed on any sent-but-unpaid invoice (Submitted / Approved / Partially Paid).
+  if (!isUnpaid(invoice.status)) {
+    throw httpError(409, 'Only sent (unpaid) invoices can take payments');
   }
   const amount = round2(parsed.data.amount);
 
@@ -906,8 +910,8 @@ export const recordPayment: RequestHandler = async (req, res) => {
       | { status: string; total_amount: string; amount_paid: string }
       | undefined;
     if (!row) throw httpError(404, 'Invoice not found');
-    if (row.status !== 'Approved' && row.status !== 'Partially Paid') {
-      throw httpError(409, 'Only approved invoices can take payments');
+    if (!isUnpaid(row.status)) {
+      throw httpError(409, 'Only sent (unpaid) invoices can take payments');
     }
     const due = round2(Number(row.total_amount ?? 0) - Number(row.amount_paid ?? 0));
     if (due <= 0) throw httpError(409, 'Invoice is already paid in full');
