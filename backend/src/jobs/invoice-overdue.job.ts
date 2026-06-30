@@ -44,10 +44,10 @@ export const invoiceOverdueJob = {
       rows = result.rows as InvoiceRow[];
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      // amount_paid / last_overdue_alert_at land in 1774000000000_invoice_payments.
+      // amount_paid / last_overdue_alert_at land in 1778000000000_invoice_payments.
       if (/column .* does not exist|relation .* does not exist|schema cache/i.test(msg)) {
         logger.warn(
-          { hint: 'Apply backend/migrations/1774000000000_invoice_payments.sql', err: msg },
+          { hint: 'Apply backend/migrations/1778000000000_invoice_payments.sql', err: msg },
           'invoice-overdue: column/table missing — job idle until migration applied',
         );
         return;
