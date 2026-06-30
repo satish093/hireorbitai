@@ -85,6 +85,9 @@ export interface InvoiceBrand {
   color?: string | null;
   logo?: Buffer | null;
   logoUrl?: string | null;
+  /** Logo is predominantly near-white → render it on a dark panel so a
+   *  white-on-transparent wordmark doesn't vanish on the white header. */
+  logoIsLight?: boolean;
 }
 
 type Doc = InstanceType<typeof PDFDocument>;
@@ -181,8 +184,26 @@ export function invoiceFileBase(invoice: InvoiceRow): string {
 function drawLogo(doc: Doc, issuer: InvoicePartySnapshot, brand: InvoiceBrand | undefined) {
   if (brand?.logo) {
     try {
-      // Match the reference's large, wide company logo block.
-      doc.image(brand.logo, LEFT, 25, { fit: [200, 72], valign: 'center' });
+      // Compute the fitted draw size from the logo's natural dimensions so a
+      // light-logo backdrop can be sized to hug it.
+      const maxW = 200;
+      const maxH = 72;
+      const top = 25;
+      // openImage exists at runtime but isn't in @types/pdfkit.
+      const img = (
+        doc as unknown as { openImage(src: Buffer): { width: number; height: number } }
+      ).openImage(brand.logo);
+      const scale = Math.min(maxW / img.width, maxH / img.height);
+      const dw = img.width * scale;
+      const dh = img.height * scale;
+      // A near-white logo (e.g. a white wordmark on transparency) is invisible
+      // on the white header — drop it onto a dark rounded panel so it reads.
+      if (brand.logoIsLight) {
+        const padX = 12;
+        const padY = 9;
+        doc.roundedRect(LEFT - padX, top - padY, dw + padX * 2, dh + padY * 2, 6).fill('#0f172a');
+      }
+      doc.image(brand.logo, LEFT, top, { width: dw, height: dh });
       return;
     } catch {
       // Corrupt or unsupported logos use the branded fallback below.

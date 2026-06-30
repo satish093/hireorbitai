@@ -23,6 +23,7 @@ import {
 } from '../services/invoiceReminder.service';
 import { audit } from '../services/audit.service';
 import { logger } from '../config/logger';
+import { logoLooksLight } from '../utils/pngLuminance';
 
 export const INVOICE_STATUSES = [
   'Draft',
@@ -760,6 +761,9 @@ async function resolveInvoiceBrand(invoice: InvoiceRow): Promise<InvoiceBrand | 
     color: grp.color ?? null,
     logo,
     logoUrl,
+    // A near-white logo (white wordmark on transparency) gets a dark backdrop in
+    // the PDF so it doesn't disappear on the white header.
+    logoIsLight: logo ? logoLooksLight(logo) : false,
   };
 }
 
