@@ -1062,3 +1062,25 @@ export const remind: RequestHandler = async (req, res) => {
   });
   res.json({ ok: true, ...result, last_overdue_alert_at: stamp });
 };
+
+// ---------------------------------------------------------------------------
+// Admin-only payment activity feed — every payment recorded or voided across
+// ALL invoices, newest first. Sourced from the audit log so voided/edited
+// payments still appear (the invoice_payments row itself is hard-deleted on
+// void). Route-gated to ADMIN_TIER.
+// ---------------------------------------------------------------------------
+export const paymentActivity: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const limit = Math.min(Math.max(Number((req.query.limit as string) ?? 100), 1), 200);
+  const offset = Math.max(0, Number((req.query.offset as string) ?? 0));
+  let q = db
+    .from('auth_audit_logs')
+    .select('id, action, email, metadata, created_at')
+    .in('action', ['invoice_payment_recorded', 'invoice_payment_voided'])
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (offset > 0) q = q.range(offset, offset + limit - 1);
+  const { data, error } = await q;
+  if (error) throw httpError(500, 'Database error');
+  res.json(data ?? []);
+};

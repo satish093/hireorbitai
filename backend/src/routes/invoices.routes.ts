@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { requireRole } from '../middleware/auth';
-import { MANAGER_TIER } from '../types';
+import { MANAGER_TIER, ADMIN_TIER } from '../types';
 import * as c from '../controllers/invoices.controller';
 
 // Invoices are role-only: MANAGER_TIER. Capability grants never widen access.
@@ -9,6 +9,8 @@ import * as c from '../controllers/invoices.controller';
 // per-route gates are belt-and-suspenders.
 export const invoicesRouter = Router();
 const gate = requireRole(...MANAGER_TIER);
+// Admin-tier only (SUPER_ADMIN / CEO / CTO / DIRECTOR) — payment audit feed.
+const adminGate = requireRole(...ADMIN_TIER);
 const emailLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 10,
@@ -20,6 +22,9 @@ const emailLimiter = rateLimit({
 
 invoicesRouter.get('/', gate, c.list);
 invoicesRouter.get('/companies', gate, c.companies);
+// Admin-only payment activity feed. MUST precede '/:id' so it isn't captured
+// as an invoice id.
+invoicesRouter.get('/payment-activity', adminGate, c.paymentActivity);
 invoicesRouter.get('/:id', gate, c.get);
 // Document generation (download) + email-send. Distinct suffixes, so order vs
 // the bare /:id routes doesn't matter; grouped here for clarity.

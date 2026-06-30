@@ -10,6 +10,8 @@ import { Pill, PillTone } from '../components/Pill';
 import { ConfirmDialog, type ConfirmSpec } from '../components/admin/ConfirmDialog';
 import { api } from '../services/api';
 import { invalidate, useInvalidationListener } from '../hooks/useInvalidate';
+import { useAuth } from '../context/AuthContext';
+import { ADMIN_TIER } from '../types';
 import toast from 'react-hot-toast';
 
 type LifecycleStatus = 'Draft' | 'Submitted' | 'Approved' | 'Partially Paid' | 'Paid' | 'Cancelled';
@@ -258,6 +260,25 @@ function dueOf(invoice: Invoice) {
   return round2(Number(invoice.total_amount ?? 0) - Number(invoice.amount_paid ?? 0));
 }
 
+function fmtDateTime(value?: string | null) {
+  if (!value) return '—';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+}
+
+interface ActivityRow {
+  id: string;
+  action: string;
+  email: string | null;
+  created_at: string;
+  metadata: {
+    invoice_number?: string | null;
+    amount?: number | string;
+    method?: string;
+    new_status?: string;
+  } | null;
+}
+
 function fmtDate(value?: string | null) {
   if (!value) return '—';
   const date = new Date(value.includes('T') ? value : `${value}T00:00:00`);
@@ -310,6 +331,12 @@ export function Invoices() {
   // The invoice a payment is being recorded against — set from either the
   // detail panel or the inline list-row "Record payment" action.
   const [payFor, setPayFor] = useState<Invoice | null>(null);
+  // Admin-only "Payment activity" subview.
+  const { profile } = useAuth();
+  const isAdminUser = !!profile && (ADMIN_TIER as readonly string[]).includes(profile.role);
+  const [view, setView] = useState<'invoices' | 'activity'>('invoices');
+  const [activity, setActivity] = useState<ActivityRow[]>([]);
+  const [activityLoading, setActivityLoading] = useState(false);
   const pageSize = 25;
 
   async function loadCompanies() {
@@ -602,6 +629,20 @@ export function Invoices() {
     }
   }
 
+  async function loadActivity() {
+    setActivityLoading(true);
+    try {
+      const response = await api.get<ActivityRow[]>('/invoices/payment-activity', {
+        params: { limit: 100 },
+      });
+      setActivity(response.data ?? []);
+    } catch (error: any) {
+      toast.error(error?.response?.data?.error ?? 'Failed to load payment activity');
+    } finally {
+      setActivityLoading(false);
+    }
+  }
+
   function openRecordPayment(invoice: Invoice) {
     const due = dueOf(invoice);
     setPayFor(invoice);
@@ -690,188 +731,212 @@ export function Invoices() {
         action={<Button onClick={openCreate}>+ New invoice</Button>}
       />
 
-      <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Metric label="Total invoiced" value={joinMoney(summary.total_by_currency)} />
-        <Metric label="Paid" value={joinMoney(summary.paid_by_currency)} tone="success" />
-        <Metric
-          label="Outstanding"
-          value={joinMoney(summary.due_by_currency)}
-          sub={
-            summary.draft_count
-              ? `${summary.draft_count} draft${summary.draft_count === 1 ? '' : 's'}`
-              : undefined
-          }
-        />
-        <Metric
-          label="Overdue"
-          value={joinMoney(summary.overdue_by_currency)}
-          tone="danger"
-          sub={
-            summary.overdue_count
-              ? `${summary.overdue_count} invoice${summary.overdue_count === 1 ? '' : 's'}`
-              : undefined
-          }
-        />
-      </div>
-
-      <div className="mb-3 grid grid-cols-1 gap-2 rounded-xl border border-border bg-surface p-3 md:grid-cols-4">
-        <FormInput
-          aria-label="Search invoices"
-          placeholder="Search number or party…"
-          value={query}
-          onChange={(event) => {
-            setPage(1);
-            setQuery(event.target.value);
-          }}
-        />
-        <SelectInput
-          aria-label="Filter by company"
-          value={companyFilter}
-          onChange={(event) => {
-            setPage(1);
-            setCompanyFilter(event.target.value);
-          }}
-          options={[
-            { value: '', label: 'All companies' },
-            ...companies.map((company) => ({ value: company.id, label: company.name })),
-          ]}
-        />
-        <SelectInput
-          aria-label="Filter by status"
-          value={statusFilter}
-          onChange={(event) => {
-            setPage(1);
-            setStatusFilter(event.target.value);
-          }}
-          options={[
-            { value: '', label: 'All statuses' },
-            ...(
-              [
-                'Draft',
-                'Submitted',
-                'Approved',
-                'Partially Paid',
-                'Overdue',
-                'Paid',
-                'Cancelled',
-              ] as const
-            ).map((status) => ({ value: status, label: status })),
-          ]}
-        />
-        <SelectInput
-          aria-label="Filter archived invoices"
-          value={archivedFilter}
-          onChange={(event) => {
-            setPage(1);
-            setArchivedFilter(event.target.value);
-          }}
-          options={[
-            { value: 'false', label: 'Active invoices' },
-            { value: 'true', label: 'Archived invoices' },
-            { value: 'all', label: 'Active + archived' },
-          ]}
-        />
-      </div>
-
-      <DataTable
-        loading={loading}
-        empty="No invoices match these filters."
-        rows={rows}
-        onRowClick={(row) => void openDetail(row.id)}
-        columns={[
-          { key: 'invoice_number', header: 'Invoice #' },
-          {
-            key: 'bill_to',
-            header: 'Bill to',
-            render: (row) => row.bill_to_snapshot?.name || '—',
-          },
-          {
-            key: 'company',
-            header: 'Issuer',
-            render: (row) => row.issuer_snapshot?.name || '—',
-            hideOnMobile: true,
-          },
-          {
-            key: 'invoice_date',
-            header: 'Invoice date',
-            render: (row) => fmtDate(row.invoice_date),
-            hideOnMobile: true,
-          },
-          { key: 'due_date', header: 'Due date', render: (row) => fmtDate(row.due_date) },
-          {
-            key: 'total_amount',
-            header: 'Total',
-            align: 'right',
-            render: (row) => fmtMoney(row.total_amount, row.currency),
-          },
-          {
-            key: 'amount_paid',
-            header: 'Paid',
-            align: 'right',
-            hideOnMobile: true,
-            render: (row) => fmtMoney(row.amount_paid ?? 0, row.currency),
-          },
-          {
-            key: 'amount_due',
-            header: 'Due',
-            align: 'right',
-            render: (row) => fmtMoney(dueOf(row), row.currency),
-          },
-          {
-            key: 'status',
-            header: 'Status',
-            render: (row) => (
-              <Pill tone={STATUS_TONES[row.display_status ?? row.status]}>
-                {row.display_status ?? row.status}
-              </Pill>
-            ),
-          },
-          {
-            key: 'actions',
-            header: '',
-            align: 'right',
-            render: (row) =>
-              row.permitted_actions?.record_payment ? (
-                // Stop the row click (which opens the detail panel) so the
-                // quick action opens the payment modal directly.
-                <span className="inline-flex" onClick={(event) => event.stopPropagation()}>
-                  <Button size="sm" variant="secondary" onClick={() => openRecordPayment(row)}>
-                    Record payment
-                  </Button>
-                </span>
-              ) : null,
-          },
-        ]}
-      />
-
-      <div className="mt-3 flex items-center justify-between text-xs text-muted">
-        <span>
-          {total
-            ? `${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, total)} of ${total}`
-            : '0 invoices'}
-        </span>
-        <div className="flex gap-2">
-          <Button
-            size="sm"
-            variant="secondary"
-            disabled={page <= 1}
-            onClick={() => setPage(page - 1)}
-          >
-            Previous
-          </Button>
-          <span className="self-center">
-            Page {page} of {pageCount}
-          </span>
-          <Button
-            size="sm"
-            variant="secondary"
-            disabled={page >= pageCount}
-            onClick={() => setPage(page + 1)}
-          >
-            Next
-          </Button>
+      {isAdminUser && (
+        <div className="mb-4 max-w-xs">
+          <SelectInput
+            aria-label="Invoice view"
+            value={view}
+            onChange={(event) => {
+              const next = event.target.value as 'invoices' | 'activity';
+              setView(next);
+              if (next === 'activity') void loadActivity();
+            }}
+            options={[
+              { value: 'invoices', label: 'Invoices' },
+              { value: 'activity', label: 'Payment activity (admin)' },
+            ]}
+          />
         </div>
-      </div>
+      )}
+
+      {view === 'activity' ? (
+        <PaymentActivity rows={activity} loading={activityLoading} />
+      ) : (
+        <>
+          <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <Metric label="Total invoiced" value={joinMoney(summary.total_by_currency)} />
+            <Metric label="Paid" value={joinMoney(summary.paid_by_currency)} tone="success" />
+            <Metric
+              label="Outstanding"
+              value={joinMoney(summary.due_by_currency)}
+              sub={
+                summary.draft_count
+                  ? `${summary.draft_count} draft${summary.draft_count === 1 ? '' : 's'}`
+                  : undefined
+              }
+            />
+            <Metric
+              label="Overdue"
+              value={joinMoney(summary.overdue_by_currency)}
+              tone="danger"
+              sub={
+                summary.overdue_count
+                  ? `${summary.overdue_count} invoice${summary.overdue_count === 1 ? '' : 's'}`
+                  : undefined
+              }
+            />
+          </div>
+
+          <div className="mb-3 grid grid-cols-1 gap-2 rounded-xl border border-border bg-surface p-3 md:grid-cols-4">
+            <FormInput
+              aria-label="Search invoices"
+              placeholder="Search number or party…"
+              value={query}
+              onChange={(event) => {
+                setPage(1);
+                setQuery(event.target.value);
+              }}
+            />
+            <SelectInput
+              aria-label="Filter by company"
+              value={companyFilter}
+              onChange={(event) => {
+                setPage(1);
+                setCompanyFilter(event.target.value);
+              }}
+              options={[
+                { value: '', label: 'All companies' },
+                ...companies.map((company) => ({ value: company.id, label: company.name })),
+              ]}
+            />
+            <SelectInput
+              aria-label="Filter by status"
+              value={statusFilter}
+              onChange={(event) => {
+                setPage(1);
+                setStatusFilter(event.target.value);
+              }}
+              options={[
+                { value: '', label: 'All statuses' },
+                ...(
+                  [
+                    'Draft',
+                    'Submitted',
+                    'Approved',
+                    'Partially Paid',
+                    'Overdue',
+                    'Paid',
+                    'Cancelled',
+                  ] as const
+                ).map((status) => ({ value: status, label: status })),
+              ]}
+            />
+            <SelectInput
+              aria-label="Filter archived invoices"
+              value={archivedFilter}
+              onChange={(event) => {
+                setPage(1);
+                setArchivedFilter(event.target.value);
+              }}
+              options={[
+                { value: 'false', label: 'Active invoices' },
+                { value: 'true', label: 'Archived invoices' },
+                { value: 'all', label: 'Active + archived' },
+              ]}
+            />
+          </div>
+
+          <DataTable
+            loading={loading}
+            empty="No invoices match these filters."
+            rows={rows}
+            onRowClick={(row) => void openDetail(row.id)}
+            columns={[
+              { key: 'invoice_number', header: 'Invoice #' },
+              {
+                key: 'bill_to',
+                header: 'Bill to',
+                render: (row) => row.bill_to_snapshot?.name || '—',
+              },
+              {
+                key: 'company',
+                header: 'Issuer',
+                render: (row) => row.issuer_snapshot?.name || '—',
+                hideOnMobile: true,
+              },
+              {
+                key: 'invoice_date',
+                header: 'Invoice date',
+                render: (row) => fmtDate(row.invoice_date),
+                hideOnMobile: true,
+              },
+              { key: 'due_date', header: 'Due date', render: (row) => fmtDate(row.due_date) },
+              {
+                key: 'total_amount',
+                header: 'Total',
+                align: 'right',
+                render: (row) => fmtMoney(row.total_amount, row.currency),
+              },
+              {
+                key: 'amount_paid',
+                header: 'Paid',
+                align: 'right',
+                hideOnMobile: true,
+                render: (row) => fmtMoney(row.amount_paid ?? 0, row.currency),
+              },
+              {
+                key: 'amount_due',
+                header: 'Due',
+                align: 'right',
+                render: (row) => fmtMoney(dueOf(row), row.currency),
+              },
+              {
+                key: 'status',
+                header: 'Status',
+                render: (row) => (
+                  <Pill tone={STATUS_TONES[row.display_status ?? row.status]}>
+                    {row.display_status ?? row.status}
+                  </Pill>
+                ),
+              },
+              {
+                key: 'actions',
+                header: '',
+                align: 'right',
+                render: (row) =>
+                  row.permitted_actions?.record_payment ? (
+                    // Stop the row click (which opens the detail panel) so the
+                    // quick action opens the payment modal directly.
+                    <span className="inline-flex" onClick={(event) => event.stopPropagation()}>
+                      <Button size="sm" variant="secondary" onClick={() => openRecordPayment(row)}>
+                        Record payment
+                      </Button>
+                    </span>
+                  ) : null,
+              },
+            ]}
+          />
+
+          <div className="mt-3 flex items-center justify-between text-xs text-muted">
+            <span>
+              {total
+                ? `${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, total)} of ${total}`
+                : '0 invoices'}
+            </span>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={page <= 1}
+                onClick={() => setPage(page - 1)}
+              >
+                Previous
+              </Button>
+              <span className="self-center">
+                Page {page} of {pageCount}
+              </span>
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={page >= pageCount}
+                onClick={() => setPage(page + 1)}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        </>
+      )}
 
       <Modal
         open={formOpen}
@@ -1459,6 +1524,63 @@ export function Invoices() {
 
       <ConfirmDialog spec={confirm} onClose={() => setConfirm(null)} />
     </Layout>
+  );
+}
+
+function PaymentActivity({ rows, loading }: { rows: ActivityRow[]; loading: boolean }) {
+  if (loading) {
+    return <div className="py-12 text-center text-sm text-muted">Loading payment activity…</div>;
+  }
+  if (!rows.length) {
+    return (
+      <div className="rounded-xl border border-border bg-surface p-10 text-center text-sm text-muted">
+        No payment activity yet. Recorded and voided payments across all invoices will appear here.
+      </div>
+    );
+  }
+  return (
+    <div className="overflow-x-auto rounded-xl border border-border bg-surface">
+      <table className="w-full min-w-[760px] text-sm">
+        <thead className="bg-hover text-left text-[10px] uppercase tracking-widest text-muted">
+          <tr>
+            <th className="px-3 py-2">When</th>
+            <th className="px-3 py-2">Action</th>
+            <th className="px-3 py-2">Invoice #</th>
+            <th className="px-3 py-2 text-right">Amount</th>
+            <th className="px-3 py-2">Method</th>
+            <th className="px-3 py-2">New status</th>
+            <th className="px-3 py-2">By</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => {
+            const meta = row.metadata ?? {};
+            const voided = row.action === 'invoice_payment_voided';
+            return (
+              <tr key={row.id} className="border-t border-border">
+                <td className="whitespace-nowrap px-3 py-2 text-muted">
+                  {fmtDateTime(row.created_at)}
+                </td>
+                <td className="px-3 py-2">
+                  <Pill tone={voided ? STATUS_TONES.Cancelled : STATUS_TONES.Paid}>
+                    {voided ? 'Voided' : 'Recorded'}
+                  </Pill>
+                </td>
+                <td className="px-3 py-2 font-medium text-ink">{meta.invoice_number || '—'}</td>
+                <td className="px-3 py-2 text-right font-medium text-ink">
+                  {fmtMoney(meta.amount ?? 0)}
+                </td>
+                <td className="px-3 py-2 text-muted">
+                  {meta.method ? methodLabel(meta.method) : '—'}
+                </td>
+                <td className="px-3 py-2 text-muted">{meta.new_status || '—'}</td>
+                <td className="px-3 py-2 text-muted">{row.email || '—'}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
