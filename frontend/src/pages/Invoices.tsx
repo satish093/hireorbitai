@@ -11,7 +11,7 @@ import { ConfirmDialog, type ConfirmSpec } from '../components/admin/ConfirmDial
 import { api } from '../services/api';
 import { invalidate, useInvalidationListener } from '../hooks/useInvalidate';
 import { useAuth } from '../context/AuthContext';
-import { ADMIN_TIER } from '../types';
+import { isAdmin } from '../types';
 import toast from 'react-hot-toast';
 
 type LifecycleStatus = 'Draft' | 'Submitted' | 'Approved' | 'Partially Paid' | 'Paid' | 'Cancelled';
@@ -339,7 +339,7 @@ export function Invoices() {
   const [payFor, setPayFor] = useState<Invoice | null>(null);
   // Admin-only "Payment activity" subview.
   const { profile } = useAuth();
-  const isAdminUser = !!profile && (ADMIN_TIER as readonly string[]).includes(profile.role);
+  const isAdminUser = isAdmin(profile?.role);
   const [view, setView] = useState<'invoices' | 'activity'>('invoices');
   const [activity, setActivity] = useState<ActivityRow[]>([]);
   const [activityLoading, setActivityLoading] = useState(false);

@@ -494,12 +494,18 @@ export const get: RequestHandler = async (req, res) => {
   res.json(await enrich(await loadInvoiceScopedOr404(req.params.id, req.user)));
 };
 
-/** Next zero-padded sequential invoice number (INV-0001 …) across all invoices. */
+/**
+ * Next zero-padded sequential invoice number (INV-0001 …) across all invoices.
+ * Caller must hold the auto-number advisory lock (see persistInvoice) so two
+ * concurrent creates can't read the same max. Only 1–9 digit INV-#### values
+ * feed the max — bounding the digits keeps the `::int` cast from overflowing on
+ * a manually-entered INV-<hugenumber>.
+ */
 async function nextInvoiceNumber(client: PoolClient): Promise<string> {
   const { rows } = await client.query<{ n: number }>(
-    `select coalesce(max(substring(invoice_number from '^INV-([0-9]+)$')::int), 0) as n
+    `select coalesce(max(substring(invoice_number from '^INV-([0-9]{1,9})$')::int), 0) as n
        from public.invoices
-      where invoice_number ~ '^INV-[0-9]+$'`,
+      where invoice_number ~ '^INV-[0-9]{1,9}$'`,
   );
   return `INV-${String(Number(rows[0]?.n ?? 0) + 1).padStart(4, '0')}`;
 }
@@ -523,6 +529,11 @@ async function persistInvoice(
     let invoiceNumber = input.invoice_number?.trim() || '';
     if (!invoiceNumber) {
       if (mode === 'create') {
+        // Serialize auto-numbering so concurrent creates can't generate the same
+        // INV-#### (the unique index is per-company; this keeps the sequence
+        // globally unique and avoids a confusing 23505 on a number the user
+        // never typed). Released automatically at commit/rollback.
+        await client.query("select pg_advisory_xact_lock(hashtext('invoice_auto_number'))");
         invoiceNumber = await nextInvoiceNumber(client);
       } else {
         const cur = await client.query<{ invoice_number: string | null }>(
@@ -685,7 +696,11 @@ export const transition: RequestHandler = async (req, res) => {
   // Marking Paid in full also settles the balance: set amount_paid = total and
   // drop a reconciling payment into the ledger so the two never diverge.
   const paidInFull = to === 'Paid';
-  const setExtra = paidInFull ? ', amount_paid=total_amount' : '';
+  // Paid in full also settles the balance and guarantees an approval timestamp
+  // (a Paid invoice should never have a NULL approved_at, even via Submitted→Paid).
+  const setExtra = paidInFull
+    ? ', amount_paid=total_amount, approved_at=coalesce(approved_at, now())'
+    : '';
   const client = await pool.connect();
   try {
     await client.query('begin');
@@ -883,9 +898,13 @@ async function reconcileFromLedger(
   );
   const total = round2(Number(invoice.total_amount ?? 0));
   const newPaid = round2(Number((sumRow.rows[0] as { paid?: string })?.paid ?? 0));
-  // No payments → back to Approved (payments are only ever taken after approval).
+  // Recording a payment implies the invoice is approved (money accepted), so we
+  // stamp approved_at below. When the ledger is emptied (last payment voided) we
+  // fall back to Approved if it was ever approved, else Submitted — never
+  // silently "approve" an invoice that was never approved and never paid.
+  const hasPayment = newPaid > 0;
   let newStatus: InvoiceStatus;
-  if (newPaid <= 0) newStatus = 'Approved';
+  if (!hasPayment) newStatus = invoice.approved_at ? 'Approved' : 'Submitted';
   else if (newPaid >= total - 0.005) newStatus = 'Paid';
   else newStatus = 'Partially Paid';
   const fullyPaid = newStatus === 'Paid';
@@ -893,11 +912,12 @@ async function reconcileFromLedger(
     `update public.invoices set
         amount_paid=$1,
         status=$2,
-        paid_at = case when $3 then coalesce(paid_at, now()) else null end,
+        approved_at = case when $3 then coalesce(approved_at, now()) else approved_at end,
+        paid_at = case when $4 then coalesce(paid_at, now()) else null end,
         updated_at=now()
-      where id=$4
+      where id=$5
       returning *`,
-    [newPaid, newStatus, fullyPaid, invoice.id],
+    [newPaid, newStatus, hasPayment, fullyPaid, invoice.id],
   );
   if (newStatus !== invoice.status) {
     await client.query(
@@ -1106,9 +1126,10 @@ export const paymentActivity: RequestHandler = async (req, res) => {
     .from('auth_audit_logs')
     .select('id, action, email, metadata, created_at')
     .in('action', ['invoice_payment_recorded', 'invoice_payment_voided'])
-    .order('created_at', { ascending: false })
-    .limit(limit);
-  if (offset > 0) q = q.range(offset, offset + limit - 1);
+    .order('created_at', { ascending: false });
+  // Use range for pagination, else a plain limit — never both (the shim would
+  // otherwise emit two LIMIT clauses → invalid SQL).
+  q = offset > 0 ? q.range(offset, offset + limit - 1) : q.limit(limit);
   const { data, error } = await q;
   if (error) throw httpError(500, 'Database error');
   res.json(data ?? []);

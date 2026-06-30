@@ -135,6 +135,7 @@ beforeEach(() => {
     company_group_id: null,
     invoice_number: 'INV-1',
     status: 'Approved',
+    approved_at: '2026-06-20T00:00:00.000Z',
     currency: 'USD',
     due_date: '2026-07-01',
     total_amount: 100,
@@ -184,6 +185,15 @@ describe('invoice partial payments', () => {
     expect(voided.error).toBeNull();
     expect(voided.res.body.status).toBe('Approved');
     expect(Number(voided.res.body.amount_paid)).toBe(0);
+  });
+
+  it('voiding the only payment on a never-approved invoice reverts to Submitted', async () => {
+    mock.invoice.status = 'Submitted';
+    delete (mock.invoice as Record<string, unknown>).approved_at;
+    await run(recordPayment, { body: { amount: 40 } });
+    const voided = await run(voidPayment, { params: { id: 'inv-1', paymentId: 'pay-1' } });
+    expect(voided.error).toBeNull();
+    expect(voided.res.body.status).toBe('Submitted');
   });
 
   it('refuses to void a payment on a fully paid invoice (no silent un-pay)', async () => {

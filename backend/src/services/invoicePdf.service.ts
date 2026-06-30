@@ -60,6 +60,7 @@ export interface InvoiceRow {
   total_amount?: number | string | null;
   amount_paid?: number | string | null;
   amount_due?: number | string | null;
+  approved_at?: string | Date | null;
   archived_at?: string | Date | null;
   last_emailed_at?: string | Date | null;
   last_overdue_alert_at?: string | Date | null;
