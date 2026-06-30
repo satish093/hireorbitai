@@ -12,8 +12,30 @@ import { api } from '../services/api';
 import { invalidate, useInvalidationListener } from '../hooks/useInvalidate';
 import toast from 'react-hot-toast';
 
-type LifecycleStatus = 'Draft' | 'Submitted' | 'Approved' | 'Paid' | 'Cancelled';
+type LifecycleStatus = 'Draft' | 'Submitted' | 'Approved' | 'Partially Paid' | 'Paid' | 'Cancelled';
 type DisplayStatus = LifecycleStatus | 'Overdue';
+
+type PaymentMethod = 'bank_transfer' | 'check' | 'card' | 'cash' | 'ach' | 'wire' | 'other';
+
+const PAYMENT_METHOD_OPTIONS: Array<{ value: PaymentMethod; label: string }> = [
+  { value: 'bank_transfer', label: 'Bank transfer' },
+  { value: 'ach', label: 'ACH' },
+  { value: 'wire', label: 'Wire' },
+  { value: 'check', label: 'Check' },
+  { value: 'card', label: 'Card' },
+  { value: 'cash', label: 'Cash' },
+  { value: 'other', label: 'Other' },
+];
+
+interface Payment {
+  id: string;
+  amount: number | string;
+  paid_on: string;
+  method: PaymentMethod | string;
+  reference?: string | null;
+  note?: string | null;
+  created_at?: string | null;
+}
 
 interface Party {
   name: string;
@@ -38,8 +60,10 @@ interface Actions {
   edit?: boolean;
   submit?: boolean;
   approve?: boolean;
+  record_payment?: boolean;
   mark_paid?: boolean;
   cancel?: boolean;
+  remind?: boolean;
   email?: boolean;
   download?: boolean;
   delete?: boolean;
@@ -60,12 +84,15 @@ interface Invoice {
   subtotal: number | string;
   tax_amount: number | string;
   total_amount: number | string;
+  amount_paid?: number | string;
+  amount_due?: number | string;
   status: LifecycleStatus;
   display_status: DisplayStatus;
   notes?: string | null;
   issuer_snapshot: Party;
   bill_to_snapshot: Party;
   line_items?: LineItem[];
+  payments?: Payment[];
   status_history?: Array<{
     id: string;
     from_status?: string | null;
@@ -86,16 +113,25 @@ interface Company {
   color?: string | null;
 }
 
+type CurrencyMap = Record<string, string | number>;
+
+interface InvoiceSummary {
+  overdue_count: number;
+  draft_count: number;
+  total_by_currency: CurrencyMap;
+  paid_by_currency: CurrencyMap;
+  due_by_currency: CurrencyMap;
+  overdue_by_currency: CurrencyMap;
+  /** Back-compat alias of due_by_currency. */
+  outstanding_by_currency: CurrencyMap;
+}
+
 interface InvoiceListResponse {
   items: Invoice[];
   total: number;
   page: number;
   page_size: number;
-  summary: {
-    outstanding_by_currency: Record<string, string | number>;
-    overdue_count: number;
-    draft_count: number;
-  };
+  summary: InvoiceSummary;
 }
 
 interface InvoiceForm {
@@ -121,6 +157,22 @@ const EMPTY_PARTY: Party = {
   website: '',
   country: '',
   tax_id: '',
+};
+
+interface PaymentForm {
+  amount: string;
+  paid_on: string;
+  method: PaymentMethod;
+  reference: string;
+  note: string;
+}
+
+const EMPTY_PAYMENT: PaymentForm = {
+  amount: '',
+  paid_on: new Date().toISOString().slice(0, 10),
+  method: 'bank_transfer',
+  reference: '',
+  note: '',
 };
 
 const EMPTY_FORM: InvoiceForm = {
@@ -158,6 +210,11 @@ const STATUS_TONES: Record<DisplayStatus, PillTone> = {
     text: 'text-violet-700 dark:text-violet-300',
     dot: 'bg-violet-500',
   },
+  'Partially Paid': {
+    bg: 'bg-teal-100 dark:bg-teal-900/40',
+    text: 'text-teal-700 dark:text-teal-300',
+    dot: 'bg-teal-500',
+  },
   Paid: {
     bg: 'bg-green-100 dark:bg-green-900/40',
     text: 'text-green-700 dark:text-green-300',
@@ -178,6 +235,27 @@ function fmtMoney(value: unknown, currency = 'USD') {
   } catch {
     return `${currency} ${number.toFixed(2)}`;
   }
+}
+
+/** Render a { currency: amount } map as a single " · "-joined money string. */
+function joinMoney(map?: CurrencyMap) {
+  const entries = Object.entries(map ?? {}).filter(([, amount]) => Number(amount) !== 0);
+  if (entries.length === 0) return fmtMoney(0);
+  return entries.map(([currency, amount]) => fmtMoney(amount, currency)).join(' · ');
+}
+
+function methodLabel(method: string) {
+  return PAYMENT_METHOD_OPTIONS.find((m) => m.value === method)?.label ?? method;
+}
+
+function round2(value: number) {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+/** Balance due for an invoice — prefers the server value, falls back to total − paid. */
+function dueOf(invoice: Invoice) {
+  if (invoice.amount_due != null) return Number(invoice.amount_due);
+  return round2(Number(invoice.total_amount ?? 0) - Number(invoice.amount_paid ?? 0));
 }
 
 function fmtDate(value?: string | null) {
@@ -202,10 +280,14 @@ export function Invoices() {
   const [rows, setRows] = useState<Invoice[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [total, setTotal] = useState(0);
-  const [summary, setSummary] = useState<InvoiceListResponse['summary']>({
-    outstanding_by_currency: {},
+  const [summary, setSummary] = useState<InvoiceSummary>({
     overdue_count: 0,
     draft_count: 0,
+    total_by_currency: {},
+    paid_by_currency: {},
+    due_by_currency: {},
+    overdue_by_currency: {},
+    outstanding_by_currency: {},
   });
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -222,6 +304,9 @@ export function Invoices() {
   const [recipient, setRecipient] = useState('');
   const [docBusy, setDocBusy] = useState(false);
   const [confirm, setConfirm] = useState<ConfirmSpec | null>(null);
+  const [payOpen, setPayOpen] = useState(false);
+  const [paySaving, setPaySaving] = useState(false);
+  const [payForm, setPayForm] = useState<PaymentForm>(EMPTY_PAYMENT);
   const pageSize = 25;
 
   async function loadCompanies() {
@@ -514,10 +599,79 @@ export function Invoices() {
     }
   }
 
+  function openRecordPayment() {
+    if (!selected) return;
+    const due = dueOf(selected);
+    setPayForm({
+      ...EMPTY_PAYMENT,
+      amount: due > 0 ? String(round2(due)) : '',
+      paid_on: new Date().toISOString().slice(0, 10),
+    });
+    setPayOpen(true);
+  }
+
+  async function savePayment() {
+    if (!selected) return;
+    const amount = Number(payForm.amount);
+    if (!Number.isFinite(amount) || amount <= 0) return toast.error('Enter a payment amount');
+    setPaySaving(true);
+    try {
+      const response = await api.post<Invoice>(`/invoices/${selected.id}/payments`, {
+        amount,
+        paid_on: payForm.paid_on || undefined,
+        method: payForm.method,
+        reference: payForm.reference.trim() || null,
+        note: payForm.note.trim() || null,
+      });
+      toast.success('Payment recorded');
+      setPayOpen(false);
+      await refreshAfterAction(response.data);
+    } catch (error: any) {
+      toast.error(error?.response?.data?.error ?? 'Failed to record payment');
+    } finally {
+      setPaySaving(false);
+    }
+  }
+
+  function requestVoidPayment(payment: Payment) {
+    if (!selected) return;
+    setConfirm({
+      title: 'Void payment',
+      message: `Remove the ${fmtMoney(payment.amount, selected.currency)} payment from ${fmtDate(payment.paid_on)}? The invoice balance will be recalculated.`,
+      confirmLabel: 'Void payment',
+      tone: 'danger',
+      run: async () => {
+        const response = await api.delete<Invoice>(
+          `/invoices/${selected.id}/payments/${payment.id}`,
+        );
+        toast.success('Payment voided');
+        await refreshAfterAction(response.data);
+      },
+    });
+  }
+
+  async function sendReminder(invoice: Invoice) {
+    setDocBusy(true);
+    try {
+      const response = await api.post(`/invoices/${invoice.id}/remind`);
+      const parts: string[] = [];
+      if (response.data.client_emailed) parts.push('client');
+      if (response.data.managers_emailed) {
+        parts.push(
+          `${response.data.managers_emailed} manager${response.data.managers_emailed === 1 ? '' : 's'}`,
+        );
+      }
+      toast.success(parts.length ? `Reminder sent to ${parts.join(' + ')}` : 'Reminder sent');
+      await openDetail(invoice.id);
+      await load();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.error ?? 'Failed to send reminder');
+    } finally {
+      setDocBusy(false);
+    }
+  }
+
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
-  const outstanding = Object.entries(summary.outstanding_by_currency ?? {})
-    .map(([currency, amount]) => fmtMoney(amount, currency))
-    .join(' · ');
 
   return (
     <Layout title="Invoices">
@@ -527,10 +681,28 @@ export function Invoices() {
         action={<Button onClick={openCreate}>+ New invoice</Button>}
       />
 
-      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <Metric label="Outstanding" value={outstanding || '—'} />
-        <Metric label="Overdue" value={String(summary.overdue_count ?? 0)} tone="danger" />
-        <Metric label="Drafts" value={String(summary.draft_count ?? 0)} />
+      <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Metric label="Total invoiced" value={joinMoney(summary.total_by_currency)} />
+        <Metric label="Paid" value={joinMoney(summary.paid_by_currency)} tone="success" />
+        <Metric
+          label="Outstanding"
+          value={joinMoney(summary.due_by_currency)}
+          sub={
+            summary.draft_count
+              ? `${summary.draft_count} draft${summary.draft_count === 1 ? '' : 's'}`
+              : undefined
+          }
+        />
+        <Metric
+          label="Overdue"
+          value={joinMoney(summary.overdue_by_currency)}
+          tone="danger"
+          sub={
+            summary.overdue_count
+              ? `${summary.overdue_count} invoice${summary.overdue_count === 1 ? '' : 's'}`
+              : undefined
+          }
+        />
       </div>
 
       <div className="mb-3 grid grid-cols-1 gap-2 rounded-xl border border-border bg-surface p-3 md:grid-cols-4">
@@ -564,9 +736,17 @@ export function Invoices() {
           }}
           options={[
             { value: '', label: 'All statuses' },
-            ...(['Draft', 'Submitted', 'Approved', 'Paid', 'Overdue', 'Cancelled'] as const).map(
-              (status) => ({ value: status, label: status }),
-            ),
+            ...(
+              [
+                'Draft',
+                'Submitted',
+                'Approved',
+                'Partially Paid',
+                'Overdue',
+                'Paid',
+                'Cancelled',
+              ] as const
+            ).map((status) => ({ value: status, label: status })),
           ]}
         />
         <SelectInput
@@ -614,6 +794,19 @@ export function Invoices() {
             header: 'Total',
             align: 'right',
             render: (row) => fmtMoney(row.total_amount, row.currency),
+          },
+          {
+            key: 'amount_paid',
+            header: 'Paid',
+            align: 'right',
+            hideOnMobile: true,
+            render: (row) => fmtMoney(row.amount_paid ?? 0, row.currency),
+          },
+          {
+            key: 'amount_due',
+            header: 'Due',
+            align: 'right',
+            render: (row) => fmtMoney(dueOf(row), row.currency),
           },
           {
             key: 'status',
@@ -918,9 +1111,28 @@ export function Invoices() {
                     Approve
                   </Button>
                 )}
+                {selected.permitted_actions?.record_payment && (
+                  <Button size="sm" onClick={openRecordPayment}>
+                    Record payment
+                  </Button>
+                )}
                 {selected.permitted_actions?.mark_paid && (
-                  <Button size="sm" onClick={() => requestTransition('Paid', 'Mark paid')}>
-                    Mark paid
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => requestTransition('Paid', 'Mark paid in full')}
+                  >
+                    Mark paid in full
+                  </Button>
+                )}
+                {selected.permitted_actions?.remind && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    loading={docBusy}
+                    onClick={() => void sendReminder(selected)}
+                  >
+                    Send reminder
                   </Button>
                 )}
                 {selected.permitted_actions?.cancel && (
@@ -936,10 +1148,10 @@ export function Invoices() {
             </div>
 
             <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-              <Detail label="Invoice date" value={fmtDate(selected.invoice_date)} />
               <Detail label="Due date" value={fmtDate(selected.due_date)} />
-              <Detail label="Currency" value={selected.currency} />
               <Detail label="Total" value={fmtMoney(selected.total_amount, selected.currency)} />
+              <Detail label="Paid" value={fmtMoney(selected.amount_paid ?? 0, selected.currency)} />
+              <Detail label="Balance due" value={fmtMoney(dueOf(selected), selected.currency)} />
             </div>
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -994,8 +1206,73 @@ export function Invoices() {
                   value={fmtMoney(selected.total_amount, selected.currency)}
                   strong
                 />
+                {Number(selected.amount_paid ?? 0) > 0 && (
+                  <TotalRow
+                    label="Amount paid"
+                    value={`− ${fmtMoney(selected.amount_paid ?? 0, selected.currency)}`}
+                  />
+                )}
+                <TotalRow
+                  label="Balance due"
+                  value={fmtMoney(dueOf(selected), selected.currency)}
+                  strong
+                />
               </div>
             </div>
+
+            {(selected.permitted_actions?.record_payment ||
+              (selected.payments?.length ?? 0) > 0) && (
+              <div className="rounded-xl border border-border p-4">
+                <div className="mb-3 flex items-center justify-between gap-2">
+                  <div>
+                    <div className="font-semibold text-ink">Payments</div>
+                    <div className="text-xs text-muted">
+                      {fmtMoney(selected.amount_paid ?? 0, selected.currency)} of{' '}
+                      {fmtMoney(selected.total_amount, selected.currency)} collected
+                    </div>
+                  </div>
+                  {selected.permitted_actions?.record_payment && (
+                    <Button size="sm" onClick={openRecordPayment}>
+                      + Record payment
+                    </Button>
+                  )}
+                </div>
+                {selected.payments?.length ? (
+                  <div className="space-y-2">
+                    {selected.payments.map((payment) => (
+                      <div
+                        key={payment.id}
+                        className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-hover/30 px-3 py-2 text-sm"
+                      >
+                        <div className="min-w-0">
+                          <span className="font-medium text-ink">
+                            {fmtMoney(payment.amount, selected.currency)}
+                          </span>
+                          <span className="text-muted">
+                            {' '}
+                            · {methodLabel(payment.method)} · {fmtDate(payment.paid_on)}
+                          </span>
+                          {payment.reference ? (
+                            <span className="text-muted"> · {payment.reference}</span>
+                          ) : null}
+                        </div>
+                        {!selected.archived_at && (
+                          <button
+                            type="button"
+                            onClick={() => requestVoidPayment(payment)}
+                            className="text-xs font-medium text-danger hover:underline"
+                          >
+                            Void
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-sm text-muted">No payments recorded yet.</div>
+                )}
+              </div>
+            )}
 
             {selected.notes && <Detail label="Notes" value={selected.notes} />}
 
@@ -1071,20 +1348,110 @@ export function Invoices() {
         )}
       </Modal>
 
+      <Modal
+        open={payOpen}
+        onClose={() => setPayOpen(false)}
+        size="md"
+        title={selected ? `Record payment · #${selected.invoice_number}` : 'Record payment'}
+        description="Logs a payment against this invoice and updates its balance."
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setPayOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={savePayment} loading={paySaving}>
+              Record payment
+            </Button>
+          </>
+        }
+      >
+        {selected && (
+          <div className="space-y-4">
+            <div className="rounded-xl border border-border bg-hover/30 p-3 text-sm">
+              <TotalRow
+                label="Invoice total"
+                value={fmtMoney(selected.total_amount, selected.currency)}
+              />
+              <TotalRow
+                label="Already paid"
+                value={fmtMoney(selected.amount_paid ?? 0, selected.currency)}
+              />
+              <TotalRow
+                label="Balance due"
+                value={fmtMoney(dueOf(selected), selected.currency)}
+                strong
+              />
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <FormInput
+                label="Amount *"
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={payForm.amount}
+                onChange={(event) => setPayForm({ ...payForm, amount: event.target.value })}
+              />
+              <FormInput
+                label="Payment date"
+                type="date"
+                value={payForm.paid_on}
+                onChange={(event) => setPayForm({ ...payForm, paid_on: event.target.value })}
+              />
+              <SelectInput
+                label="Method"
+                value={payForm.method}
+                onChange={(event) =>
+                  setPayForm({ ...payForm, method: event.target.value as PaymentMethod })
+                }
+                options={PAYMENT_METHOD_OPTIONS}
+              />
+              <FormInput
+                label="Reference"
+                placeholder="Check #, txn id…"
+                value={payForm.reference}
+                onChange={(event) => setPayForm({ ...payForm, reference: event.target.value })}
+              />
+            </div>
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-medium text-ink">Note</span>
+              <textarea
+                rows={2}
+                value={payForm.note}
+                onChange={(event) => setPayForm({ ...payForm, note: event.target.value })}
+                className="w-full rounded-md border border-border-strong bg-surface px-3 py-2 text-[13px] text-ink focus:outline-none focus-visible:ring-2 focus-visible:border-accent"
+              />
+            </label>
+          </div>
+        )}
+      </Modal>
+
       <ConfirmDialog spec={confirm} onClose={() => setConfirm(null)} />
     </Layout>
   );
 }
 
-function Metric({ label, value, tone }: { label: string; value: string; tone?: 'danger' }) {
+function Metric({
+  label,
+  value,
+  tone,
+  sub,
+}: {
+  label: string;
+  value: string;
+  tone?: 'danger' | 'success';
+  sub?: string;
+}) {
+  const toneClass =
+    tone === 'danger'
+      ? 'text-danger'
+      : tone === 'success'
+        ? 'text-emerald-600 dark:text-emerald-400'
+        : 'text-ink';
   return (
     <div className="rounded-xl border border-border bg-surface p-4">
       <div className="text-[10px] font-semibold uppercase tracking-widest text-muted">{label}</div>
-      <div
-        className={`mt-1 text-xl font-semibold ${tone === 'danger' ? 'text-danger' : 'text-ink'}`}
-      >
-        {value}
-      </div>
+      <div className={`mt-1 text-xl font-semibold ${toneClass}`}>{value}</div>
+      {sub ? <div className="mt-0.5 text-[11px] text-muted">{sub}</div> : null}
     </div>
   );
 }

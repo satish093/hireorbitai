@@ -1,4 +1,5 @@
 import { Request, RequestHandler } from 'express';
+import type { PoolClient } from 'pg';
 import { z } from 'zod';
 import { db, pool } from '../config/db';
 import { httpError, type Role } from '../types';
@@ -10,15 +11,35 @@ import {
   type InvoiceBrand,
   type InvoiceLineItem,
   type InvoicePartySnapshot,
+  type InvoicePayment,
 } from '../services/invoicePdf.service';
 import { resolveOnDisk } from '../config/storage.local';
 import { sendInvoiceEmail } from '../services/brevo.service';
 import { callerScopeGroupIds } from '../services/groupScope';
+import {
+  dispatchInvoiceReminder,
+  invoiceAmountDue,
+  daysOverdue,
+} from '../services/invoiceReminder.service';
 import { audit } from '../services/audit.service';
 import { logger } from '../config/logger';
 
-export const INVOICE_STATUSES = ['Draft', 'Submitted', 'Approved', 'Paid', 'Cancelled'] as const;
+export const INVOICE_STATUSES = [
+  'Draft',
+  'Submitted',
+  'Approved',
+  'Partially Paid',
+  'Paid',
+  'Cancelled',
+] as const;
 type InvoiceStatus = (typeof INVOICE_STATUSES)[number];
+
+const PAYMENT_METHODS = ['bank_transfer', 'check', 'card', 'cash', 'ach', 'wire', 'other'] as const;
+
+/** Decimal-safe money rounding to 2 places (avoids float drift on balances). */
+function round2(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
 
 const isoDate = z
   .string()
@@ -143,9 +164,15 @@ export function calculateInvoiceTotals(
   };
 }
 
+/** An invoice carries a live balance only while it is sent-but-unpaid. */
+const UNPAID_STATUSES = ['Submitted', 'Approved', 'Partially Paid'] as const;
+function isUnpaid(status: InvoiceRow['status']): boolean {
+  return (UNPAID_STATUSES as readonly string[]).includes(status ?? '');
+}
+
 function displayStatus(invoice: InvoiceRow): InvoiceStatus | 'Overdue' {
   if (
-    (invoice.status === 'Submitted' || invoice.status === 'Approved') &&
+    isUnpaid(invoice.status) &&
     invoice.due_date &&
     String(invoice.due_date).slice(0, 10) < new Date().toISOString().slice(0, 10)
   ) {
@@ -156,13 +183,18 @@ function displayStatus(invoice: InvoiceRow): InvoiceStatus | 'Overdue' {
 
 function permittedActions(invoice: InvoiceRow) {
   const archived = !!invoice.archived_at;
+  const due = invoiceAmountDue(invoice);
+  const collectible =
+    !archived && (invoice.status === 'Approved' || invoice.status === 'Partially Paid') && due > 0;
   return {
     edit: !archived && (invoice.status === 'Draft' || invoice.status === 'Submitted'),
     submit: !archived && invoice.status === 'Draft',
     approve: !archived && invoice.status === 'Submitted',
-    mark_paid: !archived && invoice.status === 'Approved',
+    record_payment: collectible,
+    mark_paid: collectible,
     cancel: !archived && (invoice.status === 'Submitted' || invoice.status === 'Approved'),
-    email: !archived && (invoice.status === 'Submitted' || invoice.status === 'Approved'),
+    remind: !archived && isUnpaid(invoice.status),
+    email: !archived && isUnpaid(invoice.status),
     download: !archived,
     delete: !archived && invoice.status === 'Draft',
     archive: !archived && invoice.status !== 'Draft',
@@ -192,12 +224,25 @@ async function statusHistory(invoiceId: string) {
   return rows;
 }
 
+async function payments(invoiceId: string): Promise<InvoicePayment[]> {
+  const { rows } = await pool.query(
+    `select id, invoice_id, amount, paid_on, method, reference, note, recorded_by, created_at
+       from public.invoice_payments
+      where invoice_id = $1
+      order by paid_on desc, created_at desc, id desc`,
+    [invoiceId],
+  );
+  return rows as InvoicePayment[];
+}
+
 async function enrich(invoice: InvoiceRow): Promise<InvoiceRow> {
   const result = { ...invoice };
-  [result.line_items, result.status_history] = await Promise.all([
+  [result.line_items, result.status_history, result.payments] = await Promise.all([
     lineItems(invoice.id),
     statusHistory(invoice.id),
+    payments(invoice.id),
   ]);
+  result.amount_due = invoiceAmountDue(result);
   result.display_status = displayStatus(result);
   result.permitted_actions = permittedActions(result);
   return result;
@@ -256,7 +301,9 @@ function auditInvoice(
     | 'invoice_archived'
     | 'invoice_restored'
     | 'invoice_deleted'
-    | 'invoice_downloaded',
+    | 'invoice_downloaded'
+    | 'invoice_payment_recorded'
+    | 'invoice_payment_voided',
   req: Request,
   invoice: InvoiceRow,
   extra: Record<string, unknown> = {},
@@ -287,55 +334,80 @@ export const list: RequestHandler = async (req, res) => {
       total: 0,
       page: f.page,
       page_size: f.page_size,
-      summary: { outstanding_by_currency: {}, overdue_count: 0, draft_count: 0 },
+      summary: {
+        overdue_count: 0,
+        draft_count: 0,
+        total_by_currency: {},
+        paid_by_currency: {},
+        due_by_currency: {},
+        overdue_by_currency: {},
+        outstanding_by_currency: {},
+      },
     });
     return;
   }
 
-  const values: unknown[] = [];
-  const where: string[] = [];
-  const add = (v: unknown) => {
-    values.push(v);
-    return `$${values.length}`;
+  // Base filters shared by the list AND the money-tile summary: scope, company,
+  // date range, search. Status/archived filters apply to the LIST only — the
+  // tiles summarize the whole active book so toggling a status filter never
+  // moves the headline Total / Paid / Due / Overdue numbers.
+  const baseValues: unknown[] = [];
+  const baseWhere: string[] = [];
+  const baseAdd = (v: unknown) => {
+    baseValues.push(v);
+    return `$${baseValues.length}`;
   };
-  if (scope !== null) where.push(`company_group_id = any(${add(scope)})`);
+  if (scope !== null) baseWhere.push(`company_group_id = any(${baseAdd(scope)})`);
   if (f.company_group_id) {
     if (scope !== null && !scope.includes(f.company_group_id)) {
       throw httpError(403, 'Company is outside your scope');
     }
-    where.push(`company_group_id = ${add(f.company_group_id)}`);
+    baseWhere.push(`company_group_id = ${baseAdd(f.company_group_id)}`);
   }
-  if (f.status) where.push(`status = ${add(f.status)}`);
-  if (f.display_status) {
-    if (f.display_status === 'Overdue') {
-      where.push(`status in ('Submitted','Approved') and due_date < current_date`);
-    } else {
-      where.push(`status = ${add(f.display_status)}`);
-      if (f.display_status === 'Submitted' || f.display_status === 'Approved') {
-        where.push(`(due_date is null or due_date >= current_date)`);
-      }
-    }
-  }
-  if (f.date_from) where.push(`invoice_date >= ${add(f.date_from)}`);
-  if (f.date_to) where.push(`invoice_date <= ${add(f.date_to)}`);
-  if (f.archived === 'false') where.push('archived_at is null');
-  if (f.archived === 'true') where.push('archived_at is not null');
+  if (f.date_from) baseWhere.push(`invoice_date >= ${baseAdd(f.date_from)}`);
+  if (f.date_to) baseWhere.push(`invoice_date <= ${baseAdd(f.date_to)}`);
   if (f.q) {
-    const q = add(`%${f.q}%`);
-    where.push(
+    const q = baseAdd(`%${f.q}%`);
+    baseWhere.push(
       `(invoice_number ilike ${q} or consultant_name ilike ${q} or vendor_name ilike ${q}
         or issuer_snapshot::text ilike ${q} or bill_to_snapshot::text ilike ${q})`,
     );
   }
+
+  // List-only filters layered on top of the base (status / display_status / archived).
+  const values = [...baseValues];
+  const where = [...baseWhere];
+  const add = (v: unknown) => {
+    values.push(v);
+    return `$${values.length}`;
+  };
+  if (f.status) where.push(`status = ${add(f.status)}`);
+  if (f.display_status) {
+    if (f.display_status === 'Overdue') {
+      where.push(`status in ('Submitted','Approved','Partially Paid') and due_date < current_date`);
+    } else {
+      where.push(`status = ${add(f.display_status)}`);
+      if (isUnpaid(f.display_status)) {
+        where.push(`(due_date is null or due_date >= current_date)`);
+      }
+    }
+  }
+  if (f.archived === 'false') where.push('archived_at is null');
+  if (f.archived === 'true') where.push('archived_at is not null');
+
   const whereSql = where.length ? `where ${where.join(' and ')}` : '';
   const countValues = [...values];
   const offset = (f.page - 1) * f.page_size;
   const limitArg = add(f.page_size);
   const offsetArg = add(offset);
-  const [rowsResult, countResult, summaryResult, outstandingResult] = await Promise.all([
+
+  // Money tiles + counts always scope to the active (non-archived) book.
+  const summarySql = `where ${[...baseWhere, 'archived_at is null'].join(' and ')}`;
+
+  const [rowsResult, countResult, countsResult, moneyResult] = await Promise.all([
     pool.query(
       `select *,
-        case when status in ('Submitted','Approved') and due_date < current_date
+        case when status in ('Submitted','Approved','Partially Paid') and due_date < current_date
           then 'Overdue' else status end as display_status
        from public.invoices ${whereSql}
        order by due_date asc nulls last, created_at desc
@@ -346,24 +418,33 @@ export const list: RequestHandler = async (req, res) => {
     pool.query(
       `select
          count(*) filter (
-           where status in ('Submitted','Approved') and due_date < current_date and archived_at is null
+           where status in ('Submitted','Approved','Partially Paid') and due_date < current_date
          )::int as overdue_count,
-         count(*) filter (where status = 'Draft' and archived_at is null)::int as draft_count
-       from public.invoices ${whereSql}`,
-      countValues,
+         count(*) filter (where status = 'Draft')::int as draft_count
+       from public.invoices ${summarySql}`,
+      baseValues,
     ),
     pool.query(
-      `select currency, coalesce(sum(total_amount), 0) as total
-         from public.invoices ${whereSql}
-        ${whereSql ? 'and' : 'where'} status in ('Submitted','Approved')
-          and archived_at is null
-        group by currency
-        order by currency`,
-      countValues,
+      `select currency,
+         coalesce(sum(total_amount) filter (where status <> 'Draft' and status <> 'Cancelled'), 0) as total,
+         coalesce(sum(amount_paid) filter (where status <> 'Cancelled'), 0) as paid,
+         coalesce(sum(greatest(total_amount - amount_paid, 0))
+           filter (where status in ('Submitted','Approved','Partially Paid')), 0) as due,
+         coalesce(sum(greatest(total_amount - amount_paid, 0))
+           filter (where status in ('Submitted','Approved','Partially Paid') and due_date < current_date), 0) as overdue
+       from public.invoices ${summarySql}
+       group by currency
+       order by currency`,
+      baseValues,
     ),
   ]);
+
+  const byCurrency = (key: 'total' | 'paid' | 'due' | 'overdue') =>
+    Object.fromEntries(moneyResult.rows.map((row) => [row.currency, row[key]]));
+
   const items = (rowsResult.rows as InvoiceRow[]).map((row) => ({
     ...row,
+    amount_due: invoiceAmountDue(row),
     permitted_actions: permittedActions(row),
   }));
   res.json({
@@ -372,10 +453,14 @@ export const list: RequestHandler = async (req, res) => {
     page: f.page,
     page_size: f.page_size,
     summary: {
-      ...summaryResult.rows[0],
-      outstanding_by_currency: Object.fromEntries(
-        outstandingResult.rows.map((row) => [row.currency, row.total]),
-      ),
+      overdue_count: countsResult.rows[0]?.overdue_count ?? 0,
+      draft_count: countsResult.rows[0]?.draft_count ?? 0,
+      total_by_currency: byCurrency('total'),
+      paid_by_currency: byCurrency('paid'),
+      due_by_currency: byCurrency('due'),
+      overdue_by_currency: byCurrency('overdue'),
+      // Back-compat alias (was the only money tile before this change).
+      outstanding_by_currency: byCurrency('due'),
     },
   });
 };
@@ -533,7 +618,10 @@ const transitionSchema = z.object({
 const TRANSITIONS: Record<InvoiceStatus, InvoiceStatus[]> = {
   Draft: ['Submitted'],
   Submitted: ['Approved', 'Cancelled'],
+  // Approved → Paid is the "mark paid in full" shortcut (reconciled into the
+  // payment ledger). Partial collection happens via POST /:id/payments instead.
   Approved: ['Paid', 'Cancelled'],
+  'Partially Paid': ['Paid'],
   Paid: [],
   Cancelled: [],
 };
@@ -556,12 +644,16 @@ export const transition: RequestHandler = async (req, res) => {
     Cancelled: 'cancelled_at',
   };
   const column = stampColumn[to];
+  // Marking Paid in full also settles the balance: set amount_paid = total and
+  // drop a reconciling payment into the ledger so the two never diverge.
+  const paidInFull = to === 'Paid';
+  const setExtra = paidInFull ? ', amount_paid=total_amount' : '';
   const client = await pool.connect();
   try {
     await client.query('begin');
     const result = await client.query(
       `update public.invoices
-          set status=$1, ${column}=now(), updated_at=now()
+          set status=$1, ${column}=now()${setExtra}, updated_at=now()
         where id=$2 and status=$3
         returning *`,
       [to, invoice.id, from],
@@ -573,6 +665,19 @@ export const transition: RequestHandler = async (req, res) => {
        values ($1,$2,$3,$4,$5)`,
       [invoice.id, from, to, req.user.id, parsed.data.note ?? null],
     );
+    if (paidInFull) {
+      const remaining = round2(
+        Number(invoice.total_amount ?? 0) - Number(invoice.amount_paid ?? 0),
+      );
+      if (remaining > 0) {
+        await client.query(
+          `insert into public.invoice_payments
+            (invoice_id, amount, paid_on, method, note, recorded_by)
+           values ($1,$2,current_date,'other','Marked paid in full',$3)`,
+          [invoice.id, remaining, req.user.id],
+        );
+      }
+    }
     await client.query('commit');
     const updated = await enrich(result.rows[0]);
     auditInvoice('invoice_status_changed', req, updated, { from_status: from, to_status: to });
@@ -673,8 +778,8 @@ export const send: RequestHandler = async (req, res) => {
   if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
   const invoice = await enrich(await loadInvoiceScopedOr404(req.params.id, req.user));
   if (invoice.archived_at) throw httpError(409, 'Restore the invoice before emailing it');
-  if (invoice.status !== 'Submitted' && invoice.status !== 'Approved') {
-    throw httpError(409, 'Only Submitted, Approved, or overdue invoices can be emailed');
+  if (!isUnpaid(invoice.status)) {
+    throw httpError(409, 'Only sent (unpaid) invoices can be emailed');
   }
   const recipient = (
     parsed.data.recipient_email ??
@@ -709,4 +814,194 @@ export const send: RequestHandler = async (req, res) => {
     metadata: { invoice_id: invoice.id, invoice_number: invoice.invoice_number, to: recipient },
   });
   res.json({ ok: true, emailed_to: recipient, last_emailed_at: stamp });
+};
+
+// ---------------------------------------------------------------------------
+// Payments ledger — Wave-style partial payments.
+// ---------------------------------------------------------------------------
+const paymentSchema = z
+  .object({
+    amount: z.coerce.number().positive().max(1_000_000_000),
+    paid_on: isoDate.optional().nullable(),
+    method: z.enum(PAYMENT_METHODS).default('other'),
+    reference: nullableText(200),
+    note: nullableText(1000),
+  })
+  .strict();
+
+/** Re-derive amount_paid + status from the ledger inside an open transaction. */
+async function reconcileFromLedger(
+  client: PoolClient,
+  invoice: InvoiceRow,
+  actorId: string,
+  noteForHistory: string,
+): Promise<InvoiceRow> {
+  const sumRow = await client.query(
+    `select coalesce(sum(amount),0) as paid from public.invoice_payments where invoice_id=$1`,
+    [invoice.id],
+  );
+  const total = round2(Number(invoice.total_amount ?? 0));
+  const newPaid = round2(Number((sumRow.rows[0] as { paid?: string })?.paid ?? 0));
+  // No payments → back to Approved (payments are only ever taken after approval).
+  let newStatus: InvoiceStatus;
+  if (newPaid <= 0) newStatus = 'Approved';
+  else if (newPaid >= total - 0.005) newStatus = 'Paid';
+  else newStatus = 'Partially Paid';
+  const fullyPaid = newStatus === 'Paid';
+  const result = await client.query(
+    `update public.invoices set
+        amount_paid=$1,
+        status=$2,
+        paid_at = case when $3 then coalesce(paid_at, now()) else null end,
+        updated_at=now()
+      where id=$4
+      returning *`,
+    [newPaid, newStatus, fullyPaid, invoice.id],
+  );
+  if (newStatus !== invoice.status) {
+    await client.query(
+      `insert into public.invoice_status_history
+        (invoice_id, from_status, to_status, changed_by, note)
+       values ($1,$2,$3,$4,$5)`,
+      [invoice.id, invoice.status, newStatus, actorId, noteForHistory],
+    );
+  }
+  return result.rows[0] as InvoiceRow;
+}
+
+export const recordPayment: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const parsed = paymentSchema.safeParse(req.body);
+  if (!parsed.success) throw httpError(400, 'Invalid payment', parsed.error.flatten());
+  const invoice = await loadInvoiceScopedOr404(req.params.id, req.user);
+  if (invoice.archived_at) throw httpError(409, 'Restore the invoice before recording a payment');
+  if (invoice.status !== 'Approved' && invoice.status !== 'Partially Paid') {
+    throw httpError(409, 'Only approved invoices can take payments');
+  }
+  const due = invoiceAmountDue(invoice);
+  if (due <= 0) throw httpError(409, 'Invoice is already paid in full');
+  const amount = round2(parsed.data.amount);
+  if (amount - due > 0.005) {
+    throw httpError(
+      400,
+      `Payment of ${amount.toFixed(2)} exceeds the ${due.toFixed(2)} balance due`,
+    );
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('begin');
+    await client.query(
+      `insert into public.invoice_payments
+        (invoice_id, amount, paid_on, method, reference, note, recorded_by)
+       values ($1,$2,coalesce($3::date, current_date),$4,$5,$6,$7)`,
+      [
+        invoice.id,
+        amount,
+        parsed.data.paid_on ?? null,
+        parsed.data.method,
+        parsed.data.reference ?? null,
+        parsed.data.note ?? null,
+        req.user.id,
+      ],
+    );
+    const updatedRow = await reconcileFromLedger(
+      client,
+      invoice,
+      req.user.id,
+      `Payment recorded: ${amount.toFixed(2)}`,
+    );
+    await client.query('commit');
+    const updated = await enrich(updatedRow);
+    auditInvoice('invoice_payment_recorded', req, updated, {
+      amount,
+      method: parsed.data.method,
+      amount_paid: updated.amount_paid,
+      new_status: updated.status,
+    });
+    res.status(201).json(updated);
+  } catch (error) {
+    await client.query('rollback');
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
+export const voidPayment: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const invoice = await loadInvoiceScopedOr404(req.params.id, req.user);
+  if (invoice.archived_at) throw httpError(409, 'Restore the invoice before editing payments');
+  const { rows } = await pool.query(
+    `select id, amount from public.invoice_payments where id=$1 and invoice_id=$2`,
+    [req.params.paymentId, invoice.id],
+  );
+  const payment = rows[0] as { id: string; amount: string } | undefined;
+  if (!payment) throw httpError(404, 'Payment not found');
+
+  const client = await pool.connect();
+  try {
+    await client.query('begin');
+    await client.query(`delete from public.invoice_payments where id=$1`, [payment.id]);
+    const updatedRow = await reconcileFromLedger(
+      client,
+      invoice,
+      req.user.id,
+      `Payment voided: ${round2(Number(payment.amount)).toFixed(2)}`,
+    );
+    await client.query('commit');
+    const updated = await enrich(updatedRow);
+    auditInvoice('invoice_payment_voided', req, updated, {
+      payment_id: payment.id,
+      amount: Number(payment.amount),
+      amount_paid: updated.amount_paid,
+      new_status: updated.status,
+    });
+    res.json(updated);
+  } catch (error) {
+    await client.query('rollback');
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
+// ---------------------------------------------------------------------------
+// Manual overdue / payment reminder — emails the client + the company managers.
+// (The daily invoice-overdue job sends the same notice automatically.)
+// ---------------------------------------------------------------------------
+export const remind: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const invoice = await enrich(await loadInvoiceScopedOr404(req.params.id, req.user));
+  if (invoice.archived_at) throw httpError(409, 'Restore the invoice before sending a reminder');
+  if (!isUnpaid(invoice.status)) {
+    throw httpError(409, 'Only sent (unpaid) invoices can be reminded');
+  }
+  const result = await dispatchInvoiceReminder(invoice);
+  if (!result.client_emailed && result.managers_emailed === 0) {
+    throw httpError(422, 'No reminder recipients — add a bill-to email or a company manager.');
+  }
+  const stamp = new Date().toISOString();
+  try {
+    await pool.query('update public.invoices set last_overdue_alert_at=$1 where id=$2', [
+      stamp,
+      invoice.id,
+    ]);
+  } catch (error) {
+    logger.warn({ err: error, invoiceId: invoice.id }, 'invoice remind: failed to stamp');
+  }
+  audit({
+    action: 'invoice_reminded',
+    user_id: req.user.id,
+    email: req.user.email ?? null,
+    req,
+    metadata: {
+      invoice_id: invoice.id,
+      invoice_number: invoice.invoice_number,
+      client_emailed: result.client_emailed,
+      managers_emailed: result.managers_emailed,
+      days_overdue: daysOverdue(invoice.due_date),
+    },
+  });
+  res.json({ ok: true, ...result, last_overdue_alert_at: stamp });
 };

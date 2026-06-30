@@ -25,9 +25,15 @@ invoicesRouter.get('/:id', gate, c.get);
 // the bare /:id routes doesn't matter; grouped here for clarity.
 invoicesRouter.get('/:id/document', gate, c.document);
 invoicesRouter.post('/:id/send', gate, emailLimiter, c.send);
+// Overdue / payment reminder to the client + company managers. Rate-limited
+// like the invoice send since it dispatches email.
+invoicesRouter.post('/:id/remind', gate, emailLimiter, c.remind);
 invoicesRouter.post('/', gate, c.create);
 invoicesRouter.patch('/:id', gate, c.update);
 invoicesRouter.post('/:id/transition', gate, c.transition);
 invoicesRouter.post('/:id/archive', gate, c.archive);
 invoicesRouter.post('/:id/restore', gate, c.restore);
+// Partial-payment ledger.
+invoicesRouter.post('/:id/payments', gate, c.recordPayment);
+invoicesRouter.delete('/:id/payments/:paymentId', gate, c.voidPayment);
 invoicesRouter.delete('/:id', gate, c.remove);

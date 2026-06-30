@@ -67,7 +67,14 @@ describe('invoice accounting input validation', () => {
   });
 
   it('keeps lifecycle statuses server-owned', () => {
-    expect(INVOICE_STATUSES).toEqual(['Draft', 'Submitted', 'Approved', 'Paid', 'Cancelled']);
+    expect(INVOICE_STATUSES).toEqual([
+      'Draft',
+      'Submitted',
+      'Approved',
+      'Partially Paid',
+      'Paid',
+      'Cancelled',
+    ]);
   });
 
   it('allows partial updates but still rejects unknown fields', () => {

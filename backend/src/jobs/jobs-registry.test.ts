@@ -29,6 +29,7 @@ describe('jobs/index — every expected job is registered', () => {
     // Audit regression — was implemented + tested but never registered,
     // so the H1B/EAD/I797 expiry alerts never fired in production.
     ['workAuthExpiryJob', /register\(workAuthExpiryJob\)/],
+    ['invoiceOverdueJob', /register\(invoiceOverdueJob\)/],
   ];
 
   for (const [symbol, call] of expected) {

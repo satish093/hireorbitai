@@ -56,10 +56,27 @@ export interface InvoiceRow {
   subtotal?: number | string | null;
   tax_amount?: number | string | null;
   total_amount?: number | string | null;
+  amount_paid?: number | string | null;
+  amount_due?: number | string | null;
   archived_at?: string | Date | null;
+  last_emailed_at?: string | Date | null;
+  last_overdue_alert_at?: string | Date | null;
   line_items?: InvoiceLineItem[];
   status_history?: InvoiceStatusHistory[];
+  payments?: InvoicePayment[];
   permitted_actions?: Record<string, boolean>;
+}
+
+export interface InvoicePayment {
+  id: string;
+  invoice_id?: string;
+  amount: number | string;
+  paid_on: string | Date;
+  method: string;
+  reference?: string | null;
+  note?: string | null;
+  recorded_by?: string | null;
+  created_at?: string | Date | null;
 }
 
 export interface InvoiceBrand {
