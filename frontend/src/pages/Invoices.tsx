@@ -860,38 +860,17 @@ export function Invoices() {
             empty="No invoices match these filters."
             rows={rows}
             onRowClick={(row) => void openDetail(row.id)}
+            // Compact, fits-on-screen column set. Description / Issuer / Invoice
+            // date / Paid live in the click-through detail panel.
             columns={[
               { key: 'invoice_number', header: 'Invoice #' },
               { key: 'name', header: 'Name', render: (row) => row.name || '—' },
-              {
-                key: 'description',
-                header: 'Description',
-                render: (row) =>
-                  row.description ? (
-                    <span className="block max-w-[26ch] truncate">{row.description}</span>
-                  ) : (
-                    '—'
-                  ),
-                hideOnMobile: true,
-              },
               {
                 key: 'bill_to',
                 header: 'Bill to',
                 render: (row) => row.bill_to_snapshot?.name || '—',
               },
-              {
-                key: 'company',
-                header: 'Issuer',
-                render: (row) => row.issuer_snapshot?.name || '—',
-                hideOnMobile: true,
-              },
-              {
-                key: 'invoice_date',
-                header: 'Invoice date',
-                render: (row) => fmtDate(row.invoice_date),
-                hideOnMobile: true,
-              },
-              { key: 'due_date', header: 'Due date', render: (row) => fmtDate(row.due_date) },
+              { key: 'due_date', header: 'Due', render: (row) => fmtDate(row.due_date) },
               {
                 key: 'total_amount',
                 header: 'Total',
@@ -899,17 +878,20 @@ export function Invoices() {
                 render: (row) => fmtMoney(row.total_amount, row.currency),
               },
               {
-                key: 'amount_paid',
-                header: 'Paid',
-                align: 'right',
-                hideOnMobile: true,
-                render: (row) => fmtMoney(row.amount_paid ?? 0, row.currency),
-              },
-              {
                 key: 'amount_due',
-                header: 'Due',
+                header: 'Balance',
                 align: 'right',
-                render: (row) => fmtMoney(dueOf(row), row.currency),
+                render: (row) => {
+                  const total = Number(row.total_amount ?? 0);
+                  const due = dueOf(row);
+                  if (total > 0 && due <= 0)
+                    return (
+                      <span className="font-medium text-emerald-600 dark:text-emerald-400">
+                        Paid
+                      </span>
+                    );
+                  return fmtMoney(due, row.currency);
+                },
               },
               {
                 key: 'status',
@@ -1297,9 +1279,9 @@ export function Invoices() {
             </div>
 
             <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+              <Detail label="Invoice date" value={fmtDate(selected.invoice_date)} />
               <Detail label="Due date" value={fmtDate(selected.due_date)} />
               <Detail label="Total" value={fmtMoney(selected.total_amount, selected.currency)} />
-              <Detail label="Paid" value={fmtMoney(selected.amount_paid ?? 0, selected.currency)} />
               <Detail label="Balance due" value={fmtMoney(dueOf(selected), selected.currency)} />
             </div>
 
