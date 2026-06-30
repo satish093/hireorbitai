@@ -77,6 +77,8 @@ interface Invoice {
   id: string;
   company_group_id: string;
   invoice_number: string;
+  name?: string | null;
+  description?: string | null;
   invoice_date?: string | null;
   due_date?: string | null;
   net_terms_days?: number | null;
@@ -139,6 +141,8 @@ interface InvoiceListResponse {
 interface InvoiceForm {
   company_group_id: string;
   invoice_number: string;
+  name: string;
+  description: string;
   invoice_date: string;
   due_date: string;
   net_terms_days: string;
@@ -180,6 +184,8 @@ const EMPTY_PAYMENT: PaymentForm = {
 const EMPTY_FORM: InvoiceForm = {
   company_group_id: '',
   invoice_number: '',
+  name: '',
+  description: '',
   invoice_date: new Date().toISOString().slice(0, 10),
   due_date: '',
   net_terms_days: '30',
@@ -430,6 +436,8 @@ export function Invoices() {
     setForm({
       company_group_id: invoice.company_group_id,
       invoice_number: invoice.invoice_number,
+      name: invoice.name ?? '',
+      description: invoice.description ?? '',
       invoice_date: invoice.invoice_date ?? '',
       due_date: invoice.due_date ?? '',
       net_terms_days: invoice.net_terms_days == null ? '' : String(invoice.net_terms_days),
@@ -478,7 +486,6 @@ export function Invoices() {
 
   async function save() {
     if (!form.company_group_id) return toast.error('Company is required');
-    if (!form.invoice_number.trim()) return toast.error('Invoice number is required');
     if (!form.bill_to_snapshot.name.trim()) return toast.error('Bill-to name is required');
     if (form.line_items.some((item) => !item.description.trim())) {
       return toast.error('Every line item needs a description');
@@ -486,7 +493,10 @@ export function Invoices() {
     setSaving(true);
     const payload = {
       ...form,
-      invoice_number: form.invoice_number.trim(),
+      // Blank → omit so the server auto-generates (INV-0001 …) on create.
+      invoice_number: form.invoice_number.trim() || undefined,
+      name: form.name.trim() || null,
+      description: form.description.trim() || null,
       invoice_date: form.invoice_date || null,
       due_date: form.due_date || null,
       net_terms_days: form.net_terms_days === '' ? null : Number(form.net_terms_days),
@@ -843,6 +853,7 @@ export function Invoices() {
             onRowClick={(row) => void openDetail(row.id)}
             columns={[
               { key: 'invoice_number', header: 'Invoice #' },
+              { key: 'name', header: 'Name', render: (row) => row.name || '—' },
               {
                 key: 'bill_to',
                 header: 'Bill to',
@@ -969,9 +980,16 @@ export function Invoices() {
                 ]}
               />
               <FormInput
-                label="Invoice number *"
+                label="Invoice number"
+                placeholder="Auto-generated (INV-0001)"
                 value={form.invoice_number}
                 onChange={(event) => setForm({ ...form, invoice_number: event.target.value })}
+              />
+              <FormInput
+                label="Name"
+                placeholder="e.g. March retainer"
+                value={form.name}
+                onChange={(event) => setForm({ ...form, name: event.target.value })}
               />
               <FormInput
                 label="Invoice date"
@@ -1018,6 +1036,16 @@ export function Invoices() {
                 onChange={(event) => setForm({ ...form, tax_percent: event.target.value })}
               />
             </div>
+            <label className="mt-3 block">
+              <span className="mb-1.5 block text-xs font-medium text-ink">Description</span>
+              <textarea
+                rows={2}
+                placeholder="Optional summary shown on the invoice"
+                value={form.description}
+                onChange={(event) => setForm({ ...form, description: event.target.value })}
+                className="w-full rounded-md border border-border-strong bg-surface px-3 py-2 text-[13px] text-ink focus:outline-none focus-visible:border-accent focus-visible:ring-2"
+              />
+            </label>
           </section>
 
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
@@ -1180,6 +1208,18 @@ export function Invoices() {
       >
         {selected ? (
           <div className="space-y-5">
+            {(selected.name || selected.description) && (
+              <div className="rounded-xl border border-border bg-hover/30 p-3">
+                {selected.name && (
+                  <div className="text-base font-semibold text-ink">{selected.name}</div>
+                )}
+                {selected.description && (
+                  <div className="mt-1 whitespace-pre-line text-sm text-muted">
+                    {selected.description}
+                  </div>
+                )}
+              </div>
+            )}
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-hover/30 p-3">
               <div>
                 <Pill tone={STATUS_TONES[selected.display_status]}>{selected.display_status}</Pill>

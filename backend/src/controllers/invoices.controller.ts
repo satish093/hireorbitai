@@ -84,7 +84,10 @@ const lineItemSchema = z
 
 const writable = {
   company_group_id: z.string().uuid(),
-  invoice_number: z.string().trim().min(1).max(100),
+  // Optional — auto-generated server-side (INV-0001 …) when omitted/blank.
+  invoice_number: z.string().trim().min(1).max(100).optional(),
+  name: nullableText(200),
+  description: nullableText(5000),
   invoice_date: isoDate.optional().nullable(),
   due_date: isoDate.optional().nullable(),
   net_terms_days: z.coerce.number().int().min(0).max(3650).optional().nullable(),
@@ -491,6 +494,16 @@ export const get: RequestHandler = async (req, res) => {
   res.json(await enrich(await loadInvoiceScopedOr404(req.params.id, req.user)));
 };
 
+/** Next zero-padded sequential invoice number (INV-0001 …) across all invoices. */
+async function nextInvoiceNumber(client: PoolClient): Promise<string> {
+  const { rows } = await client.query<{ n: number }>(
+    `select coalesce(max(substring(invoice_number from '^INV-([0-9]+)$')::int), 0) as n
+       from public.invoices
+      where invoice_number ~ '^INV-[0-9]+$'`,
+  );
+  return `INV-${String(Number(rows[0]?.n ?? 0) + 1).padStart(4, '0')}`;
+}
+
 async function persistInvoice(
   mode: 'create' | 'update',
   invoiceId: string | null,
@@ -505,10 +518,24 @@ async function persistInvoice(
   const client = await pool.connect();
   try {
     await client.query('begin');
+    // Resolve the invoice number: use the supplied one, else auto-generate on
+    // create / keep the existing one on update.
+    let invoiceNumber = input.invoice_number?.trim() || '';
+    if (!invoiceNumber) {
+      if (mode === 'create') {
+        invoiceNumber = await nextInvoiceNumber(client);
+      } else {
+        const cur = await client.query<{ invoice_number: string | null }>(
+          'select invoice_number from public.invoices where id=$1',
+          [invoiceId],
+        );
+        invoiceNumber = cur.rows[0]?.invoice_number ?? '';
+      }
+    }
     let invoice: InvoiceRow;
     const common = [
       companyId,
-      input.invoice_number,
+      invoiceNumber,
       input.invoice_date ?? null,
       input.due_date ?? null,
       input.net_terms_days ?? null,
@@ -527,6 +554,8 @@ async function persistInvoice(
       first.service_period ?? null,
       totals.total_amount,
       input.bill_to_snapshot.email ?? null,
+      input.name ?? null,
+      input.description ?? null,
     ];
     if (mode === 'create') {
       const result = await client.query(
@@ -534,10 +563,10 @@ async function persistInvoice(
           company_group_id, invoice_number, invoice_date, due_date, net_terms_days,
           currency, discount_amount, tax_percent, subtotal, tax_amount, total_amount,
           issuer_snapshot, bill_to_snapshot, notes, consultant_name, vendor_name,
-          pay_rate, billing_month, invoice_amount, bill_to_email, status, created_by
+          pay_rate, billing_month, invoice_amount, bill_to_email, name, description, status, created_by
         ) values (
           $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13::jsonb,$14,$15,$16,
-          $17,$18,$19,$20,'Draft',$21
+          $17,$18,$19,$20,$21,$22,'Draft',$23
         ) returning *`,
         [...common, req.user.id],
       );
@@ -556,8 +585,8 @@ async function persistInvoice(
           subtotal=$9, tax_amount=$10, total_amount=$11, issuer_snapshot=$12::jsonb,
           bill_to_snapshot=$13::jsonb, notes=$14, consultant_name=$15, vendor_name=$16,
           pay_rate=$17, billing_month=$18, invoice_amount=$19, bill_to_email=$20,
-          updated_at=now()
-         where id=$21 returning *`,
+          name=$21, description=$22, updated_at=now()
+         where id=$23 returning *`,
         [...common, invoiceId],
       );
       invoice = result.rows[0];

@@ -66,6 +66,19 @@ describe('invoice accounting input validation', () => {
     expect(createSchema.safeParse({ ...valid, line_items: [] }).success).toBe(false);
   });
 
+  it('allows omitting invoice_number (auto-generated server-side)', () => {
+    const noNumber = { ...valid } as Record<string, unknown>;
+    delete noNumber.invoice_number;
+    expect(createSchema.safeParse(noNumber).success).toBe(true);
+  });
+
+  it('accepts optional name + description fields', () => {
+    expect(
+      createSchema.safeParse({ ...valid, name: 'March retainer', description: 'Monthly work' })
+        .success,
+    ).toBe(true);
+  });
+
   it('keeps lifecycle statuses server-owned', () => {
     expect(INVOICE_STATUSES).toEqual([
       'Draft',

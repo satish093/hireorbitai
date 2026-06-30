@@ -34,6 +34,8 @@ export interface InvoiceStatusHistory {
 export interface InvoiceRow {
   id: string;
   invoice_number?: string | null;
+  name?: string | null;
+  description?: string | null;
   consultant_name?: string | null;
   vendor_name?: string | null;
   billing_month?: string | null;
