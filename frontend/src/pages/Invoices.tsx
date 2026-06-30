@@ -889,21 +889,29 @@ export function Invoices() {
                 ),
               },
               {
-                key: 'due_date',
-                header: 'Due',
-                render: (row) => fmtDate(row.due_date),
-                hideOnMobile: true,
+                key: 'dates',
+                header: 'Dates',
+                render: (row) => (
+                  <div className="text-xs leading-tight">
+                    <div className="text-ink">Issued {fmtDate(row.invoice_date)}</div>
+                    <div className="text-muted">Due {fmtDate(row.due_date)}</div>
+                  </div>
+                ),
               },
               {
                 key: 'amount',
                 header: 'Amount',
                 align: 'right',
                 render: (row) => {
+                  const total = Number(row.total_amount ?? 0);
                   const due = dueOf(row);
                   const paid = Number(row.amount_paid ?? 0);
-                  const showBalance = row.status !== 'Draft' && row.status !== 'Cancelled';
+                  // Only show a paid/due sub-line for real (non-zero), sent invoices —
+                  // a $0 draft/submitted shouldn't read as "Paid".
+                  const showBalance =
+                    total > 0 && row.status !== 'Draft' && row.status !== 'Cancelled';
                   return (
-                    <div>
+                    <div className="leading-tight">
                       <div className="font-medium text-ink">
                         {fmtMoney(row.total_amount, row.currency)}
                       </div>
