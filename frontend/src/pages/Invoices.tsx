@@ -861,44 +861,66 @@ export function Invoices() {
             rows={rows}
             onRowClick={(row) => void openDetail(row.id)}
             columns={[
-              { key: 'invoice_number', header: 'Invoice #' },
-              { key: 'name', header: 'Name', render: (row) => row.name || '—' },
+              {
+                key: 'invoice',
+                header: 'Invoice',
+                render: (row) => (
+                  <div className="min-w-0">
+                    <div className="font-medium text-ink">{row.invoice_number || '—'}</div>
+                    {row.name && <div className="truncate text-xs text-ink-2">{row.name}</div>}
+                    {row.description && (
+                      <div className="max-w-[34ch] truncate text-xs text-muted">
+                        {row.description}
+                      </div>
+                    )}
+                  </div>
+                ),
+              },
               {
                 key: 'bill_to',
                 header: 'Bill to',
-                render: (row) => row.bill_to_snapshot?.name || '—',
+                render: (row) => (
+                  <div className="min-w-0">
+                    <div className="truncate text-ink">{row.bill_to_snapshot?.name || '—'}</div>
+                    {row.issuer_snapshot?.name && (
+                      <div className="truncate text-xs text-muted">{row.issuer_snapshot.name}</div>
+                    )}
+                  </div>
+                ),
               },
               {
-                key: 'company',
-                header: 'Issuer',
-                render: (row) => row.issuer_snapshot?.name || '—',
-                hideOnMobile: true,
-              },
-              {
-                key: 'invoice_date',
-                header: 'Invoice date',
-                render: (row) => fmtDate(row.invoice_date),
-                hideOnMobile: true,
-              },
-              { key: 'due_date', header: 'Due date', render: (row) => fmtDate(row.due_date) },
-              {
-                key: 'total_amount',
-                header: 'Total',
-                align: 'right',
-                render: (row) => fmtMoney(row.total_amount, row.currency),
-              },
-              {
-                key: 'amount_paid',
-                header: 'Paid',
-                align: 'right',
-                hideOnMobile: true,
-                render: (row) => fmtMoney(row.amount_paid ?? 0, row.currency),
-              },
-              {
-                key: 'amount_due',
+                key: 'due_date',
                 header: 'Due',
+                render: (row) => fmtDate(row.due_date),
+                hideOnMobile: true,
+              },
+              {
+                key: 'amount',
+                header: 'Amount',
                 align: 'right',
-                render: (row) => fmtMoney(dueOf(row), row.currency),
+                render: (row) => {
+                  const due = dueOf(row);
+                  const paid = Number(row.amount_paid ?? 0);
+                  const showBalance = row.status !== 'Draft' && row.status !== 'Cancelled';
+                  return (
+                    <div>
+                      <div className="font-medium text-ink">
+                        {fmtMoney(row.total_amount, row.currency)}
+                      </div>
+                      {showBalance &&
+                        (due <= 0 ? (
+                          <div className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                            Paid
+                          </div>
+                        ) : (
+                          <div className="text-xs text-muted">
+                            {paid > 0 && `${fmtMoney(paid, row.currency)} paid · `}
+                            {fmtMoney(due, row.currency)} due
+                          </div>
+                        ))}
+                    </div>
+                  );
+                },
               },
               {
                 key: 'status',
