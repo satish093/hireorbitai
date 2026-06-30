@@ -19,6 +19,8 @@ const INVOICE = {
   tax_percent: 0,
   tax_amount: 0,
   total_amount: 10400,
+  amount_paid: 0,
+  amount_due: 10400,
   issuer_snapshot: { name: 'CloudFen', email: 'billing@cloudfen.test' },
   bill_to_snapshot: { name: 'Acme Corp', email: 'vendor@acme.test' },
   line_items: [
@@ -49,7 +51,15 @@ const EMPTY_LIST = {
   total: 0,
   page: 1,
   page_size: 25,
-  summary: { outstanding_by_currency: {}, overdue_count: 0, draft_count: 0 },
+  summary: {
+    overdue_count: 0,
+    draft_count: 0,
+    total_by_currency: {},
+    paid_by_currency: {},
+    due_by_currency: {},
+    overdue_by_currency: {},
+    outstanding_by_currency: {},
+  },
 };
 
 test.describe('Invoice accounting workflow', () => {
@@ -67,9 +77,13 @@ test.describe('Invoice accounting workflow', () => {
             items: [INVOICE],
             total: 1,
             summary: {
-              outstanding_by_currency: { USD: 10400 },
               overdue_count: 0,
               draft_count: 0,
+              total_by_currency: { USD: 10400 },
+              paid_by_currency: { USD: 0 },
+              due_by_currency: { USD: 10400 },
+              overdue_by_currency: {},
+              outstanding_by_currency: { USD: 10400 },
             },
           },
         },

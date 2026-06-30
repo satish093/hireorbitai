@@ -51,8 +51,12 @@ jobs:
         run: |
           URL="${{ inputs.target_url || secrets.ZAP_TARGET_URL }}"
           if [ -z "$URL" ]; then
-            echo "::error::No target URL configured. Set ZAP_TARGET_URL secret or provide target_url input."
-            exit 1
+            # No staging target configured — skip the scan gracefully (green job)
+            # rather than failing the weekly cron. Set ZAP_TARGET_URL (or pass
+            # target_url on manual dispatch) to enable it.
+            echo "::notice::No ZAP_TARGET_URL configured — skipping the passive scan."
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
           # Safety guard: refuse to scan the production domain from an automated workflow.
           # Operators can still run scripts/zap-baseline.sh manually against anything.
@@ -60,13 +64,16 @@ jobs:
             echo "::error::ZAP_TARGET_URL points to production (hireorbitai.com). Use staging or localhost instead."
             exit 1
           fi
+          echo "configured=true" >> "$GITHUB_OUTPUT"
           echo "url=$URL" >> "$GITHUB_OUTPUT"
           echo "→ ZAP target: $URL"
 
       - name: Make script executable
+        if: steps.target.outputs.configured == 'true'
         run: chmod +x scripts/zap-baseline.sh
 
       - name: Run ZAP baseline scan
+        if: steps.target.outputs.configured == 'true'
         # continue-on-error keeps the job green even if ZAP finds warnings.
         # The report artifact carries the detail; this job is informational only.
         continue-on-error: true
@@ -74,7 +81,7 @@ jobs:
 
       - name: Upload ZAP report
         uses: actions/upload-artifact@v4
-        if: always()
+        if: ${{ always() && steps.target.outputs.configured == 'true' }}
         with:
           name: zap-report-${{ github.run_number }}
           path: zap-report/

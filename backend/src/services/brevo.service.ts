@@ -501,6 +501,100 @@ export async function sendDailyMatchDigest(args: {
   });
 }
 
+// ---------------------------------------------------------------------------
+// Invoice overdue / payment reminder.
+//
+// Sent by the daily invoice-overdue job and the manual "Send reminder" button.
+// Two audiences share one template with different tone:
+//   - 'client'  → the bill-to party: a polite nudge to settle the balance.
+//   - 'manager' → the company's HR/Manager group leads: an internal heads-up
+//                 with a deeplink into the Invoices workspace.
+// ---------------------------------------------------------------------------
+export async function sendInvoiceOverdueNotice(args: {
+  to: { email: string; name?: string };
+  audience: 'client' | 'manager';
+  invoiceNumber?: string | null;
+  companyName?: string | null;
+  billToName?: string | null;
+  amountDue: number;
+  currency: string;
+  dueDate?: string | null;
+  daysOverdue: number;
+}): Promise<void> {
+  const number = args.invoiceNumber ? `#${args.invoiceNumber}` : '';
+  const companyName = args.companyName?.trim() || brand.productName;
+  let amount: string;
+  try {
+    amount = args.amountDue.toLocaleString('en-US', { style: 'currency', currency: args.currency });
+  } catch {
+    amount = `${args.currency} ${args.amountDue.toFixed(2)}`;
+  }
+  const dueStr = args.dueDate ? String(args.dueDate).slice(0, 10) : '';
+  const overdue = args.daysOverdue > 0;
+  const dayLabel = `${args.daysOverdue} day${args.daysOverdue === 1 ? '' : 's'}`;
+
+  const statusLine = overdue
+    ? `Overdue by <strong style="color:#dc2626;">${dayLabel}</strong>`
+    : 'Payment reminder';
+  const detail = `
+    <table role="presentation" cellpadding="0" cellspacing="0" style="margin:16px 0;width:100%;">
+      <tr><td style="padding:14px 16px;background:${brand.bgColor};border:1px solid ${brand.borderColor};border-radius:10px;font-size:13px;color:${brand.textColor};">
+        <div><span style="color:${brand.mutedColor};">Invoice:</span> ${escapeHtml(number || '—')}</div>
+        <div><span style="color:${brand.mutedColor};">Balance due:</span> <strong>${escapeHtml(amount)}</strong></div>
+        ${dueStr ? `<div><span style="color:${brand.mutedColor};">Due date:</span> ${escapeHtml(dueStr)}</div>` : ''}
+        <div style="margin-top:4px;color:${overdue ? '#dc2626' : brand.mutedColor};">${statusLine}</div>
+      </td></tr>
+    </table>`;
+
+  let subject: string;
+  let heading: string;
+  let body: string;
+  let cta: { label: string; href: string } | undefined;
+
+  if (args.audience === 'manager') {
+    const who = args.billToName?.trim() ? escapeHtml(args.billToName.trim()) : 'a client';
+    subject = overdue
+      ? `Overdue invoice ${number} — ${amount} outstanding`.replace(/\s+/g, ' ').trim()
+      : `Invoice ${number} due — ${amount} outstanding`.replace(/\s+/g, ' ').trim();
+    heading = overdue ? 'Overdue invoice needs attention' : 'Invoice payment due';
+    body = `
+      <p>Hi ${escapeHtml(args.to.name ?? 'there')},</p>
+      <p>Invoice ${escapeHtml(number)} to <strong>${who}</strong> ${overdue ? `is <strong>overdue by ${dayLabel}</strong>` : 'is awaiting payment'}. This is an internal reminder for your group.</p>
+      ${detail}
+      <p style="font-size:13px;color:${brand.mutedColor};">Open the Invoices workspace to follow up or record a payment.</p>`;
+    cta = { label: 'Open invoices', href: `${env.frontendUrl}/invoices` };
+  } else {
+    subject = overdue
+      ? `Reminder: invoice ${number} from ${companyName} is overdue`.replace(/\s+/g, ' ').trim()
+      : `Reminder: invoice ${number} from ${companyName} is due`.replace(/\s+/g, ' ').trim();
+    heading = overdue
+      ? `Invoice ${number} is overdue`.trim()
+      : `Invoice ${number} payment reminder`.trim();
+    body = `
+      <p>Hi ${escapeHtml(args.to.name ?? 'there')},</p>
+      <p>This is a friendly reminder that invoice ${escapeHtml(number)} from <strong>${escapeHtml(companyName)}</strong> ${overdue ? `is now <strong>overdue by ${dayLabel}</strong>` : 'is awaiting payment'}.</p>
+      ${detail}
+      <p style="font-size:13px;color:${brand.mutedColor};">If you've already sent this payment, please disregard this message. Questions? Reply to this email to reach ${escapeHtml(companyName)}.</p>`;
+  }
+
+  await sendViaBrevo({
+    to: args.to,
+    subject,
+    html: shell({
+      preheader: `${number ? number + ' · ' : ''}${amount} ${overdue ? 'overdue' : 'due'}.`.trim(),
+      heading,
+      body,
+      ...(cta ? { cta } : {}),
+    }),
+    text:
+      `${heading}\n\n` +
+      `Invoice: ${number || '—'}\nBalance due: ${amount}${dueStr ? `\nDue date: ${dueStr}` : ''}\n` +
+      `${overdue ? `Overdue by ${dayLabel}` : 'Payment reminder'}` +
+      `${args.audience === 'manager' ? `\n\nOpen invoices: ${env.frontendUrl}/invoices` : ''}`,
+    tag: args.audience === 'manager' ? 'invoice-overdue-manager' : 'invoice-overdue',
+  });
+}
+
 export async function sendWorkAuthExpiryAlert(args: {
   to: { email: string; name?: string };
   consultantName: string;

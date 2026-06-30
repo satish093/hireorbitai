@@ -56,10 +56,27 @@ export interface InvoiceRow {
   subtotal?: number | string | null;
   tax_amount?: number | string | null;
   total_amount?: number | string | null;
+  amount_paid?: number | string | null;
+  amount_due?: number | string | null;
   archived_at?: string | Date | null;
+  last_emailed_at?: string | Date | null;
+  last_overdue_alert_at?: string | Date | null;
   line_items?: InvoiceLineItem[];
   status_history?: InvoiceStatusHistory[];
+  payments?: InvoicePayment[];
   permitted_actions?: Record<string, boolean>;
+}
+
+export interface InvoicePayment {
+  id: string;
+  invoice_id?: string;
+  amount: number | string;
+  paid_on: string | Date;
+  method: string;
+  reference?: string | null;
+  note?: string | null;
+  recorded_by?: string | null;
+  created_at?: string | Date | null;
 }
 
 export interface InvoiceBrand {
@@ -68,6 +85,9 @@ export interface InvoiceBrand {
   color?: string | null;
   logo?: Buffer | null;
   logoUrl?: string | null;
+  /** Logo is predominantly near-white → render it on a dark panel so a
+   *  white-on-transparent wordmark doesn't vanish on the white header. */
+  logoIsLight?: boolean;
 }
 
 type Doc = InstanceType<typeof PDFDocument>;
@@ -164,8 +184,26 @@ export function invoiceFileBase(invoice: InvoiceRow): string {
 function drawLogo(doc: Doc, issuer: InvoicePartySnapshot, brand: InvoiceBrand | undefined) {
   if (brand?.logo) {
     try {
-      // Match the reference's large, wide company logo block.
-      doc.image(brand.logo, LEFT, 25, { fit: [200, 72], valign: 'center' });
+      // Compute the fitted draw size from the logo's natural dimensions so a
+      // light-logo backdrop can be sized to hug it.
+      const maxW = 200;
+      const maxH = 72;
+      const top = 25;
+      // openImage exists at runtime but isn't in @types/pdfkit.
+      const img = (
+        doc as unknown as { openImage(src: Buffer): { width: number; height: number } }
+      ).openImage(brand.logo);
+      const scale = Math.min(maxW / img.width, maxH / img.height);
+      const dw = img.width * scale;
+      const dh = img.height * scale;
+      // A near-white logo (e.g. a white wordmark on transparency) is invisible
+      // on the white header — drop it onto a dark rounded panel so it reads.
+      if (brand.logoIsLight) {
+        const padX = 12;
+        const padY = 9;
+        doc.roundedRect(LEFT - padX, top - padY, dw + padX * 2, dh + padY * 2, 6).fill('#0f172a');
+      }
+      doc.image(brand.logo, LEFT, top, { width: dw, height: dh });
       return;
     } catch {
       // Corrupt or unsupported logos use the branded fallback below.
@@ -423,8 +461,19 @@ export function renderInvoicePdf(invoice: InvoiceRow, brand?: InvoiceBrand): Pro
 
     const hasDiscount = Number(invoice.discount_amount ?? 0) > 0;
     const hasTax = Number(invoice.tax_amount ?? 0) > 0 || Number(invoice.tax_percent ?? 0) > 0;
+    // Partial payments: show a "Paid" line and bill the remaining balance, not
+    // the full total, so a Partially Paid invoice's PDF doesn't ask for the
+    // whole amount again.
+    const amountPaid = Number(invoice.amount_paid ?? 0);
+    const hasPaid = amountPaid > 0;
+    const invoiceTotal = Number(invoice.total_amount ?? invoice.invoice_amount ?? 0);
+    const balanceDue = Math.round((invoiceTotal - amountPaid) * 100) / 100;
     const summaryHeight =
-      80 + (hasDiscount ? 18 : 0) + (hasTax ? 18 : 0) + (invoice.notes ? 45 : 0);
+      80 +
+      (hasDiscount ? 18 : 0) +
+      (hasTax ? 18 : 0) +
+      (hasPaid ? 18 : 0) +
+      (invoice.notes ? 45 : 0);
     if (y + summaryHeight > PAGE_H - 80) nextPage();
     y += 18;
 
@@ -437,6 +486,7 @@ export function renderInvoicePdf(invoice: InvoiceRow, brand?: InvoiceBrand): Pro
     if (hasDiscount) summaryRows.push(['Discount:', -Number(invoice.discount_amount)]);
     if (hasTax)
       summaryRows.push([`Tax (${decimal(invoice.tax_percent)}%):`, invoice.tax_amount ?? 0]);
+    if (hasPaid) summaryRows.push(['Paid:', -amountPaid]);
 
     for (const [label, value] of summaryRows) {
       doc
@@ -455,7 +505,7 @@ export function renderInvoicePdf(invoice: InvoiceRow, brand?: InvoiceBrand): Pro
       .font('Helvetica-Bold')
       .fontSize(9)
       .text(`Amount Due (${currency}):`, 380, y, { width: 117, align: 'right' });
-    doc.text(money(invoice.total_amount ?? invoice.invoice_amount, currency), totalsValueX, y, {
+    doc.text(money(balanceDue, currency), totalsValueX, y, {
       width: totalsWidth,
       align: 'right',
     });

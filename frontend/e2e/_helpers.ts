@@ -44,7 +44,38 @@ export interface MockProfile {
   /** Set to a timestamp so the first-run ProductTour overlay never auto-opens
    *  over the dashboard (it would otherwise intercept clicks in tests). */
   tour_completed_at?: string | null;
+  // Mandatory-profile fields (see src/utils/profileComplete.ts). Non-admin
+  // users with any of these blank are bounced to /profile/complete by
+  // ProtectedRoute, so every fixture below fills them via COMPLETE_PROFILE.
+  first_name?: string | null;
+  last_name?: string | null;
+  phone?: string | null;
+  address_line1?: string | null;
+  address_line2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postal_code?: string | null;
+  country?: string | null;
+  linkedin_url?: string | null;
 }
+
+/**
+ * Filled mandatory-profile fields so the ProtectedRoute profile-completion gate
+ * (src/utils/profileComplete.ts) treats a mocked user as complete and renders
+ * the requested page instead of redirecting to /profile/complete. Admin-tier is
+ * exempt from the gate, but including these is harmless.
+ */
+export const COMPLETE_PROFILE = {
+  first_name: 'Test',
+  last_name: 'User',
+  phone: '+1 555 010 0000',
+  address_line1: '1 Test Plaza',
+  city: 'Austin',
+  state: 'TX',
+  postal_code: '78701',
+  country: 'United States',
+  linkedin_url: 'https://www.linkedin.com/in/testuser',
+} as const;
 
 /** A manager-tier profile — lands on the Manager dashboard, no onboarding gate. */
 export const MANAGER: MockProfile = {
@@ -55,6 +86,7 @@ export const MANAGER: MockProfile = {
   is_active: true,
   must_change_password: false,
   tour_completed_at: '2024-01-01T00:00:00.000Z',
+  ...COMPLETE_PROFILE,
 };
 
 /** A consultant who has finished onboarding (consultant_id set). */
@@ -67,6 +99,7 @@ export const CONSULTANT: MockProfile = {
   must_change_password: false,
   consultant_id: 'c-1',
   tour_completed_at: '2024-01-01T00:00:00.000Z',
+  ...COMPLETE_PROFILE,
 };
 
 /** A recruiter who has finished onboarding (recruiter_id set) — no onboarding gate. */
@@ -79,6 +112,7 @@ export const RECRUITER: MockProfile = {
   must_change_password: false,
   recruiter_id: 'r-1',
   tour_completed_at: '2024-01-01T00:00:00.000Z',
+  ...COMPLETE_PROFILE,
 };
 
 /** A DEVELOPER with no capabilities — scoped super-admin with nothing granted.
@@ -92,6 +126,7 @@ export const DEVELOPER: MockProfile = {
   is_active: true,
   must_change_password: false,
   tour_completed_at: '2024-01-01T00:00:00.000Z',
+  ...COMPLETE_PROFILE,
 };
 
 interface FulfillSpec {
@@ -137,7 +172,11 @@ export async function mockApi(page: Page, opts: MockApiOptions = {}): Promise<vo
     switch (path) {
       case '/auth/me':
         if (!opts.profile) return route.fulfill({ status: 401, json: { error: 'Unauthorized' } });
-        return route.fulfill({ json: opts.profile });
+        // Default-fill the mandatory-profile fields so ProtectedRoute's
+        // profile-completion gate (src/utils/profileComplete.ts) doesn't bounce
+        // mocked users to /profile/complete. A spec can still override any field
+        // by setting it on its profile (e.g. to exercise the gate itself).
+        return route.fulfill({ json: { ...COMPLETE_PROFILE, ...opts.profile } });
       case '/feature-flags/me':
         return route.fulfill({ json: opts.flags ?? {} });
       case '/auth/refresh':
