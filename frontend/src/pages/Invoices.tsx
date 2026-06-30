@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Layout } from '../components/Layout';
-import { DataTable } from '../components/DataTable';
+import { DataTable, type Column } from '../components/DataTable';
 import { Modal } from '../components/Modal';
 import { FormInput } from '../components/FormInput';
 import { SelectInput } from '../components/SelectInput';
@@ -280,6 +280,7 @@ interface ActivityRow {
   metadata: {
     invoice_number?: string | null;
     amount?: number | string;
+    currency?: string;
     method?: string;
     new_status?: string;
   } | null;
@@ -381,10 +382,13 @@ export function Invoices() {
     void loadCompanies();
   }, []);
   useEffect(() => {
+    // Don't fetch the invoice list while the admin Payment-activity view is up;
+    // refetch when switching back (view is a dep).
+    if (view !== 'invoices') return;
     const timer = window.setTimeout(() => void load(), query ? 250 : 0);
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, query, companyFilter, statusFilter, archivedFilter]);
+  }, [page, query, companyFilter, statusFilter, archivedFilter, view]);
   useInvalidationListener('invoices', load);
 
   const totals = useMemo(() => {
@@ -531,6 +535,9 @@ export function Invoices() {
   }
 
   async function openDetail(id: string) {
+    // Clear any previously-open invoice so the panel shows the loading state
+    // instead of the prior invoice's data while the fetch is in flight.
+    setSelected(null);
     setDetailLoading(true);
     try {
       const response = await api.get<Invoice>(`/invoices/${id}`);
@@ -683,6 +690,8 @@ export function Invoices() {
       setPayFor(null);
       invalidate('invoices');
       await load();
+      // Keep the admin Payment-activity feed current if it's the active view.
+      if (view === 'activity') await loadActivity();
       // If the detail panel is open for this invoice, refresh it in place;
       // otherwise leave it closed (inline list-row payment).
       if (selected?.id === target.id) setSelected(response.data);
@@ -1366,48 +1375,44 @@ export function Invoices() {
                     </Button>
                   )}
                 </div>
-                {selected.payments?.length ? (
-                  <div className="overflow-x-auto rounded-xl border border-border">
-                    <table className="w-full min-w-[480px] text-sm">
-                      <thead className="bg-hover text-left text-[10px] uppercase tracking-widest text-muted">
-                        <tr>
-                          <th className="px-3 py-2">Date</th>
-                          <th className="px-3 py-2">Method</th>
-                          <th className="px-3 py-2">Reference</th>
-                          <th className="px-3 py-2 text-right">Amount</th>
-                          {!selected.archived_at && (
-                            <th className="px-3 py-2 text-right">Action</th>
-                          )}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {selected.payments.map((payment) => (
-                          <tr key={payment.id} className="border-t border-border">
-                            <td className="px-3 py-2 text-ink">{fmtDate(payment.paid_on)}</td>
-                            <td className="px-3 py-2 text-muted">{methodLabel(payment.method)}</td>
-                            <td className="px-3 py-2 text-muted">{payment.reference || '—'}</td>
-                            <td className="px-3 py-2 text-right font-medium text-ink">
-                              {fmtMoney(payment.amount, selected.currency)}
-                            </td>
-                            {!selected.archived_at && (
-                              <td className="px-3 py-2 text-right">
-                                <button
-                                  type="button"
-                                  onClick={() => requestVoidPayment(payment)}
-                                  className="text-xs font-medium text-danger hover:underline"
-                                >
-                                  Void
-                                </button>
-                              </td>
-                            )}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div className="text-sm text-muted">No payments recorded yet.</div>
-                )}
+                <DataTable
+                  rows={selected.payments ?? []}
+                  empty="No payments recorded yet."
+                  columns={[
+                    { key: 'paid_on', header: 'Date', render: (p) => fmtDate(p.paid_on) },
+                    { key: 'method', header: 'Method', render: (p) => methodLabel(p.method) },
+                    {
+                      key: 'reference',
+                      header: 'Reference',
+                      render: (p) => p.reference || '—',
+                      hideOnMobile: true,
+                    },
+                    {
+                      key: 'amount',
+                      header: 'Amount',
+                      align: 'right',
+                      render: (p) => fmtMoney(p.amount, selected.currency),
+                    },
+                    ...(selected.archived_at
+                      ? []
+                      : [
+                          {
+                            key: 'void',
+                            header: '',
+                            align: 'right' as const,
+                            render: (p: Payment) => (
+                              <button
+                                type="button"
+                                onClick={() => requestVoidPayment(p)}
+                                className="text-xs font-medium text-danger hover:underline"
+                              >
+                                Void
+                              </button>
+                            ),
+                          },
+                        ]),
+                  ]}
+                />
               </div>
             )}
 
@@ -1568,59 +1573,47 @@ export function Invoices() {
 }
 
 function PaymentActivity({ rows, loading }: { rows: ActivityRow[]; loading: boolean }) {
-  if (loading) {
-    return <div className="py-12 text-center text-sm text-muted">Loading payment activity…</div>;
-  }
-  if (!rows.length) {
-    return (
-      <div className="rounded-xl border border-border bg-surface p-10 text-center text-sm text-muted">
-        No payment activity yet. Recorded and voided payments across all invoices will appear here.
-      </div>
-    );
-  }
+  const columns: Column<ActivityRow>[] = [
+    {
+      key: 'created_at',
+      header: 'When',
+      render: (row) => fmtDateTime(row.created_at),
+    },
+    {
+      key: 'action',
+      header: 'Action',
+      render: (row) => {
+        const voided = row.action === 'invoice_payment_voided';
+        return (
+          <Pill tone={voided ? STATUS_TONES.Cancelled : STATUS_TONES.Paid}>
+            {voided ? 'Voided' : 'Recorded'}
+          </Pill>
+        );
+      },
+    },
+    { key: 'invoice', header: 'Invoice #', render: (row) => row.metadata?.invoice_number || '—' },
+    {
+      key: 'amount',
+      header: 'Amount',
+      align: 'right',
+      render: (row) => fmtMoney(row.metadata?.amount ?? 0, row.metadata?.currency || 'USD'),
+    },
+    {
+      key: 'method',
+      header: 'Method',
+      render: (row) => (row.metadata?.method ? methodLabel(row.metadata.method) : '—'),
+      hideOnMobile: true,
+    },
+    { key: 'new_status', header: 'New status', render: (row) => row.metadata?.new_status || '—' },
+    { key: 'by', header: 'By', render: (row) => row.email || '—', hideOnMobile: true },
+  ];
   return (
-    <div className="overflow-x-auto rounded-xl border border-border bg-surface">
-      <table className="w-full min-w-[760px] text-sm">
-        <thead className="bg-hover text-left text-[10px] uppercase tracking-widest text-muted">
-          <tr>
-            <th className="px-3 py-2">When</th>
-            <th className="px-3 py-2">Action</th>
-            <th className="px-3 py-2">Invoice #</th>
-            <th className="px-3 py-2 text-right">Amount</th>
-            <th className="px-3 py-2">Method</th>
-            <th className="px-3 py-2">New status</th>
-            <th className="px-3 py-2">By</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => {
-            const meta = row.metadata ?? {};
-            const voided = row.action === 'invoice_payment_voided';
-            return (
-              <tr key={row.id} className="border-t border-border">
-                <td className="whitespace-nowrap px-3 py-2 text-muted">
-                  {fmtDateTime(row.created_at)}
-                </td>
-                <td className="px-3 py-2">
-                  <Pill tone={voided ? STATUS_TONES.Cancelled : STATUS_TONES.Paid}>
-                    {voided ? 'Voided' : 'Recorded'}
-                  </Pill>
-                </td>
-                <td className="px-3 py-2 font-medium text-ink">{meta.invoice_number || '—'}</td>
-                <td className="px-3 py-2 text-right font-medium text-ink">
-                  {fmtMoney(meta.amount ?? 0)}
-                </td>
-                <td className="px-3 py-2 text-muted">
-                  {meta.method ? methodLabel(meta.method) : '—'}
-                </td>
-                <td className="px-3 py-2 text-muted">{meta.new_status || '—'}</td>
-                <td className="px-3 py-2 text-muted">{row.email || '—'}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
+    <DataTable
+      columns={columns}
+      rows={rows}
+      loading={loading}
+      empty="No payment activity yet. Recorded and voided payments across all invoices appear here."
+    />
   );
 }
 

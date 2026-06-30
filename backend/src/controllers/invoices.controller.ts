@@ -994,6 +994,7 @@ export const recordPayment: RequestHandler = async (req, res) => {
     const updated = await enrich(updatedRow);
     auditInvoice('invoice_payment_recorded', req, updated, {
       amount,
+      currency: updated.currency,
       method: parsed.data.method,
       amount_paid: updated.amount_paid,
       new_status: updated.status,
@@ -1051,6 +1052,7 @@ export const voidPayment: RequestHandler = async (req, res) => {
     auditInvoice('invoice_payment_voided', req, updated, {
       payment_id: payment.id,
       amount: Number(payment.amount),
+      currency: updated.currency,
       amount_paid: updated.amount_paid,
       new_status: updated.status,
     });
