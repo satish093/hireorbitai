@@ -36,6 +36,11 @@ type InvoiceStatus = (typeof INVOICE_STATUSES)[number];
 
 const PAYMENT_METHODS = ['bank_transfer', 'check', 'card', 'cash', 'ach', 'wire', 'other'] as const;
 
+// Per-invoice cooldown shared by the manual "Send reminder" button and the
+// daily job's throttle stamp (last_overdue_alert_at). Keeps a manager from
+// re-emailing the external client many times the same day.
+const REMINDER_COOLDOWN_MS = 12 * 60 * 60 * 1000;
+
 /** Decimal-safe money rounding to 2 places (avoids float drift on balances). */
 function round2(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100;
@@ -875,22 +880,39 @@ export const recordPayment: RequestHandler = async (req, res) => {
   if (!parsed.success) throw httpError(400, 'Invalid payment', parsed.error.flatten());
   const invoice = await loadInvoiceScopedOr404(req.params.id, req.user);
   if (invoice.archived_at) throw httpError(409, 'Restore the invoice before recording a payment');
+  // Coarse fast-fail on the snapshot; the authoritative checks run under the
+  // row lock below (the snapshot can be stale under concurrency).
   if (invoice.status !== 'Approved' && invoice.status !== 'Partially Paid') {
     throw httpError(409, 'Only approved invoices can take payments');
   }
-  const due = invoiceAmountDue(invoice);
-  if (due <= 0) throw httpError(409, 'Invoice is already paid in full');
   const amount = round2(parsed.data.amount);
-  if (amount - due > 0.005) {
-    throw httpError(
-      400,
-      `Payment of ${amount.toFixed(2)} exceeds the ${due.toFixed(2)} balance due`,
-    );
-  }
 
   const client = await pool.connect();
   try {
     await client.query('begin');
+    // Lock the invoice row and re-read the authoritative balance UNDER the lock,
+    // so two concurrent payments can't both pass the over-balance guard and
+    // overpay the invoice (amount_paid > total_amount).
+    const locked = await client.query(
+      `select status, total_amount, amount_paid
+         from public.invoices where id=$1 for update`,
+      [invoice.id],
+    );
+    const row = locked.rows[0] as
+      | { status: string; total_amount: string; amount_paid: string }
+      | undefined;
+    if (!row) throw httpError(404, 'Invoice not found');
+    if (row.status !== 'Approved' && row.status !== 'Partially Paid') {
+      throw httpError(409, 'Only approved invoices can take payments');
+    }
+    const due = round2(Number(row.total_amount ?? 0) - Number(row.amount_paid ?? 0));
+    if (due <= 0) throw httpError(409, 'Invoice is already paid in full');
+    if (amount - due > 0.005) {
+      throw httpError(
+        400,
+        `Payment of ${amount.toFixed(2)} exceeds the ${due.toFixed(2)} balance due`,
+      );
+    }
     await client.query(
       `insert into public.invoice_payments
         (invoice_id, amount, paid_on, method, reference, note, recorded_by)
@@ -907,7 +929,7 @@ export const recordPayment: RequestHandler = async (req, res) => {
     );
     const updatedRow = await reconcileFromLedger(
       client,
-      invoice,
+      { ...invoice, status: row.status, total_amount: row.total_amount },
       req.user.id,
       `Payment recorded: ${amount.toFixed(2)}`,
     );
@@ -932,6 +954,13 @@ export const voidPayment: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   const invoice = await loadInvoiceScopedOr404(req.params.id, req.user);
   if (invoice.archived_at) throw httpError(409, 'Restore the invoice before editing payments');
+  // Don't let a void silently un-pay a settled invoice. A fully Paid invoice
+  // (including historical ones the migration backfilled with a reconciling
+  // payment, and "Marked paid in full") must not be reverted to Approved by
+  // deleting a ledger row — that would clear paid_at and re-open collections.
+  if (invoice.status === 'Paid') {
+    throw httpError(409, 'Cannot void a payment on a fully paid invoice.');
+  }
   const { rows } = await pool.query(
     `select id, amount from public.invoice_payments where id=$1 and invoice_id=$2`,
     [req.params.paymentId, invoice.id],
@@ -942,10 +971,21 @@ export const voidPayment: RequestHandler = async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('begin');
+    // Lock + re-check under the lock so a concurrent payment that just settled
+    // the invoice can't be silently un-paid by a racing void.
+    const locked = await client.query(
+      `select status, total_amount from public.invoices where id=$1 for update`,
+      [invoice.id],
+    );
+    const row = locked.rows[0] as { status: string; total_amount: string } | undefined;
+    if (!row) throw httpError(404, 'Invoice not found');
+    if (row.status === 'Paid') {
+      throw httpError(409, 'Cannot void a payment on a fully paid invoice.');
+    }
     await client.query(`delete from public.invoice_payments where id=$1`, [payment.id]);
     const updatedRow = await reconcileFromLedger(
       client,
-      invoice,
+      { ...invoice, status: row.status, total_amount: row.total_amount },
       req.user.id,
       `Payment voided: ${round2(Number(payment.amount)).toFixed(2)}`,
     );
@@ -976,6 +1016,15 @@ export const remind: RequestHandler = async (req, res) => {
   if (invoice.archived_at) throw httpError(409, 'Restore the invoice before sending a reminder');
   if (!isUnpaid(invoice.status)) {
     throw httpError(409, 'Only sent (unpaid) invoices can be reminded');
+  }
+  // Per-invoice throttle: don't let repeated clicks spam the client. Shared with
+  // the daily job's stamp, so a just-sent automatic reminder also blocks here.
+  if (invoice.last_overdue_alert_at) {
+    const elapsed = Date.now() - new Date(invoice.last_overdue_alert_at as string).getTime();
+    if (elapsed >= 0 && elapsed < REMINDER_COOLDOWN_MS) {
+      const hours = Math.ceil((REMINDER_COOLDOWN_MS - elapsed) / (60 * 60 * 1000));
+      throw httpError(429, `A reminder was already sent recently. Try again in ${hours}h.`);
+    }
   }
   const result = await dispatchInvoiceReminder(invoice);
   if (!result.client_emailed && result.managers_emailed === 0) {

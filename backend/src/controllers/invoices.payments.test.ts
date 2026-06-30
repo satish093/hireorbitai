@@ -30,6 +30,17 @@ vi.mock('../config/db', () => {
   const client = {
     query: vi.fn(async (text: string, values: unknown[] = []) => {
       if (/^\s*(begin|commit|rollback)\s*$/i.test(text)) return { rows: [] };
+      if (/from public\.invoices where id=\$1 for update/.test(text)) {
+        return {
+          rows: [
+            {
+              status: mock.invoice.status,
+              total_amount: mock.invoice.total_amount,
+              amount_paid: mock.invoice.amount_paid,
+            },
+          ],
+        };
+      }
       if (/insert into public\.invoice_payments/.test(text)) {
         const amount = Number(values[1]);
         mock.paid = round2(mock.paid + amount);
@@ -166,6 +177,14 @@ describe('invoice partial payments', () => {
     expect(voided.res.body.status).toBe('Approved');
     expect(Number(voided.res.body.amount_paid)).toBe(0);
   });
+
+  it('refuses to void a payment on a fully paid invoice (no silent un-pay)', async () => {
+    await run(recordPayment, { body: { amount: 100 } });
+    expect(mock.invoice.status).toBe('Paid');
+    expect(
+      (await run(voidPayment, { params: { id: 'inv-1', paymentId: 'pay-1' } })).error?.status,
+    ).toBe(409);
+  });
 });
 
 describe('invoice reminder', () => {
@@ -179,5 +198,10 @@ describe('invoice reminder', () => {
   it('refuses to remind a paid invoice', async () => {
     mock.invoice.status = 'Paid';
     expect((await run(remind)).error?.status).toBe(409);
+  });
+
+  it('throttles repeated manual reminders (429 within the cooldown window)', async () => {
+    mock.invoice.last_overdue_alert_at = new Date().toISOString();
+    expect((await run(remind)).error?.status).toBe(429);
   });
 });

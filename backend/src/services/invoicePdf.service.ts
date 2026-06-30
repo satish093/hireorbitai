@@ -440,8 +440,19 @@ export function renderInvoicePdf(invoice: InvoiceRow, brand?: InvoiceBrand): Pro
 
     const hasDiscount = Number(invoice.discount_amount ?? 0) > 0;
     const hasTax = Number(invoice.tax_amount ?? 0) > 0 || Number(invoice.tax_percent ?? 0) > 0;
+    // Partial payments: show a "Paid" line and bill the remaining balance, not
+    // the full total, so a Partially Paid invoice's PDF doesn't ask for the
+    // whole amount again.
+    const amountPaid = Number(invoice.amount_paid ?? 0);
+    const hasPaid = amountPaid > 0;
+    const invoiceTotal = Number(invoice.total_amount ?? invoice.invoice_amount ?? 0);
+    const balanceDue = Math.round((invoiceTotal - amountPaid) * 100) / 100;
     const summaryHeight =
-      80 + (hasDiscount ? 18 : 0) + (hasTax ? 18 : 0) + (invoice.notes ? 45 : 0);
+      80 +
+      (hasDiscount ? 18 : 0) +
+      (hasTax ? 18 : 0) +
+      (hasPaid ? 18 : 0) +
+      (invoice.notes ? 45 : 0);
     if (y + summaryHeight > PAGE_H - 80) nextPage();
     y += 18;
 
@@ -454,6 +465,7 @@ export function renderInvoicePdf(invoice: InvoiceRow, brand?: InvoiceBrand): Pro
     if (hasDiscount) summaryRows.push(['Discount:', -Number(invoice.discount_amount)]);
     if (hasTax)
       summaryRows.push([`Tax (${decimal(invoice.tax_percent)}%):`, invoice.tax_amount ?? 0]);
+    if (hasPaid) summaryRows.push(['Paid:', -amountPaid]);
 
     for (const [label, value] of summaryRows) {
       doc
@@ -472,7 +484,7 @@ export function renderInvoicePdf(invoice: InvoiceRow, brand?: InvoiceBrand): Pro
       .font('Helvetica-Bold')
       .fontSize(9)
       .text(`Amount Due (${currency}):`, 380, y, { width: 117, align: 'right' });
-    doc.text(money(invoice.total_amount ?? invoice.invoice_amount, currency), totalsValueX, y, {
+    doc.text(money(balanceDue, currency), totalsValueX, y, {
       width: totalsWidth,
       align: 'right',
     });
