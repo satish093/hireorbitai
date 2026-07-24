@@ -47,5 +47,9 @@
   },
   "dependencies": {
     "lru-cache": "^11.5.0"
+  },
+  "overrides": {
+    "react-native": "0.86.0",
+    "react": "19.2.3"
   }
 }

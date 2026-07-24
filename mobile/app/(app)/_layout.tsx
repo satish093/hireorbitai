@@ -1,4 +1,4 @@
-import { Text, View } from 'react-native';
+import { Text, type ColorValue } from 'react-native';
 import { Tabs } from 'expo-router';
 import { RouteGuard } from '../../src/components/RouteGuard';
 import { useAuth } from '../../src/context/AuthContext';
@@ -125,7 +125,9 @@ export default function AppLayout() {
   );
 }
 
-function TabIcon({ glyph, color }: { glyph: string; color: string }) {
+// `color` is RN's ColorValue, not string — it may be an OpaqueColorValue
+// (PlatformColor / DynamicColorIOS), which has no string representation.
+function TabIcon({ glyph, color }: { glyph: string; color: ColorValue }) {
   return <Text style={{ fontSize: 20, color }}>{glyph}</Text>;
 }
 

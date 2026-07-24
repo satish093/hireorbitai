@@ -75,7 +75,8 @@
       "favicon": "./assets/favicon.png"
     },
     "experiments": {
-      "typedRoutes": true
+      "_comment": "typedRoutes is OFF. In this npm-workspaces layout the Expo CLI hoists to the repo root while expo-router resolves inside mobile/node_modules, so the CLI's typed-route generator cannot require expo-router/_ctx-shared and crashes Metro on startup. It is a DX nicety (autocomplete on href strings), not a runtime feature — the app is unaffected. Re-enable if the hoisting is ever flattened.",
+      "typedRoutes": false
     },
     "extra": {
       "router": {

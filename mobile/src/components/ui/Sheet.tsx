@@ -191,6 +191,8 @@ export function ConfirmSheet({
   );
 }
 
+// `StyleSheet.absoluteFillObject` was removed in React Native 0.86;
+// `absoluteFill` is the supported registered style.
 const styles = StyleSheet.create({
-  scrim: { ...StyleSheet.absoluteFillObject },
+  scrim: StyleSheet.absoluteFill,
 });
