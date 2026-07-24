@@ -33,6 +33,61 @@ npm run mobile:start          # then press i / a, or scan the QR
 npm run mobile:typecheck
 ```
 
+Running through **Expo Go** needs nothing else. The Expo Go app on the store
+tracks the latest SDK, so `expo` here must match it — a mismatch is refused
+outright with "Project is incompatible with this version of Expo Go".
+
+## Building an APK — read this first
+
+Two host requirements that are easy to miss, because neither is enforced until
+a build is already several minutes in.
+
+### JDK 17 is required, and JDK 21 will not substitute
+
+`@react-native/gradle-plugin` declares `jvmToolchain(17)`. If no JDK 17 is
+installed, Gradle tries to **auto-download** one through the `foojay-resolver`
+plugin — and the version React Native pins (1.0.0) references
+`JvmVendorSpec.IBM_SEMERU`, a field Gradle 9.3 removed. The build dies with:
+
+```
+Class org.gradle.jvm.toolchain.JvmVendorSpec does not have member field
+'org.gradle.jvm.toolchain.JvmVendorSpec IBM_SEMERU'
+```
+
+That message names neither the JDK nor the toolchain, so it reads like a Gradle
+bug. It isn't — it is "no JDK 17 present". Install one:
+
+```bash
+winget install EclipseAdoptium.Temurin.17.JDK      # Windows
+brew install --cask temurin@17                     # macOS
+```
+
+Do **not** try to fix it by downgrading Gradle. Gradle 8.x ships Kotlin 1.9.25
+and Expo modules require ≥ 2.1.20, so you trade one hard failure for another.
+Expo's pinned Gradle 9.3.1 is correct; the JDK is the missing piece.
+
+Android Studio's bundled JBR (JDK 21) is fine for `JAVA_HOME` — Gradle picks the
+17 toolchain separately once it exists.
+
+### `mobile/android/` is generated and gitignored
+
+`expo prebuild` recreates it from `app.json` and wipes local edits. Never fix a
+build problem by editing `android/` directly — the fix must go in `app.json`,
+a config plugin, or this file. That is why the JDK requirement is documented
+here rather than patched into `gradle.properties`.
+
+```bash
+npx expo prebuild --platform android --clean
+cd android && ./gradlew assembleRelease
+# → android/app/build/outputs/apk/release/app-release.apk
+```
+
+⚠️ **The release APK is signed with the DEBUG keystore** — Expo's template
+default (`signingConfig signingConfigs.debug`). It installs fine by sideloading
+and is what you want for internal testing, but Google Play will reject it, and
+switching to a real keystore later forces every existing installer to uninstall
+first, because Android refuses an upgrade whose signature changed.
+
 ## Layout
 
 ```

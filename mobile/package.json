@@ -9,8 +9,8 @@
   },
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "typecheck": "tsc --noEmit -p tsconfig.typecheck.json",
     "lint": "eslint \"src/**/*.{ts,tsx}\" \"app/**/*.{ts,tsx}\" --max-warnings 0",
     "lint:fix": "npm run lint -- --fix",
@@ -37,6 +37,7 @@
     "expo-secure-store": "~57.0.1",
     "expo-splash-screen": "~57.0.5",
     "expo-status-bar": "~57.0.1",
+    "expo-system-ui": "~57.0.1",
     "expo-web-browser": "~57.0.2",
     "react": "19.2.3",
     "react-native": "0.86.0",
