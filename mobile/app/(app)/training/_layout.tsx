@@ -26,6 +26,13 @@ export default function TrainingLayout() {
       <Stack.Screen name="assignments" options={{ title: 'Assignments' }} />
       <Stack.Screen name="reports" options={{ title: 'Training reports' }} />
       <Stack.Screen name="ai-activity" options={{ title: 'AI activity' }} />
+      <Stack.Screen name="plan" options={{ title: 'Study plan' }} />
+      <Stack.Screen name="create" options={{ title: 'New course' }} />
+      {/* Dynamic detail routes set their own titles via <Stack.Screen> inline. */}
+      <Stack.Screen name="course/[id]" options={{ title: 'Course' }} />
+      <Stack.Screen name="lesson/[id]" options={{ title: 'Lesson' }} />
+      <Stack.Screen name="quiz/[id]" options={{ title: 'Quiz' }} />
+      <Stack.Screen name="edit/[id]" options={{ title: 'Edit course' }} />
     </Stack>
   );
 }

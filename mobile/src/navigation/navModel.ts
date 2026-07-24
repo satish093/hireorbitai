@@ -60,6 +60,13 @@ export const NAV_SECTIONS: NavSection[] = [
         badgeKey: 'tasks',
         flagKey: 'tasks',
       },
+      {
+        to: '/(app)/tasks-assigned',
+        label: 'Assigned to me',
+        icon: '☑',
+        roles: BUSINESS_ROLES,
+        flagKey: 'tasks',
+      },
       { to: '/(app)/calendar', label: 'Calendar', icon: '▦', roles: BUSINESS_ROLES },
       {
         to: '/(app)/messages',
@@ -136,6 +143,13 @@ export const NAV_SECTIONS: NavSection[] = [
         to: '/(app)/training/my',
         label: 'My Training',
         icon: '🎓',
+        roles: BUSINESS_ROLES,
+        flagKey: 'training',
+      },
+      {
+        to: '/(app)/training/plan',
+        label: 'Study plan',
+        icon: '🗺',
         roles: BUSINESS_ROLES,
         flagKey: 'training',
       },
