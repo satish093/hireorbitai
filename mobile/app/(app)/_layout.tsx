@@ -43,6 +43,10 @@ const GROUP_SCREENS = [
   'my-resume',
   'applications',
   'training',
+  // Detail stacks — pushed from a list row, never a tab of their own.
+  'job',
+  'task',
+  'chat',
 ] as const;
 
 export default function AppLayout() {

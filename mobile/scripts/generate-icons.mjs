@@ -69,11 +69,7 @@ async function main() {
   console.log('Generating app icons from assets/source/…');
 
   await render(join(source, 'icon.svg'), join(assets, 'icon.png'), 1024, { flatten: true });
-  await render(
-    join(source, 'adaptive-foreground.svg'),
-    join(assets, 'adaptive-icon.png'),
-    1024,
-  );
+  await render(join(source, 'adaptive-foreground.svg'), join(assets, 'adaptive-icon.png'), 1024);
   await render(join(source, 'adaptive-foreground.svg'), join(assets, 'splash-icon.png'), 512);
   await render(join(source, 'icon.svg'), join(assets, 'favicon.png'), 48, { flatten: true });
 
