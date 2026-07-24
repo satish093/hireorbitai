@@ -1,0 +1,52 @@
+<!--
+  iOS / store app icon source — derived from frontend/public/logo-mark.svg.
+
+  Two deliberate changes from the website mark:
+
+  1. NO ROUNDED CORNERS. The website tile has rx="28" because it renders as a
+     bare square in a browser tab. iOS applies its OWN superellipse mask, so a
+     pre-rounded source gets double-rounded and shows ugly light corners.
+     Ship full-bleed; let the OS mask it.
+
+  2. NO BOTTOM RULE, and the mark is recentred. The website mark's bottom rule
+     sits at y=114/128 — inside the region every platform mask crops away.
+
+  The gradient, orbit ring, planet and AI sparks are the website's, unchanged.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="ho-grad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1e3a8a" />
+      <stop offset="55%" stop-color="#3b82f6" />
+      <stop offset="100%" stop-color="#7c3aed" />
+    </linearGradient>
+  </defs>
+
+  <!-- Full-bleed background. The OS supplies the corner radius. -->
+  <rect width="1024" height="1024" fill="url(#ho-grad)" />
+
+  <!-- Orbit ring -->
+  <ellipse
+    cx="512"
+    cy="512"
+    rx="352"
+    ry="160"
+    transform="rotate(-22 512 512)"
+    fill="none"
+    stroke="#ffffff"
+    stroke-width="28"
+    opacity="0.9"
+  />
+
+  <!-- Planet body -->
+  <circle cx="512" cy="512" r="144" fill="#ffffff" />
+  <circle cx="512" cy="512" r="144" fill="url(#ho-grad)" opacity="0.30" />
+
+  <!-- AI sparks -->
+  <g fill="#ffffff" opacity="0.95">
+    <path d="M768 232 l14.4 36 36 14.4 -36 14.4 -14.4 36 -14.4 -36 -36 -14.4 36 -14.4z" />
+    <circle cx="836" cy="170" r="13" />
+    <circle cx="188" cy="286" r="11" />
+    <circle cx="848" cy="742" r="11" />
+  </g>
+</svg>

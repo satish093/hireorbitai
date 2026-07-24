@@ -1,0 +1,150 @@
+import { useMemo, useState } from 'react';
+import { Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
+import { ListScreen, PageHeader } from '../../src/components/ui/Screen';
+import { Card } from '../../src/components/ui/Card';
+import { Pill } from '../../src/components/ui/Pill';
+import { SearchInput } from '../../src/components/ui/Inputs';
+import { RouteGuard } from '../../src/components/RouteGuard';
+import { useApiList } from '../../src/hooks/useApi';
+import { OPERATOR_TIER, type Job } from '../../src/types';
+import { useTheme } from '../../src/theme';
+import { displayHost } from '../../src/utils/safeUrl';
+
+/**
+ * Job search.
+ *
+ * OPERATOR_TIER only — the /jobs router is gated that way server-side, so a
+ * CONSULTANT never reaches this screen (and the nav model already hides it).
+ *
+ * Ingestion is a strict 4-source policy: LinkedIn, Dice, Monster and
+ * CareerBuilder. Anything else appearing in `source`/`publisher` would mean the
+ * JSEARCH_ALLOWED publisher filter has been bypassed — worth noticing, so the
+ * source is shown on every row rather than hidden.
+ */
+export default function JobsScreen() {
+  return (
+    <RouteGuard allow={[...OPERATOR_TIER]}>
+      <JobsList />
+    </RouteGuard>
+  );
+}
+
+function JobsList() {
+  const router = useRouter();
+  const { colors, spacing, fontSize } = useTheme();
+  const [query, setQuery] = useState('');
+
+  const { items, loading, refreshing, error, onRefresh, refetch } = useApiList<Job>('/jobs', {
+    channel: 'jobs',
+  });
+
+  // Filter locally. The list endpoint supports server-side search, but a phone
+  // keystroke-per-request would burn the rate limit; the visible page is small
+  // enough that client filtering is instant and free.
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return items;
+    return items.filter(
+      (j) =>
+        j.title?.toLowerCase().includes(q) ||
+        j.company_name?.toLowerCase().includes(q) ||
+        j.location?.toLowerCase().includes(q),
+    );
+  }, [items, query]);
+
+  return (
+    <>
+      <PageHeader title="Jobs" subtitle={`${items.length} in your feed`} />
+      <ListScreen
+        items={filtered}
+        loading={loading}
+        refreshing={refreshing}
+        error={error}
+        onRefresh={onRefresh}
+        onRetry={() => void refetch()}
+        keyExtractor={(j) => j.id}
+        header={
+          <SearchInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Search title, company, location"
+          />
+        }
+        emptyTitle={query ? 'No matches' : 'No jobs yet'}
+        emptyDescription={
+          query
+            ? 'Try a different search term.'
+            : 'Jobs appear here once the ingestion job has run.'
+        }
+        renderItem={({ item }) => (
+          <Card onPress={() => router.push(`/(app)/job/${item.id}`)}>
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md }}>
+              <View style={{ flex: 1 }}>
+                <Text
+                  numberOfLines={2}
+                  style={{ fontSize: fontSize.md, fontWeight: '600', color: colors.ink }}
+                >
+                  {item.title}
+                </Text>
+                <Text
+                  numberOfLines={1}
+                  style={{ fontSize: fontSize.sm, color: colors.ink2, marginTop: 2 }}
+                >
+                  {item.company_name ?? 'Company not listed'}
+                </Text>
+                <Text
+                  numberOfLines={1}
+                  style={{ fontSize: fontSize.sm, color: colors.muted, marginTop: 2 }}
+                >
+                  {item.location ?? 'Location not listed'}
+                  {item.is_remote ? ' · Remote' : ''}
+                </Text>
+              </View>
+            </View>
+
+            <View
+              style={{
+                flexDirection: 'row',
+                flexWrap: 'wrap',
+                gap: 6,
+                marginTop: spacing.md,
+                alignItems: 'center',
+              }}
+            >
+              {item.publisher || item.source ? (
+                <Pill label={item.publisher ?? item.source ?? ''} tone="neutral" size="sm" />
+              ) : null}
+              {item.employment_type ? (
+                <Pill label={item.employment_type} tone="info" size="sm" />
+              ) : null}
+              {item.posted_at ? (
+                <Text style={{ fontSize: fontSize.xs, color: colors.faint }}>
+                  {relativeDate(item.posted_at)}
+                </Text>
+              ) : null}
+              {item.apply_url && displayHost(item.apply_url) ? (
+                <Text style={{ fontSize: fontSize.xs, color: colors.faint }}>
+                  · {displayHost(item.apply_url)}
+                </Text>
+              ) : null}
+            </View>
+          </Card>
+        )}
+      />
+    </>
+  );
+}
+
+/** Compact "3d ago" style stamp. Intl handles the pluralisation. */
+export function relativeDate(iso: string): string {
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return '';
+  const diffMs = Date.now() - then;
+  const day = 24 * 60 * 60 * 1000;
+  const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
+  if (diffMs < 60 * 60 * 1000) return rtf.format(-Math.round(diffMs / 60_000), 'minute');
+  if (diffMs < day) return rtf.format(-Math.round(diffMs / (60 * 60 * 1000)), 'hour');
+  if (diffMs < 30 * day) return rtf.format(-Math.round(diffMs / day), 'day');
+  return new Date(iso).toLocaleDateString();
+}

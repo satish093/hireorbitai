@@ -1,0 +1,43 @@
+<!--
+  Android adaptive-icon FOREGROUND layer.
+
+  Android composites a foreground over a background and then masks the result
+  to whatever shape the launcher uses (circle, squircle, teardrop, …). Only the
+  centre ~66% of the canvas is guaranteed visible — the outer third can be
+  cropped by any launcher.
+
+  So: transparent background (app.json supplies the colour), and the whole mark
+  scaled to fit inside the 66% safe zone. That is why this looks smaller than
+  icon.svg; at full size the orbit ring's edges would be sliced off on a circular
+  launcher.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="ho-grad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1e3a8a" />
+      <stop offset="55%" stop-color="#3b82f6" />
+      <stop offset="100%" stop-color="#7c3aed" />
+    </linearGradient>
+  </defs>
+
+  <!-- 0.62 scale about the centre keeps the ring inside the safe zone. -->
+  <g transform="translate(512 512) scale(0.62) translate(-512 -512)">
+    <ellipse
+      cx="512"
+      cy="512"
+      rx="352"
+      ry="160"
+      transform="rotate(-22 512 512)"
+      fill="none"
+      stroke="#ffffff"
+      stroke-width="28"
+      opacity="0.95"
+    />
+    <circle cx="512" cy="512" r="144" fill="#ffffff" />
+    <circle cx="512" cy="512" r="144" fill="url(#ho-grad)" opacity="0.30" />
+    <g fill="#ffffff" opacity="0.95">
+      <path d="M768 232 l14.4 36 36 14.4 -36 14.4 -14.4 36 -14.4 -36 -36 -14.4 36 -14.4z" />
+      <circle cx="836" cy="170" r="13" />
+    </g>
+  </g>
+</svg>
