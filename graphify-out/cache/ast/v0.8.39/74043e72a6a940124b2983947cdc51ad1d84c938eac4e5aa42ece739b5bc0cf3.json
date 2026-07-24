@@ -1,0 +1,13 @@
+{
+  "nodes": [
+    {
+      "id": "e_claude_hireorbitai_scripts_zap_baseline_ps1",
+      "label": "zap-baseline.ps1",
+      "file_type": "code",
+      "source_file": "scripts/zap-baseline.ps1",
+      "source_location": "L1"
+    }
+  ],
+  "edges": [],
+  "raw_calls": []
+}

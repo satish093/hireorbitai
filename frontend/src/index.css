@@ -1,0 +1,449 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Theme tokens live in src/styles/tokens.css (new "calm enterprise" system +
+ * legacy aliases). They flip on the [data-theme="dark"] attribute. */
+
+html,
+body,
+#root {
+  height: 100%;
+}
+body {
+  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  background-color: var(--background);
+  color: var(--foreground);
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  -webkit-font-smoothing: antialiased;
+  /* Prevent horizontal scroll caused by stray full-bleed elements on phones. */
+  overflow-x: hidden;
+  /* Stop the iOS rubber-band overscroll from revealing the body background. */
+  overscroll-behavior-y: none;
+  /* Kill the blue tap highlight on iOS Safari — we render our own press state. */
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* iOS Safari auto-zooms when an input's font-size is below 16px. Force the
+   base size on form fields below the sm breakpoint so taps don't trigger
+   that zoom-in jolt. Desktop styles take over above 640px. */
+@media (max-width: 640px) {
+  input:not([type='checkbox']):not([type='radio']),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+/* Smooth hover/focus micro-transitions on bare HTML elements that are not
+   wrapped in a component with its own transition classes. Components using
+   Tailwind `transition-*` classes will override these naturally. */
+@layer base {
+  /* All anchor tags get a colour-fade so every link feels responsive. */
+  a {
+    transition:
+      color 150ms ease,
+      opacity 150ms ease;
+  }
+  /* Buttons that are NOT disabled get a subtle lift + shadow on hover.
+     The :not([class*="translate"]) guard avoids fighting components that
+     already define their own transform (Button.tsx, NavLink, etc.). */
+  button:not(:disabled):not([class*='translate']):not([class*='scale']):hover {
+    transform: translateY(-1px);
+    transition:
+      transform 150ms cubic-bezier(0.22, 1, 0.36, 1),
+      box-shadow 150ms ease;
+  }
+  button:not(:disabled):active {
+    transform: translateY(0px) scale(0.98);
+    transition: transform 80ms ease;
+  }
+}
+
+/* Safe-area helpers so content tucks under the iPhone notch / Android
+   gesture bar correctly when viewport-fit=cover is set in index.html.
+   Components opt in by adding these classes. */
+@layer utilities {
+  .safe-pt {
+    padding-top: env(safe-area-inset-top);
+  }
+  .safe-pb {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .safe-pl {
+    padding-left: env(safe-area-inset-left);
+  }
+  .safe-pr {
+    padding-right: env(safe-area-inset-right);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Motion utilities
+ *
+ * Two helpers added on top of Tailwind's `animate-*` classes:
+ *
+ *   .stagger-children > *  — each direct child fades-in-up with a 40ms
+ *                            cascade. Apply on a list/grid container.
+ *   .skeleton              — animated shimmer for placeholder blocks.
+ *
+ * `prefers-reduced-motion` neutralizes all custom + Tailwind animations and
+ * transitions globally so users on macOS/iOS reduced-motion get no movement.
+ * ------------------------------------------------------------------------- */
+@layer utilities {
+  .stagger-children > * {
+    animation: fade-in-up 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .stagger-children > *:nth-child(1) {
+    animation-delay: 0ms;
+  }
+  .stagger-children > *:nth-child(2) {
+    animation-delay: 40ms;
+  }
+  .stagger-children > *:nth-child(3) {
+    animation-delay: 80ms;
+  }
+  .stagger-children > *:nth-child(4) {
+    animation-delay: 120ms;
+  }
+  .stagger-children > *:nth-child(5) {
+    animation-delay: 160ms;
+  }
+  .stagger-children > *:nth-child(6) {
+    animation-delay: 200ms;
+  }
+  .stagger-children > *:nth-child(7) {
+    animation-delay: 240ms;
+  }
+  .stagger-children > *:nth-child(8) {
+    animation-delay: 280ms;
+  }
+  .stagger-children > *:nth-child(9) {
+    animation-delay: 320ms;
+  }
+  .stagger-children > *:nth-child(10) {
+    animation-delay: 360ms;
+  }
+  .stagger-children > *:nth-child(11) {
+    animation-delay: 400ms;
+  }
+  .stagger-children > *:nth-child(12) {
+    animation-delay: 440ms;
+  }
+
+  /* Auto-stagger page sections on every route change.
+     Each page renders a single top-level div inside <main>, making its
+     sections grandchildren of <main>. Targeting main > * > * staggers them
+     automatically — no per-page changes needed.
+     The stagger is tight (50ms steps) so it feels fast, not theatrical. */
+  @media (prefers-reduced-motion: no-preference) {
+    main > * > *:nth-child(1) {
+      animation: fade-in-up 200ms cubic-bezier(0.22, 1, 0.36, 1) both;
+      animation-delay: 0ms;
+    }
+    main > * > *:nth-child(2) {
+      animation: fade-in-up 200ms cubic-bezier(0.22, 1, 0.36, 1) both;
+      animation-delay: 50ms;
+    }
+    main > * > *:nth-child(3) {
+      animation: fade-in-up 200ms cubic-bezier(0.22, 1, 0.36, 1) both;
+      animation-delay: 100ms;
+    }
+    main > * > *:nth-child(4) {
+      animation: fade-in-up 200ms cubic-bezier(0.22, 1, 0.36, 1) both;
+      animation-delay: 150ms;
+    }
+    main > * > *:nth-child(5) {
+      animation: fade-in-up 200ms cubic-bezier(0.22, 1, 0.36, 1) both;
+      animation-delay: 180ms;
+    }
+    main > * > *:nth-child(n + 6) {
+      animation: fade-in-up 200ms cubic-bezier(0.22, 1, 0.36, 1) both;
+      animation-delay: 200ms;
+    }
+  }
+
+  .skeleton {
+    position: relative;
+    overflow: hidden;
+    background-color: var(--bg-sunken);
+    border-radius: 0.5rem;
+  }
+  .skeleton::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background-image: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0) 0%,
+      rgba(255, 255, 255, 0.6) 50%,
+      rgba(255, 255, 255, 0) 100%
+    );
+    animation: shimmer 1.4s linear infinite;
+  }
+  /* The white shimmer reads as a harsh flash on the dark muted base — dim it. */
+  [data-theme='dark'] .skeleton::after {
+    background-image: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0) 0%,
+      rgba(255, 255, 255, 0.06) 50%,
+      rgba(255, 255, 255, 0) 100%
+    );
+  }
+
+  /* Standard interactive feedback for links / cards. Apply with
+     `class="hover-lift"` on anchors and clickable cards. */
+  .hover-lift {
+    transition:
+      transform 200ms cubic-bezier(0.22, 1, 0.36, 1),
+      box-shadow 200ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .hover-lift:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px -6px rgba(15, 23, 42, 0.18);
+  }
+  .hover-lift:active {
+    transform: translateY(0);
+  }
+
+  /* Job detail pane body: 2-column layout keyed off the PANE's own width
+     (container query), not the viewport — the pane is much narrower than the
+     viewport (sidebar + 440px list column eat the space), so a viewport
+     breakpoint engages two columns too early and squeezes the right-hand
+     cards. Stack until the pane itself is wide enough. */
+  .jobpane-body {
+    container-type: inline-size;
+  }
+  .jobpane-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.25rem;
+  }
+  @container (min-width: 52rem) {
+    .jobpane-grid {
+      grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+    }
+  }
+
+  /* Buttons get a tiny press feedback when active. */
+  .press {
+    transition: transform 120ms ease;
+  }
+  .press:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+
+  /* ── Deep grid/list stagger ─────────────────────────────────────────────
+   * Animates individual cards and list items within page sections.
+   * Delays start at 160ms so items appear after their parent section has
+   * already faded in (the section stagger peaks around 100–200ms).
+   * Only fires on mount/route-change because <main key={pathname}> forces a
+   * remount — subsequent in-page re-renders don't re-trigger this.
+   * ---------------------------------------------------------------------- */
+  @media (prefers-reduced-motion: no-preference) {
+    main .grid > * {
+      animation: fade-in-up 160ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+    main .grid > *:nth-child(1) {
+      animation-delay: 160ms;
+    }
+    main .grid > *:nth-child(2) {
+      animation-delay: 200ms;
+    }
+    main .grid > *:nth-child(3) {
+      animation-delay: 240ms;
+    }
+    main .grid > *:nth-child(4) {
+      animation-delay: 280ms;
+    }
+    main .grid > *:nth-child(5) {
+      animation-delay: 310ms;
+    }
+    main .grid > *:nth-child(6) {
+      animation-delay: 330ms;
+    }
+    main .grid > *:nth-child(n + 7) {
+      animation-delay: 350ms;
+    }
+
+    /* Ordered/unordered list items and role=list children */
+    main ul > li,
+    main ol > li,
+    main [role='list'] > * {
+      animation: fade-in-up 160ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+    main ul > li:nth-child(1),
+    main ol > li:nth-child(1),
+    main [role='list'] > *:nth-child(1) {
+      animation-delay: 160ms;
+    }
+    main ul > li:nth-child(2),
+    main ol > li:nth-child(2),
+    main [role='list'] > *:nth-child(2) {
+      animation-delay: 200ms;
+    }
+    main ul > li:nth-child(3),
+    main ol > li:nth-child(3),
+    main [role='list'] > *:nth-child(3) {
+      animation-delay: 240ms;
+    }
+    main ul > li:nth-child(4),
+    main ol > li:nth-child(4),
+    main [role='list'] > *:nth-child(4) {
+      animation-delay: 280ms;
+    }
+    main ul > li:nth-child(n + 5),
+    main ol > li:nth-child(n + 5),
+    main [role='list'] > *:nth-child(n + 5) {
+      animation-delay: 310ms;
+    }
+  }
+}
+
+/* Scrollbar polish — invisible until hovered. Webkit only. */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(15, 23, 42, 0.12);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(15, 23, 42, 0.25);
+  background-clip: content-box;
+  border: 2px solid transparent;
+}
+/* On dark, the near-black thumb is invisible against the dark track — flip it
+   to a light translucent fill. */
+[data-theme='dark'] ::-webkit-scrollbar-thumb {
+  background: rgba(231, 233, 234, 0.18);
+  background-clip: content-box;
+}
+[data-theme='dark'] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(231, 233, 234, 0.32);
+  background-clip: content-box;
+}
+
+/* Job-description prose. Sanitized JD HTML (see jdToSafeHtml in JobSearch.tsx)
+   renders inside `.jd-prose` — give it real reading rhythm: paragraph spacing,
+   bullet/number lists, and emphasized headings, so a posting reads like a
+   document instead of a flat wall of text. */
+.jd-prose {
+  line-height: 1.6;
+  /* Break long unbroken strings (URLs, run-on tokens) so the description can
+     never push the panel past the screen edge. */
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.jd-prose > *:first-child {
+  margin-top: 0;
+}
+.jd-prose p {
+  margin: 0 0 0.7rem;
+}
+.jd-prose ul,
+.jd-prose ol {
+  margin: 0 0 0.7rem;
+  padding-left: 1.25rem;
+}
+.jd-prose ul {
+  list-style: disc;
+}
+.jd-prose ol {
+  list-style: decimal;
+}
+.jd-prose li {
+  margin: 0.15rem 0;
+}
+.jd-prose h1,
+.jd-prose h2,
+.jd-prose h3,
+.jd-prose h4,
+.jd-prose h5,
+.jd-prose h6 {
+  font-weight: 600;
+  color: var(--foreground);
+  font-size: 0.95rem;
+  margin: 1rem 0 0.35rem;
+}
+.jd-prose strong,
+.jd-prose b {
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+/* Override browser's native dark-mode select rendering (color-scheme:dark gives
+   selects a #6b6b6b background that fails contrast with our light text tokens). */
+[data-theme='dark'] select {
+  background-color: var(--surface-2);
+  color: var(--ink);
+  border-color: var(--border);
+}
+
+/* Respect OS-level reduced-motion preference: kill all animation + transitions. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * View Transitions API — smooth crossfade between pages
+ *
+ * Requires Chrome 111+, Safari 18+, Firefox 126+. Older browsers fall back
+ * to the standard animate-page-enter (enter only). The ViewTransition component
+ * in src/components/ViewTransition.tsx wires this up by calling
+ * document.startViewTransition() before every internal navigation.
+ *
+ * view-transition-name: page on <main> scopes the animation to the content
+ * area so the sidebar and header stay perfectly stable during transitions.
+ * page-enter keyframe is generated by Tailwind (used by animate-page-enter).
+ * page-exit is defined here because it's only used in VT pseudo-elements and
+ * Tailwind JIT won't generate it unless animate-page-exit is in the markup.
+ * ------------------------------------------------------------------------- */
+@keyframes page-exit {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+/* Assign the OUTER Layout <main> a stable name so VT scopes to content, not
+ * the whole screen. Scoped to .animate-page-enter (which only the Layout
+ * main carries) — pages that render their own nested <main> (e.g. the
+ * Messages chat pane) would otherwise duplicate the name and crash with
+ * "Unexpected duplicate view-transition-name: page". */
+main.animate-page-enter {
+  view-transition-name: page;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  ::view-transition-old(page) {
+    animation: page-exit 100ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  ::view-transition-new(page) {
+    animation: page-enter 140ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(page),
+  ::view-transition-new(page) {
+    animation: none;
+  }
+}

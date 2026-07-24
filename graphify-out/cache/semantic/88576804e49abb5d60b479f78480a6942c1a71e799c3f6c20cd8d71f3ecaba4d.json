@@ -1,0 +1,90 @@
+{
+  "nodes": [
+    {
+      "id": "env_vars_reference",
+      "label": "Environment variables reference",
+      "file_type": "document",
+      "source_file": "docs/env-vars.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "env_vars_zod_validation",
+      "label": "Zod env validation at startup (env.ts)",
+      "file_type": "concept",
+      "source_file": "docs/env-vars.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "env_vars_strict_4_source_policy",
+      "label": "Job sources budget / strict-4-source note",
+      "file_type": "rationale",
+      "source_file": "docs/env-vars.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "env_vars_reference",
+      "target": "env_vars_zod_validation",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/env-vars.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "env_vars_reference",
+      "target": "env_vars_strict_4_source_policy",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/env-vars.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "env_vars_reference",
+      "target": "deployment_02_databases_db_guard",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/env-vars.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "env_vars_reference",
+      "target": "api_conventions_rate_limiting",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "docs/env-vars.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "env_vars_zod_validation",
+      "target": "architecture_request_layers",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.75,
+      "source_file": "docs/env-vars.md",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": []
+}

@@ -1,0 +1,64 @@
+{
+  "nodes": [
+    {
+      "id": "workflows_release_workflow",
+      "label": "Release Workflow",
+      "file_type": "document",
+      "source_file": ".github/workflows/release.yml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "workflows_release_changelog_extraction",
+      "label": "Changelog Section Extraction for Release Body",
+      "file_type": "concept",
+      "source_file": ".github/workflows/release.yml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "workflows_release_workflow",
+      "target": "workflows_release_changelog_extraction",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": ".github/workflows/release.yml",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "workflows_release_changelog_extraction",
+      "target": "changelog_changelog",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": ".github/workflows/release.yml",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "release_rollback_lifecycle",
+      "label": "Release & Rollback Lifecycle",
+      "nodes": [
+        "workflows_release_workflow",
+        "changelog_changelog",
+        "workflows_rollback_workflow",
+        "workflows_rollback_approval_gate"
+      ],
+      "relation": "participate_in",
+      "confidence": "EXTRACTED",
+      "confidence_score": 0.95,
+      "source_file": ".github/workflows/release.yml"
+    }
+  ]
+}

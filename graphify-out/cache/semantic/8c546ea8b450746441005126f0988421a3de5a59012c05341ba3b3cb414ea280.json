@@ -1,0 +1,127 @@
+{
+  "nodes": [
+    {
+      "id": "deployment_04_github_actions",
+      "label": "GitHub Actions secrets & variables",
+      "file_type": "document",
+      "source_file": "docs/deployment/04-github-actions.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "deployment_04_github_actions_ci_yml",
+      "label": "ci.yml workflow",
+      "file_type": "concept",
+      "source_file": "docs/deployment/04-github-actions.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "deployment_04_github_actions_dev_yml",
+      "label": "dev.yml workflow (push-to-dev)",
+      "file_type": "concept",
+      "source_file": "docs/deployment/04-github-actions.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "deployment_04_github_actions_deploy_production_yml",
+      "label": "deploy-production.yml workflow",
+      "file_type": "concept",
+      "source_file": "docs/deployment/04-github-actions.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "deployment_04_github_actions",
+      "target": "deployment_04_github_actions_ci_yml",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/04-github-actions.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "deployment_04_github_actions",
+      "target": "deployment_04_github_actions_dev_yml",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/04-github-actions.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "deployment_04_github_actions",
+      "target": "deployment_04_github_actions_deploy_production_yml",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/04-github-actions.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "deployment_04_github_actions_dev_yml",
+      "target": "deployment_02_databases_neon_dev",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/04-github-actions.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "deployment_04_github_actions_dev_yml",
+      "target": "deployment_03_render_dev_hosting",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/04-github-actions.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "deployment_04_github_actions_deploy_production_yml",
+      "target": "deployment_05_deploy_and_rollback_update_sh",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/04-github-actions.md",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "ci_cd_pipeline_workflows",
+      "label": "CI/CD pipeline: branches, workflows, deploy script",
+      "nodes": [
+        "branching_two_branch_model",
+        "deployment_04_github_actions_dev_yml",
+        "deployment_04_github_actions_deploy_production_yml",
+        "deployment_05_deploy_and_rollback_update_sh",
+        "deployment_auto_deploy_push_to_deploy"
+      ],
+      "relation": "participate_in",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/04-github-actions.md"
+    }
+  ]
+}

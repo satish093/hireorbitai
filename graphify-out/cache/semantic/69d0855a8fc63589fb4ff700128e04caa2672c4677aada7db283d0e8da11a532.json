@@ -1,0 +1,165 @@
+{
+  "nodes": [
+    {
+      "id": "rules_security",
+      "label": "Security rules",
+      "file_type": "document",
+      "source_file": ".claude/rules/security.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "rules_security_two_layered_authorization",
+      "label": "Two-layered authorization",
+      "file_type": "rationale",
+      "source_file": ".claude/rules/security.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "rules_security_mass_assignment_guard",
+      "label": "Mass-assignment Zod strict guard",
+      "file_type": "rationale",
+      "source_file": ".claude/rules/security.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "rules_security_admin_lifecycle",
+      "label": "Admin lifecycle guard checks",
+      "file_type": "rationale",
+      "source_file": ".claude/rules/security.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "rules_security_email_lookup",
+      "label": "Email lookup via eq lowercase not ilike",
+      "file_type": "rationale",
+      "source_file": ".claude/rules/security.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "rules_security_or_string_escaping",
+      "label": "PostgREST .or() input escaping",
+      "file_type": "rationale",
+      "source_file": ".claude/rules/security.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "rules_security_existence_oracle_404",
+      "label": "404-not-403 existence oracle defense",
+      "file_type": "rationale",
+      "source_file": ".claude/rules/security.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "rules_security_loadandauthorize",
+      "label": "loadAndAuthorize canonical pattern",
+      "file_type": "concept",
+      "source_file": ".claude/rules/security.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "rules_security_admin_users_controller",
+      "label": "adminUsers.controller.ts canonical admin guards",
+      "file_type": "code",
+      "source_file": ".claude/rules/security.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "rules_security_admin_lifecycle",
+      "target": "rules_security_admin_users_controller",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": ".claude/rules/security.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "rules_security_two_layered_authorization",
+      "target": "rules_security_loadandauthorize",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": ".claude/rules/security.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "rules_security_two_layered_authorization",
+      "target": "rules_security_existence_oracle_404",
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": ".claude/rules/security.md",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "security_audit_toolchain",
+      "label": "Security/IDOR audit toolchain",
+      "nodes": [
+        "agents_controller_auditor",
+        "commands_audit_controllers",
+        "skills_idor_audit",
+        "rules_security"
+      ],
+      "relation": "participate_in",
+      "confidence": "EXTRACTED",
+      "confidence_score": 0.9,
+      "source_file": ".claude/rules/security.md"
+    },
+    {
+      "id": "mass_assignment_defense_pattern",
+      "label": "Mass-assignment / ownership defense pattern",
+      "nodes": [
+        "rules_security_mass_assignment_guard",
+        "rules_security_loadandauthorize",
+        "rules_security_existence_oracle_404",
+        "rules_security_two_layered_authorization"
+      ],
+      "relation": "form",
+      "confidence": "EXTRACTED",
+      "confidence_score": 0.9,
+      "source_file": ".claude/rules/security.md"
+    }
+  ]
+}

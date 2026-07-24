@@ -1,0 +1,163 @@
+{
+  "nodes": [
+    {
+      "id": "render_blueprint",
+      "label": "Render Blueprint (free dev hosting)",
+      "file_type": "concept",
+      "source_file": "render.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "render_api_dev_service",
+      "label": "hireorbit-api-dev (Render backend service)",
+      "file_type": "concept",
+      "source_file": "render.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "render_web_dev_service",
+      "label": "hireorbit-web-dev (Render static frontend)",
+      "file_type": "concept",
+      "source_file": "render.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "render_db_bootstrap",
+      "label": "scripts/db-bootstrap.mjs (init.sql + migrate + seed)",
+      "file_type": "concept",
+      "source_file": "render.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "render_dev_db_guard",
+      "label": "Cross-env DB Guard (NODE_ENV=development)",
+      "file_type": "rationale",
+      "source_file": "render.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "render_dev_tools_force_disable",
+      "label": "DEV_TOOLS Force-disabled in Production",
+      "file_type": "rationale",
+      "source_file": "render.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "render_blueprint",
+      "target": "render_api_dev_service",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "render.yaml",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "render_blueprint",
+      "target": "render_web_dev_service",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "render.yaml",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "render_api_dev_service",
+      "target": "render_db_bootstrap",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "render.yaml",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "render_api_dev_service",
+      "target": "render_dev_db_guard",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "render.yaml",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "render_api_dev_service",
+      "target": "render_dev_tools_force_disable",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "render.yaml",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "render_api_dev_service",
+      "target": "docs_test_plan_b_mock_mode",
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "render.yaml",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "render_api_dev_service",
+      "target": "shared_readme_shared_build",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "render.yaml",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "render_web_dev_service",
+      "target": "shared_readme_shared_build",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "render.yaml",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "render_web_dev_service",
+      "target": "frontend_index_html",
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "render.yaml",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": []
+}

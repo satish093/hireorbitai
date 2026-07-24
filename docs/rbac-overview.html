@@ -1,0 +1,952 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>HireOrbit AI — Roles, Groups & Permissions</title>
+    <style>
+      :root {
+        --ink: #0f172a;
+        --muted: #64748b;
+        --line: #e2e8f0;
+        --bg: #f8fafc;
+        --card: #ffffff;
+        --brand: #4f46e5;
+        --brand-soft: #eef2ff;
+        --good: #059669;
+        --bad: #dc2626;
+        --good-soft: #ecfdf5;
+        --bad-soft: #fef2f2;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family:
+          'Inter',
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          sans-serif;
+        font-size: 15px;
+        line-height: 1.55;
+      }
+      .wrap {
+        max-width: 1080px;
+        margin: 0 auto;
+        padding: 32px 24px 80px;
+      }
+      header.hero {
+        background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+        color: #fff;
+        border-radius: 16px;
+        padding: 32px;
+        margin-bottom: 28px;
+      }
+      header.hero h1 {
+        margin: 0 0 6px;
+        font-size: 28px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+      }
+      header.hero p {
+        margin: 0;
+        opacity: 0.92;
+        font-size: 15px;
+      }
+      h2 {
+        font-size: 19px;
+        font-weight: 700;
+        margin: 36px 0 14px;
+        letter-spacing: -0.005em;
+      }
+      h3 {
+        font-size: 15px;
+        font-weight: 600;
+        margin: 0 0 8px;
+        color: var(--ink);
+      }
+      .lede {
+        color: var(--muted);
+        margin: 0 0 18px;
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 18px 20px;
+        margin-bottom: 12px;
+      }
+      .grid {
+        display: grid;
+        gap: 12px;
+      }
+      .grid.two {
+        grid-template-columns: 1fr 1fr;
+      }
+      .grid.three {
+        grid-template-columns: repeat(3, 1fr);
+      }
+      @media (max-width: 760px) {
+        .grid.two,
+        .grid.three {
+          grid-template-columns: 1fr;
+        }
+      }
+      .pill {
+        display: inline-block;
+        font-size: 11px;
+        font-weight: 600;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: var(--brand-soft);
+        color: var(--brand);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      .pill.good {
+        background: var(--good-soft);
+        color: var(--good);
+      }
+      .pill.bad {
+        background: var(--bad-soft);
+        color: var(--bad);
+      }
+      .pill.gray {
+        background: #f1f5f9;
+        color: var(--muted);
+      }
+      ul.tight {
+        margin: 6px 0 0;
+        padding-left: 18px;
+      }
+      ul.tight li {
+        margin-bottom: 4px;
+      }
+      ul.tight li.no {
+        color: var(--bad);
+      }
+      ul.tight li.yes {
+        color: var(--ink);
+      }
+      .check {
+        color: var(--good);
+        font-weight: 700;
+      }
+      .x {
+        color: var(--bad);
+        font-weight: 700;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        overflow: hidden;
+        margin: 4px 0 12px;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 9px 12px;
+        font-size: 14px;
+        border-bottom: 1px solid var(--line);
+      }
+      th {
+        background: #f8fafc;
+        font-weight: 600;
+        color: var(--muted);
+        text-transform: uppercase;
+        font-size: 11px;
+        letter-spacing: 0.05em;
+      }
+      tr:last-child td {
+        border-bottom: none;
+      }
+      td.center,
+      th.center {
+        text-align: center;
+      }
+      td.y {
+        color: var(--good);
+        font-weight: 600;
+      }
+      td.n {
+        color: var(--bad);
+        font-weight: 600;
+      }
+      td.partial {
+        color: #b45309;
+        font-weight: 600;
+      }
+      .note {
+        background: #fffbeb;
+        border-left: 3px solid #f59e0b;
+        padding: 10px 14px;
+        border-radius: 0 8px 8px 0;
+        margin: 10px 0;
+        font-size: 14px;
+        color: #78350f;
+      }
+      .legend {
+        display: flex;
+        gap: 18px;
+        font-size: 12px;
+        color: var(--muted);
+        margin-bottom: 14px;
+      }
+      .role-stack {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        overflow: hidden;
+      }
+      .role-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 14px;
+        border-bottom: 1px solid var(--line);
+        font-size: 14px;
+      }
+      .role-row:last-child {
+        border-bottom: none;
+      }
+      .role-row .name {
+        width: 140px;
+        font-weight: 600;
+      }
+      .role-row .scope {
+        color: var(--muted);
+        font-size: 13px;
+        flex: 1;
+      }
+      .seniority-bar {
+        height: 6px;
+        border-radius: 4px;
+        background: var(--brand);
+        opacity: 0.8;
+      }
+      .group-box {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 14px 16px;
+      }
+      .group-box .title {
+        font-weight: 600;
+        margin-bottom: 6px;
+      }
+      .group-box .desc {
+        font-size: 13px;
+        color: var(--muted);
+        line-height: 1.45;
+      }
+      footer {
+        margin-top: 50px;
+        text-align: center;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      code {
+        background: #f1f5f9;
+        padding: 1px 6px;
+        border-radius: 4px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 13px;
+      }
+      .toc {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 18px;
+      }
+      .toc a {
+        font-size: 12px;
+        color: var(--brand);
+        background: var(--brand-soft);
+        padding: 4px 10px;
+        border-radius: 999px;
+        text-decoration: none;
+      }
+      .toc a:hover {
+        background: #ddd6fe;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="hero">
+        <h1>HireOrbit AI — Roles, Groups & Permissions</h1>
+        <p>Who can see what, who can do what, and who can chat with whom.</p>
+      </header>
+
+      <nav class="toc">
+        <a href="#tldr">TL;DR</a>
+        <a href="#roles">Roles</a>
+        <a href="#groups">Groups (Pods)</a>
+        <a href="#what">What each role can do</a>
+        <a href="#chat">Chat policy</a>
+        <a href="#rules">Important rules</a>
+        <a href="#exceptions">Workspace-wide exceptions</a>
+      </nav>
+
+      <!-- ───────────────────────────── TL;DR ───────────────────────────── -->
+      <h2 id="tldr">The 30-second version</h2>
+      <div class="card">
+        <ul class="tight">
+          <li>
+            <strong>Super Admin</strong> can do everything. <strong>CEO / CTO / Director</strong>
+            see the whole company.
+          </li>
+          <li>
+            Every <strong>HR Manager, Manager, Recruiter and Consultant</strong> belongs to a
+            <strong>group</strong> (a pod / team).
+          </li>
+          <li>
+            <strong>Group leads</strong> (HR Manager & Manager) only see/manage people in their own
+            group.
+          </li>
+          <li>
+            <strong>Recruiters</strong> work on their own assigned consultants. They can invite
+            Consultants, and only Consultants.
+          </li>
+          <li>
+            <strong>Consultants</strong> are self-service only — they see their own training,
+            interviews, tasks, dashboard, and resume; they chat with their assigned recruiter + that
+            recruiter's manager chain. They do <strong>not</strong> see the Jobs page or the
+            Applications page (those are operator-side pipeline tools).
+          </li>
+          <li>
+            <strong>Developer</strong> is a scoped admin role with no default access. Each developer
+            gets explicit "capabilities" turned on by a Super Admin.
+          </li>
+        </ul>
+      </div>
+
+      <!-- ───────────────────────────── ROLES ───────────────────────────── -->
+      <h2 id="roles">Roles, top to bottom</h2>
+      <p class="lede">
+        Higher up = more power. Everyone above can do everything the role below them can do.
+      </p>
+      <div class="role-stack">
+        <div class="role-row">
+          <span class="name">Super Admin</span>
+          <span class="pill">absolute</span>
+          <span class="scope"
+            >Can do anything. Only role that can impersonate users, mint other Super Admins, and
+            grant Developer capabilities.</span
+          >
+        </div>
+        <div class="role-row">
+          <span class="name">CEO</span>
+          <span class="pill">owner</span>
+          <span class="scope"
+            >Owner-tier. Can toggle feature flags. Cannot create Super Admins or Developers.</span
+          >
+        </div>
+        <div class="role-row">
+          <span class="name">CTO</span>
+          <span class="pill">admin</span>
+          <span class="scope">Admin-tier, sees every group and every user.</span>
+        </div>
+        <div class="role-row">
+          <span class="name">Director</span>
+          <span class="pill">admin</span>
+          <span class="scope">Admin-tier, sees every group and every user.</span>
+        </div>
+        <div class="role-row">
+          <span class="name">HR Manager</span>
+          <span class="pill">group lead</span>
+          <span class="scope"
+            >Leads one group. Sees the people in that group only. Can invite Managers, Recruiters
+            and Consultants into the group.</span
+          >
+        </div>
+        <div class="role-row">
+          <span class="name">Manager</span>
+          <span class="pill">group lead</span>
+          <span class="scope"
+            >Leads one group. Same scope as HR Manager — they're functionally one tier.</span
+          >
+        </div>
+        <div class="role-row">
+          <span class="name">Developer</span>
+          <span class="pill gray">capability-only</span>
+          <span class="scope"
+            >No default business access. Super Admin grants specific capabilities (Users, Reports,
+            Feature Flags, etc.). One exception: every user can DM a developer for bug/error
+            reporting, and the developer can reply (chat only — no jobs, tasks, training,
+            etc.).</span
+          >
+        </div>
+        <div class="role-row">
+          <span class="name">Recruiter</span>
+          <span class="pill">operator</span>
+          <span class="scope"
+            >Works the pipeline for their own assigned consultants. Can invite Consultants
+            only.</span
+          >
+        </div>
+        <div class="role-row">
+          <span class="name">Consultant</span>
+          <span class="pill gray">self-service</span>
+          <span class="scope"
+            >Sees their own jobs, applications, interviews, messages, training, and uploads their
+            own resume.</span
+          >
+        </div>
+      </div>
+
+      <!-- ───────────────────────── GROUPS / PODS ───────────────────────── -->
+      <h2 id="groups">Groups — the team boundary</h2>
+      <p class="lede">
+        A "group" is a pod / mini-team. It's how we keep different recruiting benches from seeing
+        each other.
+      </p>
+      <div class="grid two">
+        <div class="group-box">
+          <div class="title">Who is in a group?</div>
+          <div class="desc">
+            HR Manager(s), Manager(s), Recruiters and Consultants all belong to one group.
+            Admin-tier (Super Admin, CEO, CTO, Director) is global — they aren't tied to any single
+            group.
+          </div>
+        </div>
+        <div class="group-box">
+          <div class="title">Why groups matter</div>
+          <div class="desc">
+            A group lead in <code>Cloudfen</code> doesn't see <code>Xeronix</code>'s consultants,
+            recruiters or pipeline. Each pod operates in its own lane. Admin-tier sees every pod for
+            org-wide oversight.
+          </div>
+        </div>
+        <div class="group-box">
+          <div class="title">The invariant we enforce</div>
+          <div class="desc">
+            When a consultant is assigned to a recruiter, they automatically join that recruiter's
+            group. Move a consultant to a different recruiter (admin only) and the system moves them
+            to the new recruiter's group as well. Direct group moves are guarded too: a recruiter
+            and every assigned consultant must stay in the same group, or the API rejects the move.
+          </div>
+        </div>
+        <div class="group-box">
+          <div class="title">No group = no access</div>
+          <div class="desc">
+            A group lead with no group_id is fail-closed: they see no recruiters or consultants
+            until a Super Admin places them in a group. (Org-wide peer chat with other managers
+            still works.)
+          </div>
+        </div>
+      </div>
+
+      <!-- ───────────────────────── WHAT EACH ROLE CAN DO ───────────────────────── -->
+      <h2 id="what">What each role can do</h2>
+      <p class="lede">
+        A short list of "yes/no" for the surfaces that matter most. <span class="check">✓</span> =
+        can use, <span class="x">✗</span> = blocked.
+      </p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Surface</th>
+            <th class="center">Super Admin</th>
+            <th class="center">CEO / CTO / Director</th>
+            <th class="center">HR Manager / Manager</th>
+            <th class="center">Recruiter</th>
+            <th class="center">Consultant</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Dashboard</td>
+            <td class="center y">✓</td>
+            <td class="center y">✓</td>
+            <td class="center y">✓</td>
+            <td class="center y">✓</td>
+            <td class="center y">✓</td>
+          </tr>
+          <tr>
+            <td>Tasks, Calendar, Inbox, Reminders</td>
+            <td class="center y">✓</td>
+            <td class="center y">✓</td>
+            <td class="center y">✓</td>
+            <td class="center y">✓</td>
+            <td class="center y">✓</td>
+          </tr>
+          <tr>
+            <td>Consultants page</td>
+            <td class="center y">all</td>
+            <td class="center y">all</td>
+            <td class="center partial">own group</td>
+            <td class="center partial">assigned only</td>
+            <td class="center n">✗</td>
+          </tr>
+          <tr>
+            <td>Recruiters page</td>
+            <td class="center y">all</td>
+            <td class="center y">all</td>
+            <td class="center partial">own group</td>
+            <td class="center n">✗</td>
+            <td class="center n">✗</td>
+          </tr>
+          <tr>
+            <td>Managers page</td>
+            <td class="center y">all</td>
+            <td class="center y">all</td>
+            <td class="center partial">own group</td>
+            <td class="center n">✗</td>
+            <td class="center n">✗</td>
+          </tr>
+          <tr>
+            <td>Jobs</td>
+            <td class="center y">✓</td>
+            <td class="center y">✓</td>
+            <td class="center y">✓</td>
+            <td class="center y">✓</td>
+            <td class="center n">✗</td>
+          </tr>
+          <tr>
+            <td>Applications</td>
+            <td class="center y">all</td>
+            <td class="center y">all</td>
+            <td class="center partial">own group</td>
+            <td class="center partial">own consultants</td>
+            <td class="center n">✗</td>
+          </tr>
+          <tr>
+            <td>Resumes (operator view)</td>
+            <td class="center y">all</td>
+            <td class="center y">all</td>
+            <td class="center partial">own group</td>
+            <td class="center partial">own consultants</td>
+            <td class="center n">✗</td>
+          </tr>
+          <tr>
+            <td>My Resume (consultant upload)</td>
+            <td class="center n">—</td>
+            <td class="center n">—</td>
+            <td class="center n">—</td>
+            <td class="center n">—</td>
+            <td class="center y">own resume only</td>
+          </tr>
+          <tr>
+            <td>Invitations</td>
+            <td class="center y">any role</td>
+            <td class="center partial">below rank, into any group</td>
+            <td class="center partial">below rank, into own group</td>
+            <td class="center partial">Consultant only, into own group</td>
+            <td class="center n">✗</td>
+          </tr>
+          <tr>
+            <td>Reports / Analytics</td>
+            <td class="center y">✓</td>
+            <td class="center y">✓</td>
+            <td class="center y">org-wide</td>
+            <td class="center partial">own stats</td>
+            <td class="center n">✗</td>
+          </tr>
+          <tr>
+            <td>Training — course catalog</td>
+            <td class="center y">all</td>
+            <td class="center y">all</td>
+            <td class="center y">workspace-wide</td>
+            <td class="center y">workspace-wide</td>
+            <td class="center y">workspace-wide (read)</td>
+          </tr>
+          <tr>
+            <td>Training — assignments &amp; learner data</td>
+            <td class="center y">all</td>
+            <td class="center y">all</td>
+            <td class="center partial">own group</td>
+            <td class="center partial">own training</td>
+            <td class="center partial">own training</td>
+          </tr>
+          <tr>
+            <td>User Groups admin</td>
+            <td class="center y">✓</td>
+            <td class="center y">✓</td>
+            <td class="center n">✗</td>
+            <td class="center n">✗</td>
+            <td class="center n">✗</td>
+          </tr>
+          <tr>
+            <td>Admin / Users</td>
+            <td class="center y">✓</td>
+            <td class="center y">✓</td>
+            <td class="center n">✗</td>
+            <td class="center n">✗</td>
+            <td class="center n">✗</td>
+          </tr>
+          <tr>
+            <td>Feature Flags</td>
+            <td class="center y">read &amp; write</td>
+            <td class="center partial">CEO read &amp; write · CTO/Director read-only</td>
+            <td class="center n">✗</td>
+            <td class="center n">✗</td>
+            <td class="center n">✗</td>
+          </tr>
+          <tr>
+            <td>Vendors</td>
+            <td class="center y">all</td>
+            <td class="center y">all</td>
+            <td class="center partial">own group</td>
+            <td class="center y">✓</td>
+            <td class="center n">✗</td>
+          </tr>
+          <tr>
+            <td>Clients</td>
+            <td class="center y">all</td>
+            <td class="center y">all</td>
+            <td class="center partial">own group</td>
+            <td class="center y">✓</td>
+            <td class="center n">✗</td>
+          </tr>
+          <tr>
+            <td>AI Email</td>
+            <td class="center y">✓</td>
+            <td class="center y">✓</td>
+            <td class="center y">✓</td>
+            <td class="center y">✓</td>
+            <td class="center n">✗</td>
+          </tr>
+          <tr>
+            <td>AI Usage</td>
+            <td class="center y">✓</td>
+            <td class="center y">✓</td>
+            <td class="center y">✓</td>
+            <td class="center n">✗</td>
+            <td class="center n">✗</td>
+          </tr>
+          <tr>
+            <td>AI Settings</td>
+            <td class="center y">✓</td>
+            <td class="center y">✓</td>
+            <td class="center n">✗</td>
+            <td class="center n">✗</td>
+            <td class="center n">✗</td>
+          </tr>
+          <tr>
+            <td>Audit Log</td>
+            <td class="center y">✓</td>
+            <td class="center y">✓</td>
+            <td class="center n">✗</td>
+            <td class="center n">✗</td>
+            <td class="center n">✗</td>
+          </tr>
+          <tr>
+            <td>Deactivated Accounts</td>
+            <td class="center y">✓</td>
+            <td class="center y">✓</td>
+            <td class="center n">✗</td>
+            <td class="center n">✗</td>
+            <td class="center n">✗</td>
+          </tr>
+          <tr>
+            <td>Training — AI Activity</td>
+            <td class="center y">all</td>
+            <td class="center y">all</td>
+            <td class="center partial">own group</td>
+            <td class="center n">✗</td>
+            <td class="center n">✗</td>
+          </tr>
+          <tr>
+            <td>Training — course authoring (create/edit)</td>
+            <td class="center y">all</td>
+            <td class="center y">all</td>
+            <td class="center y">workspace-wide</td>
+            <td class="center n">✗</td>
+            <td class="center n">✗</td>
+          </tr>
+          <tr>
+            <td>Training — learner pages (My Training, Lesson, Quiz)</td>
+            <td class="center y">all</td>
+            <td class="center y">all</td>
+            <td class="center partial">own group's learners</td>
+            <td class="center y">own training</td>
+            <td class="center y">own training</td>
+          </tr>
+          <tr>
+            <td>User profile pages (/users/:id)</td>
+            <td class="center y">all</td>
+            <td class="center y">all</td>
+            <td class="center partial">own group</td>
+            <td class="center partial">own consultants + own chain</td>
+            <td class="center partial">own recruiter + chain only</td>
+          </tr>
+          <tr>
+            <td>Impersonate another user</td>
+            <td class="center y">✓</td>
+            <td class="center n">✗</td>
+            <td class="center n">✗</td>
+            <td class="center n">✗</td>
+            <td class="center n">✗</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="note">
+        <strong>Developer</strong> is intentionally omitted from this table. A developer has access
+        to nothing by default; a Super Admin ticks individual capabilities (Users, User Groups,
+        Feature Flags, Invitations, Reports, AI Usage) and the developer gets only those exact admin
+        pages. They can never escalate themselves and can never be moved by anyone except a Super
+        Admin.
+      </div>
+
+      <!-- ───────────────────────── CHAT POLICY ───────────────────────── -->
+      <h2 id="chat">Who can chat with whom</h2>
+      <p class="lede">
+        The messaging directory is filtered by these rules. Anyone outside your reach is invisible —
+        you can't even start a chat with them.
+      </p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>You are…</th>
+            <th>You can chat with…</th>
+            <th>You cannot chat with…</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Super Admin</strong></td>
+            <td>Everyone in the company.</td>
+            <td>—</td>
+          </tr>
+          <tr>
+            <td><strong>CEO / CTO / Director</strong></td>
+            <td>Everyone in the company.</td>
+            <td>—</td>
+          </tr>
+          <tr>
+            <td><strong>HR Manager / Manager</strong></td>
+            <td>
+              All other Managers &amp; HR Managers · Admin leadership · Recruiters in your group ·
+              Consultants in your group · Anyone you supervise outside your group via the
+              recruiter-managers relationship.
+            </td>
+            <td>
+              Consultants outside your group · Recruiters outside your group (unless you supervise
+              them directly).
+            </td>
+          </tr>
+          <tr>
+            <td><strong>Recruiter</strong></td>
+            <td>
+              All other Recruiters · Admin leadership · Your own manager / HR chain · Your own
+              assigned consultants · <em>any active Developer (for bug reports).</em>
+            </td>
+            <td>
+              Other recruiters' consultants · Out-of-group managers (unless they directly supervise
+              you).
+            </td>
+          </tr>
+          <tr>
+            <td><strong>Consultant</strong></td>
+            <td>
+              Your assigned recruiter · That recruiter's manager / HR chain ·
+              <em>any active Developer (for bug reports).</em>
+            </td>
+            <td>Other consultants · Recruiters who aren't yours.</td>
+          </tr>
+          <tr>
+            <td><strong>Developer</strong></td>
+            <td>
+              Every active user — but <em>only</em> via the in-app messenger, for support follow-up.
+              No jobs, tasks, training, applications, resumes, or admin pages.
+            </td>
+            <td>—</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="note">
+        <strong>Developer support exception.</strong> Every active user can DM an active Developer
+        for bug/error reporting, and the Developer can reply. This is the <em>only</em> business
+        surface Developers see — they remain blocked from jobs, tasks, training, applications,
+        resumes, vendors, clients and admin pages unless a Super Admin explicitly grants them a
+        capability.
+      </div>
+
+      <div class="note">
+        <strong>No "old chat" loophole.</strong> If we reassign a consultant from Recruiter A to
+        Recruiter B, the existing chat between the consultant and Recruiter A immediately becomes
+        unreadable to both sides. Chat permissions are always evaluated against the
+        <em>current</em> assignment, never the history.
+      </div>
+
+      <!-- ───────────────────────── IMPORTANT RULES ───────────────────────── -->
+      <h2 id="rules">Important rules we enforce automatically</h2>
+
+      <div class="grid two">
+        <div class="card">
+          <h3>1. Super Admin is absolute</h3>
+          <p>
+            No other role can move, deactivate, demote or impersonate a Super Admin. A
+            non-Super-Admin can't even invite or grant the Super Admin role to anyone.
+          </p>
+        </div>
+        <div class="card">
+          <h3>2. CEO &amp; Developer mints are Super-Admin only</h3>
+          <p>
+            Only a Super Admin can create another Super Admin or a Developer account. Even the CEO
+            cannot.
+          </p>
+        </div>
+        <div class="card">
+          <h3>3. Last Super Admin protection</h3>
+          <p>
+            The system refuses to deactivate or demote the only remaining active Super Admin — there
+            must always be one. You can't accidentally lock the company out.
+          </p>
+        </div>
+        <div class="card">
+          <h3>4. Rank can never be exceeded</h3>
+          <p>
+            A Director can't promote anyone to CEO. A Manager can't promote anyone to Director.
+            Every role-change check enforces "strictly below your rank."
+          </p>
+        </div>
+        <div class="card">
+          <h3>5. Recruiter invites = Consultant only</h3>
+          <p>
+            A recruiter inviting someone can only invite a Consultant, and only into their own
+            group. The dropdown won't even show the other options.
+          </p>
+        </div>
+        <div class="card">
+          <h3>6. Group leads are always group-scoped</h3>
+          <p>
+            HR Manager &amp; Manager can never accidentally see another group's data — every list,
+            every detail page, every analytics call (including the training assignments,
+            evaluations, supervision notes and compliance report) is filtered by their own group.
+            The only training surface that stays workspace-wide is the shared course catalog itself.
+          </p>
+        </div>
+        <div class="card">
+          <h3>7. Group moves preserve the bench boundary</h3>
+          <p>
+            Manager-tier users can see group membership on Consultants, Recruiters and Managers.
+            Admin tier can move people across groups. Group leads can only move in-group people to
+            their own group, and recruiter/consultant mismatches are blocked.
+          </p>
+        </div>
+        <div class="card">
+          <h3>8. Consultants only see their own assignments</h3>
+          <p>
+            A consultant can never see another consultant's resume, applications, interviews or
+            chats. Backend checks every row, not just the page.
+          </p>
+        </div>
+        <div class="card">
+          <h3>9. Hidden = blocked</h3>
+          <p>
+            Hiding a button or a page in the UI is not enough — every protected action is also
+            rejected at the API level. A motivated user with a developer console can't bypass the
+            UI.
+          </p>
+        </div>
+      </div>
+
+      <!-- ───────────────────────── WORKSPACE-WIDE EXCEPTIONS ───────────────────────── -->
+      <h2 id="exceptions">Workspace-wide exceptions</h2>
+      <p class="lede">
+        A few admin surfaces are deliberately global instead of group-scoped. They are aggregate /
+        org-wide tools, not per-group PII.
+      </p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Surface</th>
+            <th>Why it's global</th>
+            <th>Who sees it</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Reports / Analytics — aggregate tabs</td>
+            <td>
+              The non-PII tabs (Pipeline, Recruiters, Consultants, Placements, Sources, AI Usage,
+              Time in app) are workspace-wide totals/ratios. HR Manager &amp; Manager see the whole
+              company; recruiters and consultants do not see them at all.
+            </td>
+            <td>Admin tier + HR Manager + Manager</td>
+          </tr>
+          <tr>
+            <td>Reports / Analytics — Submissions &amp; Daily log</td>
+            <td>
+              Per-row PII (which recruiter submitted which consultant, daily activity per person).
+              HR Manager &amp; Manager see only their own group. Admin tier sees everything. A
+              RECRUITER sees only their own submissions / daily numbers (the two tabs are the only
+              ones visible to them on /reports).
+            </td>
+            <td>Admin tier (all) · HR Manager + Manager (own group) · Recruiter (own rows)</td>
+          </tr>
+          <tr>
+            <td>Training — course catalog only</td>
+            <td>
+              The catalog (courses, lessons, quizzes) is a shared learning library, not user data.
+              Group leads can browse and assign from it. Assignment-level data (progress, quiz
+              attempts, evaluations, supervision notes, the compliance report) is
+              <strong>group-scoped</strong> for HR Manager &amp; Manager — they only see learners in
+              their own group. Admin tier sees everything.
+            </td>
+            <td>
+              Admin tier (all) · HR Manager + Manager (catalog workspace-wide, learner data own
+              group only)
+            </td>
+          </tr>
+          <tr>
+            <td>User Groups admin</td>
+            <td>
+              Group definitions themselves are org-level. Group leads can't create / pause / delete
+              groups — only admin tier can.
+            </td>
+            <td>Admin tier only</td>
+          </tr>
+          <tr>
+            <td>Feature Flags (write)</td>
+            <td>
+              Feature toggles are owner power. CTO / Director can read; only CEO &amp; Super Admin
+              can flip them.
+            </td>
+            <td>Super Admin + CEO</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Definition of done — security promises we keep</h2>
+      <ol>
+        <li>Every role has a clear allow/deny policy for every page.</li>
+        <li>Every visible button is also enforced on the server.</li>
+        <li>Every backend mutation independently verifies who you are.</li>
+        <li>
+          Every group lead action is scoped to their group, unless it's one of the documented
+          workspace-wide exceptions above.
+        </li>
+        <li>Super Admin remains absolute, with self-protection + last-Super-Admin protection.</li>
+        <li>Recruiter can invite Consultants — and only Consultants.</li>
+        <li>Developer access is capability-only; never accidental business access.</li>
+        <li>Hidden pages are blocked by the route guard, not just by hiding the link.</li>
+      </ol>
+
+      <footer>
+        HireOrbit AI · permission model overview · generated for client review<br />
+        Companion docs for engineers: <code>docs/rbac-matrix.md</code>
+      </footer>
+    </div>
+  </body>
+</html>

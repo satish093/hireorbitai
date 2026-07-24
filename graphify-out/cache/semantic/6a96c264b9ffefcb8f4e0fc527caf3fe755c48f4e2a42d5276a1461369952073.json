@@ -1,0 +1,74 @@
+{
+  "nodes": [
+    {
+      "id": "commands_release_checklist",
+      "label": "/release-checklist command",
+      "file_type": "document",
+      "source_file": ".claude/commands/release-checklist.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "commands_release_checklist",
+      "target": "commands_verify",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": ".claude/commands/release-checklist.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "commands_release_checklist",
+      "target": "commands_rollback",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": ".claude/commands/release-checklist.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "commands_release_checklist",
+      "target": "commands_verify_npm_run_verify",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": ".claude/commands/release-checklist.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "commands_release_checklist",
+      "target": "rules_deploy_pull_based_deploy",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.75,
+      "source_file": ".claude/commands/release-checklist.md",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "release_deploy_flow",
+      "label": "Release and deploy flow",
+      "nodes": [
+        "commands_release_checklist",
+        "commands_verify",
+        "commands_rollback",
+        "commands_check_deploy",
+        "rules_deploy"
+      ],
+      "relation": "participate_in",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": ".claude/commands/release-checklist.md"
+    }
+  ]
+}

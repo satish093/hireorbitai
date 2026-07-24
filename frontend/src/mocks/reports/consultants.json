@@ -1,0 +1,49 @@
+{
+  "kpis": [
+    {
+      "label": "Active",
+      "value": "146",
+      "prior": "131",
+      "delta": "+15",
+      "trend": "up",
+      "positive": true
+    },
+    {
+      "label": "Avg time to placement",
+      "value": "47d",
+      "prior": "52d",
+      "delta": "-5d",
+      "trend": "down",
+      "positive": true
+    },
+    {
+      "label": "Bench (no sub > 14d)",
+      "value": "23",
+      "prior": "29",
+      "delta": "-6",
+      "trend": "down",
+      "positive": true
+    },
+    {
+      "label": "Avg AI score",
+      "value": "81%",
+      "prior": "79%",
+      "delta": "+2 pts",
+      "trend": "up",
+      "positive": true
+    }
+  ],
+  "charts": {
+    "visaMix": [
+      { "label": "H1B", "value": 64, "color": "var(--brand-from)" },
+      { "label": "GC", "value": 38, "color": "var(--accent)" },
+      { "label": "US Citizen", "value": 29, "color": "var(--success)" },
+      { "label": "OPT/CPT", "value": 15, "color": "var(--warn)" }
+    ],
+    "statusMix": [
+      { "label": "Active", "value": 146, "color": "var(--success)" },
+      { "label": "Paused", "value": 41, "color": "var(--warn)" },
+      { "label": "Placed", "value": 58, "color": "var(--accent)" }
+    ]
+  }
+}

@@ -1,0 +1,13 @@
+
+> hireorbitai@0.1.0 lint
+> npm --prefix backend run lint && npm --prefix frontend run lint
+
+
+> hireorbitai-backend@0.1.0 lint
+> eslint "src/**/*.{ts,tsx}" --max-warnings 0
+
+
+> hireorbitai-frontend@0.1.0 lint
+> eslint "src/**/*.{ts,tsx}" --max-warnings 0
+
+LINT_EXIT=0

@@ -1,0 +1,185 @@
+{
+  "nodes": [
+    {
+      "id": "api_conventions_http_contract",
+      "label": "HTTP API conventions",
+      "file_type": "document",
+      "source_file": "docs/api-conventions.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "api_conventions_error_envelope",
+      "label": "Error response envelope (ApiErrorBody)",
+      "file_type": "concept",
+      "source_file": "docs/api-conventions.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "api_conventions_status_codes",
+      "label": "HTTP status code contract",
+      "file_type": "concept",
+      "source_file": "docs/api-conventions.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "api_conventions_auth_endpoints",
+      "label": "Auth endpoints (login/refresh/me/...)",
+      "file_type": "concept",
+      "source_file": "docs/api-conventions.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "api_conventions_jwt_claims",
+      "label": "JWT claims {sub,email,sv,iat,exp}",
+      "file_type": "concept",
+      "source_file": "docs/api-conventions.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "api_conventions_rate_limiting",
+      "label": "Rate limiting tiers",
+      "file_type": "concept",
+      "source_file": "docs/api-conventions.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "api_conventions_signed_file_urls",
+      "label": "HMAC-signed file download URLs",
+      "file_type": "concept",
+      "source_file": "docs/api-conventions.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "api_conventions_feature_flag_gate",
+      "label": "Feature-flag 403 gate",
+      "file_type": "concept",
+      "source_file": "docs/api-conventions.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "api_conventions_http_contract",
+      "target": "api_conventions_error_envelope",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/api-conventions.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "api_conventions_http_contract",
+      "target": "api_conventions_status_codes",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/api-conventions.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "api_conventions_http_contract",
+      "target": "api_conventions_auth_endpoints",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/api-conventions.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "api_conventions_auth_endpoints",
+      "target": "api_conventions_jwt_claims",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/api-conventions.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "api_conventions_http_contract",
+      "target": "api_conventions_rate_limiting",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/api-conventions.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "api_conventions_http_contract",
+      "target": "api_conventions_signed_file_urls",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/api-conventions.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "api_conventions_http_contract",
+      "target": "api_conventions_feature_flag_gate",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/api-conventions.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "api_conventions_http_contract",
+      "target": "architecture_system_overview",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/api-conventions.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "api_conventions_signed_file_urls",
+      "target": "architecture_query_builder_shim",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.65,
+      "source_file": "docs/api-conventions.md",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": []
+}

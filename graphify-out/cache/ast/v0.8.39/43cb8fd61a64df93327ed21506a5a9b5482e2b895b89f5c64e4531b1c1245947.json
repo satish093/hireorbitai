@@ -1,0 +1,41 @@
+{
+  "nodes": [
+    {
+      "id": "e_claude_hireorbitai_scripts_restore_sh",
+      "label": "restore.sh",
+      "file_type": "code",
+      "source_file": "scripts/restore.sh",
+      "source_location": "L1",
+      "metadata": { "language": "bash", "kind": "file" }
+    },
+    {
+      "id": "e_claude_hireorbitai_scripts_restore_sh__entry",
+      "label": "restore.sh script",
+      "file_type": "code",
+      "source_file": "scripts/restore.sh",
+      "source_location": "L1",
+      "metadata": { "language": "bash", "kind": "bash_entrypoint" }
+    }
+  ],
+  "edges": [
+    {
+      "source": "e_claude_hireorbitai_scripts_restore_sh",
+      "target": "e_claude_hireorbitai_scripts_restore_sh__entry",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/restore.sh",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "e_claude_hireorbitai_scripts_restore_sh",
+      "target": "dirname_bash_source_0_lib_env_sh",
+      "relation": "imports",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/restore.sh",
+      "source_location": "L18",
+      "weight": 1.0,
+      "context": "import"
+    }
+  ]
+}

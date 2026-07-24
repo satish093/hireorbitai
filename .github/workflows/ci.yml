@@ -1,0 +1,146 @@
+name: CI
+
+# Note: pushes to `dev` are handled by dev.yml (verify:full + Render deploy),
+# so `dev` is intentionally absent from the push list to avoid running the gate
+# twice. PRs targeting dev still run full CI here.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main, dev]
+
+# Cancel superseded runs on the same branch / PR — saves Actions minutes
+# when someone pushes twice in a row.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (typecheck + build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      # Install at the root to populate the @hireorbitai/shared workspace
+      # symlink + build the shared package before either half touches it.
+      - run: npm ci
+      - run: npm run shared:build
+      - run: npm --prefix backend run typecheck
+      - run: npm --prefix backend run build
+      - run: npm --prefix backend run test
+
+  frontend:
+    name: Frontend (typecheck + build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run shared:build
+      - run: npm --prefix frontend run typecheck
+      - run: npm --prefix frontend run build
+
+  e2e:
+    name: Frontend E2E (Playwright, mocked backend)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run shared:build
+      # Cache the Playwright browser binary keyed on package-lock so it
+      # survives repeat runs without re-downloading ~130 MB.
+      - name: Cache Playwright browser
+        uses: actions/cache@v4
+        id: pw-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ hashFiles('frontend/package-lock.json') }}
+      # The smoke suite mocks every API call, so no backend/Postgres is needed.
+      # Playwright auto-starts the Vite dev server itself (see playwright.config.ts).
+      # ubuntu-latest ships with Chromium's system deps; --with-deps is omitted
+      # to avoid the slow/hanging apt-get update that occurs on Azure runners.
+      - name: Install Playwright browser
+        if: steps.pw-cache.outputs.cache-hit != 'true'
+        timeout-minutes: 8
+        run: npx --prefix frontend playwright install chromium
+      - run: npm --prefix frontend run test:e2e
+      - name: Upload Playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: frontend/playwright-report/
+          retention-days: 7
+
+  audit:
+    name: Dependency audit (high / critical only)
+    runs-on: ubuntu-latest
+    # Don't block merges on this — surface as a soft check so a transitive
+    # CVE doesn't freeze releases. Set continue-on-error: false later once
+    # the inventory is reliably clean.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      # `npm audit` returns non-zero on any vulnerability — restrict to high+
+      # and apply two filters:
+      #   --omit=dev      → ignore devDependency advisories (build tools,
+      #                     test runners, etc.) since they never ship.
+      #   --omit=optional → ignore optional native deps (`canvas` via
+      #                     pdfjs-dist → @mapbox/node-pre-gyp → tar). We
+      #                     never use canvas at runtime; it's pulled in by
+      #                     pdfjs-dist v3 as an optional Node-rendering
+      #                     binding that browsers don't touch.
+      #
+      # After the omit filters, the only known-remaining hit is:
+      #   GHSA-wgrm-67xf-hhpq — pdfjs-dist v3 arbitrary JS execution via
+      #   crafted PDF. Mitigated at runtime in
+      #   frontend/src/components/MediaViewerModal.tsx by passing
+      #   transformGetDocumentParams: { isEvalSupported: false } to the
+      #   <Viewer/>, which disables the affected eval codepath.
+      #   @react-pdf-viewer/core@3 pins pdfjs-dist@^3 and has no v4 release,
+      #   so a package-level fix isn't available — the runtime mitigation
+      #   is the documented workaround per the GHSA advisory.
+      #
+      # The guard below accepts that single waiver: if `npm audit` flags
+      # ONLY pdfjs-dist + @react-pdf-viewer/* packages (same root advisory),
+      # exit 0. Anything else high/critical fails the job.
+      - name: Audit (high + critical, with documented waivers)
+        run: |
+          set +e
+          output=$(npm audit --audit-level=high --omit=dev --omit=optional 2>&1)
+          code=$?
+          set -e
+          echo "$output"
+          if [ "$code" -eq 0 ]; then
+            echo "✓ No high/critical advisories."
+            exit 0
+          fi
+          # Extract the offending package names from the audit report. The
+          # leading-name regex matches lines like `pdfjs-dist  <=4.1.392`.
+          blockers=$(echo "$output" \
+            | grep -E '^[a-zA-Z0-9_@/-]+ +<' \
+            | awk '{print $1}' \
+            | grep -vE '^(pdfjs-dist|@react-pdf-viewer/)' || true)
+          if [ -z "$blockers" ]; then
+            echo "::notice::Only waived advisory present (pdfjs-dist v3, GHSA-wgrm-67xf-hhpq) — runtime-mitigated via isEvalSupported:false in MediaViewerModal."
+            exit 0
+          fi
+          echo "::error::Unwaived high/critical advisories detected:"
+          echo "$blockers"
+          exit 1

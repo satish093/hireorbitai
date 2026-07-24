@@ -1,0 +1,121 @@
+name: Dev (verify + deploy to Render)
+
+# Push-to-dev pipeline for the FREE Render development environment.
+#
+#   verify (gate)  →  verify:full (build + Playwright)  →  migrate Neon dev DB
+#   →  trigger Render deploy hooks  →  report URLs
+#
+# A failure anywhere up to and including verify:full blocks the deploy — broken
+# code never reaches the dev hosting. Production is push-to-main and is handled
+# entirely by deploy-production.yml; nothing here can touch prod.
+#
+# Required (Settings → Secrets and variables → Actions):
+#   Secrets:
+#     DEV_DATABASE_URL            Neon dev connection string (must contain hireorbit_dev)
+#     RENDER_DEPLOY_HOOK_BACKEND  Render → hireorbit-api-dev → Settings → Deploy Hook
+#     RENDER_DEPLOY_HOOK_FRONTEND Render → hireorbit-web-dev → Settings → Deploy Hook
+#   Variables (optional, for the summary links):
+#     DEV_WEB_URL                 e.g. https://hireorbit-web-dev.onrender.com
+#     DEV_API_URL                 e.g. https://hireorbit-api-dev.onrender.com
+
+on:
+  workflow_dispatch:
+    inputs:
+      enabled:
+        description: 'Disabled — remove this input to re-enable'
+        required: true
+
+concurrency:
+  group: dev-pipeline
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Verify + build + e2e
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run shared:build
+      # format:check → typecheck → lint → backend vitest
+      - run: npm run verify
+      - name: Install Playwright browser
+        run: npx --prefix frontend playwright install --with-deps chromium
+      # verify (again, fast/cached) + full build + Playwright UI smoke
+      - run: npm run verify:full
+      - name: Upload Playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: dev-playwright-report
+          path: frontend/playwright-report/
+          retention-days: 7
+
+  migrate:
+    name: Apply migrations to dev DB (Neon)
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run shared:build
+      - name: Guard — DEV_DATABASE_URL must be a dev DB
+        env:
+          DATABASE_URL: ${{ secrets.DEV_DATABASE_URL }}
+        run: |
+          if [ -z "${DATABASE_URL}" ]; then
+            echo "::error::DEV_DATABASE_URL secret is not set."
+            exit 1
+          fi
+          case "$DATABASE_URL" in
+            *hireorbit_prod*)
+              echo "::error::DEV_DATABASE_URL contains 'hireorbit_prod' — refusing to migrate a prod DB from the dev pipeline."
+              exit 1 ;;
+          esac
+      - name: migrate up
+        env:
+          DATABASE_URL: ${{ secrets.DEV_DATABASE_URL }}
+        run: npm --prefix backend run migrate:ci
+
+  deploy:
+    name: Trigger Render dev deploy
+    needs: [verify, migrate]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Backend deploy hook
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_BACKEND }}
+        run: |
+          if [ -z "${HOOK}" ]; then echo "::error::RENDER_DEPLOY_HOOK_BACKEND not set"; exit 1; fi
+          curl -fsS -X POST "$HOOK" > /dev/null
+          echo "→ backend (hireorbit-api-dev) deploy triggered"
+      - name: Frontend deploy hook
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_FRONTEND }}
+        run: |
+          if [ -z "${HOOK}" ]; then echo "::error::RENDER_DEPLOY_HOOK_FRONTEND not set"; exit 1; fi
+          curl -fsS -X POST "$HOOK" > /dev/null
+          echo "→ frontend (hireorbit-web-dev) deploy triggered"
+      - name: Summary
+        env:
+          DEV_WEB_URL: ${{ vars.DEV_WEB_URL }}
+          DEV_API_URL: ${{ vars.DEV_API_URL }}
+        run: |
+          {
+            echo "## Dev deployment triggered 🚀"
+            echo ""
+            echo "| Service | URL |"
+            echo "| --- | --- |"
+            echo "| Frontend | ${DEV_WEB_URL:-set DEV_WEB_URL repo variable} |"
+            echo "| Backend  | ${DEV_API_URL:-set DEV_API_URL repo variable} |"
+            echo ""
+            echo "Render builds take ~2–4 min. The free backend cold-starts (~30s) after 15 min idle."
+          } >> "$GITHUB_STEP_SUMMARY"

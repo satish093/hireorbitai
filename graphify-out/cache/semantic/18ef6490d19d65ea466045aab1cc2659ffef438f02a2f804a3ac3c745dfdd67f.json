@@ -1,0 +1,59 @@
+{
+  "nodes": [
+    {
+      "id": "repositories_readme_repository_layer",
+      "label": "Repository layer (data-access pattern)",
+      "file_type": "rationale",
+      "source_file": "backend/src/repositories/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "repositories_readme_incremental_extraction",
+      "label": "Incremental repository extraction (no big-bang rewrite)",
+      "file_type": "rationale",
+      "source_file": "backend/src/repositories/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "repositories_readme_repository_layer",
+      "target": "architecture_query_builder_shim",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "backend/src/repositories/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "repositories_readme_repository_layer",
+      "target": "architecture_technical_debt",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "backend/src/repositories/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "repositories_readme_incremental_extraction",
+      "target": "repositories_readme_repository_layer",
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "backend/src/repositories/README.md",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": []
+}

@@ -1,0 +1,4 @@
+# Persistent notes for the release-notes-writer agent.
+# Use this directory for: glossary of "what we call X publicly",
+# previously-shipped commit SHAs (so the writer doesn't re-summarize
+# already-released work), and rejected phrasings.

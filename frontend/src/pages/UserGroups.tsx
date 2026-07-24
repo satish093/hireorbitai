@@ -1,0 +1,489 @@
+import { useEffect, useRef, useState, type ChangeEvent } from 'react';
+import toast from 'react-hot-toast';
+import { Layout } from '../components/Layout';
+import { SkeletonCard } from '../components/Skeleton';
+import { Button } from '../components/Button';
+import { invalidateUserGroupsCache } from '../components/GroupBadge';
+import { invalidate } from '../hooks/useInvalidate';
+import { api } from '../services/api';
+import { useAuth } from '../context/AuthContext';
+import { canAssignRole, Role, ROLE_LABEL } from '../types';
+
+interface UserGroup {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  is_active: boolean;
+  member_count: number;
+  color: string | null;
+  // Company billing email — shown on branded invoices.
+  email?: string | null;
+  // Signed URL for the company logo (minted server-side); null when unset.
+  logo_url?: string | null;
+}
+
+interface UserLite {
+  id: string;
+  email: string;
+  full_name: string | null;
+  role: string;
+  group_id: string | null;
+}
+
+export function UserGroups() {
+  const { profile } = useAuth();
+  const callerRole = profile?.role as Role | undefined;
+  const callerId = profile?.id;
+  const [groups, setGroups] = useState<UserGroup[]>([]);
+  const [users, setUsers] = useState<UserLite[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [name, setName] = useState('');
+  const [slug, setSlug] = useState('');
+  // Whether the user has manually edited the slug. While false, the slug
+  // auto-tracks the name. Once the user types in the slug field directly,
+  // we stop overwriting it.
+  const [slugEdited, setSlugEdited] = useState(false);
+  // New-group color (the backend accepts an optional 7-char hex; GroupBadge
+  // renders it everywhere a group appears). Default = the brand indigo.
+  const [color, setColor] = useState('#6366F1');
+  // New-group company billing email (optional).
+  const [email, setEmail] = useState('');
+  // Per-card billing-email drafts (edit existing companies). Keyed by group id.
+  const [emailDrafts, setEmailDrafts] = useState<Record<string, string>>({});
+  const [emailBusyId, setEmailBusyId] = useState<string | null>(null);
+
+  async function load() {
+    setLoading(true);
+    try {
+      // /admin/users is the authoritative source — it returns every user with
+      // role + group_id, including MANAGER / HR_MANAGER / admin-tier rows the
+      // old /consultants + /recruiters roster missed (which made group leads
+      // invisible in their own group's member list). This page is admin-gated
+      // (allow=ADMIN_TIER + capability 'users' on /admin/groups), so the call
+      // always succeeds; the legacy roster endpoints stay as a fallback only.
+      const [g, admins, cons, recs] = await Promise.all([
+        api.get('/user-groups'),
+        // /admin/users returns { rows, total, page, page_size }. Default page
+        // size is 50; request the max (200) so a small/mid org loads in one
+        // call. Anything bigger will need page-walking, but pre-200 orgs work.
+        api
+          .get('/admin/users', { params: { page_size: 200 } })
+          .catch(() => ({ data: { rows: [] } })),
+        api.get('/consultants').catch(() => ({ data: [] })),
+        api.get('/recruiters').catch(() => ({ data: [] })),
+      ]);
+      setGroups(g.data ?? []);
+      // De-dupe by user id; /admin/users wins because it's pushed first.
+      const seen = new Map<string, UserLite>();
+      const pushUsers = (rows: any[]) => {
+        for (const u of rows ?? []) {
+          const id = u?.id;
+          if (!id || seen.has(id)) continue;
+          seen.set(id, {
+            id,
+            email: u.email ?? '',
+            full_name: u.full_name ?? null,
+            role: u.role ?? 'UNKNOWN',
+            group_id: u.group_id ?? null,
+          });
+        }
+      };
+      const pushFromRoster = (rows: any[], defaultRole: string) => {
+        for (const row of rows ?? []) {
+          const u = row.user;
+          const id = u?.id ?? row.user_id;
+          if (!id || seen.has(id)) continue;
+          seen.set(id, {
+            id,
+            email: u?.email ?? '',
+            full_name: u?.full_name ?? null,
+            role: u?.role ?? defaultRole,
+            group_id: u?.group_id ?? null,
+          });
+        }
+      };
+      pushUsers(admins.data?.rows ?? []);
+      pushFromRoster(cons.data ?? [], 'CONSULTANT');
+      pushFromRoster(recs.data ?? [], 'RECRUITER');
+      setUsers(Array.from(seen.values()));
+    } catch (e: any) {
+      const msg = e?.response?.data?.error ?? 'Failed to load groups';
+      if (/user_groups|user-groups/i.test(String(msg))) {
+        toast.error(`${msg} — run database/user-groups-and-presence.sql`);
+      } else {
+        toast.error(msg);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
+  useEffect(() => {
+    load();
+  }, []);
+
+  async function create() {
+    if (!name.trim() || !slug.trim()) {
+      toast.error('Name and slug required');
+      return;
+    }
+    try {
+      await api.post('/user-groups', {
+        name: name.trim(),
+        slug: slug.trim().toLowerCase().replace(/\s+/g, '-'),
+        color,
+        email: email.trim() || undefined,
+      });
+      setName('');
+      setSlug('');
+      setSlugEdited(false);
+      setColor('#6366F1');
+      setEmail('');
+      toast.success('Group created');
+      load();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error ?? 'Failed to create');
+    }
+  }
+
+  async function toggle(g: UserGroup) {
+    try {
+      await api.patch(`/user-groups/${g.id}`, { is_active: !g.is_active });
+      load();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error ?? 'Something went wrong. Please try again.');
+    }
+  }
+
+  async function remove(g: UserGroup) {
+    if (!confirm(`Delete "${g.name}"? Members will fall back to no group.`)) return;
+    try {
+      await api.delete(`/user-groups/${g.id}`);
+      toast.success('Removed');
+      load();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error ?? 'Something went wrong. Please try again.');
+    }
+  }
+
+  async function assign(userId: string, groupId: string | null) {
+    try {
+      await api.put('/user-groups/assign', { user_id: userId, group_id: groupId });
+      load();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error ?? 'Failed to assign');
+    }
+  }
+
+  // Save a company's billing email (shown on its branded invoices).
+  async function saveEmail(g: UserGroup) {
+    const next = (emailDrafts[g.id] ?? g.email ?? '').trim();
+    if (next === (g.email ?? '')) return; // no change
+    setEmailBusyId(g.id);
+    try {
+      await api.patch(`/user-groups/${g.id}`, { email: next });
+      invalidateUserGroupsCache();
+      toast.success('Billing email saved');
+      await load();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error ?? 'Failed to save email');
+    } finally {
+      setEmailBusyId(null);
+    }
+  }
+
+  // --- Company logo upload/remove -----------------------------------------
+  // A single hidden <input type="file"> drives every card; pickLogo() points it
+  // at a group, then onLogoFile() POSTs the multipart upload. The GroupBadge
+  // cache is flushed afterwards so the new logo shows everywhere a group renders.
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const [logoTargetId, setLogoTargetId] = useState<string | null>(null);
+  const [logoBusyId, setLogoBusyId] = useState<string | null>(null);
+
+  function pickLogo(groupId: string) {
+    setLogoTargetId(groupId);
+    if (logoInputRef.current) {
+      logoInputRef.current.value = ''; // allow re-selecting the same file
+      logoInputRef.current.click();
+    }
+  }
+
+  async function onLogoFile(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    const groupId = logoTargetId;
+    if (!file || !groupId) return;
+    setLogoBusyId(groupId);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      await api.post(`/user-groups/${groupId}/logo`, fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      invalidateUserGroupsCache();
+      invalidate('invoices'); // a branded Draft invoice is seeded server-side
+      toast.success('Logo uploaded — branded draft invoice created');
+      await load();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error ?? 'Failed to upload logo');
+    } finally {
+      setLogoBusyId(null);
+      setLogoTargetId(null);
+    }
+  }
+
+  async function removeLogo(g: UserGroup) {
+    setLogoBusyId(g.id);
+    try {
+      await api.delete(`/user-groups/${g.id}/logo`);
+      invalidateUserGroupsCache();
+      toast.success('Logo removed');
+      await load();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error ?? 'Failed to remove logo');
+    } finally {
+      setLogoBusyId(null);
+    }
+  }
+
+  return (
+    <Layout
+      title="User groups"
+      crumbs={[{ label: 'Workspace', to: '/dashboard' }, { label: 'Admin' }, { label: 'Groups' }]}
+    >
+      <h1 className="text-2xl font-semibold tracking-tight text-ink mb-5">User groups</h1>
+
+      {/* Shared hidden picker — pickLogo() targets a specific group before click. */}
+      <input
+        ref={logoInputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp"
+        className="hidden"
+        onChange={onLogoFile}
+      />
+
+      {/* Create */}
+      <div className="bg-surface border border-border rounded-xl p-4 mb-6 flex items-center gap-2 flex-wrap">
+        <input
+          value={name}
+          onChange={(e) => {
+            const v = e.target.value;
+            setName(v);
+            if (!slugEdited) setSlug(toSlug(v));
+          }}
+          placeholder="Group name (e.g. Cloudfen)"
+          className="border border-border rounded-lg px-3 py-1.5 text-sm flex-1 min-w-[200px]"
+        />
+        <input
+          value={slug}
+          onChange={(e) => {
+            setSlug(e.target.value);
+            setSlugEdited(true);
+          }}
+          placeholder="slug"
+          className="border border-border rounded-lg px-3 py-1.5 text-sm font-mono"
+        />
+        <input
+          type="color"
+          value={color}
+          onChange={(e) => setColor(e.target.value)}
+          aria-label="Group color"
+          title="Group color"
+          className="h-9 w-10 rounded-lg border border-border cursor-pointer bg-surface p-0.5 shrink-0"
+        />
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="Billing email (for invoices)"
+          className="border border-border rounded-lg px-3 py-1.5 text-sm flex-1 min-w-[180px]"
+        />
+        <Button variant="primary" onClick={create}>
+          + Create group
+        </Button>
+      </div>
+
+      {loading ? (
+        <SkeletonCard lines={5} />
+      ) : groups.length === 0 ? (
+        <div className="bg-surface border border-border rounded-xl p-10 text-center text-muted">
+          No groups yet. Apply{' '}
+          <span className="font-mono text-xs">database/user-groups-and-presence.sql</span> to seed
+          Cloudfen / Zangle IT / Xeronix / Okta Solutions.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {groups.map((g) => {
+            // Rank-based visibility: a caller can only see/manage users whose
+            // role they can actually assign (`canAssignRole`). A DIRECTOR should
+            // not see a SUPER_ADMIN in either the members list or the "+ Add
+            // member" dropdown because they couldn't move them anyway — the
+            // backend would reject it (canAssignRole + assertOutranks). The
+            // caller always sees their own row regardless of rank.
+            const visibleUsers = callerRole
+              ? users.filter((u) => u.id === callerId || canAssignRole(callerRole, u.role as Role))
+              : users;
+            const members = visibleUsers.filter((u) => u.group_id === g.id);
+            const candidates = visibleUsers.filter((u) => u.group_id !== g.id);
+            return (
+              <div
+                key={g.id}
+                className="bg-surface border border-border rounded-xl overflow-hidden"
+              >
+                <div className="px-5 py-3 border-b border-border flex items-center gap-3">
+                  {/* Company logo — click to upload/replace. Falls back to a
+                      color chip when the group has no logo yet. */}
+                  <button
+                    type="button"
+                    onClick={() => pickLogo(g.id)}
+                    disabled={logoBusyId === g.id}
+                    title={g.logo_url ? 'Replace company logo' : 'Upload company logo'}
+                    className="shrink-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-50"
+                  >
+                    {g.logo_url ? (
+                      <img
+                        src={g.logo_url}
+                        alt=""
+                        className="w-9 h-9 rounded-md object-cover ring-1 ring-border"
+                      />
+                    ) : (
+                      <span
+                        className="grid h-9 w-9 place-items-center rounded-md ring-1 ring-border"
+                        style={{ background: `${g.color ?? '#6366F1'}1A` }}
+                        aria-hidden="true"
+                      >
+                        <span
+                          className="w-2.5 h-2.5 rounded-full"
+                          style={{ background: g.color ?? '#6366F1' }}
+                        />
+                      </span>
+                    )}
+                  </button>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-semibold text-ink">{g.name}</h3>
+                      <span className="text-[10px] font-mono text-muted bg-hover px-1.5 py-0.5 rounded">
+                        {g.slug}
+                      </span>
+                      {!g.is_active && (
+                        <span className="text-[10px] uppercase tracking-widest text-amber-600 dark:text-amber-400">
+                          paused
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted">
+                      {members.length} member{members.length === 1 ? '' : 's'}
+                      {g.member_count > members.length && (
+                        <span
+                          className="ml-1 text-muted/70"
+                          title={`${g.member_count - members.length} member(s) hidden — outside your rank`}
+                        >
+                          (of {g.member_count})
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                  {g.logo_url && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeLogo(g)}
+                      disabled={logoBusyId === g.id}
+                    >
+                      Remove logo
+                    </Button>
+                  )}
+                  <Button variant="ghost" size="sm" onClick={() => toggle(g)}>
+                    {g.is_active ? 'Pause' : 'Resume'}
+                  </Button>
+                  <Button variant="danger-ghost" size="sm" onClick={() => remove(g)}>
+                    Delete
+                  </Button>
+                </div>
+
+                <div className="px-5 py-3 max-h-64 overflow-y-auto">
+                  {/* Company billing email — shown on this company's branded invoices. */}
+                  <div className="mb-3 flex items-center gap-2">
+                    <input
+                      type="email"
+                      value={emailDrafts[g.id] ?? g.email ?? ''}
+                      onChange={(e) => setEmailDrafts((d) => ({ ...d, [g.id]: e.target.value }))}
+                      placeholder="Billing email (for invoices)"
+                      className="border border-border rounded-lg px-2.5 py-1.5 text-sm flex-1 min-w-0"
+                    />
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => saveEmail(g)}
+                      disabled={
+                        emailBusyId === g.id ||
+                        (emailDrafts[g.id] ?? g.email ?? '').trim() === (g.email ?? '')
+                      }
+                    >
+                      Save
+                    </Button>
+                  </div>
+                  {members.length === 0 ? (
+                    <p className="text-xs italic text-muted mb-2">No members yet.</p>
+                  ) : (
+                    <ul className="space-y-1.5 mb-3">
+                      {members.map((u) => (
+                        <li key={u.id} className="flex items-center justify-between text-sm">
+                          <span className="min-w-0 flex items-center gap-2">
+                            <span className="text-ink truncate">{u.full_name ?? u.email}</span>
+                            <span className="shrink-0 rounded-full border border-border bg-hover px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted">
+                              {ROLE_LABEL[u.role as Role] ?? u.role}
+                            </span>
+                          </span>
+                          <Button
+                            variant="danger-ghost"
+                            size="sm"
+                            onClick={() => assign(u.id, null)}
+                          >
+                            Remove
+                          </Button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <details>
+                    <summary className="text-xs text-muted cursor-pointer hover:text-ink">
+                      + Add member
+                    </summary>
+                    <div className="mt-2 max-h-44 overflow-y-auto border border-border rounded">
+                      {candidates.length === 0 ? (
+                        <p className="text-xs italic text-muted p-2">No more users to add.</p>
+                      ) : (
+                        candidates.map((u) => (
+                          <Button
+                            key={u.id}
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => assign(u.id, g.id)}
+                            className="w-full text-left px-2 py-1.5 flex items-center justify-between"
+                          >
+                            <span className="truncate">{u.full_name ?? u.email}</span>
+                            <span className="text-[10px] uppercase tracking-wider text-muted">
+                              {u.role}
+                            </span>
+                          </Button>
+                        ))
+                      )}
+                    </div>
+                  </details>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </Layout>
+  );
+}
+
+function toSlug(s: string): string {
+  return s
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+}

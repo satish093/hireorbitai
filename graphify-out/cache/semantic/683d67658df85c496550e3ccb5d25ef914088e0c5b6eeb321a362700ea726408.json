@@ -1,0 +1,111 @@
+{
+  "nodes": [
+    {
+      "id": "branching_two_branch_model",
+      "label": "Two-branch model (dev -> main)",
+      "file_type": "concept",
+      "source_file": "docs/branching.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "branching_topic_branches",
+      "label": "Topic branch naming (feat/fix/chore/hotfix)",
+      "file_type": "concept",
+      "source_file": "docs/branching.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "branching_conventional_commits",
+      "label": "Conventional Commits convention",
+      "file_type": "concept",
+      "source_file": "docs/branching.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "branching_release_workflow",
+      "label": "Release workflow (dev->main PR + tag)",
+      "file_type": "concept",
+      "source_file": "docs/branching.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "branching_two_branch_model",
+      "target": "branching_topic_branches",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/branching.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "branching_two_branch_model",
+      "target": "branching_release_workflow",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/branching.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "branching_two_branch_model",
+      "target": "branching_conventional_commits",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/branching.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "branching_release_workflow",
+      "target": "deployment_04_github_actions_deploy_production_yml",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/branching.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "branching_two_branch_model",
+      "target": "deployment_05_deploy_and_rollback",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "docs/branching.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "branching_conventional_commits",
+      "target": "changelog_product_changelog",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.65,
+      "source_file": "docs/branching.md",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": []
+}

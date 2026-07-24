@@ -1,0 +1,93 @@
+{
+  "kpis": [
+    {
+      "label": "Avg subs / recruiter / wk",
+      "value": "11.4",
+      "prior": "9.8",
+      "delta": "+1.6",
+      "trend": "up",
+      "positive": true
+    },
+    {
+      "label": "Avg interviews / recruiter / wk",
+      "value": "3.9",
+      "prior": "3.5",
+      "delta": "+0.4",
+      "trend": "up",
+      "positive": true
+    },
+    {
+      "label": "Avg time in app",
+      "value": "6h 12m",
+      "prior": "5h 40m",
+      "delta": "+32m",
+      "trend": "up",
+      "positive": true
+    },
+    {
+      "label": "Bench utilisation",
+      "value": "72%",
+      "prior": "68%",
+      "delta": "+4 pts",
+      "trend": "up",
+      "positive": true
+    }
+  ],
+  "table": [
+    {
+      "id": "r1",
+      "name": "Priya Patel",
+      "email": "priya@x.co",
+      "subs": 142,
+      "screens": 61,
+      "offers": 14,
+      "matchAvg": 82,
+      "timeInApp": "41h",
+      "spark": [4, 6, 5, 8, 7, 9, 6, 10, 8, 11, 9, 12, 10, 13]
+    },
+    {
+      "id": "r2",
+      "name": "Marcus Lee",
+      "email": "marcus@x.co",
+      "subs": 118,
+      "screens": 52,
+      "offers": 11,
+      "matchAvg": 79,
+      "timeInApp": "38h",
+      "spark": [3, 5, 4, 6, 7, 5, 8, 7, 9, 6, 10, 8, 9, 7]
+    },
+    {
+      "id": "r3",
+      "name": "Sofia Alvarez",
+      "email": "sofia@x.co",
+      "subs": 97,
+      "screens": 44,
+      "offers": 9,
+      "matchAvg": 84,
+      "timeInApp": "33h",
+      "spark": [2, 4, 3, 5, 6, 4, 7, 5, 6, 8, 5, 7, 6, 8]
+    },
+    {
+      "id": "r4",
+      "name": "David Kim",
+      "email": "david@x.co",
+      "subs": 84,
+      "screens": 39,
+      "offers": 7,
+      "matchAvg": 77,
+      "timeInApp": "29h",
+      "spark": [3, 2, 4, 3, 5, 4, 3, 6, 4, 5, 3, 6, 5, 4]
+    },
+    {
+      "id": "r5",
+      "name": "Aisha Khan",
+      "email": "aisha@x.co",
+      "subs": 71,
+      "screens": 31,
+      "offers": 6,
+      "matchAvg": 81,
+      "timeInApp": "26h",
+      "spark": [1, 3, 2, 4, 3, 2, 5, 3, 4, 2, 5, 4, 3, 5]
+    }
+  ]
+}

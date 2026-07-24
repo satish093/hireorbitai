@@ -1,0 +1,156 @@
+{
+  "nodes": [
+    {
+      "id": "e_claude_hireorbitai_scripts_setup_claude_auth_sh",
+      "label": "setup-claude-auth.sh",
+      "file_type": "code",
+      "source_file": "scripts/setup-claude-auth.sh",
+      "source_location": "L1",
+      "metadata": { "language": "bash", "kind": "file" }
+    },
+    {
+      "id": "e_claude_hireorbitai_scripts_setup_claude_auth_sh__entry",
+      "label": "setup-claude-auth.sh script",
+      "file_type": "code",
+      "source_file": "scripts/setup-claude-auth.sh",
+      "source_location": "L1",
+      "metadata": { "language": "bash", "kind": "bash_entrypoint" }
+    },
+    {
+      "id": "scripts_setup_claude_auth_red",
+      "label": "red()",
+      "file_type": "code",
+      "source_file": "scripts/setup-claude-auth.sh",
+      "source_location": "L32",
+      "metadata": { "language": "bash", "kind": "bash_function" }
+    },
+    {
+      "id": "scripts_setup_claude_auth_green",
+      "label": "green()",
+      "file_type": "code",
+      "source_file": "scripts/setup-claude-auth.sh",
+      "source_location": "L33",
+      "metadata": { "language": "bash", "kind": "bash_function" }
+    },
+    {
+      "id": "scripts_setup_claude_auth_yellow",
+      "label": "yellow()",
+      "file_type": "code",
+      "source_file": "scripts/setup-claude-auth.sh",
+      "source_location": "L34",
+      "metadata": { "language": "bash", "kind": "bash_function" }
+    },
+    {
+      "id": "scripts_setup_claude_auth_bold",
+      "label": "bold()",
+      "file_type": "code",
+      "source_file": "scripts/setup-claude-auth.sh",
+      "source_location": "L35",
+      "metadata": { "language": "bash", "kind": "bash_function" }
+    },
+    {
+      "id": "scripts_setup_claude_auth_extract_token",
+      "label": "extract_token()",
+      "file_type": "code",
+      "source_file": "scripts/setup-claude-auth.sh",
+      "source_location": "L108",
+      "metadata": { "language": "bash", "kind": "bash_function" }
+    }
+  ],
+  "edges": [
+    {
+      "source": "e_claude_hireorbitai_scripts_setup_claude_auth_sh",
+      "target": "e_claude_hireorbitai_scripts_setup_claude_auth_sh__entry",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/setup-claude-auth.sh",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "e_claude_hireorbitai_scripts_setup_claude_auth_sh",
+      "target": "scripts_setup_claude_auth_red",
+      "relation": "defines",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/setup-claude-auth.sh",
+      "source_location": "L32",
+      "weight": 1.0
+    },
+    {
+      "source": "e_claude_hireorbitai_scripts_setup_claude_auth_sh",
+      "target": "scripts_setup_claude_auth_green",
+      "relation": "defines",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/setup-claude-auth.sh",
+      "source_location": "L33",
+      "weight": 1.0
+    },
+    {
+      "source": "e_claude_hireorbitai_scripts_setup_claude_auth_sh",
+      "target": "scripts_setup_claude_auth_yellow",
+      "relation": "defines",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/setup-claude-auth.sh",
+      "source_location": "L34",
+      "weight": 1.0
+    },
+    {
+      "source": "e_claude_hireorbitai_scripts_setup_claude_auth_sh",
+      "target": "scripts_setup_claude_auth_bold",
+      "relation": "defines",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/setup-claude-auth.sh",
+      "source_location": "L35",
+      "weight": 1.0
+    },
+    {
+      "source": "e_claude_hireorbitai_scripts_setup_claude_auth_sh",
+      "target": "scripts_setup_claude_auth_extract_token",
+      "relation": "defines",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/setup-claude-auth.sh",
+      "source_location": "L108",
+      "weight": 1.0
+    },
+    {
+      "source": "e_claude_hireorbitai_scripts_setup_claude_auth_sh__entry",
+      "target": "scripts_setup_claude_auth_red",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/setup-claude-auth.sh",
+      "source_location": "L41",
+      "weight": 1.0,
+      "context": "call"
+    },
+    {
+      "source": "e_claude_hireorbitai_scripts_setup_claude_auth_sh__entry",
+      "target": "scripts_setup_claude_auth_green",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/setup-claude-auth.sh",
+      "source_location": "L50",
+      "weight": 1.0,
+      "context": "call"
+    },
+    {
+      "source": "e_claude_hireorbitai_scripts_setup_claude_auth_sh__entry",
+      "target": "scripts_setup_claude_auth_bold",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/setup-claude-auth.sh",
+      "source_location": "L55",
+      "weight": 1.0,
+      "context": "call"
+    },
+    {
+      "source": "e_claude_hireorbitai_scripts_setup_claude_auth_sh__entry",
+      "target": "scripts_setup_claude_auth_yellow",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/setup-claude-auth.sh",
+      "source_location": "L78",
+      "weight": 1.0,
+      "context": "call"
+    }
+  ]
+}

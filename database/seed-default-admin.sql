@@ -1,0 +1,44 @@
+-- =============================================================================
+-- HireOrbit AI — seed the default SUPER_ADMIN account
+--
+-- Password hashes live in public.users.password_hash (bcrypt). Generating a
+-- bcrypt hash inside SQL is awkward and locks in a cost parameter that
+-- belongs to the application, so the canonical bootstrap path is now the
+-- Node helper script.
+--
+--   cd backend && npm run bootstrap:admin
+--
+-- Required env vars (no fallbacks — the script refuses to run without both):
+--   DEFAULT_ADMIN_EMAIL       your admin email
+--   DEFAULT_ADMIN_PASSWORD    >= 12 chars; armed with must_change_password=true
+--                             and dies on first sign-in
+-- Optional:
+--   DEFAULT_ADMIN_NAME        display name
+--   DEFAULT_ADMIN_ROLE        SUPER_ADMIN (default)
+--   DEFAULT_ADMIN_RESET       set to "true" to rotate an existing admin back
+--                             to the env-provided password
+--
+-- Idempotent — re-running with RESET=true rotates the password back to the
+-- env-supplied value and re-arms must_change_password.
+--
+-- SQL-only fallback for ephemeral databases (CI, smoke tests): pre-compute a
+-- bcrypt hash from any trusted tool (`htpasswd -nbBC 10 admin '<your-pw>'`)
+-- and insert directly. Replace the placeholders before running:
+--
+--   insert into public.users (
+--     id, email, password_hash, full_name, role,
+--     must_change_password, temporary_password_sent_at, is_active
+--   ) values (
+--     gen_random_uuid(),
+--     '<your-admin-email>',
+--     '<bcrypt hash you generated>',
+--     '<display name>',
+--     'SUPER_ADMIN',
+--     true,
+--     now(),
+--     true
+--   ) on conflict (email) do nothing;
+-- =============================================================================
+
+-- Intentionally empty by design — see comment block above.
+select 1 as noop;

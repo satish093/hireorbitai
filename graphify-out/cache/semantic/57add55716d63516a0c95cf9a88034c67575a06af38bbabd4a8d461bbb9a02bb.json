@@ -1,0 +1,59 @@
+{
+  "nodes": [
+    {
+      "id": "deployment_email_deliverability_brevo_auth",
+      "label": "Email deliverability (Brevo domain auth)",
+      "file_type": "document",
+      "source_file": "docs/deployment/email-deliverability.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "deployment_email_deliverability_spf_dkim_dmarc",
+      "label": "SPF / DKIM / DMARC alignment",
+      "file_type": "concept",
+      "source_file": "docs/deployment/email-deliverability.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "deployment_email_deliverability_brevo_auth",
+      "target": "deployment_email_deliverability_spf_dkim_dmarc",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/email-deliverability.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "deployment_email_deliverability_brevo_auth",
+      "target": "env_vars_reference",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/email-deliverability.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "deployment_email_deliverability_brevo_auth",
+      "target": "deployment_production_incident_playbooks",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "docs/deployment/email-deliverability.md",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": []
+}

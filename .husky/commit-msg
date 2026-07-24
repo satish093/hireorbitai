@@ -1,0 +1,34 @@
+#!/usr/bin/env sh
+# Soft-enforce the Conventional Commits prefix documented in docs/branching.md.
+# Allowed:   feat, fix, chore, docs, refactor, perf, test, build, ci, revert
+# Plus:      release: ...  (used by scripts/release.sh)
+# Plus:      Merge ...     (auto-generated merge commits)
+# Plus:      Revert ...    (git revert default)
+#
+# Non-conforming messages get a clear hint but DON'T block the commit — this
+# is a guideline, not a wall. Set HIREORBITAI_STRICT_COMMITS=1 to hard-fail.
+
+msg_file="$1"
+first_line="$(head -n1 "$msg_file")"
+
+# Skip empty / merge / revert / fixup / squash commits.
+case "$first_line" in
+  Merge*|Revert*|"fixup!"*|"squash!"*|"") exit 0 ;;
+esac
+
+pattern='^(feat|fix|chore|docs|refactor|perf|test|build|ci|revert|release)(\([a-z0-9_-]+\))?:[[:space:]].+'
+
+if ! echo "$first_line" | grep -Eq "$pattern"; then
+  echo
+  echo "  ⚠ commit message doesn't follow Conventional Commits"
+  echo "    saw:    \"$first_line\""
+  echo "    format: <type>(<scope>): <subject>"
+  echo "    types:  feat fix chore docs refactor perf test build ci revert release"
+  echo "    example: feat(training): add quiz attempt tracking"
+  echo
+  if [ "${HIREORBITAI_STRICT_COMMITS:-0}" = "1" ]; then
+    echo "  HIREORBITAI_STRICT_COMMITS=1 → rejecting." >&2
+    exit 1
+  fi
+  echo "  (not blocking — set HIREORBITAI_STRICT_COMMITS=1 to enforce)"
+fi

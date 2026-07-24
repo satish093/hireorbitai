@@ -1,0 +1,79 @@
+{
+  "nodes": [
+    {
+      "id": "deployment_05_deploy_and_rollback",
+      "label": "Deploy & rollback procedures",
+      "file_type": "document",
+      "source_file": "docs/deployment/05-deploy-and-rollback.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "deployment_05_deploy_and_rollback_update_sh",
+      "label": "scripts/update.sh deploy script",
+      "file_type": "concept",
+      "source_file": "docs/deployment/05-deploy-and-rollback.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "deployment_05_deploy_and_rollback",
+      "target": "deployment_05_deploy_and_rollback_update_sh",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/05-deploy-and-rollback.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "deployment_05_deploy_and_rollback",
+      "target": "deployment_04_github_actions_dev_yml",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/05-deploy-and-rollback.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "deployment_05_deploy_and_rollback",
+      "target": "deployment_06_fresh_reset",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/05-deploy-and-rollback.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "deployment_05_deploy_and_rollback",
+      "target": "deployment_07_weekend_release_checklist",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/05-deploy-and-rollback.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "deployment_05_deploy_and_rollback_update_sh",
+      "target": "deployment_02_databases_init_sql",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "docs/deployment/05-deploy-and-rollback.md",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": []
+}

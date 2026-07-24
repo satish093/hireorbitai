@@ -1,0 +1,80 @@
+{
+  "nodes": [
+    {
+      "id": "changelog_changelog",
+      "label": "CHANGELOG",
+      "file_type": "document",
+      "source_file": "CHANGELOG.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "changelog_fail_closed_rbac",
+      "label": "Fail-Closed RBAC (ProtectedRoute)",
+      "file_type": "concept",
+      "source_file": "CHANGELOG.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "changelog_brevo_only_email",
+      "label": "Brevo-Only Email Transport",
+      "file_type": "rationale",
+      "source_file": "CHANGELOG.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "changelog_changelog",
+      "target": "workflows_release_workflow",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "CHANGELOG.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "changelog_changelog",
+      "target": "changelog_fail_closed_rbac",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "CHANGELOG.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "changelog_changelog",
+      "target": "changelog_brevo_only_email",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "CHANGELOG.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "changelog_fail_closed_rbac",
+      "target": "readme_rbac_tier_model",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "CHANGELOG.md",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": []
+}

@@ -1,0 +1,14 @@
+# Default owner for everything in the repo. Overridden by more specific
+# rules below. GitHub uses the LAST matching pattern, not the first.
+*                       @satish093
+
+# Backend code paths
+/backend/                @satish093
+/database/               @satish093
+
+# Frontend code paths
+/frontend/               @satish093
+
+# Infra / CI / repo meta — keep tight, these gate every PR
+/.github/                @satish093
+/scripts/                @satish093

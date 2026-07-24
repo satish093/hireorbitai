@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <!--
+      viewport-fit=cover lets the page extend under the iPhone notch / Android
+      gesture area; safe-area-inset-* padding in index.css then keeps content
+      out of those zones. maximum-scale + user-scalable=yes preserves zoom for
+      accessibility while preventing iOS's auto-zoom on inputs <16px (CSS in
+      index.css handles that separately).
+    -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="theme-color" content="#4338ca" />
+    <!--
+      Standard web-app-capable hint (preferred). Kept the apple-prefixed
+      variant for older iOS Safari builds that don't read the standard one
+      yet — Chrome warns about apple-* being deprecated, but iOS still
+      needs it to honour standalone-mode behaviour.
+    -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+    />
+    <title>HireOrbit AI</title>
+    <meta
+      name="description"
+      content="HireOrbit AI — AI-powered consultant marketing and recruiting platform"
+    />
+    <!--
+      Apply the saved (or OS-preferred) theme before first paint so there's no
+      flash of the wrong theme. Mirrors src/lib/theme.ts resolveInitialTheme().
+    -->
+    <script>
+      (function () {
+        try {
+          // Default to light unless the user has explicitly chosen dark.
+          var t = localStorage.getItem('ho-theme') || 'light';
+          document.documentElement.setAttribute('data-theme', t);
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body class="bg-background text-foreground">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

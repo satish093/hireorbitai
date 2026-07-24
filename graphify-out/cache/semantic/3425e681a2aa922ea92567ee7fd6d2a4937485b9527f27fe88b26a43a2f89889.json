@@ -1,0 +1,163 @@
+{
+  "nodes": [
+    {
+      "id": "architecture_system_overview",
+      "label": "System architecture overview",
+      "file_type": "document",
+      "source_file": "docs/architecture.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "architecture_request_layers",
+      "label": "Backend request layers (server/routes/middleware/controllers/services)",
+      "file_type": "concept",
+      "source_file": "docs/architecture.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "architecture_query_builder_shim",
+      "label": "PostgREST-style query builder shim (db.ts)",
+      "file_type": "concept",
+      "source_file": "docs/architecture.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "architecture_technical_debt",
+      "label": "Deferred technical debt",
+      "file_type": "rationale",
+      "source_file": "docs/architecture.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "architecture_no_docker_decision",
+      "label": "No Docker in production (CloudPanel+PM2 native)",
+      "file_type": "rationale",
+      "source_file": "docs/architecture.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "architecture_performance_guardrails",
+      "label": "Performance guardrails",
+      "file_type": "concept",
+      "source_file": "docs/architecture.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "architecture_technical_debt",
+      "target": "repositories_readme_repository_layer",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/architecture.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "architecture_no_docker_decision",
+      "target": "docker_docker_compose_local_stack",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.75,
+      "source_file": "docs/architecture.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "architecture_system_overview",
+      "target": "architecture_request_layers",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/architecture.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "architecture_system_overview",
+      "target": "architecture_query_builder_shim",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/architecture.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "architecture_system_overview",
+      "target": "architecture_technical_debt",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/architecture.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "architecture_system_overview",
+      "target": "architecture_performance_guardrails",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/architecture.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "architecture_no_docker_decision",
+      "target": "architecture_technical_debt",
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/architecture.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "architecture_performance_guardrails",
+      "target": "api_conventions_rate_limiting",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "docs/architecture.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "architecture_query_builder_shim",
+      "target": "deployment_02_databases_init_sql",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.65,
+      "source_file": "docs/architecture.md",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": []
+}

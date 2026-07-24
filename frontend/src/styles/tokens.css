@@ -1,0 +1,546 @@
+/* ---------------------------------------------------------------------------
+ * Design tokens — "calm enterprise" system.
+ *
+ * Single source of truth for every themeable color in the app. The NEW token
+ * set (--bg, --surface, --ink, --accent, …) is authoritative; values flip on
+ * the `[data-theme="dark"]` attribute set by useTheme() (src/hooks/useTheme.ts)
+ * and the pre-paint script in index.html.
+ *
+ * The LEGACY "Twitter theme" tokens (--background, --foreground, --card,
+ * --muted-foreground, …) are kept as ALIASES that resolve to the new tokens, so
+ * the ~1,200 existing utility usages (bg-card, text-muted-foreground, …) adopt
+ * the new palette without each call site being rewritten. Aliases use var()
+ * references, so they track the active theme automatically — no per-theme
+ * duplication needed. New code should prefer the new tokens.
+ * --------------------------------------------------------------------------- */
+
+:root {
+  color-scheme: light;
+
+  /* ── New design tokens (light) ─────────────────────────────────────────── */
+  /* sRGB hex equivalent of oklch(0.992 0.003 250) — axe-core cannot parse oklch */
+  --bg: #fafbfc;
+  --bg-elev: #ffffff;
+  --bg-sunken: oklch(0.97 0.004 250);
+  --surface: #ffffff;
+  --surface-2: oklch(0.985 0.004 250);
+  --hover: oklch(0.96 0.005 250);
+  --border: oklch(0.92 0.006 250);
+  --border-strong: oklch(0.86 0.008 250);
+  /* sRGB hex equivalents of the original oklch tokens — axe-core cannot
+   * parse oklch from getComputedStyle, which was the source of intermittent
+   * dashboard color-contrast failures in CI (e.g. CI sampled --ink-2 as
+   * #888a8f → 3.39:1 on #fdfdfe). Headroom over the WCAG AA 4.5:1
+   * threshold so 10–11 px labels stay green even with antialiasing
+   * variance between local + CI Chromium. */
+  --ink: #13161c;
+  --ink-2: #4f535b; /* ~7.5:1 on #ffffff, ~7.4:1 on #fdfdfe */
+  --muted: #5d6066; /* ~6.0:1 on #ffffff (was #696d73 ≈ 5.1:1) */
+  --faint: oklch(0.7 0.01 260);
+  --accent: oklch(0.535 0.22 275);
+  --accent-2: oklch(0.47 0.23 280);
+  --accent-soft: oklch(0.96 0.035 275);
+  --accent-fg: #ffffff;
+  --brand-from: #2563eb;
+  --brand-to: #7c3aed;
+  /* Pale indigo chip/pill background paired with `--brand-on-soft` text.
+   * Light = the original Tailwind indigo-50; dark = translucent indigo-500
+   * so the chip blends into the dark surface instead of glowing pure white.
+   * `brand.50` / `brand.700` in tailwind.config.js point at these so every
+   * `bg-brand-50` / `text-brand-700` site auto-switches per theme.
+   * --brand-soft-border is the matching brand-100 border that wraps the chip
+   * (RecruiterTargetingBar, ManagerDashboard hero card, TaskDetail pill). */
+  --brand-soft: #eef2ff;
+  --brand-on-soft: #4338ca;
+  --brand-soft-border: #e0e7ff;
+  --success: #2e7a42; /* sRGB hex — 4.8:1 on success-soft #dcf7e1; axe-core cannot parse oklch */
+  --success-soft: oklch(0.95 0.04 150);
+  --warn: oklch(0.72 0.13 75);
+  --warn-soft: oklch(0.96 0.05 80);
+  --danger: oklch(0.54 0.2 25);
+  --danger-soft: oklch(0.96 0.04 25);
+  --ring: oklch(0.535 0.22 275 / 0.35);
+
+  /* ── Legacy aliases → new tokens ───────────────────────────────────────── */
+  --background: var(--bg);
+  --foreground: var(--ink);
+  --card: var(--surface);
+  --card-foreground: var(--ink);
+  --popover: var(--bg-elev);
+  --popover-foreground: var(--ink);
+  /* Old indigo "primary" was the brand color (badges, active states, links).
+   * The new brand color is the purple accent; actual CTA buttons now go
+   * through <Button variant="primary"> (ink), so map the token to accent. */
+  --primary: var(--accent);
+  --primary-foreground: var(--accent-fg);
+  --secondary: var(--ink);
+  --secondary-foreground: var(--bg);
+  --muted-foreground: var(--muted);
+  --accent-foreground: var(--accent-fg);
+  --destructive: var(--danger);
+  --destructive-foreground: #ffffff;
+  --input: var(--surface-2);
+
+  --sidebar: var(--surface);
+  --sidebar-foreground: var(--ink);
+  --sidebar-primary: var(--accent);
+  --sidebar-primary-foreground: var(--accent-fg);
+  --sidebar-accent: var(--accent-soft);
+  --sidebar-accent-foreground: var(--accent);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--ring);
+
+  /* Data-viz palette — no new equivalent; kept as literals. */
+  --chart-1: #1e9df1;
+  --chart-2: #00b87a;
+  --chart-3: #f7b928;
+  --chart-4: #17bf63;
+  --chart-5: #e0245e;
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  /* Backgrounds: slightly richer blue-gray tint — less "pure black".
+   * Values are sRGB hex equivalents of the original oklch palette so that
+   * axe-core (which cannot parse oklch from getComputedStyle) can correctly
+   * trace background colours when auditing accessibility contrast. */
+  --bg: #080b10;
+  --bg-elev: #0e1217;
+  --bg-sunken: #04060a;
+  --surface: #12151a;
+  --surface-2: #171b20;
+  --hover: #1f2329;
+  --border: #272c32;
+  --border-strong: #383d46;
+
+  /* Text: muted steel tones — readable but not harsh-white */
+  --ink: #bbbec3;
+  --ink-2: #8b8f97;
+  --muted: #8c9098; /* brightened: 4.72:1 on accent-soft/danger-soft (was 4.3:1) */
+  --faint: #84878d; /* brightened: clears 4.5:1 AA on dark surfaces (was #7d8086 = 4.49:1) */
+
+  /* Accent (sRGB-clipped from wide-gamut oklch originals) */
+  --accent: #7887ff;
+  --accent-2: #9698ff;
+  --accent-soft: #1c1c62;
+  --accent-fg: #ffffff;
+  --brand-from: #3b82f6;
+  --brand-to: #8b5cf6;
+  /* Dark-mode brand-soft chip: translucent indigo on the dark surface
+   * (mirrors the existing `dark:bg-indigo-500/15` pattern used across the
+   * app). Paired text shifts to indigo-300 so the chip stays readable.
+   * --brand-soft-border is slightly more opaque so the chip edge stays
+   * visible on the dark surface without glowing like the light-mode #e0e7ff. */
+  --brand-soft: rgb(99 102 241 / 0.15);
+  --brand-on-soft: #a5b4fc;
+  --brand-soft-border: rgb(99 102 241 / 0.3);
+  --success: #4aa865; /* brightened from #429c5a — 5.1:1 contrast on #012d10 (was 4.43:1) */
+  --success-soft: #012d10;
+  --warn: #d49838;
+  --warn-soft: #3f2100;
+  --danger: #f06861; /* brightened: 4.93:1 on danger-soft (was 4.28:1) */
+  --danger-soft: #4c1010;
+  --ring: rgba(120, 135, 255, 0.5);
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--ink);
+}
+
+/* ---------------------------------------------------------------------------
+ * Dark-mode palette fallback for Tailwind's pale color shades.
+ *
+ * Most pages use the same `bg-{family}-50` chip pattern paired with a
+ * `text-{family}-700` foreground. Across the app there are ~100 sites that
+ * use this pattern WITHOUT an explicit `dark:` variant, so in dark mode
+ * they kept rendering as bright pastels glowing on the near-black surface
+ * (RecruiterTargetingBar is the canonical example the user surfaced).
+ *
+ * tokens.css is imported BEFORE index.css (where the @tailwind directives
+ * live), so any explicit `dark:bg-{family}-XXX` the source already has wins
+ * the cascade — equal specificity, later wins. The override only kicks in
+ * for the base `bg-{family}-50` class which has lower specificity (one
+ * class) than my `[data-theme='dark'] .bg-{family}-50` (attribute + class).
+ *
+ * Pattern per family — mirrors the existing `bg-indigo-50 dark:bg-indigo-500/15
+ * text-indigo-700 dark:text-indigo-300` chip pairs already used in
+ * StatusBadge / Training / JobDetailView:
+ *   bg-{f}-50  → translucent {f}-500 at 15% opacity
+ *   bg-{f}-100 → translucent {f}-500 at 25% opacity (hover / slightly stronger)
+ *   border-{f}-100 → translucent {f}-500 at 30%
+ *   border-{f}-200 → translucent {f}-500 at 40%
+ *   text-{f}-600 → {f}-300 (the readable-on-dark counterpart)
+ *   text-{f}-700 → {f}-300
+ *   text-{f}-800 → {f}-200
+ *   text-{f}-900 → {f}-100
+ *
+ * Neutral families (slate / gray / zinc / neutral / stone) route to the
+ * design-token surface/border/ink scale rather than translucent grays so
+ * they integrate with the rest of the dark theme.
+ * --------------------------------------------------------------------------- */
+[data-theme='dark'] {
+  /* indigo */
+  .bg-indigo-50 {
+    background-color: rgb(99 102 241 / 0.15);
+  }
+  .bg-indigo-100 {
+    background-color: rgb(99 102 241 / 0.25);
+  }
+  .border-indigo-100 {
+    border-color: rgb(99 102 241 / 0.3);
+  }
+  .border-indigo-200 {
+    border-color: rgb(99 102 241 / 0.4);
+  }
+  .text-indigo-600,
+  .text-indigo-700 {
+    color: #a5b4fc;
+  }
+  .text-indigo-800 {
+    color: #c7d2fe;
+  }
+  .text-indigo-900 {
+    color: #e0e7ff;
+  }
+
+  /* blue */
+  .bg-blue-50 {
+    background-color: rgb(59 130 246 / 0.15);
+  }
+  .bg-blue-100 {
+    background-color: rgb(59 130 246 / 0.25);
+  }
+  .border-blue-100 {
+    border-color: rgb(59 130 246 / 0.3);
+  }
+  .border-blue-200 {
+    border-color: rgb(59 130 246 / 0.4);
+  }
+  .text-blue-600,
+  .text-blue-700 {
+    color: #93c5fd;
+  }
+  .text-blue-800 {
+    color: #bfdbfe;
+  }
+  .text-blue-900 {
+    color: #dbeafe;
+  }
+
+  /* sky */
+  .bg-sky-50 {
+    background-color: rgb(14 165 233 / 0.15);
+  }
+  .bg-sky-100 {
+    background-color: rgb(14 165 233 / 0.25);
+  }
+  .border-sky-100 {
+    border-color: rgb(14 165 233 / 0.3);
+  }
+  .border-sky-200 {
+    border-color: rgb(14 165 233 / 0.4);
+  }
+  .text-sky-600,
+  .text-sky-700 {
+    color: #7dd3fc;
+  }
+  .text-sky-800 {
+    color: #bae6fd;
+  }
+
+  /* cyan */
+  .bg-cyan-50 {
+    background-color: rgb(6 182 212 / 0.15);
+  }
+  .bg-cyan-100 {
+    background-color: rgb(6 182 212 / 0.25);
+  }
+  .text-cyan-600,
+  .text-cyan-700 {
+    color: #67e8f9;
+  }
+
+  /* green */
+  .bg-green-50 {
+    background-color: rgb(34 197 94 / 0.15);
+  }
+  .bg-green-100 {
+    background-color: rgb(34 197 94 / 0.25);
+  }
+  .border-green-100 {
+    border-color: rgb(34 197 94 / 0.3);
+  }
+  .border-green-200 {
+    border-color: rgb(34 197 94 / 0.4);
+  }
+  .text-green-600,
+  .text-green-700 {
+    color: #86efac;
+  }
+  .text-green-800 {
+    color: #bbf7d0;
+  }
+
+  /* emerald */
+  .bg-emerald-50 {
+    background-color: rgb(16 185 129 / 0.15);
+  }
+  .bg-emerald-100 {
+    background-color: rgb(16 185 129 / 0.25);
+  }
+  .border-emerald-100 {
+    border-color: rgb(16 185 129 / 0.3);
+  }
+  .border-emerald-200 {
+    border-color: rgb(16 185 129 / 0.4);
+  }
+  .text-emerald-600,
+  .text-emerald-700 {
+    color: #6ee7b7;
+  }
+  .text-emerald-800 {
+    color: #a7f3d0;
+  }
+
+  /* teal */
+  .bg-teal-50 {
+    background-color: rgb(20 184 166 / 0.15);
+  }
+  .text-teal-600,
+  .text-teal-700 {
+    color: #5eead4;
+  }
+
+  /* amber */
+  .bg-amber-50 {
+    background-color: rgb(245 158 11 / 0.15);
+  }
+  .bg-amber-100 {
+    background-color: rgb(245 158 11 / 0.25);
+  }
+  .border-amber-100 {
+    border-color: rgb(245 158 11 / 0.3);
+  }
+  .border-amber-200 {
+    border-color: rgb(245 158 11 / 0.4);
+  }
+  .text-amber-600,
+  .text-amber-700 {
+    color: #fcd34d;
+  }
+  .text-amber-800 {
+    color: #fde68a;
+  }
+  .text-amber-900 {
+    color: #fef3c7;
+  }
+
+  /* yellow */
+  .bg-yellow-50 {
+    background-color: rgb(234 179 8 / 0.15);
+  }
+  .text-yellow-600,
+  .text-yellow-700 {
+    color: #fde047;
+  }
+
+  /* orange */
+  .bg-orange-50 {
+    background-color: rgb(249 115 22 / 0.15);
+  }
+  .bg-orange-100 {
+    background-color: rgb(249 115 22 / 0.25);
+  }
+  .text-orange-600,
+  .text-orange-700 {
+    color: #fdba74;
+  }
+
+  /* red */
+  .bg-red-50 {
+    background-color: rgb(239 68 68 / 0.15);
+  }
+  .bg-red-100 {
+    background-color: rgb(239 68 68 / 0.25);
+  }
+  .border-red-100 {
+    border-color: rgb(239 68 68 / 0.3);
+  }
+  .border-red-200 {
+    border-color: rgb(239 68 68 / 0.4);
+  }
+  .text-red-600,
+  .text-red-700 {
+    color: #fca5a5;
+  }
+  .text-red-800 {
+    color: #fecaca;
+  }
+
+  /* rose */
+  .bg-rose-50 {
+    background-color: rgb(244 63 94 / 0.15);
+  }
+  .bg-rose-100 {
+    background-color: rgb(244 63 94 / 0.25);
+  }
+  .border-rose-100 {
+    border-color: rgb(244 63 94 / 0.3);
+  }
+  .text-rose-600,
+  .text-rose-700 {
+    color: #fda4af;
+  }
+
+  /* pink */
+  .bg-pink-50 {
+    background-color: rgb(236 72 153 / 0.15);
+  }
+  .text-pink-600,
+  .text-pink-700 {
+    color: #f9a8d4;
+  }
+
+  /* purple */
+  .bg-purple-50 {
+    background-color: rgb(168 85 247 / 0.15);
+  }
+  .bg-purple-100 {
+    background-color: rgb(168 85 247 / 0.25);
+  }
+  .border-purple-200 {
+    border-color: rgb(168 85 247 / 0.4);
+  }
+  .text-purple-600,
+  .text-purple-700 {
+    color: #d8b4fe;
+  }
+
+  /* violet */
+  .bg-violet-50 {
+    background-color: rgb(139 92 246 / 0.15);
+  }
+  .bg-violet-100 {
+    background-color: rgb(139 92 246 / 0.25);
+  }
+  .text-violet-600,
+  .text-violet-700 {
+    color: #c4b5fd;
+  }
+
+  /* fuchsia */
+  .bg-fuchsia-50 {
+    background-color: rgb(217 70 239 / 0.15);
+  }
+  .text-fuchsia-600,
+  .text-fuchsia-700 {
+    color: #f0abfc;
+  }
+
+  /* slate / gray / zinc / neutral / stone — route to design tokens so
+     * neutral chips visually integrate with the dark surface scale. */
+  .bg-slate-50,
+  .bg-gray-50,
+  .bg-zinc-50,
+  .bg-neutral-50,
+  .bg-stone-50 {
+    background-color: var(--surface-2);
+  }
+  .bg-slate-100,
+  .bg-gray-100,
+  .bg-zinc-100,
+  .bg-neutral-100,
+  .bg-stone-100 {
+    background-color: var(--hover);
+  }
+  .border-slate-100,
+  .border-gray-100,
+  .border-zinc-100,
+  .border-neutral-100,
+  .border-stone-100 {
+    border-color: var(--border);
+  }
+  .border-slate-200,
+  .border-gray-200,
+  .border-zinc-200,
+  .border-neutral-200,
+  .border-stone-200 {
+    border-color: var(--border-strong);
+  }
+  .text-slate-700,
+  .text-gray-700,
+  .text-zinc-700,
+  .text-neutral-700,
+  .text-stone-700 {
+    color: var(--ink);
+  }
+  .text-slate-800,
+  .text-gray-800,
+  .text-zinc-800,
+  .text-neutral-800,
+  .text-stone-800 {
+    color: var(--ink);
+  }
+  .text-slate-900,
+  .text-gray-900,
+  .text-zinc-900,
+  .text-neutral-900,
+  .text-stone-900 {
+    color: var(--ink);
+  }
+  .text-slate-600,
+  .text-gray-600,
+  .text-zinc-600,
+  .text-neutral-600,
+  .text-stone-600 {
+    color: var(--ink-2);
+  }
+}
+
+/* ── Mobile sheet animation ─────────────────────────────────────────────── */
+@keyframes ho-sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+.animate-sheet-in {
+  animation: ho-sheet-in 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-sheet-in {
+    animation: none !important;
+  }
+}
+
+/* Desktop Drawer — slides in from the right */
+@keyframes slide-in-right {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+.animate-slide-in-right {
+  animation: slide-in-right 0.26s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-slide-in-right {
+    animation: none !important;
+  }
+}
+
+/* Hide scrollbars while keeping scrollability (used in mobile inner panels) */
+.noscroll::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+.noscroll {
+  scrollbar-width: none;
+}

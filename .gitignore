@@ -1,0 +1,132 @@
+node_modules/
+dist/
+
+# Env files — never commit secrets. .env.example is allowed to be tracked
+# but it must contain placeholders only (e.g. `BREVO_API_KEY=xkeysib-...`),
+# never real keys. The negation rule below makes that explicit.
+.env
+.env.*
+!.env.example
+# Per-environment templates (placeholders only, never real secrets):
+#   backend/.env.development.example, backend/.env.production.example, etc.
+!.env.*.example
+
+.env.local
+.DS_Store
+*.log
+.vite/
+
+# Claude Code config — commit team-shared files under .claude/ but exclude
+# personal overrides and per-agent memory the team doesn't share.
+.claude/settings.local.json
+.claude/projects/
+.claude/cache/
+
+# Claude Flow / auto-generated agent tooling (not project config)
+.claude-flow/
+.claude/agents/browser/
+.claude/agents/consensus/
+.claude/agents/core/
+.claude/agents/sparc/
+.claude/agents/swarm/
+.claude/agents/testing/
+.claude/commands/agents/
+.claude/commands/analysis/
+.claude/commands/automation/
+.claude/commands/claude-flow-help.md
+.claude/commands/claude-flow-memory.md
+.claude/commands/claude-flow-swarm.md
+.claude/commands/coordination/
+.claude/commands/github/
+.claude/commands/hive-mind/
+.claude/commands/hooks/
+.claude/commands/memory/
+.claude/commands/monitoring/
+.claude/commands/optimization/
+.claude/commands/sparc/
+.claude/commands/swarm/
+.claude/commands/ui-scan.md
+.claude/commands/workflows/
+.claude/helpers/
+.claude/skills/agentdb-advanced/
+.claude/skills/agentdb-learning/
+.claude/skills/agentdb-memory-patterns/
+.claude/skills/agentdb-optimization/
+.claude/skills/agentdb-vector-search/
+.claude/skills/browser/
+.claude/skills/github-code-review/
+.claude/skills/github-multi-repo/
+.claude/skills/github-project-management/
+.claude/skills/github-release-management/
+.claude/skills/github-workflow-automation/
+.claude/skills/hooks-automation/
+.claude/skills/pair-programming/
+.claude/skills/reasoningbank-agentdb/
+.claude/skills/reasoningbank-intelligence/
+.claude/skills/skill-builder/
+.claude/skills/sparc-methodology/
+.claude/skills/stream-chain/
+.claude/skills/swarm-advanced/
+.claude/skills/swarm-orchestration/
+.claude/skills/v3-cli-modernization/
+.claude/skills/v3-core-implementation/
+.claude/skills/v3-ddd-architecture/
+.claude/skills/v3-integration-deep/
+.claude/skills/v3-mcp-optimization/
+.claude/skills/v3-memory-unification/
+.claude/skills/v3-performance-optimization/
+.claude/skills/v3-security-overhaul/
+.claude/skills/v3-swarm-coordination/
+.claude/skills/verification-quality/
+
+# PM2 + Node 22 build artifacts
+.pm2/
+*.tsbuildinfo
+
+# Husky internals (the templates we commit live at .husky/<hook>; the
+# `.husky/_` directory is created by `husky` at install time).
+.husky/_/
+
+# Backups (local + production stamped dirs from scripts/backup.sh)
+backups/
+~backups/
+
+# IDE
+.idea/
+.vscode/
+
+# Coverage
+coverage/
+
+# Playwright (UI smoke suite) — generated artifacts, never committed
+frontend/playwright-report/
+frontend/test-results/
+frontend/e2e-results/
+frontend/blob-report/
+frontend/.playwright/
+test-results/
+
+# OWASP ZAP baseline scan output (scripts/zap-baseline.ps1)
+zap-report/
+
+# Live AI test script (contains no secrets but excluded to avoid confusion)
+scripts/test-ai-live.mjs
+
+# Stray files from local testing
+/*.pdf
+
+# Design handoff bundle — fetched reference material (prototypes / specs /
+# plans): the visual + written source of truth for the redesign, NOT project
+# source. Never committed; re-fetch via the design share URL if missing.
+design_handoff_hireorbitai/
+dh_response.bin
+
+# --- Expo / React Native (mobile workspace) ---
+.expo/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+mobile/ios/
+mobile/android/

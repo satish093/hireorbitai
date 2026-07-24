@@ -1,0 +1,39 @@
+{
+  "nodes": [
+    {
+      "id": "migrations_guide",
+      "label": "Migrations Guide (node-pg-migrate)",
+      "file_type": "document",
+      "source_file": "backend/MIGRATIONS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "migrations_two_systems_coexistence",
+      "label": "Two Coexisting Migration Systems (baseline + node-pg-migrate)",
+      "file_type": "rationale",
+      "source_file": "backend/MIGRATIONS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "migrations_guide",
+      "target": "migrations_two_systems_coexistence",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "backend/MIGRATIONS.md",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": []
+}

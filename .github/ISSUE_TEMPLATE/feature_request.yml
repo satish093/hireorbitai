@@ -1,0 +1,47 @@
+name: Feature request
+description: Propose a new feature or enhancement
+labels: [enhancement, triage]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user-facing problem does this solve? Who's blocked today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What you want built. UI sketches, API shapes, anything concrete.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What else did you think about, and why is the proposal better?
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Affected surface
+      multiple: true
+      options:
+        - Frontend
+        - Backend
+        - Database
+        - Email
+        - Auth
+        - Admin tools
+        - Feature flags
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options:
+        - P0 — blocking
+        - P1 — current sprint
+        - P2 — next sprint
+        - P3 — nice to have
+    validations:
+      required: true

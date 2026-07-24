@@ -1,0 +1,145 @@
+# Render Blueprint — FREE development hosting for HireOrbit AI.
+#
+# Two services, both built from the `dev` branch:
+#   • hireorbit-api-dev  — Express backend (free web service; cold-starts after
+#                          ~15 min idle, ~30s wake)
+#   • hireorbit-web-dev  — React/Vite frontend (free static site; always-on)
+#
+# The DEV database is Neon (free, separate server) — NOT defined here, set its
+# connection string as the DATABASE_URL secret below.
+#
+# autoDeploy is ON: Render's native GitHub integration redeploys both services
+# on every push to the `dev` branch — no GitHub Action or deploy hook needed.
+# (Pushing to `main` is the PRODUCTION VPS deploy and never touches Render.)
+#
+# Field names in Render's blueprint spec drift occasionally; if `render.yaml`
+# import fails, create the two services by hand in the dashboard using the same
+# build/start commands + env vars (see docs/deployment/03-render-dev-hosting.md).
+
+services:
+  # ---------------------------------------------------------------- backend ---
+  - type: web
+    name: hireorbit-api-dev
+    runtime: node
+    plan: free
+    branch: dev
+    autoDeploy: true
+    # db-bootstrap applies database/init.sql on a FRESH database (then migrations
+    # + first-time admin), and is a no-op on an already-initialised DB. It owns
+    # the migrate step, so migrate:ci is no longer called separately here.
+    buildCommand: npm ci && npm run shared:build && npm --prefix backend run build && node scripts/db-bootstrap.mjs
+    startCommand: node backend/dist/server.js
+    healthCheckPath: /health
+    envVars:
+      # development (NOT production) so the cross-env DB guard accepts a dev DB.
+      - key: NODE_ENV
+        value: development
+      - key: DB_GUARD
+        value: enforce
+      # Render injects PORT; the app reads it. 10000 is Render's default.
+      - key: PORT
+        value: 10000
+      - key: TRUST_PROXY
+        value: 1
+      # ---- secrets / set-after-first-deploy (sync:false = enter in dashboard) ----
+      - key: DATABASE_URL # Neon dev connection string (must contain hireorbit_dev)
+        sync: false
+      - key: DATABASE_SSL
+        value: require
+      - key: CORS_ORIGIN # the static-site URL, e.g. https://hireorbit-web-dev.onrender.com
+        sync: false
+      - key: APP_URL
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: BREVO_API_KEY
+        sync: false
+      # First deploy against an EMPTY DB auto-seeds the known dev accounts, so you
+      # log in with the same admin as always — admin@hireorbitai.test — using the
+      # seed password (default Passw0rd!2026; override here to match what you used
+      # before). The full org tree (satish@, rishi@, …) is seeded too. An existing
+      # DB is never re-seeded. Set SEED_DEV=false for a blank, schema-only env.
+      - key: SEED_PASSWORD
+        sync: false
+      # ---- generated once by Render, stable across deploys ----
+      - key: JWT_SECRET
+        generateValue: true
+      - key: COOKIE_SECRET
+        generateValue: true
+      - key: STORAGE_URL_SECRET
+        generateValue: true
+      # ---- dev tooling: role/user switch + super-admin test panel ----
+      # Force-disabled whenever NODE_ENV=production, so this is impossible to
+      # enable on the live VPS even by mistake.
+      - key: DEV_TOOLS
+        value: 'true'
+      # Background-job scheduler (reminders / jobs-sync / daily-digest / session
+      # purge). ON for serious testing of reminders + digests. NOTE: the free
+      # instance is RAM-constrained — if the service OOM-restarts, either bump
+      # the instance plan or set this back to 'false'.
+      - key: RUN_SCHEDULER
+        value: 'true'
+      # ---- "serious testing" profile: real email + AI enabled ----
+      # (Set the matching secrets below in the dashboard. Flip the *_MOCK keys
+      #  back to 'true' / provider to 'stub' to return to zero-spend mode.)
+      - key: UPLOADS_DIR
+        value: /tmp/uploads
+      # Real AI for training-content generation via ANTHROPIC_API_KEY. Use
+      # 'oauth' (ANTHROPIC_OAUTH_TOKEN) or 'stub' (no spend) as alternatives.
+      - key: TRAINING_AI_PROVIDER
+        value: api
+      # Send real transactional email (invitations, password reset, welcome).
+      # Requires a real BREVO_API_KEY + a Brevo-VERIFIED BREVO_SENDER_EMAIL.
+      - key: BREVO_MOCK
+        value: 'false'
+      # Must be a sender address verified in your Brevo account, or sends bounce.
+      - key: BREVO_SENDER_EMAIL
+        sync: false
+      - key: BREVO_SENDER_NAME
+        value: HireOrbit AI (Dev)
+      # Set to a real sk-ant-… key to enable Anthropic AI (matching/scoring/
+      # training). At least one AI key (Anthropic / Groq / Gemini) must be set.
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      # Free AI stack — values entered in the Render dashboard (sync:false keeps
+      # secrets OUT of git). Groq is primary for AI tasks; Gemini is a fallback;
+      # LlamaParse handles resume-PDF extraction.
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: LLAMA_CLOUD_API_KEY
+        sync: false
+      # Live job ingestion costs real RapidAPI/JSearch budget, so it stays MOCKED
+      # by default even in the serious-testing profile. To test real ingestion:
+      # set JOB_SOURCES_MOCK='false' and provide the source keys (RAPIDAPI_KEY +
+      # JSEARCH_API_KEY per the 4-source policy in CLAUDE.md). Synthetic MOCK-*
+      # jobs are produced otherwise.
+      - key: JOB_SOURCES_MOCK
+        value: 'true'
+      - key: RAPIDAPI_KEY
+        sync: false
+      - key: JSEARCH_API_KEY
+        sync: false
+
+  # --------------------------------------------------------------- frontend ---
+  - type: web
+    name: hireorbit-web-dev
+    runtime: static
+    branch: dev
+    autoDeploy: true
+    buildCommand: npm ci && npm run shared:build && npm --prefix frontend run build
+    staticPublishPath: frontend/dist
+    envVars:
+      # Set to the backend URL + /api, e.g. https://hireorbit-api-dev.onrender.com/api
+      - key: VITE_API_URL
+        sync: false
+      # Enables the floating dev toolbar + /dev test panel in this dev build.
+      # (Tree-shaken out of any production build regardless of this value.)
+      - key: VITE_DEV_TOOLS
+        value: 'true'
+    routes:
+      # SPA fallback — every unknown path serves index.html for client routing.
+      - type: rewrite
+        source: /*
+        destination: /index.html

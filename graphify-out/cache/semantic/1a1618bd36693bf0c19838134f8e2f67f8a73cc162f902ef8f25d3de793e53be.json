@@ -1,0 +1,102 @@
+{
+  "nodes": [
+    {
+      "id": "rules_frontend_responsive",
+      "label": "Frontend responsive + a11y rules",
+      "file_type": "document",
+      "source_file": ".claude/rules/frontend-responsive.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "rules_frontend_responsive_dvh_units",
+      "label": "Use dvh not vh viewport units",
+      "file_type": "rationale",
+      "source_file": ".claude/rules/frontend-responsive.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "rules_frontend_responsive_modal_portal",
+      "label": "Portaled viewport-centered Modal",
+      "file_type": "rationale",
+      "source_file": ".claude/rules/frontend-responsive.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "rules_frontend_responsive_lazy_routes",
+      "label": "Lazy-loaded page routes",
+      "file_type": "concept",
+      "source_file": ".claude/rules/frontend-responsive.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "rules_frontend_responsive_cross_page_invalidation",
+      "label": "Cross-page invalidation channel",
+      "file_type": "concept",
+      "source_file": ".claude/rules/frontend-responsive.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "rules_frontend_responsive",
+      "target": "rules_frontend_responsive_dvh_units",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": ".claude/rules/frontend-responsive.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "rules_frontend_responsive",
+      "target": "rules_frontend_responsive_modal_portal",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": ".claude/rules/frontend-responsive.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "rules_frontend_responsive",
+      "target": "rules_frontend_responsive_lazy_routes",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": ".claude/rules/frontend-responsive.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "rules_frontend_responsive",
+      "target": "rules_frontend_responsive_cross_page_invalidation",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": ".claude/rules/frontend-responsive.md",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": []
+}

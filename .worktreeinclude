@@ -1,0 +1,11 @@
+# Files copied from the main checkout into every new `git worktree`. They are
+# gitignored (or would be), so a fresh worktree wouldn't have them otherwise.
+# Without these, a worktree-spawned dev server can't boot — the backend env
+# file is required at startup.
+
+backend/.env
+frontend/.env
+
+# Personal Claude Code overrides — keep them per-worktree so a worktree
+# inherits the same permission allowlist + hooks.
+.claude/settings.local.json

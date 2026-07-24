@@ -1,0 +1,49 @@
+{
+  "nodes": [
+    {
+      "id": "dependabot_config",
+      "label": "Dependabot Config",
+      "file_type": "document",
+      "source_file": ".github/dependabot.yml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "dependabot_minor_patch_grouping",
+      "label": "Weekly Minor+Patch Dependency Grouping",
+      "file_type": "rationale",
+      "source_file": ".github/dependabot.yml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "dependabot_config",
+      "target": "dependabot_minor_patch_grouping",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": ".github/dependabot.yml",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "dependabot_config",
+      "target": "contributing_branch_model",
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": ".github/dependabot.yml",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": []
+}

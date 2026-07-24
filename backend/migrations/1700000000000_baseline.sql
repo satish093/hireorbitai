@@ -1,0 +1,43 @@
+-- =============================================================================
+-- Baseline migration — claims the existing database/*.sql tree as "version 0".
+--
+-- WHY:
+--   The repository started without a migration runner. The 30+ files under
+--   /database/ are idempotent and have been applied via plain `psql -f` on
+--   every existing environment. node-pg-migrate is now the canonical path
+--   for future schema changes — but it needs to know NOT to try to re-apply
+--   what's already there.
+--
+-- HOW:
+--   This migration is intentionally a NO-OP at the schema level (just a
+--   sentinel `select 1`). The `pgmigrations` row it inserts is the only
+--   side-effect — that row tells the runner "everything up to and including
+--   this point has already been handled by the manual /database/*.sql apply".
+--
+-- WHEN TO RUN:
+--   First time you wire this repo onto a host where the /database/ tree was
+--   already applied manually:
+--       cd backend
+--       npm run migrate:up        -- applies baseline + any new migrations
+--
+--   Fresh DB on a brand new VPS:
+--       psql "$DATABASE_URL" -f ../database/schema.sql
+--       psql "$DATABASE_URL" -f ../database/auth-hardening.sql
+--       psql "$DATABASE_URL" -f ../database/admin-user-management.sql
+--       psql "$DATABASE_URL" -f ../database/feature-flags.sql
+--       # ... plus other feature modules under /database/
+--       npm run migrate:up         -- applies baseline + any new migrations
+--
+-- GOING FORWARD:
+--   Every new schema change is a new file under /backend/migrations/, created
+--   with:
+--       npm run migrate:create <slug>
+--   The runner enforces ordering by the timestamp prefix.
+-- =============================================================================
+
+-- No-op statement so the migration runner has SOMETHING to execute.
+SELECT 1 AS noop;
+
+-- Down-migration: also a no-op. We DON'T want `migrate:down` to ever try to
+-- undo the manual baseline — that would require re-running all 30+ /database
+-- files in reverse, which isn't how they were written.

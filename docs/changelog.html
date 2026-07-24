@@ -1,0 +1,700 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>HireOrbit AI — Changelog</title>
+  <style>
+    :root {
+      --bg: #f6f7fb;
+      --card: #ffffff;
+      --border: #e6e9f1;
+      --border-strong: #d4d9e4;
+      --text: #0b1220;
+      --text-soft: #29324a;
+      --muted: #5d6781;
+      --brand: #4f46e5;
+      --brand-deep: #3730a3;
+      --brand-soft: #eef2ff;
+      --emerald: #047857;
+      --emerald-soft: #ecfdf5;
+      --rose: #be123c;
+      --rose-soft: #fff1f2;
+      --amber: #b45309;
+      --amber-soft: #fffbeb;
+      --sky: #0369a1;
+      --sky-soft: #f0f9ff;
+      --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
+      --shadow-md: 0 4px 16px -8px rgba(15, 23, 42, 0.08), 0 2px 4px -2px rgba(15, 23, 42, 0.04);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      padding: 40px 16px 16px;
+      background:
+        radial-gradient(1200px 600px at 50% -120px, rgba(79, 70, 229, 0.10), transparent 60%),
+        var(--bg);
+      color: var(--text);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      line-height: 1.6;
+      font-size: 14.5px;
+      -webkit-font-smoothing: antialiased;
+      letter-spacing: -0.005em;
+    }
+    .container { max-width: 840px; margin: 0 auto; }
+
+    /* ---- Header ----------------------------------------------------------- */
+    header {
+      position: relative;
+      padding: 32px 36px;
+      background: linear-gradient(180deg, #ffffff 0%, #fbfbfe 100%);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      margin-bottom: 28px;
+      box-shadow: var(--shadow-md);
+      overflow: hidden;
+    }
+    header::before {
+      content: '';
+      position: absolute;
+      inset: 0 0 auto 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--brand) 0%, #7c3aed 50%, #0ea5e9 100%);
+    }
+    header h1 {
+      margin: 0 0 10px 0;
+      font-size: 26px;
+      letter-spacing: -0.025em;
+      font-weight: 700;
+      color: var(--text);
+    }
+    header > p:first-of-type {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14.5px;
+    }
+
+    /* ---- Release card ----------------------------------------------------- */
+    .release {
+      position: relative;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px 32px;
+      margin-bottom: 14px;
+      box-shadow: var(--shadow-sm);
+      transition:
+        transform 180ms cubic-bezier(0.22, 1, 0.36, 1),
+        box-shadow 180ms cubic-bezier(0.22, 1, 0.36, 1),
+        border-color 180ms ease;
+      overflow: hidden;
+    }
+    .release::before {
+      /* Accent stripe along the left edge. The colour is set per pill class
+         below so the colour matches the category. */
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 14px;
+      bottom: 14px;
+      width: 3px;
+      border-radius: 0 3px 3px 0;
+      background: var(--brand);
+      opacity: 0.75;
+    }
+    .release:hover {
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-md);
+      border-color: var(--border-strong);
+    }
+    .release:has(.pill.new)::before  { background: var(--emerald); }
+    .release:has(.pill.fix)::before  { background: var(--brand); }
+    .release:has(.pill.sec)::before  { background: var(--rose); }
+    .release:has(.pill.perf)::before { background: var(--amber); }
+    .release:has(.pill.devx)::before { background: var(--sky); }
+
+    .release-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 6px;
+    }
+    .release-head h2 {
+      margin: 0;
+      font-size: 17px;
+      font-weight: 650;
+      letter-spacing: -0.012em;
+      color: var(--text);
+    }
+    .release-head .date {
+      color: var(--muted);
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+      font-weight: 500;
+      padding: 3px 9px;
+      border-radius: 999px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+    }
+    .release-summary {
+      color: var(--text-soft);
+      font-size: 14px;
+      margin: 6px 0 18px 0;
+      max-width: 68ch;
+    }
+
+    /* ---- Sub-groups ------------------------------------------------------- */
+    .group {
+      margin-top: 16px;
+      padding-top: 14px;
+      border-top: 1px dashed var(--border);
+    }
+    .group:first-of-type {
+      border-top: none;
+      padding-top: 0;
+    }
+    .group h3 {
+      font-size: 10.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      margin: 0 0 10px 0;
+    }
+
+    /* ---- Bullets ---------------------------------------------------------- */
+    ul.bullets {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    ul.bullets li {
+      position: relative;
+      padding-left: 20px;
+      margin-bottom: 8px;
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--text-soft);
+    }
+    ul.bullets li::before {
+      content: '';
+      position: absolute;
+      left: 6px;
+      top: 0.66em;
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--brand);
+      opacity: 0.7;
+    }
+    ul.bullets li strong { color: var(--text); font-weight: 600; }
+
+    /* ---- Pills ------------------------------------------------------------ */
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      padding: 3px 8px;
+      border-radius: 999px;
+      vertical-align: middle;
+      margin-left: 8px;
+      border: 1px solid transparent;
+      line-height: 1;
+    }
+    .pill::before {
+      content: '';
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: currentColor;
+      opacity: 0.7;
+    }
+    .pill.new  { background: var(--emerald-soft); color: var(--emerald); border-color: rgba(4, 120, 87, 0.15); }
+    .pill.fix  { background: var(--brand-soft);   color: var(--brand);   border-color: rgba(79, 70, 229, 0.15); }
+    .pill.sec  { background: var(--rose-soft);    color: var(--rose);    border-color: rgba(190, 18, 60, 0.15); }
+    .pill.perf { background: var(--amber-soft);   color: var(--amber);   border-color: rgba(180, 83, 9, 0.15); }
+    .pill.devx { background: var(--sky-soft);     color: var(--sky);     border-color: rgba(3, 105, 161, 0.15); }
+
+    /* ---- Footer ----------------------------------------------------------- */
+    footer {
+      color: var(--muted);
+      font-size: 12.5px;
+      text-align: center;
+      padding: 32px 8px 16px;
+    }
+    footer a { color: var(--brand); text-decoration: none; font-weight: 500; }
+    footer a:hover { text-decoration: underline; }
+
+    /* ---- Inline code ------------------------------------------------------ */
+    code {
+      background: #eef2f9;
+      color: var(--brand-deep);
+      padding: 1.5px 6px;
+      border-radius: 5px;
+      font-family: 'SF Mono', Menlo, Consolas, monospace;
+      font-size: 12.5px;
+      border: 1px solid rgba(79, 70, 229, 0.08);
+    }
+
+    /* ---- Mobile ----------------------------------------------------------- */
+    @media (max-width: 640px) {
+      body { padding: 20px 12px 8px; }
+      header { padding: 24px 22px; border-radius: 16px; }
+      header h1 { font-size: 22px; }
+      .release { padding: 20px 22px; border-radius: 14px; }
+      .release-head h2 { font-size: 16px; }
+    }
+
+    /* ---- Reduced motion --------------------------------------------------- */
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      .release { transition: none; }
+      .release:hover { transform: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <header>
+      <h1>HireOrbit AI — Product Changelog</h1>
+      <p>What we shipped, in plain language. Newest first.</p>
+      <p style="margin-top:8px;font-size:12.5px;color:var(--muted);">
+        <strong style="color:var(--text);font-weight:600;">Last updated:</strong> 2026-05-18
+        &nbsp;·&nbsp;
+        <strong style="color:var(--text);font-weight:600;">Latest highlights:</strong>
+        security hardening pass (7 access-control fixes), messaging reliability fixes, mobile navigation, design polish, saved task filters.
+      </p>
+    </header>
+
+    <!-- ================== SECURITY HARDENING (2026-05-18) ================== -->
+
+    <div class="release">
+      <div class="release-head">
+        <h2>Access-control hardening pass<span class="pill sec">Security</span></h2>
+        <span class="date">2026-05-18</span>
+      </div>
+      <p class="release-summary">A focused security review of the codebase found seven access-control issues. All seven are now closed. None had been observed in use; the fixes are precautionary.</p>
+
+      <div class="group">
+        <h3>What was tightened</h3>
+        <ul class="bullets">
+          <li><strong>Consultant profiles.</strong> Edits to a consultant&rsquo;s profile now require the editor to either be that consultant, their assigned recruiter, or a manager. Previously any signed-in user could edit any consultant&rsquo;s profile if they knew the row&rsquo;s ID.</li>
+          <li><strong>Applications &amp; pipeline.</strong> Listing, editing, and ATS scoring on the Applications surface are now scoped per user: consultants see only their own, recruiters see only their pipeline, managers see everything. The list endpoint also no longer returns the whole database when called without filters.</li>
+          <li><strong>Interviews.</strong> Scheduling, rescheduling, and submitting feedback on interviews now require the caller to either be the assigned consultant&rsquo;s recruiter, the assigned consultant themselves, or a manager. Previously these were unscoped.</li>
+          <li><strong>Training uploads.</strong> Uploading a completion artifact (used as compliance evidence on STEM-OPT / I-983 reports) now requires the uploader to actually be the assignee or a manager.</li>
+          <li><strong>Admin lifecycle.</strong> A lower-tier admin (Director, CTO, or CEO) can no longer change the status, group, or password of a Super Admin. The system also refuses to deactivate the last active Super Admin, so the org can never lock itself out.</li>
+          <li><strong>Login email lookup.</strong> The login flow now treats the email as an exact case-insensitive match instead of a pattern match. Closes a path where a pattern like <code>admin%@example.com</code> could be used to target a specific account.</li>
+        </ul>
+      </div>
+
+      <div class="group">
+        <h3>How we found them</h3>
+        <ul class="bullets">
+          <li>A multi-agent review walked every API endpoint and traced who can call what.</li>
+          <li>Each candidate finding went through an independent verification pass before being acted on. Two suspected issues were downgraded to lower-impact information notes and are not part of this fix bundle.</li>
+          <li>The existing permission-engine test suite (14 tests) still passes; no behaviour change for legitimate callers.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="release">
+      <div class="release-head">
+        <h2>Messaging reliability fixes<span class="pill fix">Fix</span></h2>
+        <span class="date">2026-05-18</span>
+      </div>
+      <p class="release-summary">Two issues affecting the Messages page are resolved.</p>
+      <ul class="bullets">
+        <li><strong>Conversations failed to load.</strong> Opening a thread returned a server error because the underlying database adapter didn&rsquo;t understand a particular query shape used by the messaging feature. The adapter now handles it, and threads load normally.</li>
+        <li><strong>Sending &ldquo;hi&rdquo; sometimes showed two copies.</strong> A race between the optimistic local append and the realtime push from the server could surface the same message twice for a moment. The local row is now reconciled against the real server message as soon as the send completes, so the deduplication that was always meant to happen actually fires.</li>
+      </ul>
+    </div>
+
+    <!-- ================== MOBILE + UI POLISH PASSES (2026-05-18) ================== -->
+
+    <div class="release">
+      <div class="release-head">
+        <h2>Design system tune-up &amp; faster first load<span class="pill perf">Performance</span></h2>
+        <span class="date">2026-05-18</span>
+      </div>
+      <p class="release-summary">A pass to unify the small repeated pieces of the interface — badges, inputs, buttons — so they look intentionally designed together. We also cut the time-to-first-paint roughly in half.</p>
+
+      <div class="group">
+        <h3>Visual polish</h3>
+        <ul class="bullets">
+          <li>Every status, priority, due-date, and tag pill now uses one shared component, so they share the same rounding, padding, and font. Small changes that add up to a more polished feel across every list and card.</li>
+          <li>Inputs, dropdowns, and buttons now align perfectly when placed side by side. Previously a row like <em>[search field] [filter dropdown] [primary button]</em> could be a pixel off — now it&rsquo;s flush.</li>
+          <li>Keyboard focus rings only appear when navigating by keyboard (Tab), not when clicking with a mouse. Cleaner look, same accessibility.</li>
+          <li>Dashboards now show animated placeholder cards while data loads instead of a row of em-dashes. Less of a &ldquo;is this broken?&rdquo; moment on slow connections.</li>
+          <li>Task detail page has tighter spacing on phones and its toolbar wraps cleanly on narrow widths.</li>
+        </ul>
+      </div>
+
+      <div class="group">
+        <h3>Speed</h3>
+        <ul class="bullets">
+          <li>The initial app download dropped from about 688 KB to 331 KB — roughly a 52% reduction. Pages people don&rsquo;t visit (admin tools, training, reports) no longer load until they&rsquo;re actually opened.</li>
+          <li>First paint is noticeably faster on slow networks and mid-range phones.</li>
+          <li>No behavioural changes — just smaller, smarter downloads.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="release">
+      <div class="release-head">
+        <h2>Works on every screen — iPhone, Android, tablet, desktop<span class="pill fix">Fix</span></h2>
+        <span class="date">2026-05-18</span>
+      </div>
+      <p class="release-summary">A focused pass on the browser-engine quirks that make a &ldquo;responsive&rdquo; site still break on real phones. The app now behaves predictably on iPhone (including notch models), Android, small phones, large phones, tablets, laptops, and desktops.</p>
+      <ul class="bullets">
+        <li>Content tucks correctly under the iPhone notch and gesture bar with proper safe-area padding.</li>
+        <li>No more layout jumping when the iPhone Safari URL bar shows or hides during scroll.</li>
+        <li>Tapping an input no longer causes iOS to auto-zoom in (and forget to zoom back).</li>
+        <li>The rubber-band scroll on iOS no longer exposes a strip of background past the content edge.</li>
+        <li>The blue flash on tap is gone — replaced with the app&rsquo;s own subtle press feedback.</li>
+        <li>A safety net at the page root prevents accidental horizontal scrolling on narrow viewports.</li>
+        <li>The Messages page stacks the conversation list above the chat on phones instead of squeezing them side-by-side.</li>
+        <li>The Create-task form switches to a single-column layout on phones so dropdowns and date pickers have room.</li>
+      </ul>
+    </div>
+
+    <div class="release">
+      <div class="release-head">
+        <h2>Mobile navigation + cleaner header<span class="pill new">New</span></h2>
+        <span class="date">2026-05-18</span>
+      </div>
+      <p class="release-summary">The sidebar now collapses into a slide-over menu on phones, and the header drops the placeholder controls that made the UI feel half-finished.</p>
+      <ul class="bullets">
+        <li>New hamburger menu on phones and small tablets — taps to open a slide-over sidebar with the full navigation. Closes automatically on route change, on Escape, or on tap-outside.</li>
+        <li>Removed the disabled &ldquo;Search (coming soon)&rdquo; field and the disabled bell icon from the header. They&rsquo;ll come back once those features actually land; until then the header looks intentional.</li>
+        <li>Modal dialogs now trap keyboard focus, restore focus to the trigger button on close, and scroll their own body instead of pushing the title and footer off the screen on tall content.</li>
+        <li>Tables now scroll horizontally on narrow screens instead of squashing columns into unreadable widths.</li>
+        <li>Page titles wrap gracefully instead of being cut off mid-word.</li>
+        <li>Two new shared building blocks &mdash; an empty-state card and a loading-skeleton primitive &mdash; available across the app for consistent &ldquo;nothing here yet&rdquo; and &ldquo;loading&rdquo; UI.</li>
+      </ul>
+    </div>
+
+    <!-- ================== FEATURES + BACKEND HARDENING (2026-05-18) ================== -->
+
+    <div class="release">
+      <div class="release-head">
+        <h2>Saved task filters &amp; real reminder delivery<span class="pill new">New</span></h2>
+        <span class="date">2026-05-18</span>
+      </div>
+      <p class="release-summary">Two practical improvements people will notice immediately: filter presets on the Tasks page, and reminders that actually send.</p>
+
+      <div class="group">
+        <h3>Saved task filters</h3>
+        <ul class="bullets">
+          <li>Set up any filter combination on the Tasks page (status, priority, assignee, search, overdue, etc.), then save it under a name.</li>
+          <li>Pin one filter as your default — it loads automatically every time you open the page.</li>
+          <li>Rename or delete saved filters at any time.</li>
+          <li>Filters are private to each person — your &ldquo;My open critical&rdquo; only shows in your dropdown.</li>
+        </ul>
+      </div>
+
+      <div class="group">
+        <h3>Reminders now deliver</h3>
+        <ul class="bullets">
+          <li>The reminders system was previously marking reminders as &ldquo;sent&rdquo; without actually emailing them. Reminders now go out through the same branded email channel as the rest of our transactional mail.</li>
+          <li>If a delivery fails (network glitch, mail-provider hiccup), the reminder is automatically retried with backoff &mdash; up to 5 attempts before giving up. No more silently dropped reminders.</li>
+          <li>Failure details are logged on the reminder row so an operator can inspect what happened.</li>
+        </ul>
+      </div>
+
+      <div class="group">
+        <h3>Security fix</h3>
+        <ul class="bullets">
+          <li>Closed a vulnerability where any signed-in user could edit, complete, or delete another user&rsquo;s reminders if they guessed an ID. Every change now verifies you own the reminder first.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="release">
+      <div class="release-head">
+        <h2>Codebase cleanup &amp; safer email path<span class="pill devx">Dev</span></h2>
+        <span class="date">2026-05-18</span>
+      </div>
+      <p class="release-summary">Internal hygiene with one user-visible improvement.</p>
+      <ul class="bullets">
+        <li>Cleaned up dead imports and stale lint suppressions across the codebase &mdash; no behaviour change, just a tidier foundation for future work.</li>
+        <li>Removed an unsafe type workaround in the password-changed email path that could in theory have sent a malformed payload to the email provider.</li>
+        <li>Same automated checks as before still pass: type checking, linting, and the security tests for the messaging permission engine.</li>
+      </ul>
+    </div>
+
+    <!-- ================== MESSAGING OVERHAUL (PHASES 1-6) ================== -->
+
+    <div class="release">
+      <div class="release-head">
+        <h2>Realtime messaging — Phase 6<span class="pill new">New</span></h2>
+        <span class="date">2026-05-18</span>
+      </div>
+      <p class="release-summary">Messages now appear instantly across every open tab — no more 8-second polling wait. The same channel will power notifications, presence, and live task updates without further plumbing.</p>
+      <ul class="bullets">
+        <li>New persistent push channel: every signed-in browser keeps one Server-Sent Events stream open against the API. New messages, edits, and deletes arrive within ~50 ms instead of every 8 s.</li>
+        <li>Cross-server delivery via Postgres LISTEN/NOTIFY — no Redis, no new dependency. Each backend worker listens on its own connection; Postgres broadcasts to all workers so the recipient always gets the push regardless of which worker the sender hit.</li>
+        <li>Reusable infrastructure: the same <code>publishToUser(userId, event, payload)</code> helper will power future notifications, presence indicators, typing dots, and any other "the server needs to tell the browser something" feature without new endpoints.</li>
+        <li>Graceful fallback: if the stream drops mid-session, the existing 60-second sidebar poller catches anything missed during the gap. Auto-reconnect with exponential backoff (1s → 30s cap) handles network blips automatically.</li>
+        <li>Heartbeat every 25 s keeps proxies / load balancers from killing idle connections.</li>
+        <li>One operations note: the production Nginx vhost needs <code>proxy_buffering off</code> for the <code>/api/realtime/stream</code> location so SSE chunks flush as they're sent. Without it, events would batch into multi-second clumps.</li>
+      </ul>
+    </div>
+
+    <div class="release">
+      <div class="release-head">
+        <h2>Messaging — Phase 5: test infrastructure<span class="pill devx">Dev</span></h2>
+        <span class="date">2026-05-18</span>
+      </div>
+      <p class="release-summary">Vitest wired into the backend with a focused unit suite for the permission engine — every security-critical branch now has a regression test.</p>
+      <ul class="bullets">
+        <li>14 unit tests covering admin override, recruiter scope, consultant scope, reports-to chain, cache hit/miss, cache invalidation, and the canViewConversation alias.</li>
+        <li>DB layer mocked end-to-end so the suite runs in ~600 ms with zero Postgres dependency.</li>
+        <li><code>npm --prefix backend run test</code> now part of the GitHub Actions CI pipeline — every PR + push validates the permission engine before deploy.</li>
+        <li>Full integration tests (supertest + provisioned test DB) deferred to a follow-up so the testing infrastructure ships clean before the integration layer is built on top.</li>
+      </ul>
+    </div>
+
+    <div class="release">
+      <div class="release-head">
+        <h2>Messaging — Phase 4: performance &amp; observability<span class="pill perf">Performance</span></h2>
+        <span class="date">2026-05-17</span>
+      </div>
+      <p class="release-summary">Permission checks now run from a 30-second in-memory cache and from a unified org-relationship view, cutting messaging-route latency to near-zero on the cached path.</p>
+      <ul class="bullets">
+        <li>In-memory permission cache keyed by user + role. First request per 30-second window does the full hierarchy resolution; the next ~N requests in that window read from the cache instantly.</li>
+        <li>Self-bounded memory: cache evicts the oldest 1k entries if it ever exceeds 5k — basically free.</li>
+        <li>Invalidation hook exported (<code>invalidatePermissionCache(userId)</code>) — ready to wire into future relationship-mutation paths so changes propagate within milliseconds instead of waiting for TTL.</li>
+        <li>New Postgres view <code>v_user_relationships</code> unifies the four canonical sources (reports_to, recruiter_managers, recruiters.manager_id, consultants.recruiter_id) under one read-only shape. Symmetric — emits each relationship in both directions so a point-lookup answers reachability without an OR.</li>
+        <li>Defers full RLS policies to a follow-up: our single-connection-pool architecture doesn't map cleanly to per-row PostgreSQL policies. Application-level checks in the permission service remain the canonical boundary.</li>
+      </ul>
+    </div>
+
+    <div class="release">
+      <div class="release-head">
+        <h2>Messaging — Phase 3b: edit &amp; retract<span class="pill new">New</span></h2>
+        <span class="date">2026-05-17</span>
+      </div>
+      <p class="release-summary">Sender-side controls for fixing typos and deleting messages, with optimistic UI that snaps back on failure.</p>
+      <ul class="bullets">
+        <li>Hover any of your own messages to see ✎ Edit and ✕ Delete pills above the bubble.</li>
+        <li>Edit: in-place textarea. Enter saves, Esc cancels, Shift+Enter for newline. Recipients see &ldquo;· edited&rdquo; next to the timestamp.</li>
+        <li>Delete: confirm dialog → message removed for both sender and recipient. Row is soft-deleted in the DB for compliance (never hard-deleted).</li>
+        <li>Optimistic UI: edits and deletes apply instantly; on backend failure, the original message snaps back with a toast explaining what went wrong.</li>
+        <li>Edits and deletes are sender-only — atomic <code>sender_id = caller.id</code> check at the SQL layer means a forged id returns 404 with no oracle about whether the row exists.</li>
+      </ul>
+    </div>
+
+    <div class="release">
+      <div class="release-head">
+        <h2>Messaging — Phase 3: access-denied UX<span class="pill new">New</span></h2>
+        <span class="date">2026-05-17</span>
+      </div>
+      <p class="release-summary">When hierarchy changes remove your access to a conversation, the UI says so cleanly instead of failing silently.</p>
+      <ul class="bullets">
+        <li>403 on thread fetch → lock-icon panel: &ldquo;Conversation no longer available&rdquo; with a one-click &ldquo;Back to inbox&rdquo; button.</li>
+        <li>Send attempt to a now-unreachable peer rolls back the typed message and surfaces a clear &ldquo;You can no longer message this user&rdquo; toast.</li>
+        <li>Active-thread polling automatically suspends once denied — no more invisible 403 storm in the background.</li>
+        <li>Past messages stay in the database; if your access is restored later, the thread comes back intact.</li>
+      </ul>
+    </div>
+
+    <div class="release">
+      <div class="release-head">
+        <h2>Messaging — Phase 2: soft-delete &amp; cleanup<span class="pill new">New</span></h2>
+        <span class="date">2026-05-17</span>
+      </div>
+      <p class="release-summary">Schema additions + a unified directory implementation.</p>
+      <ul class="bullets">
+        <li>Messages now carry <code>deleted_at</code> and <code>edited_at</code> timestamps. Every API surface filters soft-deleted rows. Recipients no longer see ghost &ldquo;1 unread&rdquo; badges for retracted messages.</li>
+        <li>Partial indexes on the new columns keep performance flat — the deleted_at filter never full-scans the messages table.</li>
+        <li>Directory endpoint refactored to call the same permission engine as the per-message checks. Eliminates the historic risk of the contact list showing peers the send-message endpoint would reject.</li>
+        <li>New endpoints: <code>PATCH /messages/:id</code> (edit body, sender only), <code>DELETE /messages/:id</code> (soft-retract, sender only).</li>
+      </ul>
+    </div>
+
+    <div class="release">
+      <div class="release-head">
+        <h2>Messaging — Phase 1: closed 3 vulnerabilities<span class="pill sec">Security</span></h2>
+        <span class="date">2026-05-17</span>
+      </div>
+      <p class="release-summary">Three direct-messaging vulnerabilities closed, with a centralized permission engine to keep future endpoints safe by default.</p>
+
+      <div class="group">
+        <h3>Closed</h3>
+        <ul class="bullets">
+          <li>Any signed-in user could read another pair's private thread by guessing the URL. Now requires you to be in the same hierarchy or have an existing thread with the peer.</li>
+          <li>Any signed-in user could silently mark a stranger's messages as &ldquo;read&rdquo; on their own inbox. Same authorization rule now applies.</li>
+          <li>Any signed-in user could send a message to any other user, bypassing reporting structure. <code>POST /messages</code> now refuses recipients outside your scope.</li>
+        </ul>
+      </div>
+
+      <div class="group">
+        <h3>Behind the scenes</h3>
+        <ul class="bullets">
+          <li>New centralized permission service — every check (send, view thread, mark read, future features) reads the same rule set. No more drift between endpoints.</li>
+          <li>Denied requests now write a <code>messages_permission_denied</code> row to the audit log so admins can see attempts.</li>
+          <li>No schema changes, no breaking API changes. Existing conversations stay reachable; only new boundary-crossing attempts are blocked.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- ================== RECENT RELEASES ================== -->
+    <div class="release">
+      <div class="release-head">
+        <h2>Job feed — pagination, full coverage, polish<span class="pill new">New</span></h2>
+        <span class="date">2026-05-17</span>
+      </div>
+      <p class="release-summary">The Recommended feed now shows every active job, paginated 40 per page, with a cleaner card design.</p>
+      <ul class="bullets">
+        <li>40 jobs per page with numbered pagination — click any page to jump.</li>
+        <li>Removed silent &ldquo;United States&rdquo; default filter — the feed lands on everything; you opt-in to a location with the pill.</li>
+        <li>Removed the &ldquo;Anywhere&rdquo; option from the location dropdown — explicit picks only.</li>
+        <li>Description excerpt visible on every card so even un-enriched roles have context to read.</li>
+        <li>Meta strip ("Level not specified" / "Experience not specified") replaces blank em-dashes for cleaner card aesthetics.</li>
+        <li>Self-healing source ingestion: a board that 404s three syncs in a row auto-deactivates with a reason. Quota-exhausted RapidAPI keys deactivate immediately. Resolves once the underlying issue is fixed.</li>
+      </ul>
+    </div>
+
+    <div class="release">
+      <div class="release-head">
+        <h2>Skill gap — see what you're missing per job<span class="pill new">New</span></h2>
+        <span class="date">2026-05-17</span>
+      </div>
+      <p class="release-summary">Opens on every job card expansion. No AI tokens spent — instant, deterministic.</p>
+      <ul class="bullets">
+        <li>Coverage % with colored progress bar (emerald 80%+, sky 60%+, amber 40%+, rose otherwise).</li>
+        <li>&ldquo;You have&rdquo; pills for matched skills, &ldquo;Missing&rdquo; pills for the gap.</li>
+        <li>Manager-tier can pass a <code>consultant_id</code> to inspect another consultant's gap.</li>
+        <li>Renders &ldquo;Complete your profile&rdquo; hint when no skills are set, instead of an empty card.</li>
+      </ul>
+    </div>
+
+    <div class="release">
+      <div class="release-head">
+        <h2>Daily match digest email<span class="pill new">New</span></h2>
+        <span class="date">2026-05-17</span>
+      </div>
+      <p class="release-summary">Every active consultant can receive a nightly email of their top 5 matched roles from the last 24 hours.</p>
+      <ul class="bullets">
+        <li>Per-consultant AI scoring on a candidate pool, top picks emailed via Brevo.</li>
+        <li>Each match card shows title, company, location, source, AI reason snippet, colored score pill.</li>
+        <li>Off by default. Admins enable via <em>Admin → Feature flags → daily_digest</em>.</li>
+        <li>Tunable: digest hour (UTC), candidate window, top-N, minimum score — all via env vars.</li>
+      </ul>
+    </div>
+
+    <div class="release">
+      <div class="release-head">
+        <h2>Admin always-on access<span class="pill new">New</span></h2>
+        <span class="date">2026-05-17</span>
+      </div>
+      <p class="release-summary">Admin-tier users (Super Admin, CEO, CTO, Director) can verify every module regardless of which feature flags are toggled.</p>
+      <ul class="bullets">
+        <li>Every gated route returns 200 for admins, even when the workspace flag is off.</li>
+        <li>Sidebar shows every module for admins — handy for previewing what end users will see when you flip a flag on.</li>
+        <li>Non-admin behavior unchanged: workspace flags + per-group overrides still apply to recruiters, consultants, etc.</li>
+      </ul>
+    </div>
+
+    <div class="release">
+      <div class="release-head">
+        <h2>Security hardening — round 1<span class="pill sec">Security</span></h2>
+        <span class="date">2026-05-17</span>
+      </div>
+      <p class="release-summary">Five high-impact, low-effort fixes from a full-stack audit.</p>
+      <ul class="bullets">
+        <li>Invitation preview email now masked (<code>s************@gmail.com</code>) — blocks email-harvesting via leaked tokens.</li>
+        <li>HSTS bumped to 1 year + includeSubDomains + preload eligibility.</li>
+        <li>Referrer-Policy: strict-origin-when-cross-origin so outbound links don't leak the full URL.</li>
+        <li>Permissions-Policy: camera, microphone, geolocation, payment, USB all denied at the browser level.</li>
+        <li>Per-route rate limit on AI endpoints (30 requests per 5 minutes) — prevents runaway Anthropic spend from a tight loop.</li>
+        <li>Postgres statement timeout (15s default) — prevents a slow query from holding a connection pool slot forever.</li>
+        <li><code>npm audit</code> wired into CI to catch high/critical CVEs at PR time.</li>
+      </ul>
+    </div>
+
+    <div class="release">
+      <div class="release-head">
+        <h2>User groups system<span class="pill new">New</span></h2>
+        <span class="date">2026-05-17</span>
+      </div>
+      <p class="release-summary">Admins can organize users into named groups (e.g. Cloudfen, Zangle IT, Xeronix, Okta Solutions) with color badges and unique IDs.</p>
+      <ul class="bullets">
+        <li>Display IDs like <code>GRP-0001</code> auto-generated.</li>
+        <li>Colored badges show on every page that displays a user (Users list, Consultants, Recruiters, Tasks assignees, Messages directory, Reports, Profile header).</li>
+        <li>Per-group feature-flag overrides — turn Tasks off for one group, on for another.</li>
+        <li>Invitations can pre-assign a group at send-time, including a &ldquo;No Group&rdquo; option.</li>
+        <li>Admins can move users between groups from the user detail page.</li>
+        <li>Audit log entries for every group lifecycle event (created, updated, deleted, user assigned/removed/moved).</li>
+      </ul>
+    </div>
+
+    <div class="release">
+      <div class="release-head">
+        <h2>Push-to-deploy CI/CD<span class="pill devx">Dev</span></h2>
+        <span class="date">2026-05-16</span>
+      </div>
+      <p class="release-summary">Every push to <code>main</code> auto-deploys to production in ~40 seconds.</p>
+      <ul class="bullets">
+        <li>GitHub Actions workflow SSHes into the VPS, pulls, builds, applies any new SQL migrations, restarts PM2, republishes the frontend bundle, and smoke-tests <code>/api/health</code>.</li>
+        <li>Workspace-aware install + shared package build (npm workspaces).</li>
+        <li>Independent post-deploy curl from the GitHub runner verifies the public URL is healthy.</li>
+        <li>Bails on first failure — broken deploys never silently take production offline.</li>
+      </ul>
+    </div>
+
+    <div class="release">
+      <div class="release-head">
+        <h2>Multi-source job ingestion<span class="pill new">New</span></h2>
+        <span class="date">2026-05-16</span>
+      </div>
+      <p class="release-summary">Pulls live postings from 14 public job-board APIs into a single feed.</p>
+      <ul class="bullets">
+        <li>Free sources: Greenhouse, Lever, Ashby, RemoteOK, Arbeitnow, Remotive (no API keys).</li>
+        <li>Optional paid: JSearch, SearchAPI, SerpAPI, LinkedIn, Monster (RapidAPI), Adzuna, Jooble, USAJobs.</li>
+        <li>Auto-sync every 6 hours, gated by a feature flag for instant kill-switch.</li>
+        <li>AI auto-matching to active consultants on new postings, with recruiter DM on strong matches.</li>
+        <li>AI resume tailoring + cover letter generation in the apply flow.</li>
+      </ul>
+    </div>
+
+    <div class="release">
+      <div class="release-head">
+        <h2>Frontend polish<span class="pill fix">Fix</span></h2>
+        <span class="date">2026-05-16</span>
+      </div>
+      <ul class="bullets">
+        <li>Page scrolls to top on every route change (no more landing halfway down a fresh page).</li>
+        <li>Empty state &amp; loading states across pages cleaned up.</li>
+      </ul>
+    </div>
+
+    <div class="release">
+      <div class="release-head">
+        <h2>Self-hosted Postgres migration<span class="pill devx">Dev</span></h2>
+        <span class="date">2026-05-16</span>
+      </div>
+      <p class="release-summary">Moved off third-party BaaS to a self-hosted Postgres on the same VPS.</p>
+      <ul class="bullets">
+        <li>40-table consolidated baseline schema. One <code>psql -f init.sql</code> on a fresh DB and the app boots.</li>
+        <li>Production + development databases provisioned separately with isolated credentials.</li>
+        <li>JWT + refresh token auth with bcrypt + session-version revocation.</li>
+        <li>Filesystem storage with HMAC-signed short-lived download URLs.</li>
+        <li>Backwards-compatible data layer — controllers kept their familiar query shape.</li>
+      </ul>
+    </div>
+
+    <footer>
+      <p>HireOrbit AI · <a href="https://hireorbitai.com">hireorbitai.com</a></p>
+    </footer>
+  </div>
+</body>
+</html>

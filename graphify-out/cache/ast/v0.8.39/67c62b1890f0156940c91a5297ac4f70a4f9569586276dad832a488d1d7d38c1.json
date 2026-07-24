@@ -1,0 +1,599 @@
+{
+  "nodes": [
+    {
+      "id": "e_claude_hireorbitai_package_json",
+      "label": "package.json",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L1"
+    },
+    {
+      "id": "hireorbitai_package_name",
+      "label": "name",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L2"
+    },
+    {
+      "id": "hireorbitai_package_version",
+      "label": "version",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L3"
+    },
+    {
+      "id": "hireorbitai_package_private",
+      "label": "private",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L4"
+    },
+    {
+      "id": "hireorbitai_package_description",
+      "label": "description",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L5"
+    },
+    {
+      "id": "hireorbitai_package_engines",
+      "label": "engines",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L6"
+    },
+    {
+      "id": "hireorbitai_package_engines_node",
+      "label": "node",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L7"
+    },
+    {
+      "id": "hireorbitai_package_workspaces",
+      "label": "workspaces",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L9"
+    },
+    {
+      "id": "hireorbitai_package_scripts",
+      "label": "scripts",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L14"
+    },
+    {
+      "id": "hireorbitai_package_scripts_prepare",
+      "label": "prepare",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L15"
+    },
+    {
+      "id": "hireorbitai_package_scripts_shared_build",
+      "label": "shared:build",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L16"
+    },
+    {
+      "id": "hireorbitai_package_scripts_format",
+      "label": "format",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L17"
+    },
+    {
+      "id": "hireorbitai_package_scripts_format_check",
+      "label": "format:check",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L18"
+    },
+    {
+      "id": "hireorbitai_package_scripts_lint",
+      "label": "lint",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L19"
+    },
+    {
+      "id": "hireorbitai_package_scripts_lint_fix",
+      "label": "lint:fix",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L20"
+    },
+    {
+      "id": "hireorbitai_package_scripts_typecheck",
+      "label": "typecheck",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L21"
+    },
+    {
+      "id": "hireorbitai_package_scripts_build",
+      "label": "build",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L22"
+    },
+    {
+      "id": "hireorbitai_package_scripts_test",
+      "label": "test",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L23"
+    },
+    {
+      "id": "hireorbitai_package_scripts_verify",
+      "label": "verify",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L24"
+    },
+    {
+      "id": "hireorbitai_package_scripts_verify_full",
+      "label": "verify:full",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L25"
+    },
+    {
+      "id": "hireorbitai_package_scripts_release",
+      "label": "release",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L26"
+    },
+    {
+      "id": "hireorbitai_package_scripts_db_build_init",
+      "label": "db:build-init",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L27"
+    },
+    {
+      "id": "hireorbitai_package_scripts_db_reset_dev",
+      "label": "db:reset:dev",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L28"
+    },
+    {
+      "id": "hireorbitai_package_devdependencies",
+      "label": "devDependencies",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L30"
+    },
+    {
+      "id": "hireorbitai_package_devdependencies_husky",
+      "label": "husky",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L31"
+    },
+    {
+      "id": "hireorbitai_package_devdependencies_lint_staged",
+      "label": "lint-staged",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L32"
+    },
+    {
+      "id": "hireorbitai_package_devdependencies_prettier",
+      "label": "prettier",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L33"
+    },
+    {
+      "id": "hireorbitai_package_lint_staged",
+      "label": "lint-staged",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L35"
+    },
+    {
+      "id": "hireorbitai_package_lint_staged_ts_tsx_js_mjs_cjs",
+      "label": "**/*.{ts,tsx,js,mjs,cjs}",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L36"
+    },
+    {
+      "id": "hireorbitai_package_lint_staged_json_md_yml_yaml_css",
+      "label": "**/*.{json,md,yml,yaml,css}",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L39"
+    },
+    {
+      "id": "hireorbitai_package_dependencies",
+      "label": "dependencies",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L43"
+    },
+    {
+      "id": "hireorbitai_package_dependencies_lru_cache",
+      "label": "lru-cache",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L44"
+    }
+  ],
+  "edges": [
+    {
+      "source": "e_claude_hireorbitai_package_json",
+      "target": "hireorbitai_package_name",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L2",
+      "weight": 1.0
+    },
+    {
+      "source": "e_claude_hireorbitai_package_json",
+      "target": "hireorbitai_package_version",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "e_claude_hireorbitai_package_json",
+      "target": "hireorbitai_package_private",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L4",
+      "weight": 1.0
+    },
+    {
+      "source": "e_claude_hireorbitai_package_json",
+      "target": "hireorbitai_package_description",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "e_claude_hireorbitai_package_json",
+      "target": "hireorbitai_package_engines",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "hireorbitai_package_engines",
+      "target": "hireorbitai_package_engines_node",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L7",
+      "weight": 1.0
+    },
+    {
+      "source": "e_claude_hireorbitai_package_json",
+      "target": "hireorbitai_package_workspaces",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L9",
+      "weight": 1.0
+    },
+    {
+      "source": "hireorbitai_package_workspaces",
+      "target": "ref_shared",
+      "relation": "extends",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L9",
+      "weight": 1.0,
+      "context": "import"
+    },
+    {
+      "source": "hireorbitai_package_workspaces",
+      "target": "ref_backend",
+      "relation": "extends",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L9",
+      "weight": 1.0,
+      "context": "import"
+    },
+    {
+      "source": "hireorbitai_package_workspaces",
+      "target": "ref_frontend",
+      "relation": "extends",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L9",
+      "weight": 1.0,
+      "context": "import"
+    },
+    {
+      "source": "e_claude_hireorbitai_package_json",
+      "target": "hireorbitai_package_scripts",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L14",
+      "weight": 1.0
+    },
+    {
+      "source": "hireorbitai_package_scripts",
+      "target": "hireorbitai_package_scripts_prepare",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L15",
+      "weight": 1.0
+    },
+    {
+      "source": "hireorbitai_package_scripts",
+      "target": "hireorbitai_package_scripts_shared_build",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L16",
+      "weight": 1.0
+    },
+    {
+      "source": "hireorbitai_package_scripts",
+      "target": "hireorbitai_package_scripts_format",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L17",
+      "weight": 1.0
+    },
+    {
+      "source": "hireorbitai_package_scripts",
+      "target": "hireorbitai_package_scripts_format_check",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L18",
+      "weight": 1.0
+    },
+    {
+      "source": "hireorbitai_package_scripts",
+      "target": "hireorbitai_package_scripts_lint",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L19",
+      "weight": 1.0
+    },
+    {
+      "source": "hireorbitai_package_scripts",
+      "target": "hireorbitai_package_scripts_lint_fix",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L20",
+      "weight": 1.0
+    },
+    {
+      "source": "hireorbitai_package_scripts",
+      "target": "hireorbitai_package_scripts_typecheck",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L21",
+      "weight": 1.0
+    },
+    {
+      "source": "hireorbitai_package_scripts",
+      "target": "hireorbitai_package_scripts_build",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L22",
+      "weight": 1.0
+    },
+    {
+      "source": "hireorbitai_package_scripts",
+      "target": "hireorbitai_package_scripts_test",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L23",
+      "weight": 1.0
+    },
+    {
+      "source": "hireorbitai_package_scripts",
+      "target": "hireorbitai_package_scripts_verify",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L24",
+      "weight": 1.0
+    },
+    {
+      "source": "hireorbitai_package_scripts",
+      "target": "hireorbitai_package_scripts_verify_full",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L25",
+      "weight": 1.0
+    },
+    {
+      "source": "hireorbitai_package_scripts",
+      "target": "hireorbitai_package_scripts_release",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L26",
+      "weight": 1.0
+    },
+    {
+      "source": "hireorbitai_package_scripts",
+      "target": "hireorbitai_package_scripts_db_build_init",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L27",
+      "weight": 1.0
+    },
+    {
+      "source": "hireorbitai_package_scripts",
+      "target": "hireorbitai_package_scripts_db_reset_dev",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L28",
+      "weight": 1.0
+    },
+    {
+      "source": "e_claude_hireorbitai_package_json",
+      "target": "hireorbitai_package_devdependencies",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L30",
+      "weight": 1.0
+    },
+    {
+      "source": "hireorbitai_package_devdependencies",
+      "target": "hireorbitai_package_devdependencies_husky",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L31",
+      "weight": 1.0
+    },
+    {
+      "source": "hireorbitai_package_devdependencies_husky",
+      "target": "husky",
+      "relation": "imports",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L31",
+      "weight": 1.0,
+      "context": "import"
+    },
+    {
+      "source": "hireorbitai_package_devdependencies",
+      "target": "hireorbitai_package_devdependencies_lint_staged",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L32",
+      "weight": 1.0
+    },
+    {
+      "source": "hireorbitai_package_devdependencies_lint_staged",
+      "target": "lint_staged",
+      "relation": "imports",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L32",
+      "weight": 1.0,
+      "context": "import"
+    },
+    {
+      "source": "hireorbitai_package_devdependencies",
+      "target": "hireorbitai_package_devdependencies_prettier",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L33",
+      "weight": 1.0
+    },
+    {
+      "source": "hireorbitai_package_devdependencies_prettier",
+      "target": "prettier",
+      "relation": "imports",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L33",
+      "weight": 1.0,
+      "context": "import"
+    },
+    {
+      "source": "e_claude_hireorbitai_package_json",
+      "target": "hireorbitai_package_lint_staged",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L35",
+      "weight": 1.0
+    },
+    {
+      "source": "hireorbitai_package_lint_staged",
+      "target": "hireorbitai_package_lint_staged_ts_tsx_js_mjs_cjs",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L36",
+      "weight": 1.0
+    },
+    {
+      "source": "hireorbitai_package_lint_staged_ts_tsx_js_mjs_cjs",
+      "target": "ref_prettier_write",
+      "relation": "extends",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L36",
+      "weight": 1.0,
+      "context": "import"
+    },
+    {
+      "source": "hireorbitai_package_lint_staged",
+      "target": "hireorbitai_package_lint_staged_json_md_yml_yaml_css",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L39",
+      "weight": 1.0
+    },
+    {
+      "source": "hireorbitai_package_lint_staged_json_md_yml_yaml_css",
+      "target": "ref_prettier_write",
+      "relation": "extends",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L39",
+      "weight": 1.0,
+      "context": "import"
+    },
+    {
+      "source": "e_claude_hireorbitai_package_json",
+      "target": "hireorbitai_package_dependencies",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L43",
+      "weight": 1.0
+    },
+    {
+      "source": "hireorbitai_package_dependencies",
+      "target": "hireorbitai_package_dependencies_lru_cache",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L44",
+      "weight": 1.0
+    },
+    {
+      "source": "hireorbitai_package_dependencies_lru_cache",
+      "target": "lru_cache",
+      "relation": "imports",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L44",
+      "weight": 1.0,
+      "context": "import"
+    }
+  ]
+}

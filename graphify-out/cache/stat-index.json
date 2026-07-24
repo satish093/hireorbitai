@@ -1,0 +1,1087 @@
+{
+  "E:\\claude\\hireorbitai\\.claude\\settings.json": {
+    "size": 2181,
+    "mtime_ns": 1781372742173123700,
+    "hash": "76773cfb3ae4a48c6b1ca85629f182ed514dd9a3e2fb27409976f0b8060c5584"
+  },
+  "E:\\claude\\hireorbitai\\.claude\\skills\\code-reviewer\\scripts\\code_quality_checker.py": {
+    "size": 3260,
+    "mtime_ns": 1781372742174122900,
+    "hash": "415b8006ad9d6dbb74f43ced2fc5ca99d3ed701bc368ec01c1c41673e9e4d330"
+  },
+  "E:\\claude\\hireorbitai\\.claude\\skills\\code-reviewer\\scripts\\pr_analyzer.py": {
+    "size": 3217,
+    "mtime_ns": 1781372742175122100,
+    "hash": "07c414b9f015279a2615ed01119506e386ff75eabd8ac779a69dac55c9ad1845"
+  },
+  "E:\\claude\\hireorbitai\\.claude\\skills\\code-reviewer\\scripts\\review_report_generator.py": {
+    "size": 3275,
+    "mtime_ns": 1781372742175122100,
+    "hash": "cf9db3a6060f27b3ec86cfebe2b50fd4f9b423160def8650c45ed04ef2f26927"
+  },
+  "E:\\claude\\hireorbitai\\.mcp.json": {
+    "size": 383,
+    "mtime_ns": 1781372742179119800,
+    "hash": "ce708dcce4a82b96931a7a29d3f9fe9c622c9fa071281e6bfbaeaea22966d130"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1700000000000_baseline.sql": {
+    "size": 2107,
+    "mtime_ns": 1781372742183117700,
+    "hash": "8b5d55d5d98d64d7cc8ca54c8fc815e04fce9b2ada4ba3caec4823afea578c9d"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1700000000001_user_groups_extended.sql": {
+    "size": 1521,
+    "mtime_ns": 1781372742183117700,
+    "hash": "a457a3dbc718a99c4d0bccf7ed6d7f3f77796c3a80f7356d93b60fb0959977fd"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1700000000002_daily_digest_flag.sql": {
+    "size": 471,
+    "mtime_ns": 1781372742183117700,
+    "hash": "1c75433fcdbbbfffcf55db561485d4242b9747b9ef28b4becff760de96a073b0"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1700000000003_source_company_self_heal.sql": {
+    "size": 3568,
+    "mtime_ns": 1781372742184117000,
+    "hash": "b292e5849f202bf3635c8243501a3da1ac7ad97664128d3662d6329b17599c4a"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1700000000004_messages_soft_delete_edit.sql": {
+    "size": 1328,
+    "mtime_ns": 1781372742184117000,
+    "hash": "b728b11deabfec6b4c28b740322671e1c20757ac58cdbccd1f4d0478afbabbb2"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1700000000005_v_user_relationships.sql": {
+    "size": 4740,
+    "mtime_ns": 1781372742184117000,
+    "hash": "b851155f798b62811caf402a3036bcd02417fcb7e82f3cb16c30884d27cd7506"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1700000000006_user_tour_completed.sql": {
+    "size": 411,
+    "mtime_ns": 1781372742184117000,
+    "hash": "721d5137e6760d2427dd94269360347e0299dc26d8aa217b135c562b3c1e446f"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1700000000007_user_job_alerts.sql": {
+    "size": 373,
+    "mtime_ns": 1781372742185047800,
+    "hash": "9ec619938f820fb05f42f9b5bebb378091fa3de554464066734ad3a8c85d0dd6"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1700000000008_training_generated_content.sql": {
+    "size": 2690,
+    "mtime_ns": 1781372742185280400,
+    "hash": "792c9254a0fb976819506ed12305627830005bc538bcbeb2b654c25cc8ada450"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1700000000009_training_versioning.sql": {
+    "size": 2274,
+    "mtime_ns": 1781372742185475600,
+    "hash": "97aad106cfbd51129886994f0a55126cfcf0f50b9e4c53aa8efc98fd7c9bc1a5"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1700000000010_job_recruiter_note.sql": {
+    "size": 696,
+    "mtime_ns": 1781372742185475600,
+    "hash": "5291cecd827be8812510bc0ca9e65f8fdfe00e8a1d419fb1baead2a4d2762dfe"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1700000000011_recruiter_goals.sql": {
+    "size": 754,
+    "mtime_ns": 1781372742185475600,
+    "hash": "8ab0d4d8f17a2f63e7db39bed892ec9fc165af8f90906624a80a490d3eda1c01"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1700000000012_application_offer_expiry.sql": {
+    "size": 345,
+    "mtime_ns": 1781372742185475600,
+    "hash": "76dac09bd337a0c76fc5c47359f0a5199529393c1f93e97736e8916cdd4dbe94"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1700000000013_task_views.sql": {
+    "size": 742,
+    "mtime_ns": 1781372742185475600,
+    "hash": "d9330a5f11c8d3dc04558a137a6b42f126edf962d2b4c18418d1d67cf8c40344"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1700000000014_task_subtasks.sql": {
+    "size": 564,
+    "mtime_ns": 1781372742185475600,
+    "hash": "1fa50602da96b4faf113fc852ae4a15f5f34623e5def3ee286532c78394638ad"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1700000000015_task_activity.sql": {
+    "size": 728,
+    "mtime_ns": 1781372742185475600,
+    "hash": "9f1385d1f096d18e4883232b34e23f9189aa61e74dea67db900a4b86bf7880a5"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1748000000000_work-auth-documents.sql": {
+    "size": 1224,
+    "mtime_ns": 1781372742186493200,
+    "hash": "bc6e40a942cb7b085d803c0a8db4149bc2021f2770dd854b004ddac23399321b"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1748100000000_ai-usage-logs.sql": {
+    "size": 779,
+    "mtime_ns": 1781372742186493200,
+    "hash": "c853127d10a6a0a7af0a8759df8ebf9c67ccc866fc33e790462a34dcecdd6aef"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1748200000000_resume-parsed-profile.sql": {
+    "size": 75,
+    "mtime_ns": 1781372742186493200,
+    "hash": "414f5a74bb1378b10df2d29f2d9cbc4fd6e388ec88c841d4e3c57f8ed4813063"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1748300000000_consultant-onboarded-at.sql": {
+    "size": 1172,
+    "mtime_ns": 1781372742186493200,
+    "hash": "a87cc41b3f74e3be32080f65377cf66aaa7931e4751c82a9f2acb07d68729242"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1749000000000_invitation_parent.sql": {
+    "size": 756,
+    "mtime_ns": 1781372742186493200,
+    "hash": "19cbf03f7fd0f84817fbcf0a58b825bd4d88adfceb31bbfa28b12ed3ba3fc3f3"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1750000000000_dev-settings.sql": {
+    "size": 589,
+    "mtime_ns": 1781372742186493200,
+    "hash": "bf9bef0238c194fdbbc54b3624989061d892c1b20f093d0e54883dcfa7c8caf3"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1751000000000_developer-capabilities.sql": {
+    "size": 416,
+    "mtime_ns": 1781372742187492400,
+    "hash": "aee2daf1b9f5e2351cac076ad8067a7c512f89a1ffb18fb5425e60b7b7948d47"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1751500000000_free-drivers.sql": {
+    "size": 2493,
+    "mtime_ns": 1781372742187492400,
+    "hash": "72fa97c1620f78cef442e0c9c45acb46c1f94f07a1a4bfb4c66ce29bab9cd957"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1752000000000_auth-sessions-refresh-lookup.sql": {
+    "size": 1136,
+    "mtime_ns": 1781372742187492400,
+    "hash": "27ecd69687d67a61121bb32749eaec29538f1e9f05370c035f63f3096422cacb"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1752500000000_jooble-only.sql": {
+    "size": 753,
+    "mtime_ns": 1781372742187492400,
+    "hash": "52eadc92d0e7dd75206618665954864023c52b361b863374e82b635c0cbdf20c"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1753000000000_calls.sql": {
+    "size": 1097,
+    "mtime_ns": 1781372742187492400,
+    "hash": "44116721547fc2dd215dfd1ad40c0c18102ef3a409ae2904f3b8e74c3fd048ec"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1753500000000_message-attachments.sql": {
+    "size": 1976,
+    "mtime_ns": 1781372742188492200,
+    "hash": "841dc8e4c3725e047eafcefa745139e2d9f375896f8fea84760318528602ff16"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1754000000000_message-reply-to.sql": {
+    "size": 1092,
+    "mtime_ns": 1781372742188492200,
+    "hash": "9b507d8c7132629ea872ce9743cc47cb11ef96686570f59276194ac8f723a111"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1755000000000_messages-internal-note.sql": {
+    "size": 835,
+    "mtime_ns": 1781372742188492200,
+    "hash": "2e6fa583714bcdea5edbfe49ac6734ded150c0027e12100fd4589c9d010e2d10"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1756000000000_conversation-states.sql": {
+    "size": 1049,
+    "mtime_ns": 1781372742188492200,
+    "hash": "f166858de5f07f6001a88ebc93023bb3e3ba563978bcd6e6b309ee489836c4f8"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1757000000000_support-tickets.sql": {
+    "size": 1065,
+    "mtime_ns": 1781372742188492200,
+    "hash": "005de421d58300105e8e87053993e91ef3796ac837c4364c78ca008e5e020c5f"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1758000000000_manager_group_grants.sql": {
+    "size": 1291,
+    "mtime_ns": 1781372742188492200,
+    "hash": "e5df79c33b03fa035838ef153671394eda3991f90327156ef2a442293e561b82"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1759000000000_interviews-notes.sql": {
+    "size": 642,
+    "mtime_ns": 1781372742189491800,
+    "hash": "b48fcbd1f9aa0864a222acdb1c4fd04b872a2310e9c5287e6ebe278bd735f9ee"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1760000000000_invoices.sql": {
+    "size": 1533,
+    "mtime_ns": 1781372742189491800,
+    "hash": "fcc3dca68f2009ee9d4419940668fda519e9b16fdebd0e4dbfc0e57c176a9dde"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1761000000000_backfill-consultant-skills.sql": {
+    "size": 1147,
+    "mtime_ns": 1781372742189491800,
+    "hash": "ce554d0c007923d38573f330da4f271aebfcd8c2af55cf7433e5a736b67413a3"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1762000000000_dismissed-jobs.sql": {
+    "size": 799,
+    "mtime_ns": 1781372742189491800,
+    "hash": "474b7114bbe4494c57d5478ddd07079009cde9146a6b2d5f866d3a5ded1221c3"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1763000000000_job-alert-prefs.sql": {
+    "size": 1006,
+    "mtime_ns": 1781372742189491800,
+    "hash": "e37d34757ac16403e8356f48289f90aacace45a516094acf55d6af55d5630ffa"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1764000000000_invoice-amounts.sql": {
+    "size": 816,
+    "mtime_ns": 1781372742189491800,
+    "hash": "c2e3b3d15eb5d6eb916de647425458576e3837cfcae20ced79bcd417499fa103"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1765000000000_user_groups_logo.sql": {
+    "size": 844,
+    "mtime_ns": 1781372742190490800,
+    "hash": "0ba87dd6826b0b637e3855fa362dff3b05cc697feb35401aef4144e68540a756"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1766000000000_invoices_bill_to.sql": {
+    "size": 922,
+    "mtime_ns": 1781372742190490800,
+    "hash": "04513d9caf210c078b0ba08dd93187bd4f7743b91569dc713bd809001e71d6e6"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1767000000000_invoices_company_group.sql": {
+    "size": 748,
+    "mtime_ns": 1781372742190490800,
+    "hash": "2a7d4db3c8344c24189837251103fbe8694e6e053d9868e4d26e1eef74896e63"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1768000000000_user_groups_email.sql": {
+    "size": 526,
+    "mtime_ns": 1781372742190490800,
+    "hash": "c594c8e57b3f2b2ed79bc3ba88f88eb006d05ceb365229457edbb15e94c286e3"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1769000000000_invoices_draft_status.sql": {
+    "size": 612,
+    "mtime_ns": 1781372742190490800,
+    "hash": "ee603e9abdee841305953b10be93a4d1a2d8b9118d4e78ff18870703c32604ee"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1770000000000_task_filters.sql": {
+    "size": 2297,
+    "mtime_ns": 1781372742191490300,
+    "hash": "2dd8620f938ef73532414e621d2ec0f90140546f1768e80836325388ece58260"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1771000000000_training_achievements.sql": {
+    "size": 3300,
+    "mtime_ns": 1781372742191490300,
+    "hash": "3b2ac579d56dabc2ef4fcad3809a6e2572343b15f40b56edfc80695718ea2a38"
+  },
+  "E:\\claude\\hireorbitai\\backend\\migrations\\1772000000000_training_workspace.sql": {
+    "size": 3399,
+    "mtime_ns": 1781372742191490300,
+    "hash": "8b104bef2725e74ea5da2531111989d42d9492188aee21eb0034ce39a59c6c83"
+  },
+  "E:\\claude\\hireorbitai\\backend\\package.json": {
+    "size": 2758,
+    "mtime_ns": 1781372742191490300,
+    "hash": "aa8c9fb656f0d03f5ec4e4c804e5c12828a139f4eb343feec26cab00a108dcf4"
+  },
+  "E:\\claude\\hireorbitai\\backend\\start.prod.sh": {
+    "size": 450,
+    "mtime_ns": 1781372742249508800,
+    "hash": "50d89ecff2bad9a107dbc0dd2e9da0b694f8a51cf7272841664757fa50259ba6"
+  },
+  "E:\\claude\\hireorbitai\\backend\\tsconfig.json": {
+    "size": 465,
+    "mtime_ns": 1781372742249508800,
+    "hash": "7cd13e9b4381760fa63c5dc06f1d6aacb27b1008ab88a09b254e5cd41612049c"
+  },
+  "E:\\claude\\hireorbitai\\database\\accounts-teardown.sql": {
+    "size": 1590,
+    "mtime_ns": 1781372742250496100,
+    "hash": "ec826002910e95072c8e29cfa78f475b3fe065a2d6628825e519669e4e3bda92"
+  },
+  "E:\\claude\\hireorbitai\\database\\admin-user-management.sql": {
+    "size": 3637,
+    "mtime_ns": 1781372742250496100,
+    "hash": "b39041be11083483660b593bda7c5a43accdd48a8ea6966c8c1c6e810cb1255f"
+  },
+  "E:\\claude\\hireorbitai\\database\\ai-job-search-and-apply.sql": {
+    "size": 2933,
+    "mtime_ns": 1781372742250496100,
+    "hash": "944caa46f5a5fa20b035ef888623c5653f83b779089644b12e088ce144cf4471"
+  },
+  "E:\\claude\\hireorbitai\\database\\all-sources-seed.sql": {
+    "size": 8135,
+    "mtime_ns": 1781372742251512800,
+    "hash": "ea7ccd4166c8c0e2b9cbe9f7ad9f23dfa79194843bc10906c57d77ab07f1da3f"
+  },
+  "E:\\claude\\hireorbitai\\database\\applications-archived-status.sql": {
+    "size": 477,
+    "mtime_ns": 1781372742251983000,
+    "hash": "8281a4722ad740ce43f68dc3cddb88dea9c5fd46ce2cabd4d6c88912f3f21148"
+  },
+  "E:\\claude\\hireorbitai\\database\\apply-flow-tables.sql": {
+    "size": 5003,
+    "mtime_ns": 1781372742252150400,
+    "hash": "7a79dfa06233347254efa5f48fd3b462d7b5beb8682e2dd94fa1aa7689a3b8aa"
+  },
+  "E:\\claude\\hireorbitai\\database\\auth-hardening.sql": {
+    "size": 4418,
+    "mtime_ns": 1781372742252647900,
+    "hash": "5cacbcfc63a33c33f39f848c650262f5c1d5313172af2f688ee805bbeae89278"
+  },
+  "E:\\claude\\hireorbitai\\database\\calendar-events-view.sql": {
+    "size": 3405,
+    "mtime_ns": 1781372742252647900,
+    "hash": "733f93fc9fec8ce3dde803929e98236c89241525f1403be97ede0cfe9fcb7946"
+  },
+  "E:\\claude\\hireorbitai\\database\\calls-duration.sql": {
+    "size": 1495,
+    "mtime_ns": 1781372742252647900,
+    "hash": "26017e7c0d42cfd719bb6a80b0b9666fccfc9c4c8f3e5e414d95c1fd9ff39eb3"
+  },
+  "E:\\claude\\hireorbitai\\database\\consultant-desired-positions.sql": {
+    "size": 183,
+    "mtime_ns": 1781372742252647900,
+    "hash": "e31107a98efa71835e7d119577f59581f4c0aea3f0c03406a8d61f791c4e4ea4"
+  },
+  "E:\\claude\\hireorbitai\\database\\consultant-skills.sql": {
+    "size": 469,
+    "mtime_ns": 1781372742253342900,
+    "hash": "455165994c6d9cbb709d8a36d2674c9e0eefb3cf6412ecb213281fb98c26f130"
+  },
+  "E:\\claude\\hireorbitai\\database\\enable-jobs-plan-b.sql": {
+    "size": 6092,
+    "mtime_ns": 1781372742253342900,
+    "hash": "f77b4e83bd37404762ad125890ae69b2d073d05c44347a96f56c3864e9cf45df"
+  },
+  "E:\\claude\\hireorbitai\\database\\feature-flags-daily-digest.sql": {
+    "size": 358,
+    "mtime_ns": 1781372742253342900,
+    "hash": "4c5a0d2d437e3c47a0435caa8f1661e44163310187c349bbb0e7eec9eedd1c93"
+  },
+  "E:\\claude\\hireorbitai\\database\\feature-flags.sql": {
+    "size": 1352,
+    "mtime_ns": 1781372742253342900,
+    "hash": "e7ad6f3bf8122c31127be6ca36f1496568b78913a720bf1e3140cd43c4395f98"
+  },
+  "E:\\claude\\hireorbitai\\database\\init.sql": {
+    "size": 259336,
+    "mtime_ns": 1781372742255760500,
+    "hash": "1f4d5ff8c2d8cf85c8ec077d544039d9dea9dfec706768c11bac2796bf22e5eb"
+  },
+  "E:\\claude\\hireorbitai\\database\\job-ingestion-extra-sources.sql": {
+    "size": 1418,
+    "mtime_ns": 1781372742255760500,
+    "hash": "0bc0bcd4c433dbdf44ad9e54e017228dbb04519bfbfdec27279f903b2d4fbce2"
+  },
+  "E:\\claude\\hireorbitai\\database\\job-ingestion.sql": {
+    "size": 2618,
+    "mtime_ns": 1781372742255760500,
+    "hash": "0865ece8c12211052155ec24b7d590259a1284f872d83de762d8bbb5f9a03e56"
+  },
+  "E:\\claude\\hireorbitai\\database\\jobs-apply-url-backfill.sql": {
+    "size": 586,
+    "mtime_ns": 1781372742255760500,
+    "hash": "7b3acddd5c084474708a90de9913e8a650591d950fad9b09c2a347a409343955"
+  },
+  "E:\\claude\\hireorbitai\\database\\jobs-extras.sql": {
+    "size": 1157,
+    "mtime_ns": 1781372742256539900,
+    "hash": "35220f220dd2325c69ffe11b22df90b09f0f4645017c4a12bb333522ccfee1f9"
+  },
+  "E:\\claude\\hireorbitai\\database\\jobs-publisher.sql": {
+    "size": 555,
+    "mtime_ns": 1781372742256539900,
+    "hash": "7fb3e989c651820a84835d99fb176a5cc0eddcd16e8c57bc1e647745601e3e31"
+  },
+  "E:\\claude\\hireorbitai\\database\\jobs-strict-4-sources.sql": {
+    "size": 7551,
+    "mtime_ns": 1781372742256539900,
+    "hash": "fe5dbf41f6fceb5d79c50a30c66c566a7f820f39ce8b894c029016312635d8eb"
+  },
+  "E:\\claude\\hireorbitai\\database\\jobs-unique-fix.sql": {
+    "size": 1128,
+    "mtime_ns": 1781372742256539900,
+    "hash": "58dd2c87991ac119b623138abe6951b6692ee261e7c7e0b4028ba774cf328af3"
+  },
+  "E:\\claude\\hireorbitai\\database\\jsearch-source-expansion.sql": {
+    "size": 1876,
+    "mtime_ns": 1781372742257273300,
+    "hash": "34ee21b441b31c566c8482012720952da77837968bb744e4846eca65ee1410c3"
+  },
+  "E:\\claude\\hireorbitai\\database\\jsearch-source.sql": {
+    "size": 805,
+    "mtime_ns": 1781372742257273300,
+    "hash": "67fa53e330c42eefd5388b63c4f0f204c335946cebcbb3de72cfac171ee87fce"
+  },
+  "E:\\claude\\hireorbitai\\database\\linkedin-source.sql": {
+    "size": 1124,
+    "mtime_ns": 1781372742257273300,
+    "hash": "8d8d4eb3107a674e6eadaca39e7d33219537a6aed3c301db05c3da81974bbc96"
+  },
+  "E:\\claude\\hireorbitai\\database\\lowercase-existing-emails.sql": {
+    "size": 1167,
+    "mtime_ns": 1781372742257273300,
+    "hash": "028447653509c0c71e09c27d500a6cee914e8df6c8230434b57068584af235e2"
+  },
+  "E:\\claude\\hireorbitai\\database\\messages-soft-delete.sql": {
+    "size": 666,
+    "mtime_ns": 1781372742257980600,
+    "hash": "25425bb754f122cc0163d690c9763f7bdd1c7a26421a5932115cbc6981529643"
+  },
+  "E:\\claude\\hireorbitai\\database\\messages.sql": {
+    "size": 1090,
+    "mtime_ns": 1781372742257980600,
+    "hash": "271e3be041b9f45844c100154c59581164fcad4fa18c0db82b7d982f8de17baf"
+  },
+  "E:\\claude\\hireorbitai\\database\\monster-source.sql": {
+    "size": 927,
+    "mtime_ns": 1781372742257980600,
+    "hash": "cc29f6ec1e49c2c7765f7d172cc7798b0bd652d434f0f684b1b60eab8f308459"
+  },
+  "E:\\claude\\hireorbitai\\database\\recruiter-managers.sql": {
+    "size": 1634,
+    "mtime_ns": 1781372742257980600,
+    "hash": "9059fc6808b5ea87eef9c6dd0e012c524d06c706aa45460cce34fd9a246b84d1"
+  },
+  "E:\\claude\\hireorbitai\\database\\reminders-delivery-tracking.sql": {
+    "size": 1421,
+    "mtime_ns": 1781372742258751400,
+    "hash": "f88f6cbd30325e0712618c969378f594becb3dc92004db7d4df3041b39d99eb7"
+  },
+  "E:\\claude\\hireorbitai\\database\\resume-tailor-sessions.sql": {
+    "size": 2755,
+    "mtime_ns": 1781372742258993300,
+    "hash": "e840d903f0c4261e01eff88e54e483cbde0b4822959f22c7ddece01b3554d220"
+  },
+  "E:\\claude\\hireorbitai\\database\\revert-scrape-to-plan-b.sql": {
+    "size": 2894,
+    "mtime_ns": 1781372742258993300,
+    "hash": "f731de3a53609e6e31f8da7a8c92577e816b1da6393cb3c65baa00a7205d462c"
+  },
+  "E:\\claude\\hireorbitai\\database\\roles-developer-hr.sql": {
+    "size": 374,
+    "mtime_ns": 1781372742258993300,
+    "hash": "dd48264ad9b4ec2db4f2ebb2ea758d4d32ea740a62a901dbe97f07bc686cabb8"
+  },
+  "E:\\claude\\hireorbitai\\database\\roles-hierarchy.sql": {
+    "size": 808,
+    "mtime_ns": 1781372742259544300,
+    "hash": "b1db333b944125663ffd7c7ccfb8f770cf5eea9851ccb19d29ed897fa9268366"
+  },
+  "E:\\claude\\hireorbitai\\database\\schema.sql": {
+    "size": 18922,
+    "mtime_ns": 1781372742259544300,
+    "hash": "430ce7061f4bb013be5a1ef309bcaca1dfecacb50a760f4a3581385ee5faadae"
+  },
+  "E:\\claude\\hireorbitai\\database\\searchapi-source.sql": {
+    "size": 1001,
+    "mtime_ns": 1781372742259544300,
+    "hash": "662d0081746a352fb6b92241938e47669ef4bce36de6fb9728371c906305db54"
+  },
+  "E:\\claude\\hireorbitai\\database\\seed-default-admin.sql": {
+    "size": 1902,
+    "mtime_ns": 1781372742259544300,
+    "hash": "1f207f737acf17fca586e449458c7375cdcb6b25f89c2d75089cac0f4b78dcf7"
+  },
+  "E:\\claude\\hireorbitai\\database\\source-companies-self-heal.sql": {
+    "size": 2401,
+    "mtime_ns": 1781372742260417200,
+    "hash": "727d0f0f5de35717045ca12f3a70385e39b179cdb62e94ae60cbe9f93f70c14f"
+  },
+  "E:\\claude\\hireorbitai\\database\\task-filters.sql": {
+    "size": 2297,
+    "mtime_ns": 1781372742260417200,
+    "hash": "a04e381f1cb0230004e5338d091bf2a781cf2014ea0bf09076349df51adcf884"
+  },
+  "E:\\claude\\hireorbitai\\database\\tasks-tags.sql": {
+    "size": 201,
+    "mtime_ns": 1781372742260417200,
+    "hash": "e17a3b1eb1eb8bd5400b4a582f9eaee24a25aff59c8d31d07a99d8a2b6fdf721"
+  },
+  "E:\\claude\\hireorbitai\\database\\tasks.sql": {
+    "size": 4094,
+    "mtime_ns": 1781372742260417200,
+    "hash": "4f45f587138b46611a591a29866fd1eeb6a357f1d404edb9d82c1d7fcddbac77"
+  },
+  "E:\\claude\\hireorbitai\\database\\training-achievements.sql": {
+    "size": 3300,
+    "mtime_ns": 1781372742261132400,
+    "hash": "953b41592fdab8889535213fe0ba9f2141e8c9f9e69924f65d3af773cb68d9a4"
+  },
+  "E:\\claude\\hireorbitai\\database\\training-ai-data-detail.sql": {
+    "size": 56960,
+    "mtime_ns": 1781372742261132400,
+    "hash": "25fbab2ef476b45b22d0f36675aabacc9a7b172d991883e322ba2e2af31afa11"
+  },
+  "E:\\claude\\hireorbitai\\database\\training-ai-data.sql": {
+    "size": 43786,
+    "mtime_ns": 1781372742262133900,
+    "hash": "f1c6eb8fd77ebaa337d92d3f7fdd03348e4ae80086ac02c64d4c8fc0c157804b"
+  },
+  "E:\\claude\\hireorbitai\\database\\training-completion-gates.sql": {
+    "size": 12080,
+    "mtime_ns": 1781372742263133200,
+    "hash": "540cebf091497ab428141100ce7419918007104c8534ce8e3b52ae4559a85c96"
+  },
+  "E:\\claude\\hireorbitai\\database\\training-content-detail.sql": {
+    "size": 67628,
+    "mtime_ns": 1781372742263857500,
+    "hash": "a81285ad21ad82f9dee4a6e0a014df18555593c4ae9bcdc46dab84ad860b75b4"
+  },
+  "E:\\claude\\hireorbitai\\database\\training-content.sql": {
+    "size": 39663,
+    "mtime_ns": 1781372742264394300,
+    "hash": "c4197c7341bcf88d3ada9a03cf7c3b6f8d9b103c851a67792d087754145f56c2"
+  },
+  "E:\\claude\\hireorbitai\\database\\training-cybersecurity.sql": {
+    "size": 28541,
+    "mtime_ns": 1781372742264394300,
+    "hash": "15427b905f32e79d7cc2f564812c895f7fd35eba524e6df9db5bd16b0888f507"
+  },
+  "E:\\claude\\hireorbitai\\database\\training-generated-content.sql": {
+    "size": 2347,
+    "mtime_ns": 1781372742264394300,
+    "hash": "94a3839218d9aceb807358572c8988306a06b4f3f3f7d0c49e041cfd3d9d51ee"
+  },
+  "E:\\claude\\hireorbitai\\database\\training-i983.sql": {
+    "size": 13536,
+    "mtime_ns": 1781372742265255800,
+    "hash": "48e14540869bb8febbce0f94f5ab2fe80ca7dae876e7d7819e2def1a5c845598"
+  },
+  "E:\\claude\\hireorbitai\\database\\training-security-detail.sql": {
+    "size": 52386,
+    "mtime_ns": 1781372742265255800,
+    "hash": "10e33058dafe37c4f62ebcd17efae3a00811f0c260e1a1e3433f320a2a827630"
+  },
+  "E:\\claude\\hireorbitai\\database\\training-security.sql": {
+    "size": 22705,
+    "mtime_ns": 1781372742265255800,
+    "hash": "2f6d921f038f45e702ab402fd9de0a457419eab3dd0917f84164378631890345"
+  },
+  "E:\\claude\\hireorbitai\\database\\training-versioning.sql": {
+    "size": 2113,
+    "mtime_ns": 1781372742266257100,
+    "hash": "665c15a51407d79ecce69c32adb33c3a40110a0fbe7720a6ef671baa8533573f"
+  },
+  "E:\\claude\\hireorbitai\\database\\training-workspace.sql": {
+    "size": 3399,
+    "mtime_ns": 1781372742266257100,
+    "hash": "b3e6ff09dc18b964ff95126532cb607e500e000eaee07ce7cb77a052ed721f0b"
+  },
+  "E:\\claude\\hireorbitai\\database\\training.sql": {
+    "size": 11398,
+    "mtime_ns": 1781372742266257100,
+    "hash": "23696e574c501e3bfdad5819be2105f1b355479644e80436f4d281c104990716"
+  },
+  "E:\\claude\\hireorbitai\\database\\user-activity-tracking.sql": {
+    "size": 982,
+    "mtime_ns": 1781372742266257100,
+    "hash": "040d3166996d8470383802cb41fc07e32e4084de72458daa89708fb0443e97cd"
+  },
+  "E:\\claude\\hireorbitai\\database\\user-groups-and-presence.sql": {
+    "size": 3420,
+    "mtime_ns": 1781372742266257100,
+    "hash": "a42e2245640dd9cf0307aa81e4b90977da39809e7166173aee4ef78a900796ce"
+  },
+  "E:\\claude\\hireorbitai\\database\\user-groups-extended.sql": {
+    "size": 2556,
+    "mtime_ns": 1781372742267257200,
+    "hash": "a6cfe884a1ef52e2982ab684969a41cc8c6595a39930bd1a6d39b99857cdcf28"
+  },
+  "E:\\claude\\hireorbitai\\database\\user-profile-fields.sql": {
+    "size": 1411,
+    "mtime_ns": 1781372742267257200,
+    "hash": "fb382b149aaf09c86334adc1236332e15311584c163c76f34bdbfc6d0adfefc4"
+  },
+  "E:\\claude\\hireorbitai\\database\\users-lower-email-index.sql": {
+    "size": 1019,
+    "mtime_ns": 1781372742267257200,
+    "hash": "342083859c174b85c7947db06a195a6be02a5c3539cb2c46adb321c256d3cfcb"
+  },
+  "E:\\claude\\hireorbitai\\database\\v-user-relationships.sql": {
+    "size": 1959,
+    "mtime_ns": 1781372742267257200,
+    "hash": "cc87efc0f1f0e9375951858086c6ce94380d79488aafbc7915ef37800416c502"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\e2e\\tsconfig.json": {
+    "size": 286,
+    "mtime_ns": 1781372742302422800,
+    "hash": "92c726e9e3c440b3fbe70ac265fd27c5c2d17e8cd68b0b8310fa122493992c54"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\package.json": {
+    "size": 1512,
+    "mtime_ns": 1781372742303489400,
+    "hash": "63a896f63806741b1b92b39d97a97d8813d38f6e252d868a9cc6e1f04fef2f8d"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\mocks\\reports\\consultants.json": {
+    "size": 1242,
+    "mtime_ns": 1781372742355806400,
+    "hash": "b7f76fdd75faba1ff0a8f98a42eca46ff3fbfdca0a90086fce6e5538cb506a1c"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\mocks\\reports\\pipeline.json": {
+    "size": 3106,
+    "mtime_ns": 1781372742355806400,
+    "hash": "8bfa38bc54b9cd6b47263716554fd089cfb91ddd7bb8bc1ac506ebae92a1b956"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\mocks\\reports\\placements.json": {
+    "size": 1001,
+    "mtime_ns": 1781372742355806400,
+    "hash": "55c63bdb46eec955d4cf0f919435a200b289015e45ec023ab4b0e0aefaf53a8c"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\mocks\\reports\\recruiters.json": {
+    "size": 2072,
+    "mtime_ns": 1781372742355806400,
+    "hash": "2963fc3e45740f5ab764b9a19d166a9c0751f0aab4e764682bbaf704ca4a6a63"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\src\\mocks\\reports\\sources.json": {
+    "size": 1984,
+    "mtime_ns": 1781372742355806400,
+    "hash": "58e611650d6f2994b1ddb14431f9b4d552fd3d5d620c3a6f4e5eead08fdbec7c"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\tsconfig.json": {
+    "size": 532,
+    "mtime_ns": 1781372742373010500,
+    "hash": "0c408eaccf29bb8caa1cadb5f52726654d74bb2aaa3cb5ce598f48a3e4a5b335"
+  },
+  "E:\\claude\\hireorbitai\\infrastructure\\bootstrap-vps.sh": {
+    "size": 5670,
+    "mtime_ns": 1781372742374009800,
+    "hash": "cc79bdb019a23e20f1ad889c51b1c45d5163aa5575a94a794fcff2312d6f7e3d"
+  },
+  "E:\\claude\\hireorbitai\\package.json": {
+    "size": 1711,
+    "mtime_ns": 1781372742377008000,
+    "hash": "67c62b1890f0156940c91a5297ac4f70a4f9569586276dad832a488d1d7d38c1"
+  },
+  "E:\\claude\\hireorbitai\\scripts\\auto-pull.sh": {
+    "size": 2363,
+    "mtime_ns": 1781372742378007600,
+    "hash": "8e968268e288f0fd19506156652c71b2949d59c061e85952a779a8a6f32d095b"
+  },
+  "E:\\claude\\hireorbitai\\scripts\\backup.sh": {
+    "size": 2054,
+    "mtime_ns": 1781372742378007600,
+    "hash": "aa2880ad5ad6b77a4ff6a99505c46c7b19e28b56ec0abb6000199c3070846faa"
+  },
+  "E:\\claude\\hireorbitai\\scripts\\deploy-rowcounts.sql": {
+    "size": 1732,
+    "mtime_ns": 1781372742378794100,
+    "hash": "4e0f512d3ae314d63155e4e9866d59aa56bbff9ec6a7b963a51f504753fe5581"
+  },
+  "E:\\claude\\hireorbitai\\scripts\\deploy.sh": {
+    "size": 1119,
+    "mtime_ns": 1781372742378794100,
+    "hash": "c09940927c6499c2bb0a2fedbe14249cc646f965f4fd3baa2933dfdf75ab99f7"
+  },
+  "E:\\claude\\hireorbitai\\scripts\\dev-windows.ps1": {
+    "size": 14632,
+    "mtime_ns": 1781372742378794100,
+    "hash": "3ef7b471f17c2564d2c1b6061bc5884c1f9419b04f3414d530c6b72245c7c929"
+  },
+  "E:\\claude\\hireorbitai\\scripts\\healthcheck.sh": {
+    "size": 2074,
+    "mtime_ns": 1781372742378794100,
+    "hash": "e615d80f9f8a4cfa93714183c4af2101266ca0bd04cf9dff1d30b8c3bd210184"
+  },
+  "E:\\claude\\hireorbitai\\scripts\\lib-env.sh": {
+    "size": 1481,
+    "mtime_ns": 1781372742379795500,
+    "hash": "78d38233631ec3006bc62fe193af109c12dce835352ead116329949ee8f9a89d"
+  },
+  "E:\\claude\\hireorbitai\\scripts\\ops.sh": {
+    "size": 18137,
+    "mtime_ns": 1781372742379795500,
+    "hash": "1e404e030dbd29cc417cb8a80e9fce2268abcc776f1949a0b263f9813bf99f32"
+  },
+  "E:\\claude\\hireorbitai\\scripts\\postdeploy-verify.sql": {
+    "size": 3265,
+    "mtime_ns": 1781372742379795500,
+    "hash": "802cca4d09e32bc92983b57fa462e10cfb7f42cc027327ea759995fe6edb9989"
+  },
+  "E:\\claude\\hireorbitai\\scripts\\release.sh": {
+    "size": 4392,
+    "mtime_ns": 1781372742379795500,
+    "hash": "bb2d79b0d8a9d835a39eef513712da31cf4a156d51f9e0ed8c4b4de0e33804a1"
+  },
+  "E:\\claude\\hireorbitai\\scripts\\reset-prod.sh": {
+    "size": 5886,
+    "mtime_ns": 1781372742380794900,
+    "hash": "0f84d65c9ea47ab42c1334652a50732d0e20ca3aff234634accffc6e5193960a"
+  },
+  "E:\\claude\\hireorbitai\\scripts\\restore.sh": {
+    "size": 2951,
+    "mtime_ns": 1781372742380794900,
+    "hash": "43cb8fd61a64df93327ed21506a5a9b5482e2b895b89f5c64e4531b1c1245947"
+  },
+  "E:\\claude\\hireorbitai\\scripts\\setup-claude-auth.sh": {
+    "size": 7811,
+    "mtime_ns": 1781372742380794900,
+    "hash": "b4333a2c0656cfc85b4e7a5307aea40f017fc3cde86c9989a8d3c275c10f1b2c"
+  },
+  "E:\\claude\\hireorbitai\\scripts\\stop-dev-windows.ps1": {
+    "size": 1158,
+    "mtime_ns": 1781372742380794900,
+    "hash": "788a2d0cbe6d73cdaf61fd59e4042285879792fef6dde9962ff083ea099aebee"
+  },
+  "E:\\claude\\hireorbitai\\scripts\\update-dev.sh": {
+    "size": 2931,
+    "mtime_ns": 1781372742381794600,
+    "hash": "841955239100f292ddb1af8ae66b2055b4522fe34592802e7fa775ab198ef04f"
+  },
+  "E:\\claude\\hireorbitai\\scripts\\update.sh": {
+    "size": 5018,
+    "mtime_ns": 1781372742381794600,
+    "hash": "4c13f4f89fd4ca76089af631a800acbe25ec5e7543e7a18f8c4ea3e13f1b6ee8"
+  },
+  "E:\\claude\\hireorbitai\\scripts\\zap-baseline.ps1": {
+    "size": 2742,
+    "mtime_ns": 1781372742381794600,
+    "hash": "74043e72a6a940124b2983947cdc51ad1d84c938eac4e5aa42ece739b5bc0cf3"
+  },
+  "E:\\claude\\hireorbitai\\scripts\\zap-baseline.sh": {
+    "size": 2303,
+    "mtime_ns": 1781372742381794600,
+    "hash": "743ece6bf7686c0c869943c87ed2ae9b9b9b97aee4856a0ab8fcc6848bbd6d37"
+  },
+  "E:\\claude\\hireorbitai\\shared\\package.json": {
+    "size": 885,
+    "mtime_ns": 1781372742382793800,
+    "hash": "d645bb62005bd208e872e8a08a3aa14dda6b04d4ac402c4235f1e47a3c698626"
+  },
+  "E:\\claude\\hireorbitai\\shared\\tsconfig.cjs.json": {
+    "size": 203,
+    "mtime_ns": 1781372742383793100,
+    "hash": "e60a6de9bcc69510ba027a2eb2a1ac4c86744f93b084e433c1a546947659cf3b"
+  },
+  "E:\\claude\\hireorbitai\\shared\\tsconfig.json": {
+    "size": 517,
+    "mtime_ns": 1781372742383793100,
+    "hash": "2671481a4e199f10de90c7e58a399a95d5a079ef6b8ec0f7e5f22bc8804c929c"
+  },
+  "E:\\claude\\hireorbitai\\.claude\\agents\\backend-test-writer.md": {
+    "size": 2440,
+    "mtime_ns": 1781372742170125200,
+    "hash": "e62c7ba13d2c6f3c583dec0d422209ad44e5d2bfe89384d4590573c9cbb3b344"
+  },
+  "E:\\claude\\hireorbitai\\.claude\\agents\\controller-auditor.md": {
+    "size": 1964,
+    "mtime_ns": 1781372742170125200,
+    "hash": "31c5e7faa6f99934a174f90abaf0d63ef5107399a83e9430dab08390ee77ac75"
+  },
+  "E:\\claude\\hireorbitai\\.claude\\agents\\release-notes-writer.md": {
+    "size": 1771,
+    "mtime_ns": 1781372742170125200,
+    "hash": "3921a59394b8473495fa0ce95a250f335c531ed006b6f05d5a8fd88d334c01f9"
+  },
+  "E:\\claude\\hireorbitai\\.claude\\agents\\ui-test-writer.md": {
+    "size": 2553,
+    "mtime_ns": 1781372742170125200,
+    "hash": "8df9d53aa64ed4f1dae7007e1099b390e93220b2e279a3496ffef5baddc816b7"
+  },
+  "E:\\claude\\hireorbitai\\.claude\\commands\\audit-controllers.md": {
+    "size": 1100,
+    "mtime_ns": 1781372742170125200,
+    "hash": "4a36d4c5ac344a8b050a4a91941f0f1fd6caf3d7a6d35669277161e32ce9dcd2"
+  },
+  "E:\\claude\\hireorbitai\\.claude\\commands\\check-deploy.md": {
+    "size": 757,
+    "mtime_ns": 1781372742171124800,
+    "hash": "dd555fef0563a8d1a8629bd206bfe8d582237ed86fbeee92f5f3a9681b547fae"
+  },
+  "E:\\claude\\hireorbitai\\.claude\\commands\\release-checklist.md": {
+    "size": 2333,
+    "mtime_ns": 1781372742171124800,
+    "hash": "6a96c264b9ffefcb8f4e0fc527caf3fe755c48f4e2a42d5276a1461369952073"
+  },
+  "E:\\claude\\hireorbitai\\.claude\\commands\\rollback.md": {
+    "size": 2017,
+    "mtime_ns": 1781372742171124800,
+    "hash": "95a25840c6dd6da01ae110bcc8fc87edb22199c14ac172e7c99398f351678b04"
+  },
+  "E:\\claude\\hireorbitai\\.claude\\commands\\verify.md": {
+    "size": 960,
+    "mtime_ns": 1781372742171124800,
+    "hash": "4392641543ff6b06d723ea34dfb996c08a5176efe9b61294500146184c8565d2"
+  },
+  "E:\\claude\\hireorbitai\\.claude\\output-styles\\terse.md": {
+    "size": 741,
+    "mtime_ns": 1781372742171124800,
+    "hash": "088291c3044778b7fd593c9d03dfde01b10e4699af3fff8980a040e4d0540f55"
+  },
+  "E:\\claude\\hireorbitai\\.claude\\rules\\database.md": {
+    "size": 2654,
+    "mtime_ns": 1781372742172123900,
+    "hash": "c13c6d5ba7cd08994d1b1f50a7985e31ca1d0ec29eb0433de064c6d3584a48c7"
+  },
+  "E:\\claude\\hireorbitai\\.claude\\rules\\deploy.md": {
+    "size": 2596,
+    "mtime_ns": 1781372742172123900,
+    "hash": "68ee00a5f1a814e1b625d7c3c16f08daadb7ee15ffeb9d04ed311734169084b5"
+  },
+  "E:\\claude\\hireorbitai\\.claude\\rules\\frontend-responsive.md": {
+    "size": 4126,
+    "mtime_ns": 1781372742172123900,
+    "hash": "1a1618bd36693bf0c19838134f8e2f67f8a73cc162f902ef8f25d3de793e53be"
+  },
+  "E:\\claude\\hireorbitai\\.claude\\rules\\security.md": {
+    "size": 3017,
+    "mtime_ns": 1781372742172123900,
+    "hash": "69d0855a8fc63589fb4ff700128e04caa2672c4677aada7db283d0e8da11a532"
+  },
+  "E:\\claude\\hireorbitai\\.claude\\skills\\apply-migration\\SKILL.md": {
+    "size": 2054,
+    "mtime_ns": 1781372742173123700,
+    "hash": "c55e04e0a7858c40d0fbc0e5d15112de68904382ffe24aab29275cb4a462d6c9"
+  },
+  "E:\\claude\\hireorbitai\\.claude\\skills\\code-reviewer\\SKILL.md": {
+    "size": 4627,
+    "mtime_ns": 1781372742174122900,
+    "hash": "5a4dd081f538cddd9f1abd4031fc60ed26de11059be3fe32a245d37093e183d1"
+  },
+  "E:\\claude\\hireorbitai\\.claude\\skills\\idor-audit\\SKILL.md": {
+    "size": 2574,
+    "mtime_ns": 1781372742175122100,
+    "hash": "80b42b98fffa0fbdc660f0e8e1db77110130983d5a5035b4c02293945167bf63"
+  },
+  "E:\\claude\\hireorbitai\\.github\\ISSUE_TEMPLATE\\bug_report.yml": {
+    "size": 1545,
+    "mtime_ns": 1781372742176122100,
+    "hash": "91c8e015037ddc7fe7f3f382767bdf9570bca69508ec6076367630ef3384c0e0"
+  },
+  "E:\\claude\\hireorbitai\\.github\\ISSUE_TEMPLATE\\config.yml": {
+    "size": 234,
+    "mtime_ns": 1781372742176122100,
+    "hash": "b59513a051d00eb682562382ec85064a82d72429bcd926e3a882ddebfe6830f7"
+  },
+  "E:\\claude\\hireorbitai\\.github\\ISSUE_TEMPLATE\\feature_request.yml": {
+    "size": 1221,
+    "mtime_ns": 1781372742176122100,
+    "hash": "f0f5bf825ea0aec6e36c96d60fc329c8bc1f0474760b47bc593d86e7220cda59"
+  },
+  "E:\\claude\\hireorbitai\\.github\\PULL_REQUEST_TEMPLATE.md": {
+    "size": 752,
+    "mtime_ns": 1781372742176122100,
+    "hash": "6933fd3fb2bd11c4cb391fc39345eebd7e618dd449a9941023174e11fd80980e"
+  },
+  "E:\\claude\\hireorbitai\\.github\\dependabot.yml": {
+    "size": 1142,
+    "mtime_ns": 1781372742176122100,
+    "hash": "a905c94b256777ccc59554041e1a631e091dd84e069f427fe37f8ac975f750e4"
+  },
+  "E:\\claude\\hireorbitai\\.github\\workflows\\ci.yml": {
+    "size": 5973,
+    "mtime_ns": 1781372742177121000,
+    "hash": "ce808a41a1ff3bb3fa6fd2b36c5466189c86c086aac47cc0def5ed53fb1b20c7"
+  },
+  "E:\\claude\\hireorbitai\\.github\\workflows\\deploy-production.yml": {
+    "size": 4653,
+    "mtime_ns": 1781372742177121000,
+    "hash": "146c706f39ed6a5064c10040649e3aa035aeeb1611eea36af0c11d7f3b4a40a4"
+  },
+  "E:\\claude\\hireorbitai\\.github\\workflows\\deploy-staging.yml": {
+    "size": 1659,
+    "mtime_ns": 1781372742177121000,
+    "hash": "f4badd18f7455695d7573cab76c380b2f78ff5a87adee8fcb83df9bfa438e815"
+  },
+  "E:\\claude\\hireorbitai\\.github\\workflows\\dev.yml": {
+    "size": 4557,
+    "mtime_ns": 1781372742177121000,
+    "hash": "9225f8b1e6c0d2b03f2bc544b7ff88597360d4635f23fc6579f81cde535a5f3c"
+  },
+  "E:\\claude\\hireorbitai\\.github\\workflows\\release.yml": {
+    "size": 3406,
+    "mtime_ns": 1781372742177121000,
+    "hash": "2a1350e898e2830b10dd9c0ed62327fbcc2f564f8c4dd218b912297e8c3d28e9"
+  },
+  "E:\\claude\\hireorbitai\\.github\\workflows\\rollback.yml": {
+    "size": 8001,
+    "mtime_ns": 1781372742178120900,
+    "hash": "771c73f94d4e7afaab70801b56a5d0bc5f59fce666edf0ed89d1659eb401bede"
+  },
+  "E:\\claude\\hireorbitai\\.github\\workflows\\security-scan.yml": {
+    "size": 3197,
+    "mtime_ns": 1781372742178120900,
+    "hash": "fca74aa8c00b774b43e67a6d3b2988265c3d672a6eb8484f65e91ea62aa47702"
+  },
+  "E:\\claude\\hireorbitai\\CHANGELOG.md": {
+    "size": 8159,
+    "mtime_ns": 1781372742180119600,
+    "hash": "6c1e89429543fcd8a1f3f0242a05801e895ad31bec9591d98c7097effa0fe640"
+  },
+  "E:\\claude\\hireorbitai\\CONTRIBUTING.md": {
+    "size": 4404,
+    "mtime_ns": 1781372742180119600,
+    "hash": "da66f1389ccef823c189a35578862ad7d6111c388b6d5dba91ed49b786e34efb"
+  },
+  "E:\\claude\\hireorbitai\\DEPLOY.md": {
+    "size": 2219,
+    "mtime_ns": 1781372742180119600,
+    "hash": "4a4601a0d40b9fd60fb951c2b4ecfda610301b87d859b7453bfb9dcac805849d"
+  },
+  "E:\\claude\\hireorbitai\\README.md": {
+    "size": 21840,
+    "mtime_ns": 1781372742181119000,
+    "hash": "f90a41c18f10c62e319aeba9bd64af6f7bf4eafec4ef076d86668f769d656568"
+  },
+  "E:\\claude\\hireorbitai\\RELEASE_NOTES.md": {
+    "size": 5958,
+    "mtime_ns": 1781372742181119000,
+    "hash": "5cbcb39211b4d7985a2b97e9c8e808ddef0d7e5da703c95e9e2154204361cadf"
+  },
+  "E:\\claude\\hireorbitai\\SECURITY.md": {
+    "size": 1806,
+    "mtime_ns": 1781372742181119000,
+    "hash": "24024fb07d4af10ebc6dbcd37a7350762c4026042f2b94cae2b848b9a861a2e4"
+  },
+  "E:\\claude\\hireorbitai\\SETUP.md": {
+    "size": 12032,
+    "mtime_ns": 1781372742181119000,
+    "hash": "e06a3460411667aab852862a0af3e697a47e0d4cad55040fc0e6029c8176dfb9"
+  },
+  "E:\\claude\\hireorbitai\\backend\\MIGRATIONS.md": {
+    "size": 2502,
+    "mtime_ns": 1781372742182118200,
+    "hash": "c1d62345bb368777766fa69cfc780aaa19e27ced8b3bcda9691b997b5e6fa8e1"
+  },
+  "E:\\claude\\hireorbitai\\backend\\src\\repositories\\README.md": {
+    "size": 4453,
+    "mtime_ns": 1781372742227897800,
+    "hash": "18ef6490d19d65ea466045aab1cc2659ffef438f02a2f804a3ac3c745dfdd67f"
+  },
+  "E:\\claude\\hireorbitai\\docker\\docker-compose.yml": {
+    "size": 3032,
+    "mtime_ns": 1781372742268668800,
+    "hash": "155abd9704e463b9106c44c0e175c9c86d059ca7643447242deb1ef9be1a9716"
+  },
+  "E:\\claude\\hireorbitai\\docs\\DEV-ENVIRONMENT.md": {
+    "size": 6444,
+    "mtime_ns": 1781372742269003300,
+    "hash": "0e3bb0059c8a375885c453c1bf30cb52c3024f1b98dbea1929f3d2c6cbebbf5b"
+  },
+  "E:\\claude\\hireorbitai\\docs\\api-conventions.md": {
+    "size": 10000,
+    "mtime_ns": 1781372742269003300,
+    "hash": "7820dc5f082e725502d7ef77898f18ef7b2e8229305a1a52f8193ae6879b19b0"
+  },
+  "E:\\claude\\hireorbitai\\docs\\architecture.md": {
+    "size": 13044,
+    "mtime_ns": 1781372742270006300,
+    "hash": "3425e681a2aa922ea92567ee7fd6d2a4937485b9527f27fe88b26a43a2f89889"
+  },
+  "E:\\claude\\hireorbitai\\docs\\branching.md": {
+    "size": 3378,
+    "mtime_ns": 1781372742270006300,
+    "hash": "683d67658df85c496550e3ccb5d25ef914088e0c5b6eeb321a362700ea726408"
+  },
+  "E:\\claude\\hireorbitai\\docs\\changelog.html": {
+    "size": 39204,
+    "mtime_ns": 1781372742270006300,
+    "hash": "54475202cd4429f59498fc246aca778a6a714485db043c8d5e0ed6a1ac6b8522"
+  },
+  "E:\\claude\\hireorbitai\\docs\\deployment\\00-production-runbook.md": {
+    "size": 9738,
+    "mtime_ns": 1781372742271006300,
+    "hash": "fdaee12d9570db6e65517f06c59dc600a926e655204a043610213629b27fe85e"
+  },
+  "E:\\claude\\hireorbitai\\docs\\deployment\\01-vps-cloudpanel.md": {
+    "size": 5159,
+    "mtime_ns": 1781372742271006300,
+    "hash": "e4baa9ae6df5361a4b080a2193d6c0097cc8e1763aa3b363a84f5f9947115ce9"
+  },
+  "E:\\claude\\hireorbitai\\docs\\deployment\\02-databases.md": {
+    "size": 5473,
+    "mtime_ns": 1781372742271006300,
+    "hash": "515e76c47620981f57d09eda422da9f0a4a1ca024bb8c44b07506c51ca00b06f"
+  },
+  "E:\\claude\\hireorbitai\\docs\\deployment\\03-render-dev-hosting.md": {
+    "size": 12129,
+    "mtime_ns": 1781372742271006300,
+    "hash": "9fa0104376f9b928b55bda9eb80cf4f97b44ad0e8d66309801a3ae0f8ede8a37"
+  },
+  "E:\\claude\\hireorbitai\\docs\\deployment\\04-github-actions.md": {
+    "size": 4502,
+    "mtime_ns": 1781372742271006300,
+    "hash": "8c546ea8b450746441005126f0988421a3de5a59012c05341ba3b3cb414ea280"
+  },
+  "E:\\claude\\hireorbitai\\docs\\deployment\\05-deploy-and-rollback.md": {
+    "size": 4454,
+    "mtime_ns": 1781372742272005400,
+    "hash": "ed601b59ed0854392c7c1a0cf1ea87ec369a971048b0bc73a21f7ac3330ac604"
+  },
+  "E:\\claude\\hireorbitai\\docs\\deployment\\06-fresh-reset.md": {
+    "size": 5456,
+    "mtime_ns": 1781372742272005400,
+    "hash": "ffbcffbb797a7527cb5bfd2e323ab693bcaef0469b819b368d433326efbc1652"
+  },
+  "E:\\claude\\hireorbitai\\docs\\deployment\\07-weekend-release-checklist.md": {
+    "size": 2903,
+    "mtime_ns": 1781372742272005400,
+    "hash": "4834b91715f20463821eedbe8486d11a721f42c6576f6841c5acbe01b0a9dbaa"
+  },
+  "E:\\claude\\hireorbitai\\docs\\deployment\\README.md": {
+    "size": 8989,
+    "mtime_ns": 1781372742272005400,
+    "hash": "9086dcd4ead6632e2038d724778536fefead29b80117a8afb5b6203062a84040"
+  },
+  "E:\\claude\\hireorbitai\\docs\\deployment\\auto-deploy.md": {
+    "size": 10727,
+    "mtime_ns": 1781372742273004700,
+    "hash": "0f5b8407c1f5b46cb0bcef8f7188dad48b82446b44c06d2099b746e571f99807"
+  },
+  "E:\\claude\\hireorbitai\\docs\\deployment\\cloudpanel.md": {
+    "size": 16778,
+    "mtime_ns": 1781372742273004700,
+    "hash": "320e16d3dd9b161ab39d971dedf9d7579ceba25ebf8654ff6f2380f10ab70f02"
+  },
+  "E:\\claude\\hireorbitai\\docs\\deployment\\email-deliverability.md": {
+    "size": 6067,
+    "mtime_ns": 1781372742273004700,
+    "hash": "57add55716d63516a0c95cf9a88034c67575a06af38bbabd4a8d461bbb9a02bb"
+  },
+  "E:\\claude\\hireorbitai\\docs\\deployment\\local.md": {
+    "size": 11316,
+    "mtime_ns": 1781372742273004700,
+    "hash": "50831c61ed557788f1974ca119a171b144deb9372bb6962a420fdf4f25840d1c"
+  },
+  "E:\\claude\\hireorbitai\\docs\\deployment\\prod-deploy-safety.md": {
+    "size": 9311,
+    "mtime_ns": 1781372742274004100,
+    "hash": "dbee7d26c8a16bfa40cdc3538ff857a015b4dba77ea957c0b6b16952e8cf45a0"
+  },
+  "E:\\claude\\hireorbitai\\docs\\deployment\\production.md": {
+    "size": 16834,
+    "mtime_ns": 1781372742274004100,
+    "hash": "c1200a9896063769e445fe1d0dd69ef69f00e947713e1b33c868b2d1394efb5c"
+  },
+  "E:\\claude\\hireorbitai\\docs\\env-vars.md": {
+    "size": 20022,
+    "mtime_ns": 1781372742274815900,
+    "hash": "88576804e49abb5d60b479f78480a6942c1a71e799c3f6c20cd8d71f3ecaba4d"
+  },
+  "E:\\claude\\hireorbitai\\docs\\rbac-matrix.md": {
+    "size": 16712,
+    "mtime_ns": 1781372742274815900,
+    "hash": "2a20369a8d5056d988a135bdbda89792190471be383db796ccaa5d3ecbda7f7d"
+  },
+  "E:\\claude\\hireorbitai\\docs\\rbac-overview.html": {
+    "size": 35269,
+    "mtime_ns": 1781372742274815900,
+    "hash": "fd3e8925e58ec5e9d378b11ab0ae791fcb89ac8b9bc599089d04957244da2290"
+  },
+  "E:\\claude\\hireorbitai\\docs\\test-plan-b.md": {
+    "size": 5023,
+    "mtime_ns": 1781372742274815900,
+    "hash": "561d23c53835d82c8bc790ad26d2dbbcf6bbb1b8cb9b1be9d5e68fb2a89a08d0"
+  },
+  "E:\\claude\\hireorbitai\\docs\\testing.md": {
+    "size": 14026,
+    "mtime_ns": 1781372742276304700,
+    "hash": "925f69154bd8fc11c5e1988883b63ae726ed7c91c120ee0cf08dcc146cd6f99c"
+  },
+  "E:\\claude\\hireorbitai\\frontend\\index.html": {
+    "size": 2269,
+    "mtime_ns": 1781372742303489400,
+    "hash": "1dff614b1986493b6497b701e3f1a34c4aa0dc984c585a3a3eb591647cd12baf"
+  },
+  "E:\\claude\\hireorbitai\\infrastructure\\README.md": {
+    "size": 2224,
+    "mtime_ns": 1781372742374009800,
+    "hash": "17d0bb89cc7b590d599ea9302bf46ec6238b661e3e575d37fee986ba2174b34b"
+  },
+  "E:\\claude\\hireorbitai\\render.yaml": {
+    "size": 6623,
+    "mtime_ns": 1781372742377008000,
+    "hash": "6d3cc81d5ad49c189a6c2d7aa3d78a0dd7b92df61a8b77b1481b7686a296925c"
+  },
+  "E:\\claude\\hireorbitai\\scripts\\SECURITY-SCAN.md": {
+    "size": 2011,
+    "mtime_ns": 1781372742377008000,
+    "hash": "6140b2da69d6e149b1b5051a065b8b6aeac6e41bd10dd5bfac615013ee674081"
+  },
+  "E:\\claude\\hireorbitai\\shared\\README.md": {
+    "size": 2615,
+    "mtime_ns": 1781372742382793800,
+    "hash": "8fd6f9146563e632b91d70cadb0e5ccb0a3ebae59bcee1e341044214a59d3a37"
+  }
+}

@@ -1,0 +1,43 @@
+version: 2
+updates:
+  # Backend npm — group all minor + patch into one PR per week so we don't
+  # drown in noise. Major bumps stay individual so they get real review.
+  - package-ecosystem: npm
+    directory: /backend
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+    open-pull-requests-limit: 5
+    target-branch: dev
+    commit-message:
+      prefix: 'deps(backend)'
+    groups:
+      backend-minor-patch:
+        update-types: [minor, patch]
+
+  # Frontend npm — same shape.
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+    open-pull-requests-limit: 5
+    target-branch: dev
+    commit-message:
+      prefix: 'deps(frontend)'
+    groups:
+      frontend-minor-patch:
+        update-types: [minor, patch]
+
+  # GitHub Actions versions (actions/checkout, actions/setup-node, etc.)
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    target-branch: dev
+    commit-message:
+      prefix: 'ci'

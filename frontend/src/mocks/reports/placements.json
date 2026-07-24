@@ -1,0 +1,48 @@
+{
+  "kpis": [
+    {
+      "label": "Placements",
+      "value": "38",
+      "prior": "31",
+      "delta": "+7",
+      "trend": "up",
+      "positive": true
+    },
+    {
+      "label": "Median TC",
+      "value": "$142k",
+      "prior": "$138k",
+      "delta": "+$4k",
+      "trend": "up",
+      "positive": true
+    },
+    {
+      "label": "Revenue (est.)",
+      "value": "$1.84M",
+      "prior": "$1.51M",
+      "delta": "+22%",
+      "trend": "up",
+      "positive": true
+    },
+    {
+      "label": "Retention 90d",
+      "value": "94%",
+      "prior": "91%",
+      "delta": "+3 pts",
+      "trend": "up",
+      "positive": true
+    }
+  ],
+  "charts": {
+    "byClient": [
+      ["Acme Corp", 8, "$420k"],
+      ["Globex", 6, "$315k"],
+      ["Initech", 5, "$268k"],
+      ["Umbrella", 5, "$244k"],
+      ["Stark Industries", 4, "$210k"],
+      ["Wayne Enterprises", 4, "$188k"],
+      ["Soylent", 3, "$120k"],
+      ["Hooli", 3, "$74k"]
+    ]
+  }
+}

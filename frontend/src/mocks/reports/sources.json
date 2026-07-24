@@ -1,0 +1,102 @@
+{
+  "kpis": [
+    {
+      "label": "Jobs ingested",
+      "value": "8,412",
+      "prior": "7,108",
+      "delta": "+18%",
+      "trend": "up",
+      "positive": true
+    },
+    {
+      "label": "Sources active",
+      "value": "11",
+      "prior": "10",
+      "delta": "+1",
+      "trend": "up",
+      "positive": true
+    },
+    {
+      "label": "Median ingest latency",
+      "value": "3.4s",
+      "prior": "4.1s",
+      "delta": "-0.7s",
+      "trend": "down",
+      "positive": true
+    },
+    {
+      "label": "Fail rate",
+      "value": "2.1%",
+      "prior": "1.4%",
+      "delta": "+0.7 pts",
+      "trend": "up",
+      "positive": false
+    }
+  ],
+  "table": [
+    {
+      "source": "greenhouse",
+      "jobs": 2140,
+      "matchAvg": 84,
+      "subs": 118,
+      "latency": "2.1s",
+      "health": "healthy"
+    },
+    {
+      "source": "lever",
+      "jobs": 1680,
+      "matchAvg": 81,
+      "subs": 92,
+      "latency": "2.6s",
+      "health": "healthy"
+    },
+    {
+      "source": "jsearch",
+      "jobs": 1520,
+      "matchAvg": 76,
+      "subs": 74,
+      "latency": "5.8s",
+      "health": "degraded"
+    },
+    {
+      "source": "ashby",
+      "jobs": 980,
+      "matchAvg": 83,
+      "subs": 51,
+      "latency": "3.0s",
+      "health": "healthy"
+    },
+    {
+      "source": "adzuna",
+      "jobs": 870,
+      "matchAvg": 72,
+      "subs": 38,
+      "latency": "4.4s",
+      "health": "degraded"
+    },
+    {
+      "source": "remoteok",
+      "jobs": 540,
+      "matchAvg": 70,
+      "subs": 22,
+      "latency": "1.9s",
+      "health": "healthy"
+    },
+    {
+      "source": "linkedin",
+      "jobs": 410,
+      "matchAvg": 86,
+      "subs": 44,
+      "latency": "8.2s",
+      "health": "failing"
+    },
+    {
+      "source": "usajobs",
+      "jobs": 272,
+      "matchAvg": 68,
+      "subs": 9,
+      "latency": "3.7s",
+      "health": "healthy"
+    }
+  ]
+}

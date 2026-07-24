@@ -1,0 +1,455 @@
+import { RequestHandler } from 'express';
+import { z } from 'zod';
+import { db, pool } from '../config/db';
+import { env } from '../config/env';
+import { createInvitation, acceptInvitation } from '../services/invitation.service';
+import {
+  resolveAutoParent,
+  isAllowedParent,
+  getExpectedParentRoles,
+  getAllValidParentRoles,
+  wireHierarchy,
+} from '../services/invitationHierarchy.service';
+import { canViewUser } from '../services/permission.service';
+import { assertCanAssignGroup } from '../services/groupScope';
+import { validatePasswordStrength } from '../utils/password';
+import { httpError, ADMIN_TIER, canAssignRole, Role } from '../types';
+
+const createSchema = z.object({
+  email: z.string().email(),
+  role: z.enum([
+    'SUPER_ADMIN',
+    'CEO',
+    'CTO',
+    'DIRECTOR',
+    'MANAGER',
+    'HR_MANAGER',
+    'DEVELOPER',
+    'RECRUITER',
+    'CONSULTANT',
+  ]),
+  // Optional group pre-assignment. null / undefined / omitted == "No Group" —
+  // the invited user lands with users.group_id = NULL.
+  group_id: z.string().uuid().nullable().optional(),
+  // Parent assignment. Omit for server-side auto-resolution.
+  parent_user_id: z.string().uuid().nullable().optional(),
+  // Admin-tier only: bypass strict hierarchy validation for the parent.
+  // Ignored (and rejected) for non-admin callers.
+  manual_override: z.boolean().optional(),
+});
+
+export const create: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const parsed = createSchema.safeParse(req.body);
+  if (!parsed.success) throw httpError(400, 'Invalid input', parsed.error.flatten());
+
+  // Privilege ceiling: SUPER_ADMIN may invite any role; everyone else may only
+  // invite a role STRICTLY below their own rank, and never a SUPER_ADMIN-only
+  // role (SUPER_ADMIN or DEVELOPER). This is what lets a RECRUITER invite a
+  // CONSULTANT (rank 2 > 1) but nothing else.
+  const requestedRole = parsed.data.role as Role;
+  if (!canAssignRole(req.user.role, requestedRole)) {
+    throw httpError(403, `You are not permitted to invite the role ${requestedRole}.`);
+  }
+
+  // Group resolution.
+  //   RECRUITER → FORCE invitee into caller's group (ignore any body.group_id)
+  //   and refuse the invite if the recruiter has no group. Without this, a
+  //   recruiter could create a Consultant with users.group_id = NULL, escaping
+  //   every downstream group-scope check.
+  //   Admin-tier + manager-tier (HR_MANAGER, MANAGER, DEVELOPER) → free choice
+  //   of group, including "no group" (null). assertCanAssignGroup still rejects
+  //   any non-admin attempt to land in a group other than the caller's own.
+  let groupId: string | null;
+  if (req.user.role === 'RECRUITER') {
+    if (!req.user.group_id) {
+      throw httpError(
+        403,
+        'You must be assigned to a group before inviting other users. Ask an admin to place you in a group first.',
+      );
+    }
+    groupId = req.user.group_id;
+  } else {
+    groupId = parsed.data.group_id ?? null;
+  }
+  assertCanAssignGroup(req.user, groupId);
+
+  // ── Parent assignment ───────────────────────────────────────────────────
+  let parentUserId: string | null = null;
+  let assignedMode: 'auto' | 'manual' = 'auto';
+  let assignedBy: string | null = null;
+
+  const isAdminCaller = (ADMIN_TIER as Role[]).includes(req.user.role);
+
+  if (parsed.data.parent_user_id) {
+    const pId = parsed.data.parent_user_id;
+
+    // Non-admins must be able to see the target user via the permission service.
+    // EXCEPT self: the inviter can always parent the invitee to themselves. This
+    // is the normal auto-resolved outcome whenever the inviter's rank qualifies
+    // (RECRUITER→CONSULTANT, HR_MANAGER/MANAGER→CONSULTANT|RECRUITER, …) —
+    // resolveAutoParent returns `inviter.id` in that case. canViewUser delegates
+    // to canMessageUser, which returns false for self (you can't message
+    // yourself), so without this carve-out the most common invite flow 403s.
+    if (!isAdminCaller && pId !== req.user.id) {
+      const canSee = await canViewUser(
+        { id: req.user.id, role: req.user.role, group_id: req.user.group_id ?? null },
+        pId,
+      );
+      if (!canSee) throw httpError(403, 'You do not have permission to assign this parent.');
+    }
+
+    // Load the target parent user.
+    const { data: parentRow } = await db
+      .from('users')
+      .select('id, role, is_active')
+      .eq('id', pId)
+      .maybeSingle();
+    const parent = parentRow as { id: string; role: Role; is_active: boolean | null } | null;
+    if (!parent || parent.is_active === false) throw httpError(404, 'Parent user not found.');
+
+    // Hierarchy check — SUPER_ADMIN with manual_override=true may bypass entirely.
+    const bypassHierarchy = parsed.data.manual_override === true && req.user.role === 'SUPER_ADMIN';
+    if (!bypassHierarchy && !isAllowedParent(requestedRole, parent.role)) {
+      const expected = getExpectedParentRoles(requestedRole);
+      throw httpError(
+        422,
+        `Invalid parent role. A ${requestedRole} requires a parent at or above the ${expected?.join(', ') ?? 'admin'} level.`,
+      );
+    }
+
+    parentUserId = pId;
+    assignedMode = 'manual';
+    assignedBy = req.user.id;
+  } else {
+    // Server-side auto-resolution — frontend never guesses the parent.
+    parentUserId = await resolveAutoParent(requestedRole, {
+      id: req.user.id,
+      role: req.user.role,
+    });
+  }
+
+  const invitation = await createInvitation({
+    email: parsed.data.email,
+    role: parsed.data.role,
+    invitedBy: req.user.id,
+    groupId,
+    parentUserId,
+    assignedMode,
+    assignedBy,
+  });
+  res.status(201).json(invitation);
+};
+
+export const list: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const isAdmin = (ADMIN_TIER as Role[]).includes(req.user.role);
+
+  // Non-admins only see invitations they created — prevents token leakage
+  // across groups and IDOR-style enumeration of other managers' invite links.
+  let query = db.from('invitations').select('*').order('created_at', { ascending: false });
+  if (!isAdmin) query = (query as any).eq('invited_by', req.user.id);
+
+  const { data, error } = await query;
+  if (error) throw httpError(500, 'Database error');
+  // Surface the accept URL for PENDING invitations so managers can copy the
+  // link manually if the email failed to send. Use frontendUrl — the same
+  // base that the email body uses (invitation.service.ts) — so the copied
+  // link and the emailed link can't diverge if APP_URL and FRONTEND_URL ever
+  // point at different hosts (e.g. api.* vs app.*).
+  const withUrls = (data ?? []).map((r: any) =>
+    r.status === 'PENDING'
+      ? { ...r, invite_url: `${env.frontendUrl}/invite/accept?token=${r.token}` }
+      : r,
+  );
+  res.json(withUrls);
+};
+
+export const accept: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const token = String(req.body?.token ?? '');
+  if (!token) throw httpError(400, 'Missing token');
+  const result = await acceptInvitation(token, req.user.id);
+  res.json(result);
+};
+
+/**
+ * Returns the server-resolved auto-parent plus the full candidate list for the
+ * given invited_role. The frontend must NOT compute the parent — it only renders
+ * what this endpoint returns.
+ *
+ * Response shape:
+ *   { auto_parent: ParentUser | null, candidates: ParentUser[] }
+ *
+ * auto_parent is non-null when the server can unambiguously resolve a single
+ * parent (inviter IS the required role, or exactly one candidate in scope).
+ * When null the frontend must show a required dropdown from candidates.
+ */
+export const availableParents: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const invitedRole = String(req.query.invited_role ?? '') as Role;
+  const validParentRoles = getAllValidParentRoles(invitedRole);
+
+  // Roles that need no parent (admin tier) — nothing to show.
+  if (!validParentRoles) return res.json({ auto_parent: null, candidates: [] });
+
+  type ParentUser = { id: string; full_name: string | null; email: string; role: Role };
+
+  const isAdmin = (ADMIN_TIER as Role[]).includes(req.user.role);
+
+  // 1. Fetch all active users whose role satisfies the parent rank requirement.
+  const { data, error } = await db
+    .from('users')
+    .select('id, full_name, email, role, group_id')
+    .in('role', validParentRoles as unknown as string[])
+    .eq('is_active', true);
+  if (error) throw httpError(500, 'Database error');
+
+  type ParentRow = ParentUser & { group_id: string | null };
+  let all = (data ?? []) as ParentRow[];
+
+  // 2. Scope to same group for non-admins (admins see workspace-wide).
+  if (!isAdmin) {
+    const { data: me } = await db
+      .from('users')
+      .select('group_id')
+      .eq('id', req.user.id)
+      .maybeSingle();
+    const callerGroupId = (me as { group_id?: string | null } | null)?.group_id ?? null;
+    if (callerGroupId) {
+      const adminRoles = ADMIN_TIER as Role[];
+      all = all.filter((u) => u.group_id === callerGroupId || adminRoles.includes(u.role));
+    }
+  }
+
+  const candidates: ParentUser[] = all.map((u) => ({
+    id: u.id,
+    full_name: u.full_name,
+    email: u.email,
+    role: u.role,
+  }));
+
+  // 3. Server-side auto-resolution — the only source of truth for the frontend.
+  const autoId = await resolveAutoParent(invitedRole, {
+    id: req.user.id,
+    role: req.user.role,
+  });
+  // The resolved ID must be in the scoped candidates list to be surfaced.
+  const auto_parent = autoId ? (candidates.find((c) => c.id === autoId) ?? null) : null;
+
+  res.json({ auto_parent, candidates });
+};
+
+/**
+ * PUBLIC: preview an invitation by its token. Returns the email + role + status so
+ * the accept page can pre-fill the form. Does NOT require auth.
+ */
+/** Mask the local-part of an email so the preview confirms identity to the
+ *  invited person without exposing the full address to a token-bruteforcer.
+ *  "satish.flex07@gmail.com" → "s************@gmail.com". The invitee
+ *  recognizes their own address; an attacker harvesting tokens just sees
+ *  the masked form. */
+function maskEmail(email: string): string {
+  const at = email.lastIndexOf('@');
+  if (at <= 0) return '***';
+  const local = email.slice(0, at);
+  const domain = email.slice(at);
+  const head = local[0] ?? '';
+  return `${head}${'*'.repeat(Math.max(2, local.length - 1))}${domain}`;
+}
+
+export const preview: RequestHandler = async (req, res) => {
+  const token = String(req.query.token ?? '');
+  if (!token) throw httpError(400, 'Missing token');
+  const { data, error } = await db
+    .from('invitations')
+    .select('email, role, status, expires_at')
+    .eq('token', token)
+    .single();
+  if (error || !data) throw httpError(404, 'Invitation not found');
+  const expired = new Date(data.expires_at) < new Date();
+  // Return a masked email so the invitee can confirm "yes, that's me"
+  // without giving a token-bruteforcer the actual address. Same masked
+  // form is fine to render in the accept-invitation UI — the user knows
+  // their own email.
+  res.json({
+    email: maskEmail(data.email),
+    role: data.role,
+    status: data.status,
+    expires_at: data.expires_at,
+    expired,
+  });
+};
+
+/**
+ * PUBLIC: complete the invitation by setting a password. Creates the auth user,
+ * the public.users row with the invited role, marks the invitation accepted,
+ * and returns a fresh session pair so the frontend can sign the user in without
+ * a second roundtrip.
+ *
+ * The user is choosing their own password here, so `must_change_password` is
+ * explicitly set to false — they are NOT forced to immediately rotate the
+ * password they just set.
+ */
+export const setup: RequestHandler = async (req, res) => {
+  const schema = z.object({
+    token: z.string().min(1),
+    password: z.string().min(12, 'Password must be at least 12 characters'),
+    full_name: z.string().optional(),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) throw httpError(400, parsed.error.issues[0]?.message ?? 'Invalid input');
+  const { token, password, full_name } = parsed.data;
+
+  // 1. Look up the invitation and validate status.
+  const { data: invite, error } = await db
+    .from('invitations')
+    .select('*')
+    .eq('token', token)
+    .single();
+  if (error || !invite) throw httpError(404, 'Invitation not found');
+  if (invite.status !== 'PENDING') throw httpError(400, `Invitation already ${invite.status}`);
+  if (new Date(invite.expires_at) < new Date()) {
+    await db.from('invitations').update({ status: 'EXPIRED' }).eq('id', invite.id);
+    throw httpError(400, 'Invitation expired');
+  }
+
+  // Strong-password check BEFORE claiming the invitation. Validating AFTER the
+  // CAS claim (the old order) meant a rejected password left the invitation
+  // marked ACCEPTED with no account ever created: the invitee then hit
+  // "Invitation already accepted" on retry and "invalid credentials" at login
+  // (the account never existed). Checking first keeps the invite PENDING/usable
+  // until a valid password is supplied.
+  const strength = validatePasswordStrength(password, { email: invite.email });
+  if (!strength.ok) throw httpError(400, strength.problems.join(' '));
+
+  // Atomically claim the invitation BEFORE creating the user. Without this
+  // CAS, two concurrent requests with the same token both read status=PENDING
+  // above and both proceed to createUser/upsert. The auth createUser would
+  // reject the second on email-uniqueness, but only after wireHierarchy
+  // could already have fired twice in racing requests (different timing
+  // windows). Move the status transition up-front so only the winner
+  // continues — losers see "already accepted" and bail before any side effect.
+  //
+  // invitation_status is an enum ('PENDING','ACCEPTED','EXPIRED','REVOKED')
+  // so we transition straight to ACCEPTED. On createUser failure below we
+  // revert to PENDING so the link remains usable.
+  const claim = await pool.query<{ id: string }>(
+    `UPDATE public.invitations
+        SET status = 'ACCEPTED', accepted_at = $2
+      WHERE id = $1 AND status = 'PENDING'
+      RETURNING id`,
+    [invite.id, new Date().toISOString()],
+  );
+  if (claim.rows.length === 0) {
+    throw httpError(400, 'Invitation already accepted');
+  }
+  // Helper: revert the claim if a downstream step fails so the user can retry.
+  const revertClaim = async (): Promise<void> => {
+    await pool
+      .query(`UPDATE public.invitations SET status = 'PENDING', accepted_at = NULL WHERE id = $1`, [
+        invite.id,
+      ])
+      .catch(() => {});
+  };
+
+  // (Password strength was validated above, before the claim.)
+
+  // 3. Create the auth user. `email_confirm: true` is a no-op flag kept for
+  //    API compatibility — all email runs through Brevo.
+  const { data: created, error: createErr } = await db.auth.admin.createUser({
+    email: invite.email,
+    password,
+    email_confirm: true,
+    user_metadata: full_name ? { full_name } : undefined,
+  });
+  if (createErr || !created.user) {
+    // Most common reason: a user already exists for this email.
+    await revertClaim();
+    const msg = createErr?.message ?? 'Could not create user';
+    throw httpError(400, msg);
+  }
+
+  // 4. Upsert the public.users row with the invited role. Explicitly clear
+  //    must_change_password — the user just set their own password, no need
+  //    to force a rotation on first login.
+  //    If the invitation pre-assigned a group, propagate it onto the new
+  //    user. Null/missing means the "No Group" path.
+  const now = new Date().toISOString();
+  const { error: upsertErr } = await db.from('users').upsert(
+    {
+      id: created.user.id,
+      email: invite.email,
+      full_name: full_name ?? null,
+      role: invite.role,
+      group_id: invite.group_id ?? null,
+      must_change_password: false,
+      last_password_changed_at: now,
+      failed_login_attempts: 0,
+      locked_until: null,
+      is_active: true,
+    },
+    { onConflict: 'id' },
+  );
+  if (upsertErr) {
+    // Roll back the auth user — otherwise the email is "taken" but the user
+    // can never finish provisioning. Also revert the invitation claim so the
+    // link is usable again.
+    await db.auth.admin.deleteUser(created.user.id).catch(() => {});
+    await revertClaim();
+    throw httpError(500, upsertErr.message);
+  }
+
+  // 5. Wire org-hierarchy — non-fatal so account creation isn't blocked.
+  const newUserId = created.user!.id;
+  await wireHierarchy(newUserId, invite.role as Role, invite.parent_user_id ?? null).catch(
+    (err: unknown) => {
+      (req as any).log?.warn?.({ err, userId: newUserId }, 'hierarchy wiring failed on setup');
+    },
+  );
+
+  // 6. The atomic claim above already set status=ACCEPTED + accepted_at —
+  //    no further write needed here.
+
+  // 7. Issue a session right now — avoids a round-trip second login on the
+  //    client and the brief window where the just-created user hasn't been
+  //    indexed for password lookup yet.
+  const fresh = await db.auth.signInWithPassword({
+    email: invite.email,
+    password,
+  });
+  if (fresh.error || !fresh.data.session) {
+    // The account is provisioned; just couldn't auto-sign-in. Let the
+    // frontend show the login page rather than 500ing.
+    res.status(201).json({ email: invite.email, role: invite.role, session: null });
+    return;
+  }
+
+  res.status(201).json({
+    email: invite.email,
+    role: invite.role,
+    session: {
+      access_token: fresh.data.session.access_token,
+      refresh_token: fresh.data.session.refresh_token,
+      expires_at: fresh.data.session.expires_at ?? Math.floor(Date.now() / 1000) + 3600,
+    },
+  });
+};
+
+export const revoke: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  const { id } = req.params;
+  const isAdmin = (ADMIN_TIER as Role[]).includes(req.user.role);
+  const { data: inv } = await db
+    .from('invitations')
+    .select('id, invited_by')
+    .eq('id', id)
+    .maybeSingle();
+  if (!inv) throw httpError(404, 'Invitation not found');
+  if (!isAdmin && (inv as any).invited_by !== req.user.id) {
+    throw httpError(404, 'Invitation not found');
+  }
+  const { error } = await db.from('invitations').update({ status: 'REVOKED' }).eq('id', id);
+  if (error) throw httpError(500, 'Database error');
+  res.json({ ok: true });
+};

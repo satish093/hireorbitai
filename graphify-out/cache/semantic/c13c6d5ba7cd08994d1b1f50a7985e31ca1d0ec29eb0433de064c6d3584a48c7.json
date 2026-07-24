@@ -1,0 +1,91 @@
+{
+  "nodes": [
+    {
+      "id": "rules_database",
+      "label": "Database rules",
+      "file_type": "document",
+      "source_file": ".claude/rules/database.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "rules_database_db_shim",
+      "label": "PostgREST-compat db shim",
+      "file_type": "concept",
+      "source_file": ".claude/rules/database.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "rules_database_retry_and_strip",
+      "label": "Retry-and-strip schema-cache pattern",
+      "file_type": "rationale",
+      "source_file": ".claude/rules/database.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "rules_database_node_pg_migrate",
+      "label": "node-pg-migrate tracked migrations",
+      "file_type": "concept",
+      "source_file": ".claude/rules/database.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "rules_database",
+      "target": "rules_database_db_shim",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": ".claude/rules/database.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "rules_database",
+      "target": "rules_database_retry_and_strip",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": ".claude/rules/database.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "rules_database",
+      "target": "rules_database_node_pg_migrate",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": ".claude/rules/database.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "rules_database_db_shim",
+      "target": "rules_security_or_string_escaping",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": ".claude/rules/database.md",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": []
+}

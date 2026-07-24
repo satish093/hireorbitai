@@ -1,0 +1,30 @@
+
+> hireorbitai@0.1.0 typecheck
+> npm run shared:build && npm --prefix backend run typecheck && npm --prefix frontend run typecheck
+
+
+> hireorbitai@0.1.0 shared:build
+> npm --workspace @hireorbitai/shared run build
+
+
+> @hireorbitai/shared@0.1.0 build
+> npm run build:esm && npm run build:cjs && node scripts/fix-cjs.mjs
+
+
+> @hireorbitai/shared@0.1.0 build:esm
+> tsc -p tsconfig.json
+
+
+> @hireorbitai/shared@0.1.0 build:cjs
+> tsc -p tsconfig.cjs.json
+
+  ✓ wrote dist/esm/package.json and dist/cjs/package.json
+
+> hireorbitai-backend@0.1.0 typecheck
+> tsc --noEmit
+
+
+> hireorbitai-frontend@0.1.0 typecheck
+> tsc --noEmit
+
+TYPECHECK_EXIT=0

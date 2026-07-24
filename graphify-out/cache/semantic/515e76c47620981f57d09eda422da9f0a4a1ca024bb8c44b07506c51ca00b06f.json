@@ -1,0 +1,111 @@
+{
+  "nodes": [
+    {
+      "id": "deployment_02_databases_separation",
+      "label": "Two separated databases (prod VPS / dev Neon)",
+      "file_type": "concept",
+      "source_file": "docs/deployment/02-databases.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "deployment_02_databases_db_guard",
+      "label": "DB_GUARD cross-environment guard",
+      "file_type": "rationale",
+      "source_file": "docs/deployment/02-databases.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "deployment_02_databases_init_sql",
+      "label": "database/init.sql consolidated baseline",
+      "file_type": "concept",
+      "source_file": "docs/deployment/02-databases.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "deployment_02_databases_neon_dev",
+      "label": "Neon hireorbit_dev managed Postgres",
+      "file_type": "rationale",
+      "source_file": "docs/deployment/02-databases.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "deployment_02_databases_separation",
+      "target": "deployment_02_databases_db_guard",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/02-databases.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "deployment_02_databases_separation",
+      "target": "deployment_02_databases_init_sql",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/02-databases.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "deployment_02_databases_separation",
+      "target": "deployment_02_databases_neon_dev",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/02-databases.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "deployment_02_databases_db_guard",
+      "target": "deployment_02_databases_separation",
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/02-databases.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "deployment_02_databases_neon_dev",
+      "target": "deployment_03_render_dev_hosting",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/deployment/02-databases.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "deployment_02_databases_db_guard",
+      "target": "env_vars_zod_validation",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "docs/deployment/02-databases.md",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": []
+}

@@ -1,0 +1,80 @@
+{
+  "nodes": [
+    {
+      "id": "docker_docker_compose_local_stack",
+      "label": "Local dev Docker Compose stack",
+      "file_type": "concept",
+      "source_file": "docker/docker-compose.yml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docker_docker_compose_db_service",
+      "label": "db service (postgres:16-alpine)",
+      "file_type": "concept",
+      "source_file": "docker/docker-compose.yml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docker_docker_compose_api_service",
+      "label": "api service (backend container)",
+      "file_type": "concept",
+      "source_file": "docker/docker-compose.yml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "docker_docker_compose_local_stack",
+      "target": "docker_docker_compose_db_service",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docker/docker-compose.yml",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docker_docker_compose_local_stack",
+      "target": "docker_docker_compose_api_service",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docker/docker-compose.yml",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docker_docker_compose_api_service",
+      "target": "docker_docker_compose_db_service",
+      "relation": "shares_data_with",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docker/docker-compose.yml",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docker_docker_compose_api_service",
+      "target": "deployment_02_databases_init_sql",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docker/docker-compose.yml",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": []
+}
