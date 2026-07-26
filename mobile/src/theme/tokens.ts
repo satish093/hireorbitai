@@ -46,68 +46,75 @@ export interface Palette {
   scrim: string;
 }
 
+// Values match frontend/src/styles/tokens.css EXACTLY. Hex tokens are copied
+// verbatim; the web's oklch() tokens are converted to their precise sRGB hex
+// via OKLCH→OKLab→linear-sRGB→gamma (not eyeballed). Keep these in lockstep
+// with the website — the whole point is that the app looks identical.
 export const lightPalette: Palette = {
-  bg: '#fafbfc',
-  bgElev: '#ffffff',
-  bgSunken: '#f4f5f7',
-  surface: '#ffffff',
-  surface2: '#fafbfc',
-  hover: '#f1f2f5',
-  border: '#e5e7ec',
-  borderStrong: '#d1d4dc',
-  ink: '#13161c',
-  ink2: '#4f535b',
-  muted: '#5d6066',
-  faint: '#9ca0aa',
-  accent: '#5b3df5',
-  accent2: '#4b21de',
-  accentSoft: '#eeeafe',
-  accentFg: '#ffffff',
-  brandFrom: '#2563eb',
-  brandTo: '#7c3aed',
-  brandSoft: '#eef2ff',
-  brandOnSoft: '#4338ca',
-  brandSoftBorder: '#e0e7ff',
-  success: '#2e7a42',
-  successSoft: '#dcf7e1',
-  warn: '#b7791f',
-  warnSoft: '#fdf1d9',
-  danger: '#c92a2a',
-  dangerSoft: '#fde8e6',
-  ring: 'rgba(91, 61, 245, 0.35)',
-  scrim: 'rgba(15, 23, 42, 0.45)',
+  bg: '#fafbfc', // --bg
+  bgElev: '#ffffff', // --bg-elev
+  bgSunken: '#f3f5f8', // --bg-sunken  oklch(0.97 0.004 250)
+  surface: '#ffffff', // --surface
+  surface2: '#f8fafd', // --surface-2  oklch(0.985 0.004 250)
+  hover: '#eff2f5', // --hover       oklch(0.96 0.005 250)
+  border: '#e2e5e8', // --border      oklch(0.92 0.006 250)
+  borderStrong: '#cdd1d6', // --border-strong oklch(0.86 0.008 250)
+  ink: '#13161c', // --ink
+  ink2: '#4f535b', // --ink-2
+  muted: '#5d6066', // --muted
+  faint: '#9b9fa5', // --faint       oklch(0.7 0.01 260)
+  accent: '#5053e9', // --accent      oklch(0.535 0.22 275)
+  accent2: '#4d34d5', // --accent-2    oklch(0.47 0.23 280)
+  accentSoft: '#eaf1ff', // --accent-soft oklch(0.96 0.035 275)
+  accentFg: '#ffffff', // --accent-fg
+  brandFrom: '#2563eb', // --brand-from
+  brandTo: '#7c3aed', // --brand-to
+  brandSoft: '#eef2ff', // --brand-soft
+  brandOnSoft: '#4338ca', // --brand-on-soft
+  brandSoftBorder: '#e0e7ff', // --brand-soft-border
+  success: '#2e7a42', // --success
+  successSoft: '#dcf7e1', // --success-soft oklch(0.95 0.04 150)
+  warn: '#d49838', // --warn        oklch(0.72 0.13 75)
+  warnSoft: '#ffefcd', // --warn-soft   oklch(0.96 0.05 80)
+  danger: '#c9222b', // --danger      oklch(0.54 0.2 25)
+  dangerSoft: '#ffe8e4', // --danger-soft oklch(0.96 0.04 25)
+  ring: 'rgba(80, 83, 233, 0.35)', // --ring oklch(0.535 0.22 275 / 0.35)
+  scrim: 'rgba(15, 23, 42, 0.45)', // modal backdrop (RN has no CSS backdrop-filter)
 };
 
+// Matches [data-theme='dark'] in tokens.css. These are the values the website
+// actually renders in dark mode — the previous mobile dark palette was
+// hand-guessed and noticeably lighter/bluer than the site.
 export const darkPalette: Palette = {
-  bg: '#0b0e14',
-  bgElev: '#131720',
-  bgSunken: '#080a0f',
-  surface: '#131720',
-  surface2: '#181d28',
-  hover: '#1e2430',
-  border: '#252b38',
-  borderStrong: '#343c4c',
-  ink: '#f2f4f8',
-  ink2: '#c2c7d0',
-  muted: '#9aa1ad',
-  faint: '#6c7382',
-  accent: '#8b73ff',
-  accent2: '#a691ff',
-  accentSoft: '#211c3d',
-  accentFg: '#0b0e14',
-  brandFrom: '#60a5fa',
-  brandTo: '#a78bfa',
-  brandSoft: '#1c1f3a',
-  brandOnSoft: '#a5b4fc',
-  brandSoftBorder: '#2a2f52',
-  success: '#5fd07f',
-  successSoft: '#12261a',
-  warn: '#e0a545',
-  warnSoft: '#2a1f0d',
-  danger: '#f47171',
-  dangerSoft: '#2c1416',
-  ring: 'rgba(139, 115, 255, 0.4)',
-  scrim: 'rgba(0, 0, 0, 0.6)',
+  bg: '#080b10', // --bg
+  bgElev: '#0e1217', // --bg-elev
+  bgSunken: '#04060a', // --bg-sunken
+  surface: '#12151a', // --surface
+  surface2: '#171b20', // --surface-2
+  hover: '#1f2329', // --hover
+  border: '#272c32', // --border
+  borderStrong: '#383d46', // --border-strong
+  ink: '#bbbec3', // --ink
+  ink2: '#8b8f97', // --ink-2
+  muted: '#8c9098', // --muted
+  faint: '#84878d', // --faint
+  accent: '#7887ff', // --accent
+  accent2: '#9698ff', // --accent-2
+  accentSoft: '#1c1c62', // --accent-soft
+  accentFg: '#ffffff', // --accent-fg
+  brandFrom: '#3b82f6', // --brand-from
+  brandTo: '#8b5cf6', // --brand-to
+  brandSoft: 'rgba(99, 102, 241, 0.15)', // --brand-soft  rgb(99 102 241 / .15)
+  brandOnSoft: '#a5b4fc', // --brand-on-soft
+  brandSoftBorder: 'rgba(99, 102, 241, 0.3)', // --brand-soft-border
+  success: '#4aa865', // --success
+  successSoft: '#012d10', // --success-soft
+  warn: '#d49838', // --warn
+  warnSoft: '#3f2100', // --warn-soft
+  danger: '#f06861', // --danger
+  dangerSoft: '#4c1010', // --danger-soft
+  ring: 'rgba(120, 135, 255, 0.5)', // --ring
+  scrim: 'rgba(0, 0, 0, 0.6)', // modal backdrop
 };
 
 /** 4px base scale — matches Tailwind's spacing rhythm used on the web. */
