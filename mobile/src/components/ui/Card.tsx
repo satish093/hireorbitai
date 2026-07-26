@@ -1,6 +1,15 @@
-import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import {
+  Animated,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
 import { useRouter, type Href } from 'expo-router';
 import { useTheme } from '../../theme';
+import { usePressScale } from '../../hooks/useAnim';
 
 interface CardProps {
   children: React.ReactNode;
@@ -15,6 +24,7 @@ interface CardProps {
 export function Card({ children, onPress, href, style, padded = true }: CardProps) {
   const { colors, radius, spacing } = useTheme();
   const router = useRouter();
+  const press = usePressScale(0.98);
 
   const body = (
     <View
@@ -37,13 +47,17 @@ export function Card({ children, onPress, href, style, padded = true }: CardProp
   if (!onPress && !href) return body;
 
   return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={() => (href ? router.push(href) : onPress?.())}
-      style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
-    >
-      {body}
-    </Pressable>
+    <Animated.View style={press.style}>
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => (href ? router.push(href) : onPress?.())}
+        onPressIn={press.handlers.onPressIn}
+        onPressOut={press.handlers.onPressOut}
+        style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1 })}
+      >
+        {body}
+      </Pressable>
+    </Animated.View>
   );
 }
 

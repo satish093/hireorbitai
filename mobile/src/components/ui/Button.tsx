@@ -1,6 +1,15 @@
-import { ActivityIndicator, Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
+import {
+  ActivityIndicator,
+  Animated,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type ViewStyle,
+} from 'react-native';
 import { useRouter, type Href } from 'expo-router';
 import { useTheme } from '../../theme';
+import { usePressScale } from '../../hooks/useAnim';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
 export type ButtonSize = 'sm' | 'md' | 'lg';
@@ -45,6 +54,7 @@ export function Button({
 }: Props) {
   const { colors, radius, fontSize, controlHeight, spacing } = useTheme();
   const router = useRouter();
+  const press = usePressScale(0.97);
 
   const isDisabled = !!disabled || !!loading;
 
@@ -66,38 +76,45 @@ export function Button({
   };
 
   return (
-    <Pressable
-      onPress={handlePress}
-      disabled={isDisabled}
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel ?? label}
-      accessibilityState={{ disabled: isDisabled, busy: !!loading }}
-      style={({ pressed }) => [
-        styles.base,
-        {
-          height,
-          minHeight: height,
-          borderRadius: radius.lg,
-          backgroundColor: tone.bg,
-          borderColor: tone.border,
-          paddingHorizontal: spacing.xl,
-          alignSelf: block ? 'stretch' : 'flex-start',
-          opacity: isDisabled ? 0.45 : pressed ? 0.85 : 1,
-        },
-        style,
-      ]}
-    >
-      {loading ? (
-        <ActivityIndicator size="small" color={tone.fg} />
-      ) : (
-        <View style={styles.content}>
-          {icon ? <View style={{ marginRight: spacing.sm }}>{icon}</View> : null}
-          <Text numberOfLines={1} style={{ color: tone.fg, fontSize: textSize, fontWeight: '600' }}>
-            {label}
-          </Text>
-        </View>
-      )}
-    </Pressable>
+    <Animated.View style={[{ alignSelf: block ? 'stretch' : 'flex-start' }, press.style]}>
+      <Pressable
+        onPress={handlePress}
+        onPressIn={press.handlers.onPressIn}
+        onPressOut={press.handlers.onPressOut}
+        disabled={isDisabled}
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel ?? label}
+        accessibilityState={{ disabled: isDisabled, busy: !!loading }}
+        style={({ pressed }) => [
+          styles.base,
+          {
+            height,
+            minHeight: height,
+            borderRadius: radius.lg,
+            backgroundColor: tone.bg,
+            borderColor: tone.border,
+            paddingHorizontal: spacing.xl,
+            alignSelf: 'stretch',
+            opacity: isDisabled ? 0.45 : pressed ? 0.9 : 1,
+          },
+          style,
+        ]}
+      >
+        {loading ? (
+          <ActivityIndicator size="small" color={tone.fg} />
+        ) : (
+          <View style={styles.content}>
+            {icon ? <View style={{ marginRight: spacing.sm }}>{icon}</View> : null}
+            <Text
+              numberOfLines={1}
+              style={{ color: tone.fg, fontSize: textSize, fontWeight: '600' }}
+            >
+              {label}
+            </Text>
+          </View>
+        )}
+      </Pressable>
+    </Animated.View>
   );
 }
 

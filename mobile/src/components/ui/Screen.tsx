@@ -1,4 +1,5 @@
 import {
+  Animated,
   FlatList,
   RefreshControl,
   ScrollView,
@@ -10,6 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../theme';
+import { useEntrance } from '../../hooks/useAnim';
 import { EmptyState, ErrorState, SkeletonList } from './States';
 
 /**
@@ -36,9 +38,10 @@ export function Screen({
   edges?: ('top' | 'bottom' | 'left' | 'right')[];
 }) {
   const { colors } = useTheme();
+  const entrance = useEntrance();
   return (
     <SafeAreaView edges={edges} style={[{ flex: 1, backgroundColor: colors.bg }, style]}>
-      {children}
+      <Animated.View style={[{ flex: 1 }, entrance]}>{children}</Animated.View>
     </SafeAreaView>
   );
 }
@@ -170,49 +173,52 @@ export function ListScreen<T>({
 }: ListScreenProps<T>) {
   const { colors, spacing } = useTheme();
   const insets = useSafeAreaInsets();
+  const entrance = useEntrance();
 
   const showSkeleton = loading && items.length === 0;
   const showError = !!error && items.length === 0 && !loading;
 
   return (
-    <FlatList
-      data={showSkeleton ? [] : items}
-      keyboardShouldPersistTaps="handled"
-      contentContainerStyle={{
-        padding: spacing.lg,
-        paddingBottom: spacing['4xl'] + insets.bottom,
-        gap: spacing.md,
-        flexGrow: 1,
-      }}
-      ListHeaderComponent={
-        header ? <View style={{ marginBottom: spacing.sm }}>{header}</View> : null
-      }
-      ListEmptyComponent={
-        showSkeleton ? (
-          <SkeletonList count={skeletonCount} />
-        ) : showError ? (
-          <ErrorState message={error} onRetry={onRetry ?? onRefresh} />
-        ) : (
-          <EmptyState
-            title={emptyTitle}
-            description={emptyDescription}
-            actionLabel={emptyActionLabel}
-            onAction={onEmptyAction}
-          />
-        )
-      }
-      refreshControl={
-        onRefresh ? (
-          <RefreshControl
-            refreshing={!!refreshing}
-            onRefresh={onRefresh}
-            tintColor={colors.accent}
-            colors={[colors.accent]}
-          />
-        ) : undefined
-      }
-      {...flatListProps}
-    />
+    <Animated.View style={[{ flex: 1 }, entrance]}>
+      <FlatList
+        data={showSkeleton ? [] : items}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{
+          padding: spacing.lg,
+          paddingBottom: spacing['4xl'] + insets.bottom,
+          gap: spacing.md,
+          flexGrow: 1,
+        }}
+        ListHeaderComponent={
+          header ? <View style={{ marginBottom: spacing.sm }}>{header}</View> : null
+        }
+        ListEmptyComponent={
+          showSkeleton ? (
+            <SkeletonList count={skeletonCount} />
+          ) : showError ? (
+            <ErrorState message={error} onRetry={onRetry ?? onRefresh} />
+          ) : (
+            <EmptyState
+              title={emptyTitle}
+              description={emptyDescription}
+              actionLabel={emptyActionLabel}
+              onAction={onEmptyAction}
+            />
+          )
+        }
+        refreshControl={
+          onRefresh ? (
+            <RefreshControl
+              refreshing={!!refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.accent}
+              colors={[colors.accent]}
+            />
+          ) : undefined
+        }
+        {...flatListProps}
+      />
+    </Animated.View>
   );
 }
 

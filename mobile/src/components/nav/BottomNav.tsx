@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Animated, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePathname, useRouter } from 'expo-router';
 import { Icon, type IconName } from '../ui/Icon';
 import { MoreSheet } from './MoreSheet';
 import { useAuth } from '../../context/AuthContext';
 import { useBadgeCounts } from '../../hooks/useBadgeCounts';
+import { usePressScale } from '../../hooks/useAnim';
 import { OPERATOR_TIER, type Role } from '../../types';
 import { useTheme } from '../../theme';
 
@@ -67,7 +68,7 @@ export function BottomNav() {
   const pathname = usePathname();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { colors, fontSize } = useTheme();
+  const { colors } = useTheme();
   const [moreOpen, setMoreOpen] = useState(false);
 
   const tabs: Tab[] = [
@@ -127,73 +128,91 @@ export function BottomNav() {
           borderTopColor: colors.border,
         }}
       >
-        {tabs.map((tab) => {
-          const active = isActive(tab);
-          const tint = active ? colors.accent : colors.muted;
-          const badgeCount = tab.badge ? (counts[tab.badge] ?? 0) : 0;
-          return (
-            <Pressable
-              key={tab.id}
-              accessibilityRole="button"
-              accessibilityLabel={tab.label}
-              accessibilityState={{ selected: active }}
-              onPress={() => {
-                if (tab.to) {
-                  setMoreOpen(false);
-                  router.navigate(tab.to as never);
-                } else {
-                  setMoreOpen(true);
-                }
-              }}
-              style={{
-                flex: 1,
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 3,
-                minHeight: 44,
-              }}
-            >
-              <View>
-                <Icon name={tab.icon} size={23} color={tint} strokeWidth={active ? 2.1 : 1.75} />
-                {badgeCount > 0 ? (
-                  <View
-                    style={{
-                      position: 'absolute',
-                      top: -4,
-                      right: -8,
-                      minWidth: 15,
-                      height: 15,
-                      paddingHorizontal: 3,
-                      borderRadius: 8,
-                      backgroundColor: colors.danger,
-                      borderWidth: 1.5,
-                      borderColor: colors.bgElev,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <Text style={{ color: '#fff', fontSize: 9, fontWeight: '700' }}>
-                      {badgeCount > 99 ? '99+' : badgeCount}
-                    </Text>
-                  </View>
-                ) : null}
-              </View>
-              <Text
-                style={{
-                  fontSize: 10.5,
-                  fontWeight: active ? '700' : '500',
-                  letterSpacing: 0.1,
-                  color: tint,
-                }}
-              >
-                {tab.label}
-              </Text>
-            </Pressable>
-          );
-        })}
+        {tabs.map((tab) => (
+          <TabButton
+            key={tab.id}
+            tab={tab}
+            active={isActive(tab)}
+            badgeCount={tab.badge ? (counts[tab.badge] ?? 0) : 0}
+            onPress={() => {
+              if (tab.to) {
+                setMoreOpen(false);
+                router.navigate(tab.to as never);
+              } else {
+                setMoreOpen(true);
+              }
+            }}
+          />
+        ))}
       </View>
 
       <MoreSheet open={moreOpen} onClose={() => setMoreOpen(false)} />
     </>
+  );
+}
+
+function TabButton({
+  tab,
+  active,
+  badgeCount,
+  onPress,
+}: {
+  tab: Tab;
+  active: boolean;
+  badgeCount: number;
+  onPress: () => void;
+}) {
+  const { colors } = useTheme();
+  const press = usePressScale(0.88);
+  const tint = active ? colors.accent : colors.muted;
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={tab.label}
+      accessibilityState={{ selected: active }}
+      onPress={onPress}
+      onPressIn={press.handlers.onPressIn}
+      onPressOut={press.handlers.onPressOut}
+      style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 3, minHeight: 44 }}
+    >
+      <Animated.View style={[{ alignItems: 'center', gap: 3 }, press.style]}>
+        <View>
+          <Icon name={tab.icon} size={23} color={tint} strokeWidth={active ? 2.1 : 1.75} />
+          {badgeCount > 0 ? (
+            <View
+              style={{
+                position: 'absolute',
+                top: -4,
+                right: -8,
+                minWidth: 15,
+                height: 15,
+                paddingHorizontal: 3,
+                borderRadius: 8,
+                backgroundColor: colors.danger,
+                borderWidth: 1.5,
+                borderColor: colors.bgElev,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Text style={{ color: '#fff', fontSize: 9, fontWeight: '700' }}>
+                {badgeCount > 99 ? '99+' : badgeCount}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+        <Text
+          style={{
+            fontSize: 10.5,
+            fontWeight: active ? '700' : '500',
+            letterSpacing: 0.1,
+            color: tint,
+          }}
+        >
+          {tab.label}
+        </Text>
+      </Animated.View>
+    </Pressable>
   );
 }
