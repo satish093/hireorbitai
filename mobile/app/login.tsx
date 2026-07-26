@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Screen } from '../src/components/ui/Screen';
+import { Screen, Banner } from '../src/components/ui/Screen';
 import { Button } from '../src/components/ui/Button';
+import { Brand } from '../src/components/ui/Brand';
 import { FormInput, PasswordInput } from '../src/components/ui/Inputs';
-import { Banner } from '../src/components/ui/Screen';
 import { GuestOnly } from '../src/components/RouteGuard';
 import { useAuth } from '../src/context/AuthContext';
 import { apiErrorMessage } from '../src/services/api';
@@ -33,7 +33,7 @@ export default function LoginScreen() {
 function LoginForm() {
   const { signIn } = useAuth();
   const router = useRouter();
-  const { colors, spacing, fontSize } = useTheme();
+  const { colors, spacing, fontSize, radius } = useTheme();
   const params = useLocalSearchParams<{ locked?: string }>();
 
   const [email, setEmail] = useState('');
@@ -64,7 +64,8 @@ function LoginForm() {
   };
 
   return (
-    <Screen edges={['top', 'bottom']}>
+    // bg-hover full-screen backdrop, matching the web login (hireorbitai.com/login).
+    <Screen edges={['top', 'bottom']} style={{ backgroundColor: colors.hover }}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -73,66 +74,113 @@ function LoginForm() {
           contentContainerStyle={{
             flexGrow: 1,
             justifyContent: 'center',
-            padding: spacing.xl,
+            alignItems: 'center',
+            padding: spacing.lg,
           }}
           keyboardShouldPersistTaps="handled"
         >
-          <View style={{ marginBottom: spacing['3xl'] }}>
-            <Text style={{ fontSize: fontSize['2xl'], fontWeight: '700', color: colors.ink }}>
-              HireOrbit AI
-            </Text>
-            <Text style={{ fontSize: fontSize.base, color: colors.muted, marginTop: spacing.xs }}>
-              Sign in to your workspace
-            </Text>
-          </View>
+          {/* max-w-sm centred column, brand mark on top, white card below. */}
+          <View style={{ width: '100%', maxWidth: 384 }}>
+            <View style={{ alignItems: 'center', marginBottom: spacing['2xl'] }}>
+              <Brand size="lg" />
+            </View>
 
-          {params.locked === '1' ? (
-            <View style={{ marginBottom: spacing.lg }}>
-              <Banner
-                tone="danger"
-                message="This account is locked after too many failed sign-in attempts. Try again later, or reset your password."
+            {params.locked === '1' ? (
+              <View style={{ marginBottom: spacing.md }}>
+                <Banner
+                  tone="danger"
+                  message="This account is locked after too many failed sign-in attempts. Try again later, or reset your password."
+                />
+              </View>
+            ) : null}
+
+            <View
+              style={{
+                backgroundColor: colors.surface,
+                borderRadius: radius['2xl'],
+                borderWidth: StyleSheet.hairlineWidth,
+                borderColor: colors.border,
+                padding: spacing['2xl'],
+                // shadow-sm — subtle lift on both platforms.
+                shadowColor: '#000',
+                shadowOpacity: 0.06,
+                shadowRadius: 12,
+                shadowOffset: { width: 0, height: 4 },
+                elevation: 2,
+              }}
+            >
+              <View style={{ marginBottom: spacing.lg }}>
+                <Text
+                  style={{
+                    fontSize: fontSize.xl,
+                    fontWeight: '600',
+                    letterSpacing: -0.3,
+                    color: colors.ink,
+                  }}
+                >
+                  Sign in
+                </Text>
+                <Text style={{ fontSize: fontSize.sm, color: colors.muted, marginTop: 4 }}>
+                  Use your work email and password.
+                </Text>
+              </View>
+
+              {error ? (
+                <View style={{ marginBottom: spacing.md }}>
+                  <Banner tone="danger" message={error} />
+                </View>
+              ) : null}
+
+              <FormInput
+                label="Email"
+                value={email}
+                onChangeText={setEmail}
+                placeholder="you@company.com"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="email"
+                textContentType="emailAddress"
+                returnKeyType="next"
               />
+
+              <PasswordInput
+                label="Password"
+                value={password}
+                onChangeText={setPassword}
+                placeholder="••••••••"
+                returnKeyType="go"
+                onSubmitEditing={onSubmit}
+              />
+
+              <Button
+                label="Sign in"
+                onPress={onSubmit}
+                disabled={!canSubmit}
+                loading={pending}
+                size="lg"
+              />
+
+              {/* Forgot password? · Need an account? Ask an admin. — matches web. */}
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginTop: spacing.lg,
+                }}
+              >
+                <Text
+                  onPress={() => router.push('/forgot-password')}
+                  style={{ fontSize: fontSize.xs, color: colors.brandOnSoft, fontWeight: '600' }}
+                >
+                  Forgot password?
+                </Text>
+                <Text style={{ fontSize: fontSize.xs, color: colors.muted }}>
+                  Need an account? Ask an admin.
+                </Text>
+              </View>
             </View>
-          ) : null}
-
-          {error ? (
-            <View style={{ marginBottom: spacing.lg }}>
-              <Banner tone="danger" message={error} />
-            </View>
-          ) : null}
-
-          <FormInput
-            label="Email"
-            value={email}
-            onChangeText={setEmail}
-            placeholder="you@company.com"
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-            autoComplete="email"
-            textContentType="emailAddress"
-            returnKeyType="next"
-          />
-
-          <PasswordInput
-            label="Password"
-            value={password}
-            onChangeText={setPassword}
-            placeholder="••••••••"
-            returnKeyType="go"
-            onSubmitEditing={onSubmit}
-          />
-
-          <Button label="Sign in" onPress={onSubmit} disabled={!canSubmit} loading={pending} />
-
-          <View style={{ marginTop: spacing.lg, alignItems: 'center' }}>
-            <Button
-              label="Forgot your password?"
-              href="/forgot-password"
-              variant="ghost"
-              size="sm"
-              block={false}
-            />
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
