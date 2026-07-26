@@ -39,48 +39,97 @@ outright with "Project is incompatible with this version of Expo Go".
 
 ## Building an APK — read this first
 
-Two host requirements that are easy to miss, because neither is enforced until
-a build is already several minutes in.
+A working release APK was produced with the exact recipe below. Every line here
+is empirically confirmed, not guessed — several were learned by a build failing
+20–36 minutes in. Do **not** deviate ("upgrade Gradle", "use Expo's default")
+without re-proving it; each default below is wrong for RN 0.86 on Windows.
 
-### JDK 17 is required, and JDK 21 will not substitute
+### 0. Build from a path with NO spaces and NO parentheses ⚠️ (the big one)
 
-`@react-native/gradle-plugin` declares `jvmToolchain(17)`. If no JDK 17 is
-installed, Gradle tries to **auto-download** one through the `foojay-resolver`
-plugin — and the version React Native pins (1.0.0) references
-`JvmVendorSpec.IBM_SEMERU`, a field Gradle 9.3 removed. The build dies with:
+The single hardest failure was the C++/NDK (Ninja) stage looping and dying:
 
 ```
-Class org.gradle.jvm.toolchain.JvmVendorSpec does not have member field
-'org.gradle.jvm.toolchain.JvmVendorSpec IBM_SEMERU'
+ninja: error: manifest 'build.ninja' still dirty after 100 tries
+  …expo-modules-core/android/.cxx/…
 ```
 
-That message names neither the JDK nor the toolchain, so it reads like a Gradle
-bug. It isn't — it is "no JDK 17 present". Install one:
+**Root cause: the project path contained a space and parentheses** —
+`D:\hireorbitai-main (1)\…`. CMake generates `build.ninja` with that path
+inconsistently escaped, so Ninja's dirty-check never matches, regenerates, and
+loops to its 100-try cap. Proven by A/B: the _identical_ project, toolchain and
+caches **failed** at `…(1)\…` and **succeeded** at `D:\hobuild\…`.
+
+Fix: build from e.g. `D:\hobuild` or `C:\src\hireorbit`. Never `…(1)`,
+`New folder (2)`, `Program Files`, or a `OneDrive` path. (The
+`Hard link … failed. Doing a slower copy instead.` log lines are benign — a
+cross-drive hardlink from `C:\…\.gradle`; the build succeeds through them.)
+
+### 1. JDK 17 (JDK 21 will not substitute)
+
+`@react-native/gradle-plugin` declares `jvmToolchain(17)`. With no JDK 17,
+Gradle tries to auto-download one via `foojay-resolver 1.0.0`, which references
+`JvmVendorSpec.IBM_SEMERU` — removed in Gradle 9.3 — and crashes with a message
+that names neither the JDK nor the toolchain. Install it:
 
 ```bash
 winget install EclipseAdoptium.Temurin.17.JDK      # Windows
 brew install --cask temurin@17                     # macOS
 ```
 
-Do **not** try to fix it by downgrading Gradle. Gradle 8.x ships Kotlin 1.9.25
-and Expo modules require ≥ 2.1.20, so you trade one hard failure for another.
-Expo's pinned Gradle 9.3.1 is correct; the JDK is the missing piece.
-
-Android Studio's bundled JBR (JDK 21) is fine for `JAVA_HOME` — Gradle picks the
+Android Studio's bundled JBR (JDK 21) is fine as `JAVA_HOME`; Gradle selects the
 17 toolchain separately once it exists.
 
-### `mobile/android/` is generated and gitignored
+### 2. Gradle 8.14.3 + Kotlin 2.1.20 (Expo's default 9.3.1 does NOT work)
 
-`expo prebuild` recreates it from `app.json` and wipes local edits. Never fix a
-build problem by editing `android/` directly — the fix must go in `app.json`,
-a config plugin, or this file. That is why the JDK requirement is documented
-here rather than patched into `gradle.properties`.
+RN 0.86's Gradle plugin compiles at Kotlin language level 1.9 and **cannot read
+Gradle 9.3.1's Kotlin-2.2 API metadata** — `settings-plugin:compileKotlin`
+fails. Gradle 8.14.3 works, but embeds Kotlin 1.9.25 while Expo modules require
+≥ 2.1.20, so you must _also_ pin `kotlinVersion`. After `expo prebuild`, edit the
+(regenerated) `mobile/android/`:
+
+- `gradle/wrapper/gradle-wrapper.properties` → `gradle-8.14.3-bin.zip`
+- `build.gradle` → add `ext { kotlinVersion = "2.1.20" }` inside `buildscript {`
+
+### 3. Serialize Gradle workers (else the worker daemon times out)
+
+Parallel worker JVMs exhaust the machine and the native build fails with
+"Failed to run Gradle Worker Daemon … timeout after 120s". In
+`mobile/android/gradle.properties`:
+
+```
+org.gradle.parallel=false
+org.gradle.workers.max=2
+org.gradle.jvmargs=-Xmx6144m -XX:MaxMetaspaceSize=1024m
+```
+
+### 4. A clean dependency tree — mobile must resolve react-native 0.86.0
+
+The SDK 52→57 upgrade left a stale `react-native@0.76.9` hoisted at the repo
+root while mobile's `0.86.0` was deduped away, so Gradle resolved the wrong
+plugin (`enableBundleCompression` unknown property). `npm install` does not
+self-heal this. Force mobile its own copy and verify:
 
 ```bash
-npx expo prebuild --platform android --clean
-cd android && ./gradlew assembleRelease
-# → android/app/build/outputs/apk/release/app-release.apk
+npm install react-native@0.86.0 --workspace @hireorbitai/mobile
+node -p "require('./mobile/node_modules/react-native/package.json').version"   # must print 0.86.0
 ```
+
+### The full recipe
+
+```bash
+# from a SPACE/PAREN-FREE path, with JDK 17 installed:
+npm install
+npm install react-native@0.86.0 --workspace @hireorbitai/mobile
+npm run shared:build
+cd mobile && npx expo prebuild --platform android --clean
+#  → then apply steps 2 and 3 to mobile/android/ (prebuild regenerates it)
+cd android && ./gradlew assembleRelease --no-daemon --max-workers=2
+# → android/app/build/outputs/apk/release/app-release.apk   (~101 MB)
+```
+
+`mobile/android/` is generated by `expo prebuild` and gitignored, so steps 2–3
+must be re-applied after every prebuild — that is why they live in this README,
+not in the (disposable) generated project.
 
 ⚠️ **The release APK is signed with the DEBUG keystore** — Expo's template
 default (`signingConfig signingConfigs.debug`). It installs fine by sideloading
