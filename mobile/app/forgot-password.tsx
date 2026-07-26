@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import axios from 'axios';
-import { Screen, Banner } from '../src/components/ui/Screen';
+import { Banner } from '../src/components/ui/Screen';
+import { AuthCard, AuthHeading } from '../src/components/ui/AuthCard';
 import { Button } from '../src/components/ui/Button';
 import { FormInput } from '../src/components/ui/Inputs';
 import { config as appConfig } from '../src/config/env';
@@ -43,68 +44,60 @@ export default function ForgotPasswordScreen() {
   };
 
   return (
-    <Screen edges={['bottom']}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <ScrollView
-          contentContainerStyle={{ flexGrow: 1, padding: spacing.xl }}
-          keyboardShouldPersistTaps="handled"
-        >
-          {sent ? (
-            <View style={{ gap: spacing.lg }}>
-              <Banner
-                tone="success"
-                message="If an account exists for that address, a reset link is on its way. The link expires in 15 minutes."
-              />
-              <Text style={{ fontSize: fontSize.sm, color: colors.muted, lineHeight: 20 }}>
-                Open the link on this device and it will bring you straight back into the app.
-              </Text>
-              <Button label="Back to sign in" href="/login" variant="secondary" />
+    <AuthCard>
+      {sent ? (
+        <>
+          <AuthHeading title="Check your inbox" />
+          <View style={{ gap: spacing.md }}>
+            <Banner
+              tone="success"
+              message="If an account exists for that address, a reset link is on its way. The link expires in 15 minutes."
+            />
+            <Text style={{ fontSize: fontSize.sm, color: colors.muted, lineHeight: 20 }}>
+              Open the link on this device and it will bring you straight back into the app.
+            </Text>
+            <Button label="Back to sign in" href="/login" variant="secondary" />
+          </View>
+        </>
+      ) : (
+        <>
+          <AuthHeading
+            title="Forgot password?"
+            subtitle="Enter the email you sign in with and we'll send you a reset link."
+          />
+
+          {error ? (
+            <View style={{ marginBottom: spacing.md }}>
+              <Banner tone="danger" message={error} />
             </View>
-          ) : (
-            <>
-              <Text
-                style={{
-                  fontSize: fontSize.base,
-                  color: colors.muted,
-                  marginBottom: spacing.xl,
-                  lineHeight: 22,
-                }}
-              >
-                Enter the email you sign in with and we&apos;ll send you a reset link.
-              </Text>
+          ) : null}
 
-              {error ? (
-                <View style={{ marginBottom: spacing.lg }}>
-                  <Banner tone="danger" message={error} />
-                </View>
-              ) : null}
+          <FormInput
+            label="Email"
+            value={email}
+            onChangeText={setEmail}
+            placeholder="you@company.com"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoComplete="email"
+            returnKeyType="go"
+            onSubmitEditing={onSubmit}
+          />
 
-              <FormInput
-                label="Email"
-                value={email}
-                onChangeText={setEmail}
-                placeholder="you@company.com"
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
-                autoComplete="email"
-                returnKeyType="go"
-                onSubmitEditing={onSubmit}
-              />
+          <Button
+            label="Send reset link"
+            onPress={onSubmit}
+            loading={pending}
+            disabled={!email.trim() || pending}
+            size="lg"
+          />
 
-              <Button
-                label="Send reset link"
-                onPress={onSubmit}
-                loading={pending}
-                disabled={!email.trim() || pending}
-              />
-            </>
-          )}
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </Screen>
+          <View style={{ marginTop: spacing.lg, alignItems: 'center' }}>
+            <Button label="Back to sign in" href="/login" variant="ghost" size="sm" block={false} />
+          </View>
+        </>
+      )}
+    </AuthCard>
   );
 }

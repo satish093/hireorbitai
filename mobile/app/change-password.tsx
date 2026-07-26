@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Screen, Banner } from '../src/components/ui/Screen';
+import { Banner } from '../src/components/ui/Screen';
+import { AuthCard, AuthHeading } from '../src/components/ui/AuthCard';
 import { Button } from '../src/components/ui/Button';
 import { PasswordInput } from '../src/components/ui/Inputs';
 import { RouteGuard } from '../src/components/RouteGuard';
@@ -77,78 +78,74 @@ function ChangePasswordForm() {
   };
 
   return (
-    <Screen edges={['bottom']}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <ScrollView
-          contentContainerStyle={{ flexGrow: 1, padding: spacing.xl }}
-          keyboardShouldPersistTaps="handled"
+    <AuthCard
+      aboveCard={
+        forced ? (
+          <Banner
+            tone="warn"
+            message="You're signed in with a temporary password. Set a new one to continue."
+          />
+        ) : undefined
+      }
+    >
+      <AuthHeading
+        title={forced ? 'Set a new password' : 'Change password'}
+        subtitle={`At least ${MIN_LENGTH} characters.`}
+      />
+
+      {error ? (
+        <View style={{ marginBottom: spacing.md }}>
+          <Banner tone="danger" message={error} />
+        </View>
+      ) : null}
+
+      <PasswordInput
+        label="Current password"
+        value={current}
+        onChangeText={setCurrent}
+        placeholder="••••••••"
+      />
+      <PasswordInput
+        label="New password"
+        value={next}
+        onChangeText={setNext}
+        placeholder="••••••••"
+        error={tooShort ? `Use at least ${MIN_LENGTH} characters.` : null}
+        hint={`At least ${MIN_LENGTH} characters.`}
+      />
+      <PasswordInput
+        label="Confirm new password"
+        value={confirm}
+        onChangeText={setConfirm}
+        placeholder="••••••••"
+        error={mismatch ? 'Passwords do not match.' : null}
+      />
+
+      <Button
+        label="Update password"
+        onPress={onSubmit}
+        disabled={!canSubmit}
+        loading={pending}
+        size="lg"
+      />
+
+      {!forced ? (
+        <View style={{ marginTop: spacing.md }}>
+          <Button label="Cancel" onPress={() => router.back()} variant="secondary" />
+        </View>
+      ) : (
+        <Text
+          style={{
+            marginTop: spacing.lg,
+            fontSize: fontSize.sm,
+            color: colors.muted,
+            textAlign: 'center',
+            lineHeight: 20,
+          }}
         >
-          {forced ? (
-            <View style={{ marginBottom: spacing.lg }}>
-              <Banner
-                tone="warn"
-                message="You're signed in with a temporary password. Set a new one to continue."
-              />
-            </View>
-          ) : null}
-
-          {error ? (
-            <View style={{ marginBottom: spacing.lg }}>
-              <Banner tone="danger" message={error} />
-            </View>
-          ) : null}
-
-          <PasswordInput
-            label="Current password"
-            value={current}
-            onChangeText={setCurrent}
-            placeholder="••••••••"
-          />
-          <PasswordInput
-            label="New password"
-            value={next}
-            onChangeText={setNext}
-            placeholder="••••••••"
-            error={tooShort ? `Use at least ${MIN_LENGTH} characters.` : null}
-            hint={`At least ${MIN_LENGTH} characters.`}
-          />
-          <PasswordInput
-            label="Confirm new password"
-            value={confirm}
-            onChangeText={setConfirm}
-            placeholder="••••••••"
-            error={mismatch ? 'Passwords do not match.' : null}
-          />
-
-          <Button
-            label="Update password"
-            onPress={onSubmit}
-            disabled={!canSubmit}
-            loading={pending}
-          />
-
-          {!forced ? (
-            <View style={{ marginTop: spacing.md }}>
-              <Button label="Cancel" onPress={() => router.back()} variant="secondary" />
-            </View>
-          ) : (
-            <Text
-              style={{
-                marginTop: spacing.lg,
-                fontSize: fontSize.sm,
-                color: colors.muted,
-                textAlign: 'center',
-                lineHeight: 20,
-              }}
-            >
-              Every other screen stays locked until your password is rotated.
-            </Text>
-          )}
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </Screen>
+          Every other screen stays locked until your password is rotated.
+        </Text>
+      )}
+    </AuthCard>
   );
 }

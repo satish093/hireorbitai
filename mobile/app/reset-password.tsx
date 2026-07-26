@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import axios from 'axios';
-import { Screen, Banner } from '../src/components/ui/Screen';
+import { Banner } from '../src/components/ui/Screen';
+import { AuthCard, AuthHeading } from '../src/components/ui/AuthCard';
 import { Button } from '../src/components/ui/Button';
 import { PasswordInput } from '../src/components/ui/Inputs';
 import { config as appConfig } from '../src/config/env';
@@ -58,69 +59,69 @@ export default function ResetPasswordScreen() {
 
   if (!token) {
     return (
-      <Screen edges={['bottom']}>
-        <View style={{ padding: spacing.xl, gap: spacing.lg }}>
+      <AuthCard>
+        <AuthHeading title="Invalid reset link" />
+        <View style={{ gap: spacing.md }}>
           <Banner
             tone="danger"
             message="This screen needs a reset link. Open the link from your password-reset email."
           />
           <Button label="Request a new link" href="/forgot-password" variant="secondary" />
         </View>
-      </Screen>
+      </AuthCard>
     );
   }
 
   return (
-    <Screen edges={['bottom']}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <ScrollView
-          contentContainerStyle={{ flexGrow: 1, padding: spacing.xl }}
-          keyboardShouldPersistTaps="handled"
-        >
-          {done ? (
-            <View style={{ gap: spacing.lg }}>
-              <Banner tone="success" message="Your password has been updated." />
-              <Text style={{ fontSize: fontSize.sm, color: colors.muted, lineHeight: 20 }}>
-                Every other device signed in with the old password has been signed out.
-              </Text>
-              <Button label="Sign in" onPress={() => router.replace('/login')} />
+    <AuthCard>
+      {done ? (
+        <>
+          <AuthHeading title="Password updated" />
+          <View style={{ gap: spacing.md }}>
+            <Banner tone="success" message="Your password has been updated." />
+            <Text style={{ fontSize: fontSize.sm, color: colors.muted, lineHeight: 20 }}>
+              Every other device signed in with the old password has been signed out.
+            </Text>
+            <Button label="Sign in" onPress={() => router.replace('/login')} size="lg" />
+          </View>
+        </>
+      ) : (
+        <>
+          <AuthHeading
+            title="Choose a new password"
+            subtitle={`At least ${MIN_LENGTH} characters.`}
+          />
+
+          {error ? (
+            <View style={{ marginBottom: spacing.md }}>
+              <Banner tone="danger" message={error} />
             </View>
-          ) : (
-            <>
-              {error ? (
-                <View style={{ marginBottom: spacing.lg }}>
-                  <Banner tone="danger" message={error} />
-                </View>
-              ) : null}
+          ) : null}
 
-              <PasswordInput
-                label="New password"
-                value={next}
-                onChangeText={setNext}
-                placeholder="••••••••"
-                hint={`At least ${MIN_LENGTH} characters.`}
-              />
-              <PasswordInput
-                label="Confirm new password"
-                value={confirm}
-                onChangeText={setConfirm}
-                placeholder="••••••••"
-                error={mismatch ? 'Passwords do not match.' : null}
-              />
+          <PasswordInput
+            label="New password"
+            value={next}
+            onChangeText={setNext}
+            placeholder="••••••••"
+            hint={`At least ${MIN_LENGTH} characters.`}
+          />
+          <PasswordInput
+            label="Confirm new password"
+            value={confirm}
+            onChangeText={setConfirm}
+            placeholder="••••••••"
+            error={mismatch ? 'Passwords do not match.' : null}
+          />
 
-              <Button
-                label="Set new password"
-                onPress={onSubmit}
-                disabled={!canSubmit}
-                loading={pending}
-              />
-            </>
-          )}
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </Screen>
+          <Button
+            label="Set new password"
+            onPress={onSubmit}
+            disabled={!canSubmit}
+            loading={pending}
+            size="lg"
+          />
+        </>
+      )}
+    </AuthCard>
   );
 }

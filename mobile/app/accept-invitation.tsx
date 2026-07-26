@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import axios from 'axios';
-import { Screen, Banner } from '../src/components/ui/Screen';
-import { Card } from '../src/components/ui/Card';
+import { Banner } from '../src/components/ui/Screen';
+import { AuthCard, AuthHeading } from '../src/components/ui/AuthCard';
 import { Button } from '../src/components/ui/Button';
 import { PasswordInput } from '../src/components/ui/Inputs';
 import { SkeletonCard } from '../src/components/ui/States';
@@ -86,89 +86,85 @@ export default function AcceptInvitationScreen() {
 
   if (!token) {
     return (
-      <Screen edges={['bottom']}>
-        <View style={{ padding: spacing.xl, gap: spacing.lg }}>
+      <AuthCard wide>
+        <AuthHeading title="Can't open this invitation" />
+        <View style={{ gap: spacing.md }}>
           <Banner
             tone="danger"
             message="This screen needs an invitation link. Open the link from your invitation email."
           />
           <Button label="Go to sign in" href="/login" variant="secondary" />
         </View>
-      </Screen>
+      </AuthCard>
     );
   }
 
   return (
-    <Screen edges={['bottom']}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <ScrollView
-          contentContainerStyle={{ padding: spacing.xl, gap: spacing.lg }}
-          keyboardShouldPersistTaps="handled"
-        >
-          {done ? (
-            <>
-              <Banner tone="success" message="Your account is ready." />
-              <Button label="Sign in" onPress={() => router.replace('/login')} />
-            </>
-          ) : loading ? (
-            <SkeletonCard />
-          ) : previewError ? (
-            <>
-              <Banner tone="danger" message={previewError} />
-              <Button label="Go to sign in" href="/login" variant="secondary" />
-            </>
-          ) : (
-            <>
-              <Card>
-                <Text style={{ fontSize: fontSize.sm, color: colors.muted }}>
-                  You&apos;ve been invited to join HireOrbit AI as
-                </Text>
-                <View style={{ marginTop: spacing.sm, flexDirection: 'row', alignItems: 'center' }}>
-                  <Pill
-                    label={preview?.role ? ROLE_LABEL[preview.role] : 'Team member'}
-                    tone="brand"
-                  />
-                </View>
-                {preview?.email ? (
-                  <Text
-                    style={{ fontSize: fontSize.base, color: colors.ink, marginTop: spacing.md }}
-                  >
-                    {preview.email}
-                  </Text>
-                ) : null}
-              </Card>
+    <AuthCard wide>
+      {done ? (
+        <>
+          <AuthHeading title="You're all set" subtitle="Your account is ready." />
+          <Button label="Sign in" onPress={() => router.replace('/login')} size="lg" />
+        </>
+      ) : loading ? (
+        <SkeletonCard />
+      ) : previewError ? (
+        <>
+          <AuthHeading title="Can't open this invitation" />
+          <View style={{ gap: spacing.md }}>
+            <Banner tone="danger" message={previewError} />
+            <Button label="Go to sign in" href="/login" variant="secondary" />
+          </View>
+        </>
+      ) : (
+        <>
+          <AuthHeading title="Create your account" />
 
-              {error ? <Banner tone="danger" message={error} /> : null}
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: spacing.sm,
+              marginBottom: spacing.lg,
+            }}
+          >
+            <Text style={{ fontSize: fontSize.sm, color: colors.muted }}>Joining as</Text>
+            <Pill label={preview?.role ? ROLE_LABEL[preview.role] : 'Team member'} tone="brand" />
+            {preview?.email ? (
+              <Text style={{ fontSize: fontSize.sm, color: colors.ink }}>· {preview.email}</Text>
+            ) : null}
+          </View>
 
-              <View>
-                <PasswordInput
-                  label="Create a password"
-                  value={password}
-                  onChangeText={setPassword}
-                  placeholder="••••••••"
-                  hint={`At least ${MIN_LENGTH} characters.`}
-                />
-                <PasswordInput
-                  label="Confirm password"
-                  value={confirm}
-                  onChangeText={setConfirm}
-                  placeholder="••••••••"
-                  error={mismatch ? 'Passwords do not match.' : null}
-                />
-                <Button
-                  label="Create my account"
-                  onPress={onSubmit}
-                  disabled={!canSubmit}
-                  loading={pending}
-                />
-              </View>
-            </>
-          )}
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </Screen>
+          {error ? (
+            <View style={{ marginBottom: spacing.md }}>
+              <Banner tone="danger" message={error} />
+            </View>
+          ) : null}
+
+          <PasswordInput
+            label="Create a password"
+            value={password}
+            onChangeText={setPassword}
+            placeholder="••••••••"
+            hint={`At least ${MIN_LENGTH} characters.`}
+          />
+          <PasswordInput
+            label="Confirm password"
+            value={confirm}
+            onChangeText={setConfirm}
+            placeholder="••••••••"
+            error={mismatch ? 'Passwords do not match.' : null}
+          />
+          <Button
+            label="Create my account"
+            onPress={onSubmit}
+            disabled={!canSubmit}
+            loading={pending}
+            size="lg"
+          />
+        </>
+      )}
+    </AuthCard>
   );
 }

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Screen } from '../src/components/ui/Screen';
+import { AuthCard } from '../src/components/ui/AuthCard';
 import { Button } from '../src/components/ui/Button';
 import { useAuth } from '../src/context/AuthContext';
 import { useTheme } from '../src/theme';
@@ -20,7 +20,7 @@ import { useTheme } from '../src/theme';
  */
 export default function UnauthorizedScreen() {
   const { profile, refreshProfile, signOut } = useAuth();
-  const { colors, spacing, fontSize, radius } = useTheme();
+  const { colors, spacing, fontSize } = useTheme();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
 
@@ -39,15 +39,8 @@ export default function UnauthorizedScreen() {
   };
 
   return (
-    <Screen edges={['top', 'bottom']}>
-      <View
-        style={{
-          flex: 1,
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: spacing.xl,
-        }}
-      >
+    <AuthCard wide>
+      <View style={{ alignItems: 'center' }}>
         <View
           style={{
             width: 56,
@@ -56,7 +49,7 @@ export default function UnauthorizedScreen() {
             backgroundColor: colors.dangerSoft,
             alignItems: 'center',
             justifyContent: 'center',
-            marginBottom: spacing.lg,
+            marginBottom: spacing.md,
           }}
         >
           <Text style={{ fontSize: 26, color: colors.danger }}>⊘</Text>
@@ -65,7 +58,8 @@ export default function UnauthorizedScreen() {
         <Text
           style={{
             fontSize: fontSize.xl,
-            fontWeight: '700',
+            fontWeight: '600',
+            letterSpacing: -0.3,
             color: colors.ink,
             textAlign: 'center',
           }}
@@ -74,12 +68,11 @@ export default function UnauthorizedScreen() {
         </Text>
         <Text
           style={{
-            fontSize: fontSize.base,
+            fontSize: fontSize.sm,
             color: colors.muted,
             textAlign: 'center',
             marginTop: spacing.sm,
-            lineHeight: 22,
-            maxWidth: 340,
+            lineHeight: 21,
           }}
         >
           {profile
@@ -87,19 +80,11 @@ export default function UnauthorizedScreen() {
             : 'We couldn’t load your profile. Your account may have been deactivated, or the connection dropped mid-sign-in.'}
         </Text>
 
-        <View
-          style={{
-            marginTop: spacing['2xl'],
-            width: '100%',
-            maxWidth: 320,
-            gap: spacing.sm,
-            borderRadius: radius.lg,
-          }}
-        >
-          <Button label="Try again" onPress={retry} loading={busy} />
+        <View style={{ marginTop: spacing.xl, width: '100%', gap: spacing.sm }}>
+          <Button label="Try again" onPress={retry} loading={busy} size="lg" />
           <Button label="Sign out" onPress={out} variant="secondary" disabled={busy} />
         </View>
       </View>
-    </Screen>
+    </AuthCard>
   );
 }
