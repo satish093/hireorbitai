@@ -14,6 +14,7 @@
  * these rules on every request.
  */
 
+import type { IconName } from '../components/ui/Icon';
 import {
   ALL_ROLES,
   ADMIN_TIER,
@@ -35,8 +36,7 @@ export interface NavItem {
   to: string;
   label: string;
   roles: Role[];
-  /** Single-glyph icon. Kept as text so there is no icon-font dependency. */
-  icon: string;
+  icon: IconName;
   badgeKey?: BadgeKey;
   flagKey?: string;
   capability?: DeveloperCapability;
@@ -51,11 +51,11 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     heading: 'Workspace',
     items: [
-      { to: '/(app)/dashboard', label: 'Dashboard', icon: '⌂', roles: ALL_ROLES },
+      { to: '/(app)/dashboard', label: 'Dashboard', icon: 'home', roles: ALL_ROLES },
       {
         to: '/(app)/tasks',
         label: 'Tasks',
-        icon: '☑',
+        icon: 'tasks',
         roles: BUSINESS_ROLES,
         badgeKey: 'tasks',
         flagKey: 'tasks',
@@ -63,15 +63,15 @@ export const NAV_SECTIONS: NavSection[] = [
       {
         to: '/(app)/tasks-assigned',
         label: 'Assigned to me',
-        icon: '☑',
+        icon: 'tasks',
         roles: BUSINESS_ROLES,
         flagKey: 'tasks',
       },
-      { to: '/(app)/calendar', label: 'Calendar', icon: '▦', roles: BUSINESS_ROLES },
+      { to: '/(app)/calendar', label: 'Calendar', icon: 'calendar', roles: BUSINESS_ROLES },
       {
         to: '/(app)/messages',
         label: 'Inbox',
-        icon: '✉',
+        icon: 'inbox',
         roles: MESSAGING_ROLES,
         badgeKey: 'inbox',
         flagKey: 'messages',
@@ -79,43 +79,43 @@ export const NAV_SECTIONS: NavSection[] = [
       {
         to: '/(app)/reminders',
         label: 'Reminders',
-        icon: '⏰',
+        icon: 'reminder',
         roles: BUSINESS_ROLES,
         badgeKey: 'reminders',
         flagKey: 'reminders',
       },
-      { to: '/(app)/my-resume', label: 'My Resume', icon: '▤', roles: ['CONSULTANT'] },
+      { to: '/(app)/my-resume', label: 'My Resume', icon: 'file', roles: ['CONSULTANT'] },
     ],
   },
   {
     heading: 'Talent',
     items: [
-      { to: '/(app)/consultants', label: 'Consultants', icon: '👥', roles: OPERATOR_TIER },
-      { to: '/(app)/recruiters', label: 'Recruiters', icon: '👤', roles: MANAGER_TIER },
-      { to: '/(app)/managers', label: 'Managers', icon: '⚙', roles: MANAGER_TIER },
-      { to: '/(app)/jobs', label: 'Jobs', icon: '💼', roles: OPERATOR_TIER },
-      { to: '/(app)/applications', label: 'Applications', icon: '📄', roles: OPERATOR_TIER },
+      { to: '/(app)/consultants', label: 'Consultants', icon: 'users', roles: OPERATOR_TIER },
+      { to: '/(app)/recruiters', label: 'Recruiters', icon: 'user', roles: MANAGER_TIER },
+      { to: '/(app)/managers', label: 'Managers', icon: 'usersCog', roles: MANAGER_TIER },
+      { to: '/(app)/jobs', label: 'Jobs', icon: 'briefcase', roles: OPERATOR_TIER },
+      { to: '/(app)/applications', label: 'Applications', icon: 'fileText', roles: OPERATOR_TIER },
       {
         to: '/(app)/interviews',
         label: 'Interviews',
-        icon: '🎥',
+        icon: 'video',
         roles: BUSINESS_ROLES,
         flagKey: 'interviews',
       },
-      { to: '/(app)/resumes', label: 'Resumes', icon: '▤', roles: OPERATOR_TIER },
-      { to: '/(app)/vendors', label: 'Vendors', icon: '🏢', roles: OPERATOR_TIER },
-      { to: '/(app)/clients', label: 'Clients', icon: '🏬', roles: OPERATOR_TIER },
+      { to: '/(app)/resumes', label: 'Resumes', icon: 'file', roles: OPERATOR_TIER },
+      { to: '/(app)/vendors', label: 'Vendors', icon: 'building', roles: OPERATOR_TIER },
+      { to: '/(app)/clients', label: 'Clients', icon: 'building2', roles: OPERATOR_TIER },
       {
         to: '/(app)/invoices',
         label: 'Invoices',
-        icon: '🧾',
+        icon: 'fileText',
         roles: MANAGER_TIER,
         flagKey: 'invoices',
       },
       {
         to: '/(app)/reports',
         label: 'Analytics',
-        icon: '📊',
+        icon: 'barChart',
         roles: OPERATOR_TIER,
         flagKey: 'reports',
         capability: 'reports',
@@ -128,42 +128,42 @@ export const NAV_SECTIONS: NavSection[] = [
       {
         to: '/(app)/training/courses',
         label: 'Courses',
-        icon: '📚',
+        icon: 'bookOpen',
         roles: MANAGER_TIER,
         flagKey: 'training',
       },
       {
         to: '/(app)/training/assignments',
         label: 'Assignments',
-        icon: '📋',
+        icon: 'clipboard',
         roles: MANAGER_TIER,
         flagKey: 'training',
       },
       {
         to: '/(app)/training/my',
         label: 'My Training',
-        icon: '🎓',
+        icon: 'graduation',
         roles: BUSINESS_ROLES,
         flagKey: 'training',
       },
       {
         to: '/(app)/training/plan',
         label: 'Study plan',
-        icon: '🗺',
+        icon: 'bookOpen',
         roles: BUSINESS_ROLES,
         flagKey: 'training',
       },
       {
         to: '/(app)/training/reports',
         label: 'Training Reports',
-        icon: '📊',
+        icon: 'barChart',
         roles: MANAGER_TIER,
         flagKey: 'training',
       },
       {
         to: '/(app)/training/ai-activity',
         label: 'AI Activity',
-        icon: '✦',
+        icon: 'sparkles',
         roles: MANAGER_TIER,
         flagKey: 'training',
       },
@@ -175,52 +175,52 @@ export const NAV_SECTIONS: NavSection[] = [
       {
         to: '/(app)/admin/users',
         label: 'Users',
-        icon: '👥',
+        icon: 'users',
         roles: ADMIN_TIER,
         capability: 'users',
       },
       {
         to: '/(app)/invitations',
         label: 'Invitations',
-        icon: '✉',
+        icon: 'mailPlus',
         roles: OPERATOR_TIER,
         capability: 'invitations',
       },
       {
         to: '/(app)/admin/groups',
         label: 'User Groups',
-        icon: '⚙',
+        icon: 'usersCog',
         roles: ADMIN_TIER,
         capability: 'user_groups',
       },
       {
         to: '/(app)/ai-usage',
         label: 'AI Usage',
-        icon: '✦',
+        icon: 'sparkles',
         roles: MANAGER_TIER,
         capability: 'ai_usage',
       },
       {
         to: '/(app)/ai-email',
         label: 'AI Email',
-        icon: '✉',
+        icon: 'mailPlus',
         roles: OPERATOR_TIER,
         flagKey: 'ai_email',
       },
-      { to: '/(app)/admin/deactivated', label: 'Deactivated', icon: '⊘', roles: ADMIN_TIER },
+      { to: '/(app)/admin/deactivated', label: 'Deactivated', icon: 'userX', roles: ADMIN_TIER },
       {
         to: '/(app)/admin/features',
         label: 'Feature Flags',
-        icon: '⇄',
+        icon: 'toggle',
         roles: ADMIN_TIER,
         capability: 'feature_flags',
       },
-      { to: '/(app)/admin/ai-settings', label: 'AI Settings', icon: '✦', roles: OWNER_TIER },
-      { to: '/(app)/admin/audit-log', label: 'Audit Log', icon: '📋', roles: ADMIN_TIER },
+      { to: '/(app)/admin/ai-settings', label: 'AI Settings', icon: 'sparkles', roles: OWNER_TIER },
+      { to: '/(app)/admin/audit-log', label: 'Audit Log', icon: 'clipboard', roles: ADMIN_TIER },
       {
         to: '/(app)/admin/calls-usage',
         label: 'Call Usage',
-        icon: '☎',
+        icon: 'phone',
         roles: OWNER_TIER,
         capability: 'calls_usage',
       },
@@ -253,40 +253,4 @@ export function filterNavSections(
       return true;
     }),
   })).filter((s) => s.items.length > 0);
-}
-
-/**
- * The four destinations pinned to the bottom tab bar, in priority order.
- *
- * A phone tab bar holds five items at most before labels truncate, and this app
- * has ~35 reachable destinations — so the tab bar carries the highest-frequency
- * few and the rest live behind "More", which renders the full gated model above.
- *
- * Resolved per-role: a CONSULTANT has no Jobs tab (they don't browse jobs —
- * /jobs is OPERATOR_TIER on the backend), so they get My Resume instead.
- */
-export function primaryTabsFor(
-  role: Role | undefined,
-  profile: Pick<UserProfile, 'role' | 'capabilities'> | null | undefined,
-  flags: Record<string, boolean | undefined>,
-): NavItem[] {
-  const visible = filterNavSections(role, profile, flags).flatMap((s) => s.items);
-  const byPath = new Map(visible.map((i) => [i.to, i] as const));
-
-  const preference =
-    role === 'CONSULTANT'
-      ? ['/(app)/dashboard', '/(app)/training/my', '/(app)/messages', '/(app)/my-resume']
-      : role === 'DEVELOPER'
-        ? ['/(app)/dashboard', '/(app)/messages']
-        : ['/(app)/dashboard', '/(app)/jobs', '/(app)/messages', '/(app)/tasks'];
-
-  const picked = preference.map((p) => byPath.get(p)).filter((i): i is NavItem => i !== undefined);
-
-  // Backfill from the visible set if a preferred tab was gated away, so the bar
-  // is never left with one lonely item.
-  for (const item of visible) {
-    if (picked.length >= 4) break;
-    if (!picked.some((p) => p.to === item.to)) picked.push(item);
-  }
-  return picked.slice(0, 4);
 }
