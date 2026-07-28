@@ -11,7 +11,13 @@ import { useRouter, type Href } from 'expo-router';
 import { useTheme } from '../../theme';
 import { usePressScale } from '../../hooks/useAnim';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
+export type ButtonVariant =
+  | 'primary'
+  | 'accent'
+  | 'secondary'
+  | 'ghost'
+  | 'danger'
+  | 'danger-ghost';
 export type ButtonSize = 'sm' | 'md' | 'lg';
 
 interface Props {
@@ -63,9 +69,13 @@ export function Button({
 
   const palette: Record<ButtonVariant, { bg: string; fg: string; border: string }> = {
     primary: { bg: colors.ink, fg: colors.bg, border: colors.ink },
+    // `accent` = the web's brand-gradient highlight/AI CTA. RN has no gradient
+    // without a native dep, so we use the solid accent purple — same intent.
+    accent: { bg: colors.accent, fg: colors.accentFg, border: colors.accent },
     secondary: { bg: colors.surface, fg: colors.ink, border: colors.border },
     ghost: { bg: 'transparent', fg: colors.accent, border: 'transparent' },
     danger: { bg: colors.danger, fg: '#ffffff', border: colors.danger },
+    'danger-ghost': { bg: 'transparent', fg: colors.danger, border: 'transparent' },
   };
   const tone = palette[variant];
 

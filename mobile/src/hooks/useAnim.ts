@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, type ViewStyle } from 'react-native';
 
 /**
@@ -69,4 +69,37 @@ export function useEntrance({ distance = 10, duration = 260, delay = 0 } = {}) {
     ],
   };
   return style;
+}
+
+/**
+ * Count-up: animate a number from its previous value to the new one with an
+ * ease-out cubic, matching the web KpiCard/DashboardCard count-up. JS-driven
+ * (the displayed number must live in JS), but it's a single short 600ms ramp per
+ * value change — cheap. Returns the integer to render.
+ */
+export function useCountUp(value: number, duration = 600): number {
+  const [display, setDisplay] = useState(value);
+  const fromRef = useRef(value);
+
+  useEffect(() => {
+    const from = fromRef.current;
+    if (from === value) return;
+    const start = Date.now();
+    let raf = 0;
+    const tick = () => {
+      const p = Math.min(1, (Date.now() - start) / duration);
+      const eased = 1 - Math.pow(1 - p, 3);
+      const next = Math.round(from + (value - from) * eased);
+      setDisplay(next);
+      if (p < 1) {
+        raf = requestAnimationFrame(tick);
+      } else {
+        fromRef.current = value;
+      }
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [value, duration]);
+
+  return display;
 }

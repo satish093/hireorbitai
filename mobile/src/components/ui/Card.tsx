@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
 import { useTheme } from '../../theme';
-import { usePressScale } from '../../hooks/useAnim';
+import { usePressScale, useCountUp } from '../../hooks/useAnim';
 
 interface CardProps {
   children: React.ReactNode;
@@ -150,19 +150,39 @@ export function Divider({ inset = 0 }: { inset?: number }) {
   );
 }
 
-/** Big number + caption, used on every dashboard. */
+export type MetricAccent = 'brand' | 'blue' | 'green' | 'amber' | 'red' | 'slate';
+
+/**
+ * KPI tile — the mobile port of the web KpiCard/DashboardCard: a 3px left accent
+ * bar, uppercase label, large count-up value, and an optional trend delta (▲ in
+ * success colour when `up`). Used for the 4-up metric rows on every dashboard.
+ */
 export function MetricTile({
   label,
   value,
   hint,
   tone,
+  accent,
+  delta,
+  up,
+  onPress,
 }: {
   label: string;
   value: string | number;
   hint?: string;
   tone?: 'default' | 'success' | 'warn' | 'danger';
+  /** Left accent-bar colour, matching the web KpiCard accents. */
+  accent?: MetricAccent;
+  /** Trend text under the value, e.g. "+3 this week". */
+  delta?: string;
+  /** Renders ▲ in success colour before the delta. */
+  up?: boolean;
+  onPress?: () => void;
 }) {
-  const { colors, fontSize, spacing } = useTheme();
+  const { colors, fontSize, spacing, radius } = useTheme();
+  const isNumber = typeof value === 'number';
+  const animated = useCountUp(isNumber ? (value as number) : 0);
+
   const valueColor =
     tone === 'success'
       ? colors.success
@@ -172,14 +192,38 @@ export function MetricTile({
           ? colors.danger
           : colors.ink;
 
+  const accentColor: Record<MetricAccent, string> = {
+    brand: colors.accent,
+    blue: colors.accent2,
+    green: colors.success,
+    amber: colors.warn,
+    red: colors.danger,
+    slate: colors.faint,
+  };
+
   return (
-    <Card style={{ flex: 1, minWidth: 140 }}>
+    <Card style={{ flex: 1, minWidth: 140 }} onPress={onPress}>
+      {accent ? (
+        <View
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            bottom: 0,
+            width: 3,
+            borderTopLeftRadius: radius.xl,
+            borderBottomLeftRadius: radius.xl,
+            backgroundColor: accentColor[accent],
+          }}
+        />
+      ) : null}
       <Text
         style={{
           fontSize: fontSize.xs,
-          color: colors.muted,
+          color: colors.ink2,
           textTransform: 'uppercase',
           letterSpacing: 0.6,
+          fontWeight: '700',
         }}
       >
         {label}
@@ -187,13 +231,23 @@ export function MetricTile({
       <Text
         style={{
           fontSize: fontSize['2xl'],
-          fontWeight: '700',
+          fontWeight: '800',
           color: valueColor,
           marginTop: spacing.xs,
         }}
       >
-        {value}
+        {isNumber ? animated : value}
       </Text>
+      {delta ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: spacing.xs }}>
+          {up ? (
+            <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: colors.success }}>
+              ▲
+            </Text>
+          ) : null}
+          <Text style={{ fontSize: fontSize.xs, color: colors.muted }}>{delta}</Text>
+        </View>
+      ) : null}
       {hint ? (
         <Text style={{ fontSize: fontSize.xs, color: colors.faint, marginTop: 2 }}>{hint}</Text>
       ) : null}
