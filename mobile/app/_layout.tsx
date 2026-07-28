@@ -11,6 +11,7 @@ import { hydrateSession } from '../src/services/session';
 import { onAuthFailure, startResumeRefresh } from '../src/services/api';
 import { AppLockProvider } from '../src/security/AppLock';
 import { PrivacyCover } from '../src/security/PrivacyScreen';
+import { ErrorBoundary } from '../src/components/ErrorBoundary';
 
 // Hold the native splash until the encrypted session read finishes. Without
 // this the app flashes the login screen for a frame before restoring a valid
@@ -51,7 +52,9 @@ export default function RootLayout() {
             <AuthProvider>
               <AppLockProvider>
                 <FeatureFlagsProvider>
-                  <AppShell />
+                  <ErrorBoundary>
+                    <AppShell />
+                  </ErrorBoundary>
                 </FeatureFlagsProvider>
               </AppLockProvider>
             </AuthProvider>

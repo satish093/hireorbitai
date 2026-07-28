@@ -30,10 +30,41 @@
 
 import { useEffect, useRef } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
-import EventSource from 'react-native-sse';
+import type EventSource from 'react-native-sse';
 import { api } from '../services/api';
 import { getSession } from '../services/session';
 import { config as appConfig } from '../config/env';
+
+/**
+ * Resolve `react-native-sse` LAZILY and defensively.
+ *
+ * The library is a pure-JS XHR polyfill (no native module to link), but a hard
+ * top-level `import` means that if the package fails to load for ANY reason —
+ * not bundled, or incompatible with the installed React Native/Hermes — the
+ * whole route module throws at import time. With no error boundary above the
+ * route that used to close the entire app the moment Inbox was tapped, since
+ * this hook is the one thing unique to the messages/chat routes.
+ *
+ * Resolving it inside a try/catch turns "SSE library unavailable" into "no live
+ * updates" (screens still refetch via pull-to-refresh and onReconnect) instead
+ * of a crash. Cached after the first attempt; `null` means unavailable.
+ */
+type EventSourceCtor = typeof EventSource;
+let sseModuleResolved = false;
+let EventSourceCls: EventSourceCtor | null = null;
+
+function resolveEventSource(): EventSourceCtor | null {
+  if (sseModuleResolved) return EventSourceCls;
+  sseModuleResolved = true;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const mod = require('react-native-sse');
+    EventSourceCls = (mod?.default ?? mod) as EventSourceCtor;
+  } catch {
+    EventSourceCls = null;
+  }
+  return EventSourceCls;
+}
 
 export type RealtimeHandlers = Record<string, (payload: unknown) => void>;
 
@@ -89,6 +120,12 @@ export function useRealtime(handlers: RealtimeHandlers, options: Options = {}): 
       const sess = getSession();
       if (!sess?.access_token) return;
 
+      // If the SSE library can't load, run without live push. Do NOT schedule a
+      // reconnect — retrying can't make a missing module appear, and the screen
+      // already refetches on focus / pull-to-refresh.
+      const ES = resolveEventSource();
+      if (!ES) return;
+
       let sseToken: string;
       try {
         const { data } = await api.post<{ sse_token: string }>('/realtime/token');
@@ -101,7 +138,7 @@ export function useRealtime(handlers: RealtimeHandlers, options: Options = {}): 
 
       const url = `${appConfig.apiBaseUrl}/realtime/stream?token=${encodeURIComponent(sseToken)}`;
       try {
-        es = new EventSource(url, {
+        es = new ES(url, {
           // The token in the URL is the credential; no bearer header needed.
           headers: {},
           // We drive reconnection ourselves so a rejected token can't spin.
