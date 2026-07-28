@@ -11,6 +11,7 @@ import {
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Screen, Banner } from '../../../src/components/ui/Screen';
+import { PageTopBar } from '../../../src/components/ui/TopBar';
 import { Avatar } from '../../../src/components/ui/Avatar';
 import { EmptyState, SkeletonList } from '../../../src/components/ui/States';
 import { RouteGuard } from '../../../src/components/RouteGuard';
@@ -110,8 +111,9 @@ function ChatThread() {
 
   return (
     <>
-      <Stack.Screen options={{ headerShown: true, title: peerName }} />
-      <Screen edges={['bottom']}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <Screen edges={['top', 'bottom']}>
+        <PageTopBar title={peerName} showBack bell={false} />
         <KeyboardAvoidingView
           style={{ flex: 1 }}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}

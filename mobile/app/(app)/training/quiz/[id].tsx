@@ -1,7 +1,9 @@
 import { useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { ScreenScroll, Banner } from '../../../../src/components/ui/Screen';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Screen, Banner } from '../../../../src/components/ui/Screen';
+import { PageTopBar } from '../../../../src/components/ui/TopBar';
 import { Card, SectionHeader } from '../../../../src/components/ui/Card';
 import { Button } from '../../../../src/components/ui/Button';
 import { SkeletonList, EmptyState } from '../../../../src/components/ui/States';
@@ -47,6 +49,7 @@ function Quiz() {
   const { id, assignmentId } = useLocalSearchParams<{ id: string; assignmentId?: string }>();
   const router = useRouter();
   const { colors, spacing, fontSize, radius } = useTheme();
+  const insets = useSafeAreaInsets();
 
   // Selected option INDEX per question id.
   const [answers, setAnswers] = useState<Record<string, number>>({});
@@ -111,148 +114,164 @@ function Quiz() {
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Quiz' }} />
-      <ScreenScroll edges={[]}>
-        {quiz.loading && questions.length === 0 ? (
-          <SkeletonList count={3} />
-        ) : questions.length === 0 ? (
-          <Card>
-            <EmptyState compact title="No quiz for this lesson" />
-          </Card>
-        ) : (
-          <>
-            {scored ? (
-              <Card>
-                <SectionHeader title={passed ? 'Passed' : 'Keep going'} />
-                <Text
-                  style={{
-                    fontSize: fontSize['2xl'],
-                    fontWeight: '700',
-                    color: passed ? colors.success : colors.danger,
-                  }}
-                >
-                  {scored.correct} / {scored.total}
-                </Text>
-                <Text style={{ fontSize: fontSize.sm, color: colors.muted, marginTop: spacing.sm }}>
-                  {passed
-                    ? 'Nice work — review any misses below.'
-                    : 'Review the lesson and the answers below, then try again.'}
-                </Text>
-                <View style={{ marginTop: spacing.lg }}>
-                  <Button
-                    label="Back to course"
-                    onPress={() => router.back()}
-                    variant="secondary"
-                  />
-                </View>
-              </Card>
-            ) : error ? (
-              <Banner tone="danger" message={error} />
-            ) : null}
-
-            {questions.map((q, qi) => {
-              const res = results[q.id];
-              return (
-                <Card key={q.id}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <Screen>
+        <PageTopBar title="Quiz" showBack />
+        <ScrollView
+          style={{ flex: 1 }}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{
+            padding: spacing.lg,
+            paddingBottom: spacing['4xl'] + insets.bottom,
+            gap: spacing.lg,
+          }}
+        >
+          {quiz.loading && questions.length === 0 ? (
+            <SkeletonList count={3} />
+          ) : questions.length === 0 ? (
+            <Card>
+              <EmptyState compact title="No quiz for this lesson" />
+            </Card>
+          ) : (
+            <>
+              {scored ? (
+                <Card>
+                  <SectionHeader title={passed ? 'Passed' : 'Keep going'} />
                   <Text
                     style={{
-                      fontSize: fontSize.md,
-                      fontWeight: '600',
-                      color: colors.ink,
-                      marginBottom: spacing.md,
+                      fontSize: fontSize['2xl'],
+                      fontWeight: '700',
+                      color: passed ? colors.success : colors.danger,
                     }}
                   >
-                    {qi + 1}. {q.question}
+                    {scored.correct} / {scored.total}
                   </Text>
-                  {(q.options ?? []).map((opt, oi) => {
-                    const selected = answers[q.id] === oi;
-                    // After grading, colour the correct option green and a wrong
-                    // pick red.
-                    const isCorrectOpt = !!res && res.correct_answer === opt;
-                    const isWrongPick = !!res && selected && !res.is_correct;
-                    const borderColor = isCorrectOpt
-                      ? colors.success
-                      : isWrongPick
-                        ? colors.danger
-                        : selected
-                          ? colors.accent
-                          : colors.border;
-                    return (
-                      <Pressable
-                        key={oi}
-                        onPress={() =>
-                          !scored ? setAnswers((a) => ({ ...a, [q.id]: oi })) : undefined
-                        }
-                        disabled={!!scored}
-                        accessibilityRole="radio"
-                        accessibilityState={{ selected }}
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          gap: spacing.md,
-                          minHeight: 48,
-                          paddingVertical: spacing.sm,
-                          paddingHorizontal: spacing.md,
-                          borderRadius: radius.lg,
-                          borderWidth: 1,
-                          borderColor,
-                          backgroundColor: selected && !scored ? colors.accentSoft : 'transparent',
-                          marginBottom: spacing.sm,
-                        }}
-                      >
-                        <View
-                          style={{
-                            width: 20,
-                            height: 20,
-                            borderRadius: 10,
-                            borderWidth: 2,
-                            borderColor: selected ? colors.accent : colors.borderStrong,
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                          }}
-                        >
-                          {selected ? (
-                            <View
-                              style={{
-                                width: 10,
-                                height: 10,
-                                borderRadius: 5,
-                                backgroundColor: colors.accent,
-                              }}
-                            />
-                          ) : null}
-                        </View>
-                        <Text
-                          style={{
-                            flex: 1,
-                            fontSize: fontSize.base,
-                            color: isCorrectOpt
-                              ? colors.success
-                              : selected
-                                ? colors.accent
-                                : colors.ink,
-                          }}
-                        >
-                          {opt}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
+                  <Text
+                    style={{ fontSize: fontSize.sm, color: colors.muted, marginTop: spacing.sm }}
+                  >
+                    {passed
+                      ? 'Nice work — review any misses below.'
+                      : 'Review the lesson and the answers below, then try again.'}
+                  </Text>
+                  <View style={{ marginTop: spacing.lg }}>
+                    <Button
+                      label="Back to course"
+                      onPress={() => router.back()}
+                      variant="secondary"
+                    />
+                  </View>
                 </Card>
-              );
-            })}
+              ) : error ? (
+                <Banner tone="danger" message={error} />
+              ) : null}
 
-            {!scored ? (
-              <Button
-                label={allAnswered ? 'Submit answers' : `Answer all ${questions.length} questions`}
-                onPress={submit}
-                disabled={!allAnswered || submitting}
-                loading={submitting}
-              />
-            ) : null}
-          </>
-        )}
-      </ScreenScroll>
+              {questions.map((q, qi) => {
+                const res = results[q.id];
+                return (
+                  <Card key={q.id}>
+                    <Text
+                      style={{
+                        fontSize: fontSize.md,
+                        fontWeight: '600',
+                        color: colors.ink,
+                        marginBottom: spacing.md,
+                      }}
+                    >
+                      {qi + 1}. {q.question}
+                    </Text>
+                    {(q.options ?? []).map((opt, oi) => {
+                      const selected = answers[q.id] === oi;
+                      // After grading, colour the correct option green and a wrong
+                      // pick red.
+                      const isCorrectOpt = !!res && res.correct_answer === opt;
+                      const isWrongPick = !!res && selected && !res.is_correct;
+                      const borderColor = isCorrectOpt
+                        ? colors.success
+                        : isWrongPick
+                          ? colors.danger
+                          : selected
+                            ? colors.accent
+                            : colors.border;
+                      return (
+                        <Pressable
+                          key={oi}
+                          onPress={() =>
+                            !scored ? setAnswers((a) => ({ ...a, [q.id]: oi })) : undefined
+                          }
+                          disabled={!!scored}
+                          accessibilityRole="radio"
+                          accessibilityState={{ selected }}
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: spacing.md,
+                            minHeight: 48,
+                            paddingVertical: spacing.sm,
+                            paddingHorizontal: spacing.md,
+                            borderRadius: radius.lg,
+                            borderWidth: 1,
+                            borderColor,
+                            backgroundColor:
+                              selected && !scored ? colors.accentSoft : 'transparent',
+                            marginBottom: spacing.sm,
+                          }}
+                        >
+                          <View
+                            style={{
+                              width: 20,
+                              height: 20,
+                              borderRadius: 10,
+                              borderWidth: 2,
+                              borderColor: selected ? colors.accent : colors.borderStrong,
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                          >
+                            {selected ? (
+                              <View
+                                style={{
+                                  width: 10,
+                                  height: 10,
+                                  borderRadius: 5,
+                                  backgroundColor: colors.accent,
+                                }}
+                              />
+                            ) : null}
+                          </View>
+                          <Text
+                            style={{
+                              flex: 1,
+                              fontSize: fontSize.base,
+                              color: isCorrectOpt
+                                ? colors.success
+                                : selected
+                                  ? colors.accent
+                                  : colors.ink,
+                            }}
+                          >
+                            {opt}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </Card>
+                );
+              })}
+
+              {!scored ? (
+                <Button
+                  label={
+                    allAnswered ? 'Submit answers' : `Answer all ${questions.length} questions`
+                  }
+                  onPress={submit}
+                  disabled={!allAnswered || submitting}
+                  loading={submitting}
+                />
+              ) : null}
+            </>
+          )}
+        </ScrollView>
+      </Screen>
     </>
   );
 }

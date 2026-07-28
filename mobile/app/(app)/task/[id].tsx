@@ -1,7 +1,9 @@
 import { useState } from 'react';
-import { Text, View } from 'react-native';
+import { RefreshControl, ScrollView, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { ScreenScroll, Banner } from '../../../src/components/ui/Screen';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Screen, Banner } from '../../../src/components/ui/Screen';
+import { PageTopBar } from '../../../src/components/ui/TopBar';
 import { Card, SectionHeader, DetailRow, Divider } from '../../../src/components/ui/Card';
 import { Pill, TASK_STATUS_TONE, TASK_PRIORITY_TONE } from '../../../src/components/ui/Pill';
 import { Button } from '../../../src/components/ui/Button';
@@ -25,10 +27,10 @@ import { relativeDate } from '../jobs';
 /**
  * Task detail — GET /tasks/:id, with status change and comments.
  *
- * Status uses the dedicated PATCH /tasks/:id/status endpoint rather than a
- * general PATCH with a status field. That route exists precisely so a status
- * transition is not a general-purpose row update, and using it keeps the app
- * away from anything resembling mass assignment.
+ * Status uses the dedicated PATCH /tasks/:id/status endpoint (not a general
+ * PATCH with a status field) so a transition is never a general-purpose row
+ * update. Uses the site-style PageTopBar (back + bell + toggle) rather than the
+ * native Stack header.
  */
 export default function TaskDetailScreen() {
   return (
@@ -41,6 +43,7 @@ export default function TaskDetailScreen() {
 function TaskDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { colors, spacing, fontSize } = useTheme();
+  const insets = useSafeAreaInsets();
   const [comment, setComment] = useState('');
 
   const task = useApiQuery<Task>(id ? `/tasks/${id}` : null, {
@@ -77,9 +80,25 @@ function TaskDetail() {
   const t = task.data;
 
   return (
-    <>
-      <Stack.Screen options={{ headerShown: true, title: 'Task' }} />
-      <ScreenScroll refreshing={task.refreshing} onRefresh={task.onRefresh} edges={[]}>
+    <Screen edges={['top']}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <PageTopBar showBack title="Task" />
+      <ScrollView
+        contentContainerStyle={{
+          padding: spacing.lg,
+          paddingBottom: spacing['4xl'] + insets.bottom,
+          gap: spacing.lg,
+        }}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl
+            refreshing={!!task.refreshing}
+            onRefresh={task.onRefresh}
+            tintColor={colors.accent}
+            colors={[colors.accent]}
+          />
+        }
+      >
         {task.loading && !t ? (
           <SkeletonCard />
         ) : task.error && !t ? (
@@ -250,7 +269,7 @@ function TaskDetail() {
             </Card>
           </>
         )}
-      </ScreenScroll>
-    </>
+      </ScrollView>
+    </Screen>
   );
 }

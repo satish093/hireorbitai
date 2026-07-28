@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react';
-import { Text, View } from 'react-native';
-import { ListScreen, PageHeader } from '../../../src/components/ui/Screen';
-import { Card } from '../../../src/components/ui/Card';
-import { Pill } from '../../../src/components/ui/Pill';
+import { Pressable, Text, View } from 'react-native';
+import { Stack } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Screen, ListScreen } from '../../../src/components/ui/Screen';
+import { PageTopBar } from '../../../src/components/ui/TopBar';
+import { Divider } from '../../../src/components/ui/Card';
 import { Tabs } from '../../../src/components/ui/Tabs';
 import { Avatar } from '../../../src/components/ui/Avatar';
 import { RouteGuard } from '../../../src/components/RouteGuard';
@@ -50,7 +52,8 @@ function isOverdue(a: AssignmentRow): boolean {
 }
 
 function AssignmentsList() {
-  const { colors, spacing, fontSize, radius } = useTheme();
+  const { colors, spacing, fontSize } = useTheme();
+  const insets = useSafeAreaInsets();
   const [filter, setFilter] = useState<Filter>('all');
 
   const { items, loading, refreshing, error, onRefresh, refetch } = useApiList<AssignmentRow>(
@@ -82,8 +85,9 @@ function AssignmentsList() {
   }, [items, filter]);
 
   return (
-    <>
-      <PageHeader title="Assignments" subtitle={`${items.length} total`} />
+    <Screen>
+      <Stack.Screen options={{ headerShown: false }} />
+      <PageTopBar title="Assignments" subtitle={`${items.length} total`} />
       <ListScreen
         items={filtered}
         loading={loading}
@@ -92,6 +96,11 @@ function AssignmentsList() {
         onRefresh={onRefresh}
         onRetry={() => void refetch()}
         keyExtractor={(a) => a.id}
+        ItemSeparatorComponent={() => <Divider inset={spacing.lg} />}
+        contentContainerStyle={{
+          paddingBottom: spacing['4xl'] + insets.bottom,
+          flexGrow: 1,
+        }}
         header={
           <Tabs
             value={filter}
@@ -110,14 +119,23 @@ function AssignmentsList() {
           const pct = Math.max(0, Math.min(100, Math.round(item.progress_percentage ?? 0)));
           const done = isDone(item);
           const overdue = isOverdue(item);
+          const statusColor = done ? colors.success : overdue ? colors.danger : colors.accent;
+          const statusLabel = done ? 'Complete' : overdue ? 'Overdue' : `${pct}%`;
+
           return (
-            <Card>
+            <View
+              style={{
+                paddingHorizontal: spacing.lg,
+                paddingVertical: spacing.md,
+                gap: spacing.sm,
+              }}
+            >
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
                 <Avatar
                   id={item.assignee?.id}
                   name={item.assignee?.full_name}
                   email={item.assignee?.email}
-                  size={36}
+                  size={34}
                 />
                 <View style={{ flex: 1 }}>
                   <Text
@@ -128,53 +146,33 @@ function AssignmentsList() {
                   </Text>
                   <Text numberOfLines={1} style={{ fontSize: fontSize.sm, color: colors.muted }}>
                     {item.course?.title ?? 'Course'}
+                    {item.due_date ? ` · Due ${shortDate(item.due_date)}` : ''}
                   </Text>
                 </View>
-                {done ? (
-                  <Pill label="Complete" tone="success" size="sm" />
-                ) : overdue ? (
-                  <Pill label="Overdue" tone="danger" size="sm" />
-                ) : (
-                  <Pill label={`${pct}%`} tone="info" size="sm" />
-                )}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <View
+                    style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: statusColor }}
+                  />
+                  <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: statusColor }}>
+                    {statusLabel}
+                  </Text>
+                </View>
               </View>
 
               <View
                 style={{
-                  height: 6,
-                  borderRadius: radius.pill,
+                  height: 5,
+                  borderRadius: 3,
                   backgroundColor: colors.hover,
                   overflow: 'hidden',
-                  marginTop: spacing.md,
                 }}
               >
-                <View
-                  style={{
-                    width: `${pct}%`,
-                    height: '100%',
-                    backgroundColor: done
-                      ? colors.success
-                      : overdue
-                        ? colors.danger
-                        : colors.accent,
-                  }}
-                />
+                <View style={{ width: `${pct}%`, height: '100%', backgroundColor: statusColor }} />
               </View>
-              {item.due_date ? (
-                <Text
-                  style={{
-                    fontSize: fontSize.xs,
-                    color: overdue ? colors.danger : colors.faint,
-                    marginTop: 6,
-                  }}
-                >
-                  Due {shortDate(item.due_date)}
-                </Text>
-              ) : null}
-            </Card>
+            </View>
           );
         }}
       />
-    </>
+    </Screen>
   );
 }

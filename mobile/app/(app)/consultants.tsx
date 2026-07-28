@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react';
-import { Text, View } from 'react-native';
-import { ListScreen, PageHeader } from '../../src/components/ui/Screen';
-import { Card, DetailRow, Divider, SectionHeader } from '../../src/components/ui/Card';
+import { Pressable, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Screen, ListScreen } from '../../src/components/ui/Screen';
+import { PageTopBar } from '../../src/components/ui/TopBar';
+import { DetailRow, Divider, SectionHeader } from '../../src/components/ui/Card';
 import { Tabs, type TabItem } from '../../src/components/ui/Tabs';
 import { Sheet } from '../../src/components/ui/Sheet';
-import { Pill, MARKETING_STATUS_TONE } from '../../src/components/ui/Pill';
+import { Pill, MARKETING_STATUS_TONE, pillToneColor } from '../../src/components/ui/Pill';
 import { Avatar } from '../../src/components/ui/Avatar';
 import { SearchInput } from '../../src/components/ui/Inputs';
 import { RouteGuard } from '../../src/components/RouteGuard';
@@ -38,6 +40,7 @@ const titleCase = (s: string) => s.charAt(0) + s.slice(1).toLowerCase();
 
 function ConsultantsList() {
   const { colors, spacing, fontSize } = useTheme();
+  const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<string>('ALL');
   const [selected, setSelected] = useState<Consultant | null>(null);
@@ -74,8 +77,8 @@ function ConsultantsList() {
   }, [items, query, status]);
 
   return (
-    <>
-      <PageHeader title="Consultants" subtitle={`${items.length} on your bench`} />
+    <Screen edges={['top']}>
+      <PageTopBar title="Consultants" subtitle={`${items.length} on your bench`} showBack />
       <ListScreen
         items={filtered}
         loading={loading}
@@ -84,8 +87,15 @@ function ConsultantsList() {
         onRefresh={onRefresh}
         onRetry={() => void refetch()}
         keyExtractor={(c) => c.id}
+        ItemSeparatorComponent={() => <Divider inset={56} />}
+        contentContainerStyle={{
+          paddingHorizontal: spacing.lg,
+          paddingTop: spacing.sm,
+          paddingBottom: spacing['4xl'] + insets.bottom,
+          flexGrow: 1,
+        }}
         header={
-          <View style={{ gap: spacing.sm }}>
+          <View style={{ gap: spacing.sm, marginBottom: spacing.xs }}>
             <SearchInput value={query} onChangeText={setQuery} placeholder="Search name or skill" />
             <Tabs items={tabs} value={status} onChange={setStatus} />
           </View>
@@ -96,9 +106,22 @@ function ConsultantsList() {
             ? 'Try a different name, skill, or status.'
             : 'Consultants assigned to you appear here.'
         }
-        renderItem={({ item }) => (
-          <Card onPress={() => setSelected(item)}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+        renderItem={({ item }) => {
+          const meta = item.skills?.length
+            ? item.skills.slice(0, 3).join(' · ')
+            : (item.visa_status ?? 'Work authorization not set');
+          return (
+            <Pressable
+              onPress={() => setSelected(item)}
+              accessibilityRole="button"
+              style={({ pressed }) => ({
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: spacing.md,
+                paddingVertical: 12,
+                backgroundColor: pressed ? colors.hover : 'transparent',
+              })}
+            >
               <Avatar
                 id={item.user?.id ?? item.id}
                 name={item.user?.full_name}
@@ -106,7 +129,7 @@ function ConsultantsList() {
                 uri={item.user?.avatar_url}
                 size={44}
               />
-              <View style={{ flex: 1 }}>
+              <View style={{ flex: 1, minWidth: 0 }}>
                 <Text
                   numberOfLines={1}
                   style={{ fontSize: fontSize.md, fontWeight: '600', color: colors.ink }}
@@ -114,38 +137,36 @@ function ConsultantsList() {
                   {item.user?.full_name?.trim() || item.user?.email || 'Unnamed consultant'}
                 </Text>
                 <Text numberOfLines={1} style={{ fontSize: fontSize.sm, color: colors.muted }}>
-                  {item.visa_status ?? 'Work authorization not set'}
+                  {meta}
                 </Text>
               </View>
               {item.marketing_status ? (
-                <Pill
-                  label={item.marketing_status}
-                  tone={MARKETING_STATUS_TONE[item.marketing_status] ?? 'neutral'}
-                  size="sm"
+                <StatusText
+                  label={titleCase(item.marketing_status)}
+                  color={pillToneColor(
+                    MARKETING_STATUS_TONE[item.marketing_status] ?? 'neutral',
+                    colors,
+                  )}
                 />
               ) : null}
-            </View>
-
-            {item.skills?.length ? (
-              <View
-                style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: spacing.md }}
-              >
-                {item.skills.slice(0, 6).map((s) => (
-                  <Pill key={s} label={s} tone="brand" size="sm" />
-                ))}
-                {item.skills.length > 6 ? (
-                  <Text style={{ fontSize: fontSize.xs, color: colors.faint, alignSelf: 'center' }}>
-                    +{item.skills.length - 6} more
-                  </Text>
-                ) : null}
-              </View>
-            ) : null}
-          </Card>
-        )}
+            </Pressable>
+          );
+        }}
       />
 
       <ConsultantDetail consultant={selected} onClose={() => setSelected(null)} />
-    </>
+    </Screen>
+  );
+}
+
+/** Inline status = a small colored dot + colored text (the website's row status). */
+function StatusText({ label, color }: { label: string; color: string }) {
+  const { fontSize } = useTheme();
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+      <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: color }} />
+      <Text style={{ fontSize: fontSize.sm, fontWeight: '600', color }}>{label}</Text>
+    </View>
   );
 }
 

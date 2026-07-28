@@ -1,6 +1,8 @@
-import { Text, View } from 'react-native';
+import { RefreshControl, ScrollView, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { ScreenScroll, Banner } from '../../../../src/components/ui/Screen';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Screen, Banner } from '../../../../src/components/ui/Screen';
+import { PageTopBar } from '../../../../src/components/ui/TopBar';
 import { Card, SectionHeader, DetailRow, Divider } from '../../../../src/components/ui/Card';
 import { Pill } from '../../../../src/components/ui/Pill';
 import { Button } from '../../../../src/components/ui/Button';
@@ -60,6 +62,7 @@ function CourseDetail() {
   const { id, assignmentId } = useLocalSearchParams<{ id: string; assignmentId?: string }>();
   const router = useRouter();
   const { colors, spacing, fontSize } = useTheme();
+  const insets = useSafeAreaInsets();
 
   const { data, loading, refreshing, error, onRefresh, refetch } = useApiQuery<CourseResponse>(
     id ? `/training/courses/${id}` : null,
@@ -80,178 +83,199 @@ function CourseDetail() {
 
   return (
     <>
-      <Stack.Screen options={{ headerShown: true, title: 'Course' }} />
-      <ScreenScroll refreshing={refreshing} onRefresh={onRefresh} edges={[]}>
-        {loading && !data ? (
-          <SkeletonCard />
-        ) : error && !data ? (
-          <ErrorState message={error} onRetry={() => void refetch()} />
-        ) : !data ? (
-          <Banner tone="warn" message="This course is no longer available." />
-        ) : (
-          <>
-            <Card>
-              <Text style={{ fontSize: fontSize.xl, fontWeight: '700', color: colors.ink }}>
-                {data.title}
-              </Text>
-              {data.description ? (
-                <Text
-                  style={{
-                    fontSize: fontSize.base,
-                    color: colors.ink2,
-                    lineHeight: 22,
-                    marginTop: spacing.sm,
-                  }}
+      <Stack.Screen options={{ headerShown: false }} />
+      <Screen>
+        <PageTopBar title={data?.title ?? 'Course'} showBack />
+        <ScrollView
+          style={{ flex: 1 }}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{
+            padding: spacing.lg,
+            paddingBottom: spacing['4xl'] + insets.bottom,
+            gap: spacing.lg,
+          }}
+          refreshControl={
+            <RefreshControl
+              refreshing={!!refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.accent}
+              colors={[colors.accent]}
+            />
+          }
+        >
+          {loading && !data ? (
+            <SkeletonCard />
+          ) : error && !data ? (
+            <ErrorState message={error} onRetry={() => void refetch()} />
+          ) : !data ? (
+            <Banner tone="warn" message="This course is no longer available." />
+          ) : (
+            <>
+              <Card>
+                <Text style={{ fontSize: fontSize.xl, fontWeight: '700', color: colors.ink }}>
+                  {data.title}
+                </Text>
+                {data.description ? (
+                  <Text
+                    style={{
+                      fontSize: fontSize.base,
+                      color: colors.ink2,
+                      lineHeight: 22,
+                      marginTop: spacing.sm,
+                    }}
+                  >
+                    {data.description}
+                  </Text>
+                ) : null}
+                <View
+                  style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: spacing.md }}
                 >
-                  {data.description}
-                </Text>
-              ) : null}
-              <View
-                style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: spacing.md }}
-              >
-                {data.category ? <Pill label={data.category} tone="brand" size="sm" /> : null}
-                {data.difficulty ? (
-                  <Pill label={data.difficulty.toLowerCase()} tone="neutral" size="sm" />
-                ) : null}
-                <Pill
-                  label={published ? 'Active' : (data.status ?? 'Draft').toLowerCase()}
-                  tone={published ? 'success' : 'neutral'}
-                  size="sm"
-                />
-                <Pill label={`${lessons.length} lessons`} tone="info" size="sm" />
-                {typeof data.estimated_duration_hours === 'number' ? (
-                  <Pill label={`~${data.estimated_duration_hours}h`} tone="neutral" size="sm" />
-                ) : null}
-              </View>
-
-              {lessons.length > 0 ? (
-                <View style={{ marginTop: spacing.md }}>
-                  <Button
-                    label={assignmentId ? 'Start / continue' : 'Open first lesson'}
-                    onPress={() => lessons[0] && openLesson(lessons[0].id)}
+                  {data.category ? <Pill label={data.category} tone="brand" size="sm" /> : null}
+                  {data.difficulty ? (
+                    <Pill label={data.difficulty.toLowerCase()} tone="neutral" size="sm" />
+                  ) : null}
+                  <Pill
+                    label={published ? 'Active' : (data.status ?? 'Draft').toLowerCase()}
+                    tone={published ? 'success' : 'neutral'}
+                    size="sm"
                   />
+                  <Pill label={`${lessons.length} lessons`} tone="info" size="sm" />
+                  {typeof data.estimated_duration_hours === 'number' ? (
+                    <Pill label={`~${data.estimated_duration_hours}h`} tone="neutral" size="sm" />
+                  ) : null}
                 </View>
-              ) : null}
-            </Card>
 
-            {data.overview ? (
-              <Card>
-                <SectionHeader title="Overview" />
-                <Text style={{ fontSize: fontSize.base, color: colors.ink2, lineHeight: 22 }}>
-                  {data.overview}
-                </Text>
-              </Card>
-            ) : null}
-
-            {Array.isArray(data.roadmap) && data.roadmap.length > 0 ? (
-              <Card>
-                <SectionHeader title="Roadmap" />
-                {data.roadmap.map((p, i) => (
-                  <View key={i} style={{ marginTop: i === 0 ? 0 : spacing.md }}>
-                    <Text style={{ fontSize: fontSize.base, fontWeight: '600', color: colors.ink }}>
-                      {p.phase}
-                    </Text>
-                    {p.duration_label ? (
-                      <Text style={{ fontSize: fontSize.xs, color: colors.faint, marginTop: 2 }}>
-                        {p.duration_label}
-                      </Text>
-                    ) : null}
-                    {Array.isArray(p.focus_areas) && p.focus_areas.length > 0 ? (
-                      <Text style={{ fontSize: fontSize.sm, color: colors.muted, marginTop: 4 }}>
-                        {p.focus_areas.join(' · ')}
-                      </Text>
-                    ) : null}
+                {lessons.length > 0 ? (
+                  <View style={{ marginTop: spacing.md }}>
+                    <Button
+                      label={assignmentId ? 'Start / continue' : 'Open first lesson'}
+                      onPress={() => lessons[0] && openLesson(lessons[0].id)}
+                    />
                   </View>
-                ))}
+                ) : null}
               </Card>
-            ) : null}
 
-            <Card padded={false}>
-              <View style={{ padding: spacing.lg, paddingBottom: spacing.sm }}>
-                <SectionHeader title="Lessons" />
-              </View>
+              {data.overview ? (
+                <Card>
+                  <SectionHeader title="Overview" />
+                  <Text style={{ fontSize: fontSize.base, color: colors.ink2, lineHeight: 22 }}>
+                    {data.overview}
+                  </Text>
+                </Card>
+              ) : null}
 
-              {lessons.length === 0 ? (
-                <View style={{ paddingBottom: spacing.lg }}>
-                  <EmptyState
-                    compact
-                    title="No lessons yet"
-                    description="This course hasn't had its content generated."
-                  />
+              {Array.isArray(data.roadmap) && data.roadmap.length > 0 ? (
+                <Card>
+                  <SectionHeader title="Roadmap" />
+                  {data.roadmap.map((p, i) => (
+                    <View key={i} style={{ marginTop: i === 0 ? 0 : spacing.md }}>
+                      <Text
+                        style={{ fontSize: fontSize.base, fontWeight: '600', color: colors.ink }}
+                      >
+                        {p.phase}
+                      </Text>
+                      {p.duration_label ? (
+                        <Text style={{ fontSize: fontSize.xs, color: colors.faint, marginTop: 2 }}>
+                          {p.duration_label}
+                        </Text>
+                      ) : null}
+                      {Array.isArray(p.focus_areas) && p.focus_areas.length > 0 ? (
+                        <Text style={{ fontSize: fontSize.sm, color: colors.muted, marginTop: 4 }}>
+                          {p.focus_areas.join(' · ')}
+                        </Text>
+                      ) : null}
+                    </View>
+                  ))}
+                </Card>
+              ) : null}
+
+              <Card padded={false}>
+                <View style={{ padding: spacing.lg, paddingBottom: spacing.sm }}>
+                  <SectionHeader title="Lessons" />
                 </View>
-              ) : (
-                lessons.map((lesson, i) => (
-                  <View key={lesson.id}>
-                    {i > 0 ? <Divider inset={spacing.lg} /> : null}
-                    <Card
-                      padded={false}
-                      onPress={() => openLesson(lesson.id)}
-                      style={{ backgroundColor: 'transparent', borderWidth: 0 }}
-                    >
-                      <View
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          gap: spacing.md,
-                          paddingHorizontal: spacing.lg,
-                          paddingVertical: spacing.md,
-                          minHeight: 52,
-                        }}
+
+                {lessons.length === 0 ? (
+                  <View style={{ paddingBottom: spacing.lg }}>
+                    <EmptyState
+                      compact
+                      title="No lessons yet"
+                      description="This course hasn't had its content generated."
+                    />
+                  </View>
+                ) : (
+                  lessons.map((lesson, i) => (
+                    <View key={lesson.id}>
+                      {i > 0 ? <Divider inset={spacing.lg} /> : null}
+                      <Card
+                        padded={false}
+                        onPress={() => openLesson(lesson.id)}
+                        style={{ backgroundColor: 'transparent', borderWidth: 0 }}
                       >
                         <View
                           style={{
-                            width: 28,
-                            height: 28,
-                            borderRadius: 14,
-                            backgroundColor: colors.hover,
+                            flexDirection: 'row',
                             alignItems: 'center',
-                            justifyContent: 'center',
+                            gap: spacing.md,
+                            paddingHorizontal: spacing.lg,
+                            paddingVertical: spacing.md,
+                            minHeight: 52,
                           }}
                         >
-                          <Text
+                          <View
                             style={{
-                              fontSize: fontSize.xs,
-                              fontWeight: '700',
-                              color: colors.muted,
+                              width: 28,
+                              height: 28,
+                              borderRadius: 14,
+                              backgroundColor: colors.hover,
+                              alignItems: 'center',
+                              justifyContent: 'center',
                             }}
                           >
-                            {i + 1}
-                          </Text>
-                        </View>
-                        <View style={{ flex: 1 }}>
-                          <Text
-                            numberOfLines={2}
-                            style={{ fontSize: fontSize.base, color: colors.ink }}
-                          >
-                            {lesson.title}
-                          </Text>
-                          {lesson.estimated_minutes ? (
                             <Text
-                              style={{ fontSize: fontSize.xs, color: colors.faint, marginTop: 2 }}
+                              style={{
+                                fontSize: fontSize.xs,
+                                fontWeight: '700',
+                                color: colors.muted,
+                              }}
                             >
-                              {lesson.estimated_minutes} min
+                              {i + 1}
                             </Text>
-                          ) : null}
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text
+                              numberOfLines={2}
+                              style={{ fontSize: fontSize.base, color: colors.ink }}
+                            >
+                              {lesson.title}
+                            </Text>
+                            {lesson.estimated_minutes ? (
+                              <Text
+                                style={{ fontSize: fontSize.xs, color: colors.faint, marginTop: 2 }}
+                              >
+                                {lesson.estimated_minutes} min
+                              </Text>
+                            ) : null}
+                          </View>
+                          <Text style={{ fontSize: fontSize.lg, color: colors.faint }}>›</Text>
                         </View>
-                        <Text style={{ fontSize: fontSize.lg, color: colors.faint }}>›</Text>
-                      </View>
-                    </Card>
-                  </View>
-                ))
-              )}
-            </Card>
+                      </Card>
+                    </View>
+                  ))
+                )}
+              </Card>
 
-            <Card>
-              <SectionHeader title="About" />
-              <DetailRow label="Category" value={data.category ?? '—'} />
-              <Divider />
-              <DetailRow label="Difficulty" value={data.difficulty ?? '—'} />
-              <Divider />
-              <DetailRow label="Created" value={shortDate(data.created_at)} />
-            </Card>
-          </>
-        )}
-      </ScreenScroll>
+              <Card>
+                <SectionHeader title="About" />
+                <DetailRow label="Category" value={data.category ?? '—'} />
+                <Divider />
+                <DetailRow label="Difficulty" value={data.difficulty ?? '—'} />
+                <Divider />
+                <DetailRow label="Created" value={shortDate(data.created_at)} />
+              </Card>
+            </>
+          )}
+        </ScrollView>
+      </Screen>
     </>
   );
 }

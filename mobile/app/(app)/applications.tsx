@@ -1,12 +1,15 @@
 import { useMemo, useState } from 'react';
-import { Text, View } from 'react-native';
-import { ListScreen, PageHeader } from '../../src/components/ui/Screen';
-import { Card } from '../../src/components/ui/Card';
+import { Pressable, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Screen, ListScreen } from '../../src/components/ui/Screen';
+import { PageTopBar } from '../../src/components/ui/TopBar';
+import { Divider } from '../../src/components/ui/Card';
 import { Tabs, type TabItem } from '../../src/components/ui/Tabs';
 import { Sheet, ConfirmSheet } from '../../src/components/ui/Sheet';
 import { SelectInput } from '../../src/components/ui/Inputs';
 import { Button } from '../../src/components/ui/Button';
-import { Pill, APPLICATION_STATUS_TONE } from '../../src/components/ui/Pill';
+import { Avatar } from '../../src/components/ui/Avatar';
+import { APPLICATION_STATUS_TONE, pillToneColor } from '../../src/components/ui/Pill';
 import { RouteGuard } from '../../src/components/RouteGuard';
 import { useApiList, useApiMutation } from '../../src/hooks/useApi';
 import { useAuth } from '../../src/context/AuthContext';
@@ -15,22 +18,14 @@ import { useTheme } from '../../src/theme';
 import { relativeDate } from './jobs';
 
 /**
- * Application pipeline.
+ * Application pipeline. The endpoint depends on the caller's role, and that
+ * difference is load-bearing (see the original header): a CONSULTANT hits
+ * /applications/mine (narrowed projection); an operator hits /applications
+ * (full recruiter-side context). Operators can change status / delete inline
+ * via the bottom Sheet.
  *
- * The endpoint depends on the caller's role, and that difference is load-bearing:
- *
- *   CONSULTANT → GET /applications/mine   self-scoped, NARROWED projection
- *   operator   → GET /applications        full recruiter-side context
- *
- * `/applications` responses carry the assigned recruiter, internal notes and ATS
- * scoring — data a consultant must not see. The mount is BUSINESS_ROLES only so
- * `/mine` is reachable; every operator route inside is separately OPERATOR_TIER
- * gated. Asking for the right one here is not just courtesy: calling
- * `/applications` as a consultant returns 403.
- *
- * Operators can change a submission's status or delete it inline via a bottom
- * Sheet — the mobile equivalent of the web's manage-submission modal
- * (PATCH/DELETE /applications/:id, both OPERATOR_TIER-gated server-side).
+ * Rows follow the web's compact pattern: consultant avatar, the primary name,
+ * a role · company line, then an inline coloured status dot + relative time.
  */
 export default function ApplicationsScreen() {
   return (
@@ -63,6 +58,7 @@ const titleCase = (s: string) => s.charAt(0) + s.slice(1).toLowerCase();
 function ApplicationsList() {
   const { profile } = useAuth();
   const { colors, spacing, fontSize } = useTheme();
+  const insets = useSafeAreaInsets();
   const [status, setStatus] = useState<ApplicationStatus | 'ALL'>('ALL');
   const [editApp, setEditApp] = useState<Application | null>(null);
   const [draftStatus, setDraftStatus] = useState<ApplicationStatus>('SUBMITTED');
@@ -116,8 +112,8 @@ function ApplicationsList() {
   };
 
   return (
-    <>
-      <PageHeader
+    <Screen edges={['top']}>
+      <PageTopBar
         title="Applications"
         subtitle={isConsultant ? 'Your submissions' : `${items.length} total`}
       />
@@ -130,67 +126,100 @@ function ApplicationsList() {
         onRetry={() => void refetch()}
         keyExtractor={(a) => a.id}
         header={<Tabs items={tabs} value={status} onChange={(k) => setStatus(k as never)} />}
+        ItemSeparatorComponent={() => <Divider />}
+        contentContainerStyle={{
+          paddingHorizontal: spacing.lg,
+          paddingTop: spacing.sm,
+          paddingBottom: spacing['4xl'] + insets.bottom,
+          flexGrow: 1,
+        }}
         emptyTitle={status === 'ALL' ? 'No applications yet' : `Nothing ${status.toLowerCase()}`}
         emptyDescription={
           isConsultant
             ? 'Submissions your recruiter makes on your behalf appear here.'
             : 'Submit a consultant to a job to start the pipeline.'
         }
-        renderItem={({ item }) => (
-          <Card onPress={isConsultant ? undefined : () => openEdit(item)}>
-            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md }}>
-              <View style={{ flex: 1 }}>
-                <Text
-                  numberOfLines={2}
-                  style={{ fontSize: fontSize.md, fontWeight: '600', color: colors.ink }}
-                >
-                  {item.job?.title ?? 'Untitled role'}
-                </Text>
-                <Text
-                  numberOfLines={1}
-                  style={{ fontSize: fontSize.sm, color: colors.ink2, marginTop: 2 }}
-                >
-                  {item.job?.company_name ?? '—'}
-                </Text>
-                {/* Consultant name only renders on the operator response;
-                    /applications/mine never includes it. */}
-                {!isConsultant && item.consultant?.user?.full_name ? (
-                  <Text
-                    numberOfLines={1}
-                    style={{ fontSize: fontSize.sm, color: colors.muted, marginTop: 2 }}
-                  >
-                    {item.consultant.user.full_name}
-                  </Text>
-                ) : null}
-              </View>
-              <Pill
-                label={item.status}
-                tone={APPLICATION_STATUS_TONE[item.status] ?? 'neutral'}
-                size="sm"
-              />
-            </View>
-
-            <View
-              style={{
+        renderItem={({ item }) => {
+          const statusColor = pillToneColor(
+            APPLICATION_STATUS_TONE[item.status] ?? 'neutral',
+            colors,
+          );
+          const name = item.consultant?.user?.full_name;
+          const jobTitle = item.job?.title ?? 'Untitled role';
+          const company = item.job?.company_name;
+          const primary = isConsultant ? jobTitle : (name ?? jobTitle);
+          const secondary = isConsultant
+            ? (company ?? '—')
+            : `${jobTitle}${company ? ` · ${company}` : ''}`;
+          return (
+            <Pressable
+              onPress={isConsultant ? undefined : () => openEdit(item)}
+              style={({ pressed }) => ({
+                opacity: pressed ? 0.6 : 1,
                 flexDirection: 'row',
                 alignItems: 'center',
-                gap: spacing.sm,
-                marginTop: spacing.md,
-              }}
+                gap: spacing.md,
+                paddingVertical: spacing.md,
+              })}
             >
-              <Text style={{ fontSize: fontSize.xs, color: colors.faint }}>
-                {relativeDate(item.applied_at ?? item.created_at)}
-              </Text>
-              {!isConsultant && typeof item.ats_score === 'number' ? (
-                <Pill
-                  label={`ATS ${Math.round(item.ats_score)}`}
-                  tone={item.ats_score >= 70 ? 'success' : item.ats_score >= 40 ? 'warn' : 'danger'}
-                  size="sm"
+              {!isConsultant ? (
+                <Avatar
+                  id={item.consultant?.id}
+                  name={name}
+                  email={item.consultant?.user?.email}
+                  size={38}
                 />
               ) : null}
-            </View>
-          </Card>
-        )}
+
+              <View style={{ flex: 1 }}>
+                <Text
+                  numberOfLines={1}
+                  style={{ fontSize: fontSize.md, fontWeight: '600', color: colors.ink }}
+                >
+                  {primary}
+                </Text>
+                <Text numberOfLines={1} style={{ fontSize: fontSize.sm, color: colors.muted }}>
+                  {secondary}
+                </Text>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 6,
+                    marginTop: 3,
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  <View
+                    style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: statusColor }}
+                  />
+                  <Text style={{ fontSize: fontSize.sm, color: statusColor, fontWeight: '600' }}>
+                    {titleCase(item.status)}
+                  </Text>
+                  <Text style={{ fontSize: fontSize.xs, color: colors.faint }}>
+                    · {relativeDate(item.applied_at ?? item.created_at)}
+                  </Text>
+                  {!isConsultant && typeof item.ats_score === 'number' ? (
+                    <Text
+                      style={{
+                        fontSize: fontSize.xs,
+                        fontWeight: '600',
+                        color:
+                          item.ats_score >= 70
+                            ? colors.success
+                            : item.ats_score >= 40
+                              ? colors.warn
+                              : colors.danger,
+                      }}
+                    >
+                      · ATS {Math.round(item.ats_score)}
+                    </Text>
+                  ) : null}
+                </View>
+              </View>
+            </Pressable>
+          );
+        }}
       />
 
       {/* Operator: manage a submission (status change + delete). */}
@@ -238,6 +267,6 @@ function ApplicationsList() {
         confirmLabel="Delete"
         destructive
       />
-    </>
+    </Screen>
   );
 }

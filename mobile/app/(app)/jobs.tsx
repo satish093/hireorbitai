@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
-import { Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ListScreen, PageHeader } from '../../src/components/ui/Screen';
-import { Card } from '../../src/components/ui/Card';
-import { Pill } from '../../src/components/ui/Pill';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Screen, ListScreen } from '../../src/components/ui/Screen';
+import { PageTopBar } from '../../src/components/ui/TopBar';
+import { Divider } from '../../src/components/ui/Card';
 import { Tabs, type TabItem } from '../../src/components/ui/Tabs';
 import { SearchInput } from '../../src/components/ui/Inputs';
 import { RouteGuard } from '../../src/components/RouteGuard';
@@ -17,15 +18,12 @@ import { relativeDate } from '../../src/utils/format';
 export { relativeDate };
 
 /**
- * Job search.
+ * Job search. OPERATOR_TIER only (the /jobs router is gated that way). Strict
+ * 4-source ingestion (LinkedIn, Dice, Monster, CareerBuilder) — the source is
+ * shown on every row so a policy violation is easy to notice.
  *
- * OPERATOR_TIER only — the /jobs router is gated that way server-side, so a
- * CONSULTANT never reaches this screen (and the nav model already hides it).
- *
- * Ingestion is a strict 4-source policy: LinkedIn, Dice, Monster and
- * CareerBuilder. Anything else appearing in `source`/`publisher` would mean the
- * JSEARCH_ALLOWED publisher filter has been bypassed — worth noticing, so the
- * source is shown on every row rather than hidden.
+ * Rows follow the web's compact list: title, company · location, then a muted
+ * meta line (source · type · posted · host).
  */
 export default function JobsScreen() {
   return (
@@ -45,6 +43,7 @@ function jobSource(j: Job): string {
 function JobsList() {
   const router = useRouter();
   const { colors, spacing, fontSize } = useTheme();
+  const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
   const [source, setSource] = useState<string>('ALL');
 
@@ -52,9 +51,8 @@ function JobsList() {
     channel: 'jobs',
   });
 
-  // Filter locally. The list endpoint supports server-side search, but a phone
-  // keystroke-per-request would burn the rate limit; the visible page is small
-  // enough that client filtering is instant and free.
+  // Filter locally — a keystroke-per-request would burn the rate limit, and the
+  // visible page is small enough that client filtering is instant and free.
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return items.filter((j) => {
@@ -78,8 +76,8 @@ function JobsList() {
   }));
 
   return (
-    <>
-      <PageHeader title="Jobs" subtitle={`${items.length} in your feed`} />
+    <Screen edges={['top']}>
+      <PageTopBar title="Jobs" subtitle={`${items.length} in your feed`} />
       <ListScreen
         items={filtered}
         loading={loading}
@@ -98,67 +96,76 @@ function JobsList() {
             <Tabs items={sourceTabs} value={source} onChange={setSource} />
           </View>
         }
+        ItemSeparatorComponent={() => <Divider />}
+        contentContainerStyle={{
+          paddingHorizontal: spacing.lg,
+          paddingTop: spacing.sm,
+          paddingBottom: spacing['4xl'] + insets.bottom,
+          flexGrow: 1,
+        }}
         emptyTitle={query ? 'No matches' : 'No jobs yet'}
         emptyDescription={
           query
             ? 'Try a different search term.'
             : 'Jobs appear here once the ingestion job has run.'
         }
-        renderItem={({ item }) => (
-          <Card onPress={() => router.push(`/(app)/job/${item.id}`)}>
-            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md }}>
-              <View style={{ flex: 1 }}>
-                <Text
-                  numberOfLines={2}
-                  style={{ fontSize: fontSize.md, fontWeight: '600', color: colors.ink }}
-                >
-                  {item.title}
-                </Text>
-                <Text
-                  numberOfLines={1}
-                  style={{ fontSize: fontSize.sm, color: colors.ink2, marginTop: 2 }}
-                >
-                  {item.company_name ?? 'Company not listed'}
-                </Text>
-                <Text
-                  numberOfLines={1}
-                  style={{ fontSize: fontSize.sm, color: colors.muted, marginTop: 2 }}
-                >
-                  {item.location ?? 'Location not listed'}
-                  {item.is_remote ? ' · Remote' : ''}
-                </Text>
-              </View>
-            </View>
-
-            <View
-              style={{
-                flexDirection: 'row',
-                flexWrap: 'wrap',
-                gap: 6,
-                marginTop: spacing.md,
-                alignItems: 'center',
-              }}
+        renderItem={({ item }) => {
+          const src = item.publisher ?? item.source;
+          const host = item.apply_url ? displayHost(item.apply_url) : null;
+          return (
+            <Pressable
+              onPress={() => router.push(`/(app)/job/${item.id}`)}
+              style={({ pressed }) => ({
+                opacity: pressed ? 0.6 : 1,
+                paddingVertical: spacing.md,
+              })}
             >
-              {item.publisher || item.source ? (
-                <Pill label={item.publisher ?? item.source ?? ''} tone="neutral" size="sm" />
-              ) : null}
-              {item.employment_type ? (
-                <Pill label={item.employment_type} tone="info" size="sm" />
-              ) : null}
-              {item.posted_at ? (
-                <Text style={{ fontSize: fontSize.xs, color: colors.faint }}>
-                  {relativeDate(item.posted_at)}
-                </Text>
-              ) : null}
-              {item.apply_url && displayHost(item.apply_url) ? (
-                <Text style={{ fontSize: fontSize.xs, color: colors.faint }}>
-                  · {displayHost(item.apply_url)}
-                </Text>
-              ) : null}
-            </View>
-          </Card>
-        )}
+              <Text
+                numberOfLines={2}
+                style={{ fontSize: fontSize.md, fontWeight: '600', color: colors.ink }}
+              >
+                {item.title}
+              </Text>
+              <Text
+                numberOfLines={1}
+                style={{ fontSize: fontSize.sm, color: colors.muted, marginTop: 2 }}
+              >
+                {item.company_name ?? 'Company not listed'}
+                {item.location ? ` · ${item.location}` : ''}
+                {item.is_remote ? ' · Remote' : ''}
+              </Text>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: 6,
+                  marginTop: 3,
+                }}
+              >
+                {src ? (
+                  <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: colors.ink2 }}>
+                    {src}
+                  </Text>
+                ) : null}
+                {item.employment_type ? (
+                  <Text style={{ fontSize: fontSize.xs, color: colors.muted }}>
+                    · {item.employment_type}
+                  </Text>
+                ) : null}
+                {item.posted_at ? (
+                  <Text style={{ fontSize: fontSize.xs, color: colors.faint }}>
+                    · {relativeDate(item.posted_at)}
+                  </Text>
+                ) : null}
+                {host ? (
+                  <Text style={{ fontSize: fontSize.xs, color: colors.faint }}>· {host}</Text>
+                ) : null}
+              </View>
+            </Pressable>
+          );
+        }}
       />
-    </>
+    </Screen>
   );
 }

@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react';
-import { Text, View } from 'react-native';
-import { ListScreen, PageHeader } from '../../src/components/ui/Screen';
-import { Card, DetailRow, Divider } from '../../src/components/ui/Card';
-import { Pill } from '../../src/components/ui/Pill';
+import { Pressable, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Screen, ListScreen } from '../../src/components/ui/Screen';
+import { PageTopBar } from '../../src/components/ui/TopBar';
+import { DetailRow, Divider } from '../../src/components/ui/Card';
+import { Pill, pillToneColor } from '../../src/components/ui/Pill';
 import { Sheet } from '../../src/components/ui/Sheet';
 import { Avatar } from '../../src/components/ui/Avatar';
 import { SearchInput } from '../../src/components/ui/Inputs';
@@ -28,6 +30,7 @@ export default function RecruitersScreen() {
 
 function RecruitersList() {
   const { colors, spacing, fontSize } = useTheme();
+  const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<Recruiter | null>(null);
 
@@ -48,8 +51,8 @@ function RecruitersList() {
   }, [items, query]);
 
   return (
-    <>
-      <PageHeader title="Recruiters" subtitle={`${items.length} in your org`} />
+    <Screen edges={['top']}>
+      <PageTopBar title="Recruiters" subtitle={`${items.length} in your org`} showBack />
       <ListScreen
         items={filtered}
         loading={loading}
@@ -58,13 +61,33 @@ function RecruitersList() {
         onRefresh={onRefresh}
         onRetry={() => void refetch()}
         keyExtractor={(r) => r.id}
+        ItemSeparatorComponent={() => <Divider inset={56} />}
+        contentContainerStyle={{
+          paddingHorizontal: spacing.lg,
+          paddingTop: spacing.sm,
+          paddingBottom: spacing['4xl'] + insets.bottom,
+          flexGrow: 1,
+        }}
         header={
-          <SearchInput value={query} onChangeText={setQuery} placeholder="Search name or team" />
+          <View style={{ marginBottom: spacing.xs }}>
+            <SearchInput value={query} onChangeText={setQuery} placeholder="Search name or team" />
+          </View>
         }
         emptyTitle={query ? 'No matches' : 'No recruiters'}
-        renderItem={({ item }) => (
-          <Card onPress={() => setSelected(item)}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+        renderItem={({ item }) => {
+          const active = (item.status ?? '').toUpperCase() === 'ACTIVE';
+          return (
+            <Pressable
+              onPress={() => setSelected(item)}
+              accessibilityRole="button"
+              style={({ pressed }) => ({
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: spacing.md,
+                paddingVertical: 12,
+                backgroundColor: pressed ? colors.hover : 'transparent',
+              })}
+            >
               <Avatar
                 id={item.user?.id ?? item.id}
                 name={item.user?.full_name}
@@ -72,7 +95,7 @@ function RecruitersList() {
                 uri={item.user?.avatar_url}
                 size={44}
               />
-              <View style={{ flex: 1 }}>
+              <View style={{ flex: 1, minWidth: 0 }}>
                 <Text
                   numberOfLines={1}
                   style={{ fontSize: fontSize.md, fontWeight: '600', color: colors.ink }}
@@ -83,10 +106,30 @@ function RecruitersList() {
                   {item.team ?? 'No team set'}
                 </Text>
               </View>
-              {item.status ? <Pill label={item.status} tone="neutral" size="sm" /> : null}
-            </View>
-          </Card>
-        )}
+              {item.status ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <View
+                    style={{
+                      width: 7,
+                      height: 7,
+                      borderRadius: 4,
+                      backgroundColor: pillToneColor(active ? 'success' : 'neutral', colors),
+                    }}
+                  />
+                  <Text
+                    style={{
+                      fontSize: fontSize.sm,
+                      fontWeight: '600',
+                      color: pillToneColor(active ? 'success' : 'neutral', colors),
+                    }}
+                  >
+                    {item.status}
+                  </Text>
+                </View>
+              ) : null}
+            </Pressable>
+          );
+        }}
       />
 
       <Sheet
@@ -123,6 +166,6 @@ function RecruitersList() {
           </View>
         ) : null}
       </Sheet>
-    </>
+    </Screen>
   );
 }

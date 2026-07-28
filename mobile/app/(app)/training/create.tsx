@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { Screen, Banner } from '../../../src/components/ui/Screen';
+import { PageTopBar } from '../../../src/components/ui/TopBar';
 import { Card, SectionHeader } from '../../../src/components/ui/Card';
 import { Button } from '../../../src/components/ui/Button';
 import { FormInput, SelectInput } from '../../../src/components/ui/Inputs';
@@ -100,8 +101,9 @@ function CreateCourse() {
 
   return (
     <>
-      <Stack.Screen options={{ title: 'New course' }} />
-      <Screen edges={['bottom']}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <Screen edges={['top', 'bottom']}>
+        <PageTopBar title="New course" showBack />
         <KeyboardAvoidingView
           style={{ flex: 1 }}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}

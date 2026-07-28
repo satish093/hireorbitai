@@ -1,6 +1,8 @@
-import { Text, View } from 'react-native';
+import { RefreshControl, ScrollView, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { ScreenScroll, Banner } from '../../../src/components/ui/Screen';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Screen, Banner } from '../../../src/components/ui/Screen';
+import { PageTopBar } from '../../../src/components/ui/TopBar';
 import { Card, SectionHeader, DetailRow, Divider } from '../../../src/components/ui/Card';
 import { Pill } from '../../../src/components/ui/Pill';
 import { Button } from '../../../src/components/ui/Button';
@@ -14,14 +16,14 @@ import { useTheme } from '../../../src/theme';
 import { relativeDate } from '../jobs';
 
 /**
- * Job detail — GET /jobs/:id.
+ * Job detail — GET /jobs/:id. OPERATOR_TIER, matching the router gate.
  *
- * OPERATOR_TIER, matching the router gate on /jobs.
+ * `apply_url` is ingested third-party data, so it goes through openExternalUrl
+ * (https-only) — on a phone that matters more, since Linking hands custom
+ * schemes to the OS.
  *
- * `apply_url` is ingested from a third-party board, so it is untrusted stored
- * data and goes through openExternalUrl (https-only). On a phone that matters
- * more than on the web: Linking.openURL hands the string to the OS, which will
- * resolve a custom scheme into another app.
+ * Uses the site-style PageTopBar (back + bell + theme toggle) instead of the
+ * native Stack header, so the chrome matches the rest of the app.
  */
 export default function JobDetailScreen() {
   return (
@@ -34,6 +36,7 @@ export default function JobDetailScreen() {
 function JobDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { colors, spacing, fontSize } = useTheme();
+  const insets = useSafeAreaInsets();
 
   const { data, loading, refreshing, error, onRefresh, refetch } = useApiQuery<Job>(
     id ? `/jobs/${id}` : null,
@@ -43,9 +46,27 @@ function JobDetail() {
   const salary = formatSalary(data?.salary_min, data?.salary_max);
 
   return (
-    <>
-      <Stack.Screen options={{ headerShown: true, title: 'Job' }} />
-      <ScreenScroll refreshing={refreshing} onRefresh={onRefresh} edges={[]}>
+    <Screen edges={['top']}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <PageTopBar showBack title="Job" />
+      <ScrollView
+        contentContainerStyle={{
+          padding: spacing.lg,
+          paddingBottom: spacing['4xl'] + insets.bottom,
+          gap: spacing.lg,
+        }}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          onRefresh ? (
+            <RefreshControl
+              refreshing={!!refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.accent}
+              colors={[colors.accent]}
+            />
+          ) : undefined
+        }
+      >
         {loading && !data ? (
           <SkeletonCard />
         ) : error && !data ? (
@@ -130,8 +151,8 @@ function JobDetail() {
             ) : null}
           </>
         )}
-      </ScreenScroll>
-    </>
+      </ScrollView>
+    </Screen>
   );
 }
 

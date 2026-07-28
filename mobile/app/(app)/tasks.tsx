@@ -1,26 +1,24 @@
 import { useMemo, useState } from 'react';
-import { Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ListScreen, PageHeader } from '../../src/components/ui/Screen';
-import { Card } from '../../src/components/ui/Card';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Screen, ListScreen } from '../../src/components/ui/Screen';
+import { PageTopBar } from '../../src/components/ui/TopBar';
+import { Divider } from '../../src/components/ui/Card';
 import { Tabs, type TabItem } from '../../src/components/ui/Tabs';
-import { Pill, TASK_STATUS_TONE, TASK_PRIORITY_TONE } from '../../src/components/ui/Pill';
-import { Avatar } from '../../src/components/ui/Avatar';
 import { RouteGuard } from '../../src/components/RouteGuard';
 import { useApiList } from '../../src/hooks/useApi';
 import { BUSINESS_ROLES, TASK_STATUS_LABEL, type Task, type TaskStatus } from '../../src/types';
-import { useTheme } from '../../src/theme';
+import { useTheme, type Palette } from '../../src/theme';
 
 /**
- * Task list.
+ * Task list — the mobile port of the web board/table (neither survives a phone
+ * screen, so it's a filtered list with the same data + actions).
  *
- * The web offers a Kanban board and a table. Neither survives a phone screen —
- * a 7-column board at 390pt wide is unusable, and horizontal scrolling to reach
- * a column is worse than no board. So mobile gets a filtered list with the same
- * data, the same statuses, and the same actions.
- *
- * Due-date urgency is computed here rather than trusted from the row, because
- * "overdue" depends on the reader's clock, not the server's.
+ * The web's mobile task list is a stack of compact borderless rows: a round
+ * checkbox (filled green when done), the title (strikethrough when complete), a
+ * coloured status line (red "Overdue · date"), and a muted note. This mirrors
+ * that. Due-date urgency is computed against the reader's clock, not the server's.
  */
 export default function TasksScreen() {
   return (
@@ -45,6 +43,7 @@ const DONE_STATUSES: TaskStatus[] = ['COMPLETED', 'CANCELLED'];
 function TaskList() {
   const router = useRouter();
   const { colors, spacing, fontSize } = useTheme();
+  const insets = useSafeAreaInsets();
   const [filter, setFilter] = useState<TaskStatus | 'ALL' | 'OPEN'>('OPEN');
 
   const { items, loading, refreshing, error, onRefresh, refetch } = useApiList<Task>('/tasks', {
@@ -71,8 +70,8 @@ function TaskList() {
   }));
 
   return (
-    <>
-      <PageHeader title="Tasks" subtitle={`${items.length} total`} />
+    <Screen edges={['top']}>
+      <PageTopBar title="Tasks" subtitle={`${items.length} total`} />
       <ListScreen
         items={filtered}
         loading={loading}
@@ -82,99 +81,116 @@ function TaskList() {
         onRetry={() => void refetch()}
         keyExtractor={(t) => t.id}
         header={<Tabs items={tabs} value={filter} onChange={(k) => setFilter(k as never)} />}
+        ItemSeparatorComponent={() => <Divider />}
+        contentContainerStyle={{
+          paddingHorizontal: spacing.lg,
+          paddingTop: spacing.sm,
+          paddingBottom: spacing['4xl'] + insets.bottom,
+          flexGrow: 1,
+        }}
         emptyTitle={filter === 'OPEN' ? 'Nothing open' : 'No tasks'}
         emptyDescription="Tasks assigned to you or your team will show up here."
         renderItem={({ item }) => {
-          const due = dueMeta(item.due_at, item.status);
+          const done = DONE_STATUSES.includes(item.status);
+          const line = statusLine(item.due_at, item.status, colors);
           return (
-            <Card onPress={() => router.push(`/(app)/task/${item.id}`)}>
-              <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md }}>
-                <View style={{ flex: 1 }}>
-                  <Text
-                    numberOfLines={2}
-                    style={{
-                      fontSize: fontSize.md,
-                      fontWeight: '600',
-                      color: colors.ink,
-                      textDecorationLine:
-                        item.status === 'COMPLETED' || item.status === 'CANCELLED'
-                          ? 'line-through'
-                          : 'none',
-                    }}
-                  >
-                    {item.title}
-                  </Text>
-                  {item.description ? (
-                    <Text
-                      numberOfLines={2}
-                      style={{ fontSize: fontSize.sm, color: colors.muted, marginTop: 2 }}
-                    >
-                      {item.description}
-                    </Text>
-                  ) : null}
-                </View>
-                {item.assignee ? (
-                  <Avatar
-                    id={item.assignee.id}
-                    name={item.assignee.full_name}
-                    email={item.assignee.email}
-                    size={32}
-                  />
+            <Pressable
+              onPress={() => router.push(`/(app)/task/${item.id}`)}
+              style={({ pressed }) => ({
+                opacity: pressed ? 0.6 : 1,
+                flexDirection: 'row',
+                alignItems: 'flex-start',
+                gap: spacing.md,
+                paddingVertical: spacing.md,
+              })}
+            >
+              <View
+                style={{
+                  width: 22,
+                  height: 22,
+                  borderRadius: 11,
+                  marginTop: 1,
+                  borderWidth: 1.5,
+                  borderColor: done ? colors.success : colors.borderStrong,
+                  backgroundColor: done ? colors.success : 'transparent',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                {done ? (
+                  <Text style={{ color: '#ffffff', fontSize: 12, fontWeight: '800' }}>✓</Text>
                 ) : null}
               </View>
 
-              <View
-                style={{
-                  flexDirection: 'row',
-                  flexWrap: 'wrap',
-                  alignItems: 'center',
-                  gap: 6,
-                  marginTop: spacing.md,
-                }}
-              >
-                <Pill
-                  label={TASK_STATUS_LABEL[item.status] ?? item.status}
-                  tone={TASK_STATUS_TONE[item.status] ?? 'neutral'}
-                  size="sm"
-                />
-                {item.priority ? (
-                  <Pill
-                    label={item.priority}
-                    tone={TASK_PRIORITY_TONE[item.priority] ?? 'neutral'}
-                    size="sm"
-                  />
+              <View style={{ flex: 1 }}>
+                <Text
+                  numberOfLines={2}
+                  style={{
+                    fontSize: fontSize.md,
+                    fontWeight: '600',
+                    color: done ? colors.muted : colors.ink,
+                    textDecorationLine: done ? 'line-through' : 'none',
+                  }}
+                >
+                  {item.title}
+                </Text>
+
+                {line ? (
+                  <View
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 }}
+                  >
+                    <View
+                      style={{
+                        width: 7,
+                        height: 7,
+                        borderRadius: 3.5,
+                        backgroundColor: line.color,
+                      }}
+                    />
+                    <Text style={{ fontSize: fontSize.sm, color: line.color, fontWeight: '600' }}>
+                      {line.text}
+                    </Text>
+                  </View>
                 ) : null}
-                {due ? <Pill label={due.label} tone={due.tone} size="sm" /> : null}
+
+                {item.description ? (
+                  <Text
+                    numberOfLines={1}
+                    style={{ fontSize: fontSize.sm, color: colors.muted, marginTop: 2 }}
+                  >
+                    {item.description}
+                  </Text>
+                ) : null}
               </View>
-            </Card>
+            </Pressable>
           );
         }}
       />
-    </>
+    </Screen>
   );
 }
 
 /**
- * Due-date chip. Returns null for a task with no due date, and stays neutral
- * once the task is done — an overdue-red badge on a completed task is noise.
+ * Colored status line for a task row. Returns null for a task with no due date.
+ * Overdue is red, imminent is amber, a future/completed date is muted — matching
+ * the web list where only urgency is coloured.
  */
-function dueMeta(
+function statusLine(
   dueAt: string | null | undefined,
   status: TaskStatus,
-): { label: string; tone: 'neutral' | 'warn' | 'danger' | 'info' } | null {
+  colors: Palette,
+): { color: string; text: string } | null {
   if (!dueAt) return null;
-  const due = new Date(dueAt).getTime();
-  if (Number.isNaN(due)) return null;
-  if (DONE_STATUSES.includes(status)) {
-    return { label: `Due ${new Date(dueAt).toLocaleDateString()}`, tone: 'neutral' };
-  }
+  const due = new Date(dueAt);
+  if (Number.isNaN(due.getTime())) return null;
+  const dateStr = due.toLocaleDateString();
 
-  const now = Date.now();
+  if (DONE_STATUSES.includes(status)) return { color: colors.muted, text: dateStr };
+
+  const diff = due.getTime() - Date.now();
   const day = 24 * 60 * 60 * 1000;
-  const diff = due - now;
-
-  if (diff < 0) return { label: 'Overdue', tone: 'danger' };
-  if (diff < day) return { label: 'Due today', tone: 'warn' };
-  if (diff < 2 * day) return { label: 'Due tomorrow', tone: 'warn' };
-  return { label: `Due ${new Date(dueAt).toLocaleDateString()}`, tone: 'info' };
+  if (diff < 0) return { color: colors.danger, text: `Overdue · ${dateStr}` };
+  if (diff < day) return { color: colors.warn, text: 'Due today' };
+  if (diff < 2 * day) return { color: colors.warn, text: 'Due tomorrow' };
+  return { color: colors.muted, text: dateStr };
 }

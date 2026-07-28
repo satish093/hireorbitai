@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
-import { Alert, Text, View } from 'react-native';
-import { ListScreen, PageHeader, Banner } from '../../src/components/ui/Screen';
-import { Card } from '../../src/components/ui/Card';
+import { Alert, Pressable, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Screen, ListScreen, Banner } from '../../src/components/ui/Screen';
+import { PageTopBar } from '../../src/components/ui/TopBar';
+import { Divider } from '../../src/components/ui/Card';
 import { Pill } from '../../src/components/ui/Pill';
-import { Button } from '../../src/components/ui/Button';
 import { SearchInput, SelectInput } from '../../src/components/ui/Inputs';
 import { RouteGuard } from '../../src/components/RouteGuard';
 import { useApiList } from '../../src/hooks/useApi';
@@ -12,7 +13,7 @@ import { useScreenCaptureGuard } from '../../src/security/PrivacyScreen';
 import { openExternalUrl } from '../../src/utils/safeUrl';
 import { OPERATOR_TIER, type Consultant, type Resume } from '../../src/types';
 import { useTheme } from '../../src/theme';
-import { relativeDate } from './jobs';
+import { relativeDate } from '../../src/utils/format';
 
 /**
  * Résumés — operator view.
@@ -38,6 +39,7 @@ function ResumesView() {
   useScreenCaptureGuard();
 
   const { colors, spacing, fontSize } = useTheme();
+  const insets = useSafeAreaInsets();
   const [consultantId, setConsultantId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
 
@@ -75,8 +77,8 @@ function ResumesView() {
   };
 
   return (
-    <>
-      <PageHeader title="Résumés" />
+    <Screen edges={['top']}>
+      <PageTopBar title="Résumés" showBack />
       <ListScreen
         items={consultantId ? resumes.items : []}
         loading={consultantId ? resumes.loading : false}
@@ -85,15 +87,30 @@ function ResumesView() {
         onRefresh={resumes.onRefresh}
         onRetry={() => void resumes.refetch()}
         keyExtractor={(r) => r.id}
+        ItemSeparatorComponent={() => <Divider />}
+        contentContainerStyle={{
+          paddingHorizontal: spacing.lg,
+          paddingTop: spacing.sm,
+          paddingBottom: spacing['4xl'] + insets.bottom,
+          flexGrow: 1,
+        }}
         header={
-          <View style={{ gap: spacing.md }}>
+          <View style={{ gap: spacing.md, marginBottom: spacing.xs }}>
+            <View>
+              <Text style={{ fontSize: fontSize.xl, fontWeight: '800', color: colors.ink }}>
+                Resume workspace
+              </Text>
+              <Text style={{ fontSize: fontSize.sm, color: colors.muted, marginTop: 4 }}>
+                Select a consultant to manage their resumes.
+              </Text>
+            </View>
             <SearchInput value={query} onChangeText={setQuery} placeholder="Filter consultants" />
             <SelectInput
               label="Consultant"
               value={consultantId}
               options={options}
               onChange={setConsultantId}
-              placeholder={consultants.loading ? 'Loading consultants…' : 'Choose a consultant'}
+              placeholder={consultants.loading ? 'Loading consultants…' : 'Select a consultant…'}
             />
             <Banner
               tone="info"
@@ -105,35 +122,39 @@ function ResumesView() {
         emptyDescription={
           consultantId
             ? 'This consultant has no résumé uploaded yet.'
-            : 'Choose someone above to see their résumé versions.'
+            : 'Select a consultant above to open their resumes.'
         }
         renderItem={({ item }) => (
-          <Card>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-              <View style={{ flex: 1 }}>
-                <Text
-                  numberOfLines={1}
-                  style={{ fontSize: fontSize.base, fontWeight: '600', color: colors.ink }}
-                >
-                  {item.file_name}
-                </Text>
-                <Text style={{ fontSize: fontSize.xs, color: colors.faint, marginTop: 2 }}>
-                  v{item.version ?? '—'} · {relativeDate(item.created_at)}
-                </Text>
-              </View>
-              {item.is_current ? <Pill label="Current" tone="success" size="sm" /> : null}
+          <Pressable
+            onPress={() => void openResume(item.id)}
+            accessibilityRole="button"
+            accessibilityLabel={`Open ${item.file_name}`}
+            style={({ pressed }) => ({
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: spacing.md,
+              paddingVertical: 12,
+              backgroundColor: pressed ? colors.hover : 'transparent',
+            })}
+          >
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text
+                numberOfLines={1}
+                style={{ fontSize: fontSize.base, fontWeight: '600', color: colors.ink }}
+              >
+                {item.file_name}
+              </Text>
+              <Text style={{ fontSize: fontSize.xs, color: colors.faint, marginTop: 2 }}>
+                v{item.version ?? '—'} · {relativeDate(item.created_at)}
+              </Text>
             </View>
-            <View style={{ marginTop: spacing.md }}>
-              <Button
-                label="Open"
-                size="sm"
-                variant="secondary"
-                onPress={() => void openResume(item.id)}
-              />
-            </View>
-          </Card>
+            {item.is_current ? <Pill label="Current" tone="success" size="sm" /> : null}
+            <Text style={{ fontSize: fontSize.sm, fontWeight: '600', color: colors.accent }}>
+              Open
+            </Text>
+          </Pressable>
         )}
       />
-    </>
+    </Screen>
   );
 }

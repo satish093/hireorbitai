@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
-import { ScreenScroll, PageHeader, Banner } from '../../src/components/ui/Screen';
+import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Screen, Banner } from '../../src/components/ui/Screen';
+import { PageTopBar } from '../../src/components/ui/TopBar';
 import { Card, SectionHeader, Divider } from '../../src/components/ui/Card';
 import { Pill, INTERVIEW_STATUS_TONE } from '../../src/components/ui/Pill';
 import { SkeletonList, EmptyState } from '../../src/components/ui/States';
@@ -55,6 +57,7 @@ const RANGES = [
 
 function CalendarAgenda() {
   const { colors, spacing, fontSize, radius } = useTheme();
+  const insets = useSafeAreaInsets();
   const [days, setDays] = useState<(typeof RANGES)[number]['key']>(7);
 
   const interviews = useApiList<Interview>('/interviews', { channel: 'interviews' });
@@ -112,119 +115,146 @@ function CalendarAgenda() {
     return [...byDay.entries()];
   }, [interviews.items, reminders.items, days]);
 
-  return (
-    <ScreenScroll refreshing={refreshing} onRefresh={onRefresh}>
-      <PageHeader title="Calendar" />
+  const monthLabel = new Date().toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
 
+  return (
+    <Screen edges={['top']}>
+      <PageTopBar title="Calendar" showBack />
       <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: spacing.sm, paddingVertical: 2 }}
+        contentContainerStyle={{
+          padding: spacing.lg,
+          paddingBottom: spacing['4xl'] + insets.bottom,
+          gap: spacing.lg,
+        }}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.accent}
+            colors={[colors.accent]}
+          />
+        }
       >
-        {RANGES.map((r) => {
-          const active = r.key === days;
-          return (
-            <Pressable
-              key={r.key}
-              onPress={() => setDays(r.key)}
-              accessibilityRole="button"
-              accessibilityState={{ selected: active }}
-              style={{
-                paddingHorizontal: spacing.md,
-                height: 44,
-                justifyContent: 'center',
-                borderRadius: radius.pill,
-                backgroundColor: active ? colors.ink : colors.surface,
-                borderWidth: 1,
-                borderColor: active ? colors.ink : colors.border,
-              }}
-            >
-              <Text
+        <View>
+          <Text style={{ fontSize: fontSize.xl, fontWeight: '800', color: colors.ink }}>
+            {monthLabel}
+          </Text>
+          <Text style={{ fontSize: fontSize.sm, color: colors.muted, marginTop: 4 }}>
+            Your interviews and deadlines — add personal items to any date.
+          </Text>
+        </View>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ gap: spacing.sm, paddingVertical: 2 }}
+        >
+          {RANGES.map((r) => {
+            const active = r.key === days;
+            return (
+              <Pressable
+                key={r.key}
+                onPress={() => setDays(r.key)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
                 style={{
-                  color: active ? colors.bg : colors.ink2,
-                  fontSize: fontSize.sm,
-                  fontWeight: '600',
+                  paddingHorizontal: spacing.md,
+                  height: 44,
+                  justifyContent: 'center',
+                  borderRadius: radius.pill,
+                  backgroundColor: active ? colors.ink : colors.surface,
+                  borderWidth: 1,
+                  borderColor: active ? colors.ink : colors.border,
                 }}
               >
-                {r.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
-
-      {interviews.error ? <Banner tone="danger" message={interviews.error} /> : null}
-
-      {loading && sections.length === 0 ? (
-        <SkeletonList count={3} />
-      ) : sections.length === 0 ? (
-        <Card>
-          <EmptyState
-            compact
-            title="Nothing scheduled"
-            description="Interviews and reminders in this window will appear here."
-          />
-        </Card>
-      ) : (
-        sections.map(([dayKey, events]) => (
-          <Card key={dayKey} padded={false}>
-            <View style={{ padding: spacing.lg, paddingBottom: spacing.sm }}>
-              <SectionHeader title={dayLabel(new Date(dayKey))} />
-            </View>
-            {events.map((e, i) => (
-              <View key={e.id}>
-                {i > 0 ? <Divider inset={spacing.lg} /> : null}
-                <View
+                <Text
                   style={{
-                    flexDirection: 'row',
-                    alignItems: 'flex-start',
-                    gap: spacing.md,
-                    paddingHorizontal: spacing.lg,
-                    paddingVertical: spacing.md,
+                    color: active ? colors.bg : colors.ink2,
+                    fontSize: fontSize.sm,
+                    fontWeight: '600',
                   }}
                 >
-                  <Text
+                  {r.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+
+        {interviews.error ? <Banner tone="danger" message={interviews.error} /> : null}
+
+        {loading && sections.length === 0 ? (
+          <SkeletonList count={3} />
+        ) : sections.length === 0 ? (
+          <Card>
+            <EmptyState
+              compact
+              title="Nothing scheduled"
+              description="Interviews and reminders in this window will appear here."
+            />
+          </Card>
+        ) : (
+          sections.map(([dayKey, events]) => (
+            <Card key={dayKey} padded={false}>
+              <View style={{ padding: spacing.lg, paddingBottom: spacing.sm }}>
+                <SectionHeader title={dayLabel(new Date(dayKey))} />
+              </View>
+              {events.map((e, i) => (
+                <View key={e.id}>
+                  {i > 0 ? <Divider inset={spacing.lg} /> : null}
+                  <View
                     style={{
-                      fontSize: fontSize.sm,
-                      color: colors.muted,
-                      width: 62,
-                      fontVariant: ['tabular-nums'],
+                      flexDirection: 'row',
+                      alignItems: 'flex-start',
+                      gap: spacing.md,
+                      paddingHorizontal: spacing.lg,
+                      paddingVertical: spacing.md,
                     }}
                   >
-                    {e.at.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
-                  </Text>
-                  <View style={{ flex: 1 }}>
                     <Text
-                      numberOfLines={2}
-                      style={{ fontSize: fontSize.base, color: colors.ink, fontWeight: '600' }}
+                      style={{
+                        fontSize: fontSize.sm,
+                        color: colors.muted,
+                        width: 62,
+                        fontVariant: ['tabular-nums'],
+                      }}
                     >
-                      {e.title}
+                      {e.at.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
                     </Text>
-                    {e.subtitle ? (
+                    <View style={{ flex: 1 }}>
                       <Text
-                        numberOfLines={1}
-                        style={{ fontSize: fontSize.sm, color: colors.muted, marginTop: 2 }}
+                        numberOfLines={2}
+                        style={{ fontSize: fontSize.base, color: colors.ink, fontWeight: '600' }}
                       >
-                        {e.subtitle}
+                        {e.title}
                       </Text>
-                    ) : null}
+                      {e.subtitle ? (
+                        <Text
+                          numberOfLines={1}
+                          style={{ fontSize: fontSize.sm, color: colors.muted, marginTop: 2 }}
+                        >
+                          {e.subtitle}
+                        </Text>
+                      ) : null}
+                    </View>
+                    <Pill
+                      label={e.kind === 'interview' ? 'Interview' : 'Reminder'}
+                      tone={
+                        e.kind === 'interview'
+                          ? (INTERVIEW_STATUS_TONE[e.status ?? ''] ?? 'info')
+                          : 'accent'
+                      }
+                      size="sm"
+                    />
                   </View>
-                  <Pill
-                    label={e.kind === 'interview' ? 'Interview' : 'Reminder'}
-                    tone={
-                      e.kind === 'interview'
-                        ? (INTERVIEW_STATUS_TONE[e.status ?? ''] ?? 'info')
-                        : 'accent'
-                    }
-                    size="sm"
-                  />
                 </View>
-              </View>
-            ))}
-          </Card>
-        ))
-      )}
-    </ScreenScroll>
+              ))}
+            </Card>
+          ))
+        )}
+      </ScrollView>
+    </Screen>
   );
 }
 

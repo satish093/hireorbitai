@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react';
-import { Linking, Text, View } from 'react-native';
+import { Linking, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { ScreenScroll, Banner } from '../../../../src/components/ui/Screen';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Screen, Banner } from '../../../../src/components/ui/Screen';
+import { PageTopBar } from '../../../../src/components/ui/TopBar';
 import { Card, SectionHeader } from '../../../../src/components/ui/Card';
 import { Button } from '../../../../src/components/ui/Button';
 import { SkeletonCard, ErrorState } from '../../../../src/components/ui/States';
@@ -56,6 +58,7 @@ function LessonViewer() {
   }>();
   const router = useRouter();
   const { colors, spacing, fontSize } = useTheme();
+  const insets = useSafeAreaInsets();
 
   const [marking, setMarking] = useState(false);
   const [done, setDone] = useState(false);
@@ -95,112 +98,140 @@ function LessonViewer() {
   if (!courseId) {
     return (
       <>
-        <Stack.Screen options={{ title: 'Lesson' }} />
-        <ScreenScroll edges={[]}>
-          <Banner
-            tone="warn"
-            message="Open this lesson from its course so we know which course it belongs to."
-          />
-        </ScreenScroll>
+        <Stack.Screen options={{ headerShown: false }} />
+        <Screen>
+          <PageTopBar title="Lesson" showBack />
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={{
+              padding: spacing.lg,
+              paddingBottom: spacing['4xl'] + insets.bottom,
+            }}
+          >
+            <Banner
+              tone="warn"
+              message="Open this lesson from its course so we know which course it belongs to."
+            />
+          </ScrollView>
+        </Screen>
       </>
     );
   }
 
   return (
     <>
-      <Stack.Screen options={{ title: lesson?.title ?? 'Lesson' }} />
-      <ScreenScroll refreshing={course.refreshing} onRefresh={course.onRefresh} edges={[]}>
-        {course.loading && !course.data ? (
-          <SkeletonCard />
-        ) : course.error && !course.data ? (
-          <ErrorState message={course.error} onRetry={() => void course.refetch()} />
-        ) : !lesson ? (
-          <Banner tone="warn" message="That lesson isn't part of this course any more." />
-        ) : (
-          <>
-            <Card>
-              <Text style={{ fontSize: fontSize.xl, fontWeight: '700', color: colors.ink }}>
-                {lesson.title}
-              </Text>
-              {lesson.estimated_minutes ? (
-                <Text style={{ fontSize: fontSize.sm, color: colors.muted, marginTop: 4 }}>
-                  About {lesson.estimated_minutes} minutes
-                </Text>
-              ) : null}
-              {lesson.video_url ? (
-                <View style={{ marginTop: spacing.md }}>
-                  <Button
-                    label="Watch video"
-                    variant="secondary"
-                    onPress={() => void Linking.openURL(lesson.video_url!)}
-                  />
-                </View>
-              ) : null}
-            </Card>
-
-            <Card>
-              {blocks.length === 0 ? (
-                <Text style={{ fontSize: fontSize.base, color: colors.muted }}>
-                  This lesson has no content yet.
-                </Text>
-              ) : (
-                blocks.map((b, i) => (
-                  <Text
-                    key={i}
-                    style={{
-                      fontSize: b.kind === 'heading' ? fontSize.lg : fontSize.base,
-                      fontWeight: b.kind === 'heading' ? '700' : '400',
-                      color: b.kind === 'heading' ? colors.ink : colors.ink2,
-                      lineHeight: b.kind === 'heading' ? 26 : 23,
-                      marginTop: i === 0 ? 0 : b.kind === 'heading' ? spacing.lg : spacing.sm,
-                      marginLeft: b.kind === 'bullet' ? spacing.md : 0,
-                    }}
-                  >
-                    {b.kind === 'bullet' ? `•  ${b.text}` : b.text}
-                  </Text>
-                ))
-              )}
-              {lesson.document_url ? (
-                <View style={{ marginTop: spacing.md }}>
-                  <Button
-                    label="Open attachment"
-                    variant="secondary"
-                    onPress={() => void Linking.openURL(lesson.document_url!)}
-                  />
-                </View>
-              ) : null}
-            </Card>
-
-            {assignmentId ? (
+      <Stack.Screen options={{ headerShown: false }} />
+      <Screen>
+        <PageTopBar title={lesson?.title ?? 'Lesson'} showBack />
+        <ScrollView
+          style={{ flex: 1 }}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{
+            padding: spacing.lg,
+            paddingBottom: spacing['4xl'] + insets.bottom,
+            gap: spacing.lg,
+          }}
+          refreshControl={
+            <RefreshControl
+              refreshing={!!course.refreshing}
+              onRefresh={course.onRefresh}
+              tintColor={colors.accent}
+              colors={[colors.accent]}
+            />
+          }
+        >
+          {course.loading && !course.data ? (
+            <SkeletonCard />
+          ) : course.error && !course.data ? (
+            <ErrorState message={course.error} onRetry={() => void course.refetch()} />
+          ) : !lesson ? (
+            <Banner tone="warn" message="That lesson isn't part of this course any more." />
+          ) : (
+            <>
               <Card>
-                <SectionHeader title="Progress" />
-                {markError ? <Banner tone="danger" message={markError} /> : null}
+                <Text style={{ fontSize: fontSize.xl, fontWeight: '700', color: colors.ink }}>
+                  {lesson.title}
+                </Text>
+                {lesson.estimated_minutes ? (
+                  <Text style={{ fontSize: fontSize.sm, color: colors.muted, marginTop: 4 }}>
+                    About {lesson.estimated_minutes} minutes
+                  </Text>
+                ) : null}
+                {lesson.video_url ? (
+                  <View style={{ marginTop: spacing.md }}>
+                    <Button
+                      label="Watch video"
+                      variant="secondary"
+                      onPress={() => void Linking.openURL(lesson.video_url!)}
+                    />
+                  </View>
+                ) : null}
+              </Card>
+
+              <Card>
+                {blocks.length === 0 ? (
+                  <Text style={{ fontSize: fontSize.base, color: colors.muted }}>
+                    This lesson has no content yet.
+                  </Text>
+                ) : (
+                  blocks.map((b, i) => (
+                    <Text
+                      key={i}
+                      style={{
+                        fontSize: b.kind === 'heading' ? fontSize.lg : fontSize.base,
+                        fontWeight: b.kind === 'heading' ? '700' : '400',
+                        color: b.kind === 'heading' ? colors.ink : colors.ink2,
+                        lineHeight: b.kind === 'heading' ? 26 : 23,
+                        marginTop: i === 0 ? 0 : b.kind === 'heading' ? spacing.lg : spacing.sm,
+                        marginLeft: b.kind === 'bullet' ? spacing.md : 0,
+                      }}
+                    >
+                      {b.kind === 'bullet' ? `•  ${b.text}` : b.text}
+                    </Text>
+                  ))
+                )}
+                {lesson.document_url ? (
+                  <View style={{ marginTop: spacing.md }}>
+                    <Button
+                      label="Open attachment"
+                      variant="secondary"
+                      onPress={() => void Linking.openURL(lesson.document_url!)}
+                    />
+                  </View>
+                ) : null}
+              </Card>
+
+              {assignmentId ? (
+                <Card>
+                  <SectionHeader title="Progress" />
+                  {markError ? <Banner tone="danger" message={markError} /> : null}
+                  <Button
+                    label={done ? '✓ Marked complete' : 'Mark lesson complete'}
+                    onPress={markComplete}
+                    loading={marking}
+                    disabled={done || marking}
+                  />
+                </Card>
+              ) : null}
+
+              <Card>
+                <SectionHeader title="Check your understanding" />
                 <Button
-                  label={done ? '✓ Marked complete' : 'Mark lesson complete'}
-                  onPress={markComplete}
-                  loading={marking}
-                  disabled={done || marking}
+                  label="Take the quiz"
+                  variant="secondary"
+                  onPress={() =>
+                    router.push(
+                      `/(app)/training/quiz/${lesson.id}${
+                        assignmentId ? `?assignmentId=${assignmentId}` : ''
+                      }`,
+                    )
+                  }
                 />
               </Card>
-            ) : null}
-
-            <Card>
-              <SectionHeader title="Check your understanding" />
-              <Button
-                label="Take the quiz"
-                variant="secondary"
-                onPress={() =>
-                  router.push(
-                    `/(app)/training/quiz/${lesson.id}${
-                      assignmentId ? `?assignmentId=${assignmentId}` : ''
-                    }`,
-                  )
-                }
-              />
-            </Card>
-          </>
-        )}
-      </ScreenScroll>
+            </>
+          )}
+        </ScrollView>
+      </Screen>
     </>
   );
 }

@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react';
-import { Text, View } from 'react-native';
-import { ListScreen, PageHeader } from '../../src/components/ui/Screen';
-import { Card, DetailRow, Divider } from '../../src/components/ui/Card';
+import { Pressable, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Screen, ListScreen } from '../../src/components/ui/Screen';
+import { PageTopBar } from '../../src/components/ui/TopBar';
+import { DetailRow, Divider } from '../../src/components/ui/Card';
 import { Pill } from '../../src/components/ui/Pill';
 import { Sheet } from '../../src/components/ui/Sheet';
 import { Avatar } from '../../src/components/ui/Avatar';
@@ -35,6 +37,7 @@ export default function ManagersScreen() {
 
 function ManagersList() {
   const { colors, spacing, fontSize } = useTheme();
+  const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<ManagerRow | null>(null);
 
@@ -55,8 +58,8 @@ function ManagersList() {
   }, [items, query]);
 
   return (
-    <>
-      <PageHeader title="Managers" subtitle={`${items.length} leads`} />
+    <Screen edges={['top']}>
+      <PageTopBar title="Managers" subtitle={`${items.length} leads`} showBack />
       <ListScreen
         items={filtered}
         loading={loading}
@@ -65,13 +68,37 @@ function ManagersList() {
         onRefresh={onRefresh}
         onRetry={() => void refetch()}
         keyExtractor={(m) => m.id}
+        ItemSeparatorComponent={() => <Divider inset={56} />}
+        contentContainerStyle={{
+          paddingHorizontal: spacing.lg,
+          paddingTop: spacing.sm,
+          paddingBottom: spacing['4xl'] + insets.bottom,
+          flexGrow: 1,
+        }}
         header={
-          <SearchInput value={query} onChangeText={setQuery} placeholder="Search name or group" />
+          <View style={{ marginBottom: spacing.xs }}>
+            <SearchInput value={query} onChangeText={setQuery} placeholder="Search name or group" />
+          </View>
         }
         emptyTitle={query ? 'No matches' : 'No managers'}
-        renderItem={({ item }) => (
-          <Card onPress={() => setSelected(item)}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+        renderItem={({ item }) => {
+          const meta =
+            item.group_name ??
+            (typeof item.recruiter_count === 'number'
+              ? `${item.recruiter_count} recruiter${item.recruiter_count === 1 ? '' : 's'}`
+              : 'No group assigned');
+          return (
+            <Pressable
+              onPress={() => setSelected(item)}
+              accessibilityRole="button"
+              style={({ pressed }) => ({
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: spacing.md,
+                paddingVertical: 12,
+                backgroundColor: pressed ? colors.hover : 'transparent',
+              })}
+            >
               <Avatar
                 id={item.id}
                 name={item.full_name}
@@ -79,7 +106,7 @@ function ManagersList() {
                 uri={item.avatar_url}
                 size={44}
               />
-              <View style={{ flex: 1 }}>
+              <View style={{ flex: 1, minWidth: 0 }}>
                 <Text
                   numberOfLines={1}
                   style={{ fontSize: fontSize.md, fontWeight: '600', color: colors.ink }}
@@ -87,21 +114,15 @@ function ManagersList() {
                   {item.full_name?.trim() || item.email}
                 </Text>
                 <Text numberOfLines={1} style={{ fontSize: fontSize.sm, color: colors.muted }}>
-                  {item.group_name ?? 'No group assigned'}
+                  {meta}
                 </Text>
               </View>
               {item.role ? (
                 <Pill label={ROLE_LABEL[item.role as Role] ?? item.role} tone="brand" size="sm" />
               ) : null}
-            </View>
-
-            {typeof item.recruiter_count === 'number' ? (
-              <Text style={{ fontSize: fontSize.xs, color: colors.faint, marginTop: spacing.sm }}>
-                {item.recruiter_count} recruiter{item.recruiter_count === 1 ? '' : 's'}
-              </Text>
-            ) : null}
-          </Card>
-        )}
+            </Pressable>
+          );
+        }}
       />
 
       <Sheet
@@ -149,6 +170,6 @@ function ManagersList() {
           </View>
         ) : null}
       </Sheet>
-    </>
+    </Screen>
   );
 }

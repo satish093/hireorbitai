@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
-import { Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
-import { ListScreen, PageHeader } from '../../../src/components/ui/Screen';
-import { Card } from '../../../src/components/ui/Card';
-import { Pill, type PillTone } from '../../../src/components/ui/Pill';
+import { Pressable, Text, View } from 'react-native';
+import { Stack, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Screen, ListScreen } from '../../../src/components/ui/Screen';
+import { PageTopBar } from '../../../src/components/ui/TopBar';
+import { Divider } from '../../../src/components/ui/Card';
 import { Button } from '../../../src/components/ui/Button';
 import { Tabs } from '../../../src/components/ui/Tabs';
 import { SearchInput } from '../../../src/components/ui/Inputs';
@@ -41,15 +42,11 @@ function lessonCount(c: CourseRow): number | null {
   if (typeof c.lessons === 'number') return c.lessons;
   return null;
 }
-function statusTone(status?: string | null): PillTone {
-  if (status === 'ACTIVE') return 'success';
-  if (status === 'ARCHIVED') return 'warn';
-  return 'neutral';
-}
 
 function CoursesList() {
   const router = useRouter();
   const { colors, spacing, fontSize } = useTheme();
+  const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<StatusFilter>('all');
 
@@ -80,12 +77,19 @@ function CoursesList() {
     });
   }, [items, query, status]);
 
+  const statusMeta = (s?: string | null): { color: string; label: string } => {
+    if (s === 'ACTIVE') return { color: colors.success, label: 'Active' };
+    if (s === 'ARCHIVED') return { color: colors.warn, label: 'Archived' };
+    return { color: colors.faint, label: 'Draft' };
+  };
+
   return (
-    <>
-      <PageHeader
+    <Screen>
+      <Stack.Screen options={{ headerShown: false }} />
+      <PageTopBar
         title="Courses"
         subtitle={`${items.length} in catalog`}
-        action={
+        right={
           <Button
             label="New"
             href="/(app)/training/create"
@@ -103,8 +107,13 @@ function CoursesList() {
         onRefresh={onRefresh}
         onRetry={() => void refetch()}
         keyExtractor={(c) => c.id}
+        ItemSeparatorComponent={() => <Divider inset={spacing.lg} />}
+        contentContainerStyle={{
+          paddingBottom: spacing['4xl'] + insets.bottom,
+          flexGrow: 1,
+        }}
         header={
-          <View style={{ gap: spacing.sm }}>
+          <View style={{ gap: spacing.sm, paddingHorizontal: spacing.lg, paddingTop: spacing.md }}>
             <SearchInput
               value={query}
               onChangeText={setQuery}
@@ -130,47 +139,56 @@ function CoursesList() {
         }
         renderItem={({ item }) => {
           const lc = lessonCount(item);
+          const st = statusMeta(item.status);
+          const meta = [
+            item.category,
+            item.difficulty ? item.difficulty.toLowerCase() : null,
+            typeof lc === 'number' ? `${lc} lessons` : null,
+          ]
+            .filter(Boolean)
+            .join(' · ');
+
           return (
-            <Card onPress={() => router.push(`/(app)/training/course/${item.id}`)}>
-              <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md }}>
-                <View style={{ flex: 1 }}>
-                  <Text
-                    numberOfLines={2}
-                    style={{ fontSize: fontSize.md, fontWeight: '600', color: colors.ink }}
-                  >
-                    {item.title}
+            <Pressable
+              onPress={() => router.push(`/(app)/training/course/${item.id}`)}
+              style={({ pressed }) => ({
+                paddingHorizontal: spacing.lg,
+                paddingVertical: spacing.md,
+                backgroundColor: pressed ? colors.hover : 'transparent',
+                gap: 4,
+              })}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+                <Text
+                  numberOfLines={1}
+                  style={{ flex: 1, fontSize: fontSize.base, fontWeight: '600', color: colors.ink }}
+                >
+                  {item.title}
+                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <View
+                    style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: st.color }}
+                  />
+                  <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: st.color }}>
+                    {st.label}
                   </Text>
-                  {item.description ? (
-                    <Text
-                      numberOfLines={2}
-                      style={{ fontSize: fontSize.sm, color: colors.muted, marginTop: 2 }}
-                    >
-                      {item.description}
-                    </Text>
-                  ) : null}
                 </View>
-                <Pill
-                  label={(item.status ?? 'DRAFT').toLowerCase()}
-                  tone={statusTone(item.status)}
-                  size="sm"
-                />
               </View>
 
-              <View
-                style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: spacing.md }}
-              >
-                {item.category ? <Pill label={item.category} tone="brand" size="sm" /> : null}
-                {item.difficulty ? (
-                  <Pill label={item.difficulty.toLowerCase()} tone="neutral" size="sm" />
-                ) : null}
-                {typeof lc === 'number' ? (
-                  <Pill label={`${lc} lessons`} tone="info" size="sm" />
-                ) : null}
-              </View>
-            </Card>
+              {item.description ? (
+                <Text numberOfLines={2} style={{ fontSize: fontSize.sm, color: colors.ink2 }}>
+                  {item.description}
+                </Text>
+              ) : null}
+              {meta ? (
+                <Text numberOfLines={1} style={{ fontSize: fontSize.xs, color: colors.muted }}>
+                  {meta}
+                </Text>
+              ) : null}
+            </Pressable>
           );
         }}
       />
-    </>
+    </Screen>
   );
 }

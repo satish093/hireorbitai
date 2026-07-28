@@ -1,6 +1,8 @@
 import { useMemo } from 'react';
-import { Text, View } from 'react-native';
-import { ScreenScroll, PageHeader, Banner } from '../../src/components/ui/Screen';
+import { RefreshControl, ScrollView, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Screen, Banner } from '../../src/components/ui/Screen';
+import { PageTopBar } from '../../src/components/ui/TopBar';
 import { Card, MetricTile, SectionHeader, Divider } from '../../src/components/ui/Card';
 import { Pill } from '../../src/components/ui/Pill';
 import { BreakdownRow } from '../../src/components/ui/Charts';
@@ -9,8 +11,7 @@ import { RouteGuard } from '../../src/components/RouteGuard';
 import { useApiQuery, useApiList } from '../../src/hooks/useApi';
 import { MANAGER_TIER } from '../../src/types';
 import { useTheme } from '../../src/theme';
-import { compactNumber } from '../../src/utils/format';
-import { relativeDate } from './jobs';
+import { compactNumber, relativeDate } from '../../src/utils/format';
 
 interface UsageSummary {
   total_cost_usd?: number | null;
@@ -49,6 +50,7 @@ export default function AIUsageScreen() {
 
 function AIUsage() {
   const { colors, spacing, fontSize } = useTheme();
+  const insets = useSafeAreaInsets();
 
   const summary = useApiQuery<UsageSummary>('/ai-usage/summary');
   const logs = useApiList<UsageLog>('/ai-usage/logs');
@@ -86,97 +88,112 @@ function AIUsage() {
   }, [logs.items, colors]);
 
   return (
-    <ScreenScroll refreshing={refreshing} onRefresh={onRefresh}>
-      <PageHeader title="AI usage" subtitle={summary.data?.period ?? 'This month'} />
-
-      {summary.error ? <Banner tone="danger" message={summary.error} /> : null}
-
-      {summary.loading && !summary.data ? (
-        <SkeletonMetricGrid count={3} />
-      ) : (
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md }}>
-          <MetricTile
-            label="Spend"
-            value={`$${(summary.data?.total_cost_usd ?? 0).toFixed(2)}`}
-            tone={(summary.data?.total_cost_usd ?? 0) > 50 ? 'warn' : 'default'}
-            accent={(summary.data?.total_cost_usd ?? 0) > 50 ? 'red' : 'amber'}
+    <Screen>
+      <PageTopBar title="AI usage" subtitle={summary.data?.period ?? 'This month'} />
+      <ScrollView
+        style={{ flex: 1 }}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{
+          padding: spacing.lg,
+          paddingBottom: spacing['4xl'] + insets.bottom,
+          gap: spacing.lg,
+        }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.accent}
+            colors={[colors.accent]}
           />
-          <MetricTile
-            label="Tokens"
-            value={compactNumber(summary.data?.total_tokens ?? 0)}
-            accent="blue"
-          />
-          <MetricTile label="Requests" value={summary.data?.request_count ?? 0} accent="brand" />
-        </View>
-      )}
+        }
+      >
+        {summary.error ? <Banner tone="danger" message={summary.error} /> : null}
 
-      {breakdown.total > 0 ? (
-        <Card>
-          <SectionHeader title="Calls by model" subtitle={`${breakdown.total} logged`} />
-          <View style={{ gap: spacing.md }}>
-            {breakdown.rows.map(([label, value], i) => (
-              <BreakdownRow
-                key={label}
-                label={label}
-                value={value}
-                total={breakdown.total}
-                color={breakdown.palette[i % breakdown.palette.length] ?? colors.accent}
-              />
-            ))}
-          </View>
-        </Card>
-      ) : null}
-
-      <Card padded={false}>
-        <View style={{ padding: spacing.lg, paddingBottom: spacing.sm }}>
-          <SectionHeader title="Recent calls" />
-        </View>
-
-        {logs.loading && logs.items.length === 0 ? (
-          <View style={{ padding: spacing.lg }}>
-            <SkeletonList count={4} />
-          </View>
-        ) : logs.items.length === 0 ? (
-          <View style={{ paddingBottom: spacing.lg }}>
-            <EmptyState compact title="No AI calls logged" />
-          </View>
+        {summary.loading && !summary.data ? (
+          <SkeletonMetricGrid count={3} />
         ) : (
-          logs.items.slice(0, 50).map((log, i) => (
-            <View key={log.id}>
-              {i > 0 ? <Divider inset={spacing.lg} /> : null}
-              <View
-                style={{
-                  paddingHorizontal: spacing.lg,
-                  paddingVertical: spacing.md,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: spacing.md,
-                }}
-              >
-                <View style={{ flex: 1 }}>
-                  <Text
-                    numberOfLines={1}
-                    style={{ fontSize: fontSize.base, color: colors.ink, fontWeight: '600' }}
-                  >
-                    {log.feature?.replace(/_/g, ' ') ?? 'AI call'}
-                  </Text>
-                  <Text style={{ fontSize: fontSize.xs, color: colors.faint, marginTop: 2 }}>
-                    {log.model ?? log.provider ?? '—'} · {relativeDate(log.created_at)}
-                  </Text>
-                </View>
-                <View style={{ alignItems: 'flex-end', gap: 4 }}>
-                  <Text style={{ fontSize: fontSize.sm, fontWeight: '600', color: colors.ink }}>
-                    ${(log.cost_usd ?? 0).toFixed(4)}
-                  </Text>
-                  {log.provider ? <Pill label={log.provider} tone="neutral" size="sm" /> : null}
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md }}>
+            <MetricTile
+              label="Spend"
+              value={`$${(summary.data?.total_cost_usd ?? 0).toFixed(2)}`}
+              tone={(summary.data?.total_cost_usd ?? 0) > 50 ? 'warn' : 'default'}
+              accent={(summary.data?.total_cost_usd ?? 0) > 50 ? 'red' : 'amber'}
+            />
+            <MetricTile
+              label="Tokens"
+              value={compactNumber(summary.data?.total_tokens ?? 0)}
+              accent="blue"
+            />
+            <MetricTile label="Requests" value={summary.data?.request_count ?? 0} accent="brand" />
+          </View>
+        )}
+
+        {breakdown.total > 0 ? (
+          <Card>
+            <SectionHeader title="Calls by model" subtitle={`${breakdown.total} logged`} />
+            <View style={{ gap: spacing.md }}>
+              {breakdown.rows.map(([label, value], i) => (
+                <BreakdownRow
+                  key={label}
+                  label={label}
+                  value={value}
+                  total={breakdown.total}
+                  color={breakdown.palette[i % breakdown.palette.length] ?? colors.accent}
+                />
+              ))}
+            </View>
+          </Card>
+        ) : null}
+
+        <Card padded={false}>
+          <View style={{ padding: spacing.lg, paddingBottom: spacing.sm }}>
+            <SectionHeader title="Recent calls" />
+          </View>
+
+          {logs.loading && logs.items.length === 0 ? (
+            <View style={{ padding: spacing.lg }}>
+              <SkeletonList count={4} />
+            </View>
+          ) : logs.items.length === 0 ? (
+            <View style={{ paddingBottom: spacing.lg }}>
+              <EmptyState compact title="No AI calls logged" />
+            </View>
+          ) : (
+            logs.items.slice(0, 50).map((log, i) => (
+              <View key={log.id}>
+                {i > 0 ? <Divider inset={spacing.lg} /> : null}
+                <View
+                  style={{
+                    paddingHorizontal: spacing.lg,
+                    paddingVertical: spacing.md,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: spacing.md,
+                  }}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      numberOfLines={1}
+                      style={{ fontSize: fontSize.base, color: colors.ink, fontWeight: '600' }}
+                    >
+                      {log.feature?.replace(/_/g, ' ') ?? 'AI call'}
+                    </Text>
+                    <Text style={{ fontSize: fontSize.xs, color: colors.faint, marginTop: 2 }}>
+                      {log.model ?? log.provider ?? '—'} · {relativeDate(log.created_at)}
+                    </Text>
+                  </View>
+                  <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                    <Text style={{ fontSize: fontSize.sm, fontWeight: '600', color: colors.ink }}>
+                      ${(log.cost_usd ?? 0).toFixed(4)}
+                    </Text>
+                    {log.provider ? <Pill label={log.provider} tone="neutral" size="sm" /> : null}
+                  </View>
                 </View>
               </View>
-            </View>
-          ))
-        )}
-      </Card>
-    </ScreenScroll>
+            ))
+          )}
+        </Card>
+      </ScrollView>
+    </Screen>
   );
 }
-
-// compactNumber (Intl-free) replaces the old Intl.NumberFormat compact notation.

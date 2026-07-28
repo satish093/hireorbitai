@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
-import { Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
-import { ListScreen, PageHeader } from '../../../src/components/ui/Screen';
-import { Card } from '../../../src/components/ui/Card';
-import { Pill } from '../../../src/components/ui/Pill';
+import { Pressable, Text, View } from 'react-native';
+import { Stack, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Screen, ListScreen } from '../../../src/components/ui/Screen';
+import { PageTopBar } from '../../../src/components/ui/TopBar';
+import { Divider } from '../../../src/components/ui/Card';
 import { Tabs } from '../../../src/components/ui/Tabs';
 import { RouteGuard } from '../../../src/components/RouteGuard';
 import { useApiList } from '../../../src/hooks/useApi';
@@ -55,7 +56,8 @@ function isOverdue(a: MyAssignment): boolean {
 
 function MyTrainingList() {
   const router = useRouter();
-  const { colors, spacing, fontSize, radius } = useTheme();
+  const { colors, spacing, fontSize } = useTheme();
+  const insets = useSafeAreaInsets();
   const [filter, setFilter] = useState<Filter>('all');
 
   const { items, loading, refreshing, error, onRefresh, refetch } = useApiList<MyAssignment>(
@@ -88,8 +90,9 @@ function MyTrainingList() {
   }, [items, filter]);
 
   return (
-    <>
-      <PageHeader title="My training" subtitle={`${items.length} assigned`} />
+    <Screen>
+      <Stack.Screen options={{ headerShown: false }} />
+      <PageTopBar title="My training" subtitle={`${items.length} assigned`} />
       <ListScreen
         items={ordered}
         loading={loading}
@@ -98,6 +101,11 @@ function MyTrainingList() {
         onRefresh={onRefresh}
         onRetry={() => void refetch()}
         keyExtractor={(a) => a.id}
+        ItemSeparatorComponent={() => <Divider inset={spacing.lg} />}
+        contentContainerStyle={{
+          paddingBottom: spacing['4xl'] + insets.bottom,
+          flexGrow: 1,
+        }}
         header={
           <Tabs
             value={filter}
@@ -116,78 +124,64 @@ function MyTrainingList() {
           const pct = Math.max(0, Math.min(100, Math.round(item.progress_percentage ?? 0)));
           const done = isDone(item);
           const overdue = isOverdue(item);
+          const statusColor = done ? colors.success : overdue ? colors.danger : colors.accent;
+          const statusLabel = done ? 'Complete' : overdue ? 'Overdue' : `${pct}%`;
+          const meta = [
+            item.course?.category,
+            item.due_date ? `Due ${shortDate(item.due_date)}` : null,
+          ]
+            .filter(Boolean)
+            .join(' · ');
 
           return (
-            <Card
+            <Pressable
               onPress={() =>
                 router.push(`/(app)/training/course/${item.course_id}?assignmentId=${item.id}`)
               }
+              style={({ pressed }) => ({
+                paddingHorizontal: spacing.lg,
+                paddingVertical: spacing.md,
+                backgroundColor: pressed ? colors.hover : 'transparent',
+                gap: spacing.sm,
+              })}
             >
-              <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md }}>
-                <View style={{ flex: 1 }}>
-                  <Text
-                    numberOfLines={2}
-                    style={{ fontSize: fontSize.md, fontWeight: '600', color: colors.ink }}
-                  >
-                    {item.course?.title ?? 'Course'}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+                <Text
+                  numberOfLines={2}
+                  style={{ flex: 1, fontSize: fontSize.base, fontWeight: '600', color: colors.ink }}
+                >
+                  {item.course?.title ?? 'Course'}
+                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <View
+                    style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: statusColor }}
+                  />
+                  <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: statusColor }}>
+                    {statusLabel}
                   </Text>
-                  {item.course?.category ? (
-                    <Text style={{ fontSize: fontSize.sm, color: colors.muted, marginTop: 2 }}>
-                      {item.course.category}
-                    </Text>
-                  ) : null}
                 </View>
-                {done ? (
-                  <Pill label="Complete" tone="success" size="sm" />
-                ) : overdue ? (
-                  <Pill label="Overdue" tone="danger" size="sm" />
-                ) : null}
               </View>
 
-              {/* Progress bar. A number alone doesn't read at a glance. */}
-              <View style={{ marginTop: spacing.md }}>
-                <View
-                  style={{
-                    height: 6,
-                    borderRadius: radius.pill,
-                    backgroundColor: colors.hover,
-                    overflow: 'hidden',
-                  }}
-                >
-                  <View
-                    style={{
-                      width: `${pct}%`,
-                      height: '100%',
-                      backgroundColor: done ? colors.success : colors.accent,
-                    }}
-                  />
-                </View>
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    justifyContent: 'space-between',
-                    marginTop: 6,
-                  }}
-                >
-                  <Text style={{ fontSize: fontSize.xs, color: colors.muted }}>
-                    {pct}% complete
-                  </Text>
-                  {item.due_date ? (
-                    <Text
-                      style={{
-                        fontSize: fontSize.xs,
-                        color: overdue ? colors.danger : colors.faint,
-                      }}
-                    >
-                      Due {shortDate(item.due_date)}
-                    </Text>
-                  ) : null}
-                </View>
+              {meta ? (
+                <Text numberOfLines={1} style={{ fontSize: fontSize.sm, color: colors.muted }}>
+                  {meta}
+                </Text>
+              ) : null}
+
+              <View
+                style={{
+                  height: 5,
+                  borderRadius: 3,
+                  backgroundColor: colors.hover,
+                  overflow: 'hidden',
+                }}
+              >
+                <View style={{ width: `${pct}%`, height: '100%', backgroundColor: statusColor }} />
               </View>
-            </Card>
+            </Pressable>
           );
         }}
       />
-    </>
+    </Screen>
   );
 }

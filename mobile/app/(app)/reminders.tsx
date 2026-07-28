@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react';
-import { Text, View } from 'react-native';
-import { ListScreen, PageHeader, Banner } from '../../src/components/ui/Screen';
-import { Card } from '../../src/components/ui/Card';
-import { Pill, type PillTone } from '../../src/components/ui/Pill';
+import { Pressable, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Screen, ListScreen, Banner } from '../../src/components/ui/Screen';
+import { PageTopBar } from '../../src/components/ui/TopBar';
+import { Divider } from '../../src/components/ui/Card';
+import { pillToneColor, type PillTone } from '../../src/components/ui/Pill';
 import { Tabs } from '../../src/components/ui/Tabs';
-import { Button } from '../../src/components/ui/Button';
 import { RouteGuard } from '../../src/components/RouteGuard';
 import { useApiList, useApiMutation } from '../../src/hooks/useApi';
 import { BUSINESS_ROLES } from '../../src/types';
@@ -55,6 +56,7 @@ type Filter = (typeof FILTERS)[number];
 
 function RemindersList() {
   const { colors, spacing, fontSize } = useTheme();
+  const insets = useSafeAreaInsets();
   const [completingId, setCompletingId] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>('ALL');
 
@@ -97,8 +99,8 @@ function RemindersList() {
   }, [items, filter]);
 
   return (
-    <>
-      <PageHeader title="Reminders" subtitle={`${items.length} total`} />
+    <Screen edges={['top']}>
+      <PageTopBar title="Reminders" showBack />
       <ListScreen
         items={sorted}
         loading={loading}
@@ -107,8 +109,23 @@ function RemindersList() {
         onRefresh={onRefresh}
         onRetry={() => void refetch()}
         keyExtractor={(r) => r.id}
+        ItemSeparatorComponent={() => <Divider />}
+        contentContainerStyle={{
+          paddingHorizontal: spacing.lg,
+          paddingTop: spacing.sm,
+          paddingBottom: spacing['4xl'] + insets.bottom,
+          flexGrow: 1,
+        }}
         header={
-          <View style={{ gap: spacing.md }}>
+          <View style={{ gap: spacing.md, marginBottom: spacing.xs }}>
+            <View>
+              <Text style={{ fontSize: fontSize.xl, fontWeight: '800', color: colors.ink }}>
+                Reminders &amp; follow-ups
+              </Text>
+              <Text style={{ fontSize: fontSize.sm, color: colors.muted, marginTop: 4 }}>
+                Personal nudges. The scheduler ships emails at due time once configured.
+              </Text>
+            </View>
             {complete.error ? <Banner tone="danger" message={complete.error} /> : null}
             <Tabs
               items={FILTERS.map((f) => ({
@@ -122,72 +139,97 @@ function RemindersList() {
           </View>
         }
         emptyTitle={filter === 'ALL' ? 'No reminders' : `Nothing ${filter.toLowerCase()}`}
-        emptyDescription="Reminders you or your team set will appear here."
+        emptyDescription="Add a reminder to track an upcoming follow-up."
         renderItem={({ item }) => {
           const status = (item.status ?? 'PENDING').toUpperCase();
           const when = new Date(item.due_at);
           const done = status === 'DONE';
           const overdue = !done && status !== 'SENT' && when.getTime() < Date.now();
           const actionable = status !== 'DONE' && status !== 'SENT';
+          const statusLabel = overdue
+            ? 'Overdue'
+            : status.charAt(0) + status.slice(1).toLowerCase();
+          const statusColor = overdue
+            ? colors.danger
+            : pillToneColor(STATUS_TONE[status] ?? 'neutral', colors);
+          const busy = completingId === item.id;
           return (
-            <Card>
-              <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md }}>
-                <View style={{ flex: 1 }}>
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'flex-start',
+                gap: spacing.md,
+                paddingVertical: 12,
+              }}
+            >
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text
+                  style={{
+                    fontSize: fontSize.md,
+                    fontWeight: '600',
+                    color: colors.ink,
+                    textDecorationLine: done ? 'line-through' : 'none',
+                  }}
+                >
+                  {item.title}
+                </Text>
+                {item.description ? (
                   <Text
-                    style={{
-                      fontSize: fontSize.md,
-                      fontWeight: '600',
-                      color: colors.ink,
-                      textDecorationLine: done ? 'line-through' : 'none',
-                    }}
+                    numberOfLines={2}
+                    style={{ fontSize: fontSize.sm, color: colors.muted, marginTop: 2 }}
                   >
-                    {item.title}
+                    {item.description}
                   </Text>
-                  {item.description ? (
-                    <Text
-                      numberOfLines={3}
-                      style={{ fontSize: fontSize.sm, color: colors.muted, marginTop: 2 }}
-                    >
-                      {item.description}
-                    </Text>
-                  ) : null}
-                  <Text
-                    style={{
-                      fontSize: fontSize.xs,
-                      color: overdue ? colors.danger : colors.faint,
-                      marginTop: 6,
-                    }}
-                  >
-                    {shortDate(item.due_at)} · {timeOfDay(item.due_at)}
+                ) : null}
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 6,
+                    marginTop: 6,
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  <View
+                    style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: statusColor }}
+                  />
+                  <Text style={{ fontSize: fontSize.sm, fontWeight: '600', color: statusColor }}>
+                    {statusLabel}
+                  </Text>
+                  <Text style={{ fontSize: fontSize.xs, color: colors.faint }}>
+                    · {shortDate(item.due_at)} · {timeOfDay(item.due_at)}
                   </Text>
                 </View>
-                {overdue ? (
-                  <Pill label="Overdue" tone="danger" size="sm" />
-                ) : (
-                  <Pill
-                    label={status.charAt(0) + status.slice(1).toLowerCase()}
-                    tone={STATUS_TONE[status] ?? 'neutral'}
-                    size="sm"
-                  />
-                )}
               </View>
 
               {actionable ? (
-                <View style={{ marginTop: spacing.md }}>
-                  <Button
-                    label="Mark done"
-                    variant="secondary"
-                    size="sm"
-                    onPress={() => void onComplete(item.id)}
-                    loading={completingId === item.id}
-                    disabled={complete.pending}
-                  />
-                </View>
+                <Pressable
+                  onPress={() => void onComplete(item.id)}
+                  disabled={complete.pending}
+                  accessibilityRole="button"
+                  accessibilityLabel="Mark reminder done"
+                  hitSlop={8}
+                  style={({ pressed }) => ({
+                    paddingHorizontal: spacing.md,
+                    height: 32,
+                    borderRadius: 999,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                    backgroundColor: pressed ? colors.hover : colors.surface,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    opacity: busy ? 0.6 : 1,
+                  })}
+                >
+                  <Text style={{ fontSize: fontSize.sm, fontWeight: '600', color: colors.ink }}>
+                    {busy ? '…' : 'Mark done'}
+                  </Text>
+                </Pressable>
               ) : null}
-            </Card>
+            </View>
           );
         }}
       />
-    </>
+    </Screen>
   );
 }
