@@ -1,15 +1,18 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ListScreen, PageHeader } from '../../src/components/ui/Screen';
 import { Card } from '../../src/components/ui/Card';
 import { Avatar } from '../../src/components/ui/Avatar';
 import { Pill } from '../../src/components/ui/Pill';
+import { Sheet } from '../../src/components/ui/Sheet';
+import { Icon } from '../../src/components/ui/Icon';
 import { SearchInput } from '../../src/components/ui/Inputs';
+import { EmptyState } from '../../src/components/ui/States';
 import { RouteGuard } from '../../src/components/RouteGuard';
 import { useApiList } from '../../src/hooks/useApi';
 import { useRealtime } from '../../src/hooks/useRealtime';
-import { MESSAGING_ROLES, ROLE_LABEL, type Conversation } from '../../src/types';
+import { MESSAGING_ROLES, ROLE_LABEL, type Conversation, type UserRef } from '../../src/types';
 import { useTheme } from '../../src/theme';
 import { relativeDate } from './jobs';
 
@@ -41,6 +44,7 @@ function ConversationList() {
   const router = useRouter();
   const { colors, spacing, fontSize } = useTheme();
   const [query, setQuery] = useState('');
+  const [composeOpen, setComposeOpen] = useState(false);
 
   const { items, loading, refreshing, error, onRefresh, refetch } = useApiList<Conversation>(
     '/messages/conversations',
@@ -72,7 +76,30 @@ function ConversationList() {
 
   return (
     <>
-      <PageHeader title="Inbox" />
+      <PageHeader
+        title="Inbox"
+        action={
+          <Pressable
+            onPress={() => setComposeOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel="New message"
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 6,
+              height: 36,
+              paddingHorizontal: 12,
+              borderRadius: 999,
+              backgroundColor: colors.accent,
+            }}
+          >
+            <Icon name="mailPlus" size={16} color={colors.accentFg} />
+            <Text style={{ color: colors.accentFg, fontSize: fontSize.sm, fontWeight: '700' }}>
+              New
+            </Text>
+          </Pressable>
+        }
+      />
       <ListScreen
         items={filtered}
         loading={loading}
@@ -80,7 +107,7 @@ function ConversationList() {
         error={error}
         onRefresh={onRefresh}
         onRetry={reload}
-        keyExtractor={(c) => c.peer?.id ?? Math.random().toString()}
+        keyExtractor={(c, i) => c.peer?.id ?? `row-${i}`}
         header={<SearchInput value={query} onChangeText={setQuery} placeholder="Search people" />}
         emptyTitle={query ? 'No matches' : 'No conversations'}
         emptyDescription={
@@ -158,6 +185,106 @@ function ConversationList() {
           );
         }}
       />
+
+      <ComposeSheet
+        open={composeOpen}
+        onClose={() => setComposeOpen(false)}
+        onPick={(id) => {
+          setComposeOpen(false);
+          router.push(`/(app)/chat/${id}`);
+        }}
+      />
     </>
+  );
+}
+
+/**
+ * Start-a-new-conversation picker — the mobile port of the web's compose flow.
+ * Lists everyone the caller is permitted to message (GET /messages/directory,
+ * resolved entirely server-side by permission.service.ts) with a search filter.
+ * Fetched lazily: the request only fires while the sheet is open.
+ */
+function ComposeSheet({
+  open,
+  onClose,
+  onPick,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onPick: (userId: string) => void;
+}) {
+  const { colors, spacing, fontSize } = useTheme();
+  const [q, setQ] = useState('');
+
+  const { items, loading } = useApiList<UserRef>('/messages/directory', {
+    channel: 'messages',
+    enabled: open,
+  });
+
+  const people = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    if (!needle) return items;
+    return items.filter(
+      (p) => p.full_name?.toLowerCase().includes(needle) || p.email?.toLowerCase().includes(needle),
+    );
+  }, [items, q]);
+
+  return (
+    <Sheet open={open} onClose={onClose} title="New message">
+      <View style={{ gap: spacing.md }}>
+        <SearchInput value={q} onChangeText={setQ} placeholder="Search people" />
+        {loading && items.length === 0 ? (
+          <Text style={{ color: colors.muted, fontSize: fontSize.sm, paddingVertical: spacing.md }}>
+            Loading contacts…
+          </Text>
+        ) : people.length === 0 ? (
+          <EmptyState
+            compact
+            title={q ? 'No matches' : 'No one to message yet'}
+            description={q ? 'Try a different name.' : 'People you can message will appear here.'}
+          />
+        ) : (
+          <ScrollView style={{ maxHeight: 420 }} keyboardShouldPersistTaps="handled">
+            {people.map((p) => (
+              <Pressable
+                key={p.id}
+                onPress={() => onPick(p.id)}
+                accessibilityRole="button"
+                style={({ pressed }) => ({
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: spacing.md,
+                  paddingVertical: 10,
+                  paddingHorizontal: 4,
+                  borderRadius: 10,
+                  backgroundColor: pressed ? colors.hover : 'transparent',
+                })}
+              >
+                <Avatar
+                  id={p.id}
+                  name={p.full_name}
+                  email={p.email}
+                  uri={p.avatar_url ?? undefined}
+                  size={40}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text
+                    numberOfLines={1}
+                    style={{ fontSize: fontSize.md, fontWeight: '600', color: colors.ink }}
+                  >
+                    {p.full_name?.trim() || p.email}
+                  </Text>
+                  {p.role ? (
+                    <Text style={{ fontSize: fontSize.xs, color: colors.muted, marginTop: 1 }}>
+                      {ROLE_LABEL[p.role]}
+                    </Text>
+                  ) : null}
+                </View>
+              </Pressable>
+            ))}
+          </ScrollView>
+        )}
+      </View>
+    </Sheet>
   );
 }

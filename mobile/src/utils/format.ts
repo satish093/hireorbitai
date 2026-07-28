@@ -43,6 +43,19 @@ export function longDate(d: Date = new Date()): string {
   return `${WEEKDAYS[d.getDay()]}, ${d.getDate()} ${MONTHS[d.getMonth()]}`;
 }
 
+/** "3:45 PM" — 12-hour clock time, Intl-free (used on chat message bubbles). */
+export function timeOfDay(iso?: string | null): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  let h = d.getHours();
+  const m = d.getMinutes();
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12;
+  if (h === 0) h = 12;
+  return `${h}:${m.toString().padStart(2, '0')} ${ampm}`;
+}
+
 /** 1234 → "1,234". */
 export function withThousands(n: number): string {
   return Math.round(n)

@@ -22,6 +22,7 @@ import { api, apiErrorMessage } from '../../../src/services/api';
 import { useScreenCaptureGuard } from '../../../src/security/PrivacyScreen';
 import { MESSAGING_ROLES, type Message } from '../../../src/types';
 import { useTheme } from '../../../src/theme';
+import { timeOfDay } from '../../../src/utils/format';
 
 /**
  * Message thread — GET /messages/with/:userId, POST /messages.
@@ -205,10 +206,7 @@ function ChatThread() {
                           color: mine ? 'rgba(255,255,255,0.75)' : colors.faint,
                         }}
                       >
-                        {new Date(item.created_at).toLocaleTimeString(undefined, {
-                          hour: 'numeric',
-                          minute: '2-digit',
-                        })}
+                        {timeOfDay(item.created_at)}
                         {item.edited_at ? ' · edited' : ''}
                       </Text>
                     </View>
