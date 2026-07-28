@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
 import { ListScreen, PageHeader } from '../../src/components/ui/Screen';
-import { Card } from '../../src/components/ui/Card';
+import { Card, DetailRow, Divider } from '../../src/components/ui/Card';
 import { Pill } from '../../src/components/ui/Pill';
+import { Sheet } from '../../src/components/ui/Sheet';
 import { Avatar } from '../../src/components/ui/Avatar';
 import { SearchInput } from '../../src/components/ui/Inputs';
 import { RouteGuard } from '../../src/components/RouteGuard';
@@ -35,6 +36,7 @@ export default function ManagersScreen() {
 function ManagersList() {
   const { colors, spacing, fontSize } = useTheme();
   const [query, setQuery] = useState('');
+  const [selected, setSelected] = useState<ManagerRow | null>(null);
 
   const { items, loading, refreshing, error, onRefresh, refetch } = useApiList<ManagerRow>(
     '/managers',
@@ -68,7 +70,7 @@ function ManagersList() {
         }
         emptyTitle={query ? 'No matches' : 'No managers'}
         renderItem={({ item }) => (
-          <Card>
+          <Card onPress={() => setSelected(item)}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
               <Avatar
                 id={item.id}
@@ -101,6 +103,52 @@ function ManagersList() {
           </Card>
         )}
       />
+
+      <Sheet
+        open={!!selected}
+        onClose={() => setSelected(null)}
+        title={selected?.full_name?.trim() || 'Manager'}
+      >
+        {selected ? (
+          <View style={{ gap: spacing.md }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+              <Avatar
+                id={selected.id}
+                name={selected.full_name}
+                email={selected.email}
+                uri={selected.avatar_url}
+                size={52}
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: fontSize.md, fontWeight: '700', color: colors.ink }}>
+                  {selected.full_name?.trim() || selected.email}
+                </Text>
+                {selected.role ? (
+                  <View style={{ marginTop: 4, alignSelf: 'flex-start' }}>
+                    <Pill
+                      label={ROLE_LABEL[selected.role as Role] ?? selected.role}
+                      tone="brand"
+                      size="sm"
+                    />
+                  </View>
+                ) : null}
+              </View>
+            </View>
+            <View>
+              <DetailRow label="Email" value={selected.email ?? '—'} />
+              <Divider />
+              <DetailRow label="Group" value={selected.group_name ?? '—'} />
+              <Divider />
+              <DetailRow
+                label="Recruiters"
+                value={
+                  typeof selected.recruiter_count === 'number' ? selected.recruiter_count : '—'
+                }
+              />
+            </View>
+          </View>
+        ) : null}
+      </Sheet>
     </>
   );
 }

@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
 import { ListScreen, PageHeader } from '../../src/components/ui/Screen';
-import { Card } from '../../src/components/ui/Card';
+import { Card, DetailRow, Divider } from '../../src/components/ui/Card';
 import { Pill } from '../../src/components/ui/Pill';
+import { Sheet } from '../../src/components/ui/Sheet';
 import { Avatar } from '../../src/components/ui/Avatar';
 import { SearchInput } from '../../src/components/ui/Inputs';
 import { RouteGuard } from '../../src/components/RouteGuard';
@@ -28,6 +29,7 @@ export default function RecruitersScreen() {
 function RecruitersList() {
   const { colors, spacing, fontSize } = useTheme();
   const [query, setQuery] = useState('');
+  const [selected, setSelected] = useState<Recruiter | null>(null);
 
   const { items, loading, refreshing, error, onRefresh, refetch } = useApiList<Recruiter>(
     '/recruiters',
@@ -61,7 +63,7 @@ function RecruitersList() {
         }
         emptyTitle={query ? 'No matches' : 'No recruiters'}
         renderItem={({ item }) => (
-          <Card>
+          <Card onPress={() => setSelected(item)}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
               <Avatar
                 id={item.user?.id ?? item.id}
@@ -86,6 +88,41 @@ function RecruitersList() {
           </Card>
         )}
       />
+
+      <Sheet
+        open={!!selected}
+        onClose={() => setSelected(null)}
+        title={selected?.user?.full_name?.trim() || 'Recruiter'}
+      >
+        {selected ? (
+          <View style={{ gap: spacing.md }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+              <Avatar
+                id={selected.user?.id ?? selected.id}
+                name={selected.user?.full_name}
+                email={selected.user?.email}
+                uri={selected.user?.avatar_url}
+                size={52}
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: fontSize.md, fontWeight: '700', color: colors.ink }}>
+                  {selected.user?.full_name?.trim() || selected.user?.email || 'Unnamed recruiter'}
+                </Text>
+                {selected.status ? (
+                  <View style={{ marginTop: 4, alignSelf: 'flex-start' }}>
+                    <Pill label={selected.status} tone="neutral" size="sm" />
+                  </View>
+                ) : null}
+              </View>
+            </View>
+            <View>
+              <DetailRow label="Email" value={selected.user?.email ?? '—'} />
+              <Divider />
+              <DetailRow label="Team" value={selected.team ?? '—'} />
+            </View>
+          </View>
+        ) : null}
+      </Sheet>
     </>
   );
 }
