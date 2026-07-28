@@ -11,6 +11,10 @@ import { useApiList } from '../../src/hooks/useApi';
 import { OPERATOR_TIER, type Job } from '../../src/types';
 import { useTheme } from '../../src/theme';
 import { displayHost } from '../../src/utils/safeUrl';
+import { relativeDate } from '../../src/utils/format';
+// Re-exported so the many screens that `import { relativeDate } from './jobs'`
+// keep working. The implementation is Intl-free (see src/utils/format.ts).
+export { relativeDate };
 
 /**
  * Job search.
@@ -157,17 +161,4 @@ function JobsList() {
       />
     </>
   );
-}
-
-/** Compact "3d ago" style stamp. Intl handles the pluralisation. */
-export function relativeDate(iso: string): string {
-  const then = new Date(iso).getTime();
-  if (Number.isNaN(then)) return '';
-  const diffMs = Date.now() - then;
-  const day = 24 * 60 * 60 * 1000;
-  const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
-  if (diffMs < 60 * 60 * 1000) return rtf.format(-Math.round(diffMs / 60_000), 'minute');
-  if (diffMs < day) return rtf.format(-Math.round(diffMs / (60 * 60 * 1000)), 'hour');
-  if (diffMs < 30 * day) return rtf.format(-Math.round(diffMs / day), 'day');
-  return new Date(iso).toLocaleDateString();
 }

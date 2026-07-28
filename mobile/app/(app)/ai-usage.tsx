@@ -7,6 +7,7 @@ import { RouteGuard } from '../../src/components/RouteGuard';
 import { useApiQuery, useApiList } from '../../src/hooks/useApi';
 import { MANAGER_TIER } from '../../src/types';
 import { useTheme } from '../../src/theme';
+import { compactNumber } from '../../src/utils/format';
 import { relativeDate } from './jobs';
 
 interface UsageSummary {
@@ -71,7 +72,7 @@ function AIUsage() {
             value={`$${(summary.data?.total_cost_usd ?? 0).toFixed(2)}`}
             tone={(summary.data?.total_cost_usd ?? 0) > 50 ? 'warn' : 'default'}
           />
-          <MetricTile label="Tokens" value={compact(summary.data?.total_tokens ?? 0)} />
+          <MetricTile label="Tokens" value={compactNumber(summary.data?.total_tokens ?? 0)} />
           <MetricTile label="Requests" value={summary.data?.request_count ?? 0} />
         </View>
       )}
@@ -128,9 +129,4 @@ function AIUsage() {
   );
 }
 
-/** 1234567 → "1.2M". Raw token counts are unreadable at a glance. */
-function compact(n: number): string {
-  return new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(
-    n,
-  );
-}
+// compactNumber (Intl-free) replaces the old Intl.NumberFormat compact notation.

@@ -8,6 +8,7 @@ import { useApiList } from '../../src/hooks/useApi';
 import { useScreenCaptureGuard } from '../../src/security/PrivacyScreen';
 import { MANAGER_TIER, type Invoice } from '../../src/types';
 import { useTheme } from '../../src/theme';
+import { money } from '../../src/utils/format';
 
 /**
  * Invoices — GET /invoices.
@@ -176,10 +177,4 @@ function InvoicesList() {
   );
 }
 
-function money(amount: number, currency?: string | null): string {
-  return new Intl.NumberFormat(undefined, {
-    style: 'currency',
-    currency: currency || 'USD',
-    maximumFractionDigits: 0,
-  }).format(amount);
-}
+// `money` (Intl-free) lives in src/utils/format.ts.

@@ -9,6 +9,7 @@ import { RouteGuard } from '../../../src/components/RouteGuard';
 import { useApiQuery } from '../../../src/hooks/useApi';
 import { OPERATOR_TIER, type Job } from '../../../src/types';
 import { openExternalUrl, displayHost } from '../../../src/utils/safeUrl';
+import { money } from '../../../src/utils/format';
 import { useTheme } from '../../../src/theme';
 import { relativeDate } from '../jobs';
 
@@ -135,12 +136,7 @@ function JobDetail() {
 }
 
 function formatSalary(min?: number | null, max?: number | null): string | null {
-  const fmt = (n: number) =>
-    new Intl.NumberFormat(undefined, {
-      style: 'currency',
-      currency: 'USD',
-      maximumFractionDigits: 0,
-    }).format(n);
+  const fmt = (n: number) => money(n, 'USD');
   if (min && max) return `${fmt(min)} – ${fmt(max)}`;
   if (min) return `From ${fmt(min)}`;
   if (max) return `Up to ${fmt(max)}`;

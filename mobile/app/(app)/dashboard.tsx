@@ -24,6 +24,7 @@ import {
   type Interview,
 } from '../../src/types';
 import { useTheme } from '../../src/theme';
+import { longDate } from '../../src/utils/format';
 
 /** Task metrics payload from /tasks/metrics (mirror of the web ManagerDashboard). */
 interface TaskMetrics {
@@ -47,11 +48,7 @@ const PRIORITY_LABEL: Record<string, string> = {
 
 /** "Monday, 28 Jul" — the date line the web dashboards show under the greeting. */
 function todayLine(): string {
-  return new Date().toLocaleDateString(undefined, {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'short',
-  });
+  return longDate();
 }
 
 /**
