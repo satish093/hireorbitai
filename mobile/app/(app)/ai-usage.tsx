@@ -1,7 +1,9 @@
+import { useMemo } from 'react';
 import { Text, View } from 'react-native';
 import { ScreenScroll, PageHeader, Banner } from '../../src/components/ui/Screen';
 import { Card, MetricTile, SectionHeader, Divider } from '../../src/components/ui/Card';
 import { Pill } from '../../src/components/ui/Pill';
+import { BreakdownRow } from '../../src/components/ui/Charts';
 import { SkeletonMetricGrid, SkeletonList, EmptyState } from '../../src/components/ui/States';
 import { RouteGuard } from '../../src/components/RouteGuard';
 import { useApiQuery, useApiList } from '../../src/hooks/useApi';
@@ -57,6 +59,32 @@ function AIUsage() {
     void logs.refetch();
   };
 
+  // Breakdown of calls by model (falling back to provider) — computed client-side
+  // from the log list, since there is no dedicated aggregate endpoint. Top 6 by
+  // volume; the rest fold into "Other" so the bars stay readable.
+  const breakdown = useMemo(() => {
+    const byModel = new Map<string, number>();
+    for (const log of logs.items) {
+      const key = log.model ?? log.provider ?? 'Unknown';
+      byModel.set(key, (byModel.get(key) ?? 0) + 1);
+    }
+    const rows = [...byModel.entries()].sort((a, b) => b[1] - a[1]);
+    const top = rows.slice(0, 6);
+    const restTotal = rows.slice(6).reduce((s, [, v]) => s + v, 0);
+    if (restTotal > 0) top.push(['Other', restTotal]);
+    const total = rows.reduce((s, [, v]) => s + v, 0);
+    const palette = [
+      colors.accent,
+      colors.accent2,
+      colors.success,
+      colors.warn,
+      colors.danger,
+      colors.faint,
+      colors.ink2,
+    ];
+    return { rows: top, total, palette };
+  }, [logs.items, colors]);
+
   return (
     <ScreenScroll refreshing={refreshing} onRefresh={onRefresh}>
       <PageHeader title="AI usage" subtitle={summary.data?.period ?? 'This month'} />
@@ -71,11 +99,33 @@ function AIUsage() {
             label="Spend"
             value={`$${(summary.data?.total_cost_usd ?? 0).toFixed(2)}`}
             tone={(summary.data?.total_cost_usd ?? 0) > 50 ? 'warn' : 'default'}
+            accent={(summary.data?.total_cost_usd ?? 0) > 50 ? 'red' : 'amber'}
           />
-          <MetricTile label="Tokens" value={compactNumber(summary.data?.total_tokens ?? 0)} />
-          <MetricTile label="Requests" value={summary.data?.request_count ?? 0} />
+          <MetricTile
+            label="Tokens"
+            value={compactNumber(summary.data?.total_tokens ?? 0)}
+            accent="blue"
+          />
+          <MetricTile label="Requests" value={summary.data?.request_count ?? 0} accent="brand" />
         </View>
       )}
+
+      {breakdown.total > 0 ? (
+        <Card>
+          <SectionHeader title="Calls by model" subtitle={`${breakdown.total} logged`} />
+          <View style={{ gap: spacing.md }}>
+            {breakdown.rows.map(([label, value], i) => (
+              <BreakdownRow
+                key={label}
+                label={label}
+                value={value}
+                total={breakdown.total}
+                color={breakdown.palette[i % breakdown.palette.length] ?? colors.accent}
+              />
+            ))}
+          </View>
+        </Card>
+      ) : null}
 
       <Card padded={false}>
         <View style={{ padding: spacing.lg, paddingBottom: spacing.sm }}>

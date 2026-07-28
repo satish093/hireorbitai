@@ -6,8 +6,17 @@ import { Pill, INTERVIEW_STATUS_TONE } from '../../src/components/ui/Pill';
 import { SkeletonList, EmptyState } from '../../src/components/ui/States';
 import { RouteGuard } from '../../src/components/RouteGuard';
 import { useApiList } from '../../src/hooks/useApi';
-import { BUSINESS_ROLES, type Interview, type Reminder } from '../../src/types';
+import { BUSINESS_ROLES, type Interview } from '../../src/types';
 import { useTheme } from '../../src/theme';
+
+/** Reflects the real /reminders payload (public.reminders: due_at + description). */
+interface ReminderRow {
+  id: string;
+  title: string;
+  description?: string | null;
+  due_at: string;
+  status?: string | null;
+}
 
 /**
  * Calendar — agenda view.
@@ -49,7 +58,7 @@ function CalendarAgenda() {
   const [days, setDays] = useState<(typeof RANGES)[number]['key']>(7);
 
   const interviews = useApiList<Interview>('/interviews', { channel: 'interviews' });
-  const reminders = useApiList<Reminder>('/reminders', { channel: 'reminders' });
+  const reminders = useApiList<ReminderRow>('/reminders', { channel: 'reminders' });
 
   const loading = interviews.loading || reminders.loading;
   const refreshing = interviews.refreshing || reminders.refreshing;
@@ -79,14 +88,14 @@ function CalendarAgenda() {
     }
 
     for (const r of reminders.items) {
-      const at = new Date(r.remind_at);
+      const at = new Date(r.due_at);
       if (Number.isNaN(at.getTime())) continue;
       if (at < startOfDay(now) || at > horizon) continue;
       events.push({
         id: `rm-${r.id}`,
         at,
         title: r.title,
-        subtitle: r.body,
+        subtitle: r.description,
         kind: 'reminder',
         status: r.status,
       });

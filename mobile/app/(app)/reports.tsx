@@ -1,7 +1,9 @@
 import { useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { ScreenScroll, PageHeader, Banner } from '../../src/components/ui/Screen';
 import { Card, MetricTile, SectionHeader, DetailRow, Divider } from '../../src/components/ui/Card';
+import type { MetricAccent } from '../../src/components/ui/Card';
+import { Tabs } from '../../src/components/ui/Tabs';
 import { SkeletonMetricGrid, EmptyState } from '../../src/components/ui/States';
 import { RouteGuard } from '../../src/components/RouteGuard';
 import { useApiQuery } from '../../src/hooks/useApi';
@@ -43,7 +45,6 @@ const TABS = [
 ] as const;
 
 function Reports() {
-  const { colors, spacing, fontSize, radius } = useTheme();
   const [tab, setTab] = useState<(typeof TABS)[number]['key']>('manager-summary');
 
   const report = useApiQuery<Record<string, unknown>>(`/reports/${tab}`, { channel: 'reports' });
@@ -52,42 +53,11 @@ function Reports() {
     <ScreenScroll refreshing={report.refreshing} onRefresh={report.onRefresh}>
       <PageHeader title="Analytics" />
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: spacing.sm, paddingVertical: 2 }}
-      >
-        {TABS.map((t) => {
-          const active = t.key === tab;
-          return (
-            <Pressable
-              key={t.key}
-              onPress={() => setTab(t.key)}
-              accessibilityRole="button"
-              accessibilityState={{ selected: active }}
-              style={{
-                paddingHorizontal: spacing.md,
-                height: 44,
-                justifyContent: 'center',
-                borderRadius: radius.pill,
-                backgroundColor: active ? colors.ink : colors.surface,
-                borderWidth: 1,
-                borderColor: active ? colors.ink : colors.border,
-              }}
-            >
-              <Text
-                style={{
-                  color: active ? colors.bg : colors.ink2,
-                  fontSize: fontSize.sm,
-                  fontWeight: '600',
-                }}
-              >
-                {t.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
+      <Tabs
+        items={TABS.map((t) => ({ key: t.key, label: t.label }))}
+        value={tab}
+        onChange={(k) => setTab(k as (typeof TABS)[number]['key'])}
+      />
 
       {report.error ? <Banner tone="danger" message={report.error} /> : null}
 
@@ -143,8 +113,13 @@ function ReportBody({ data }: { data: Record<string, unknown> | undefined }) {
     <>
       {scalars.length > 0 ? (
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md }}>
-          {scalars.map(([key, value]) => (
-            <MetricTile key={key} label={humanise(key)} value={value === '' ? '—' : value} />
+          {scalars.map(([key, value], i) => (
+            <MetricTile
+              key={key}
+              label={humanise(key)}
+              value={value === '' ? '—' : value}
+              accent={ACCENTS[i % ACCENTS.length]}
+            />
           ))}
         </View>
       ) : null}
@@ -183,6 +158,9 @@ function ReportBody({ data }: { data: Record<string, unknown> | undefined }) {
     </>
   );
 }
+
+/** Accent cycle for the metric tiles — matches the web KpiCard accent rotation. */
+const ACCENTS: MetricAccent[] = ['brand', 'blue', 'green', 'amber'];
 
 /** snake_case → "Snake case". */
 function humanise(key: string): string {

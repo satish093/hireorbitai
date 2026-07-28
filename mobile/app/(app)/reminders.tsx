@@ -2,22 +2,28 @@ import { useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
 import { ListScreen, PageHeader, Banner } from '../../src/components/ui/Screen';
 import { Card } from '../../src/components/ui/Card';
-import { Pill } from '../../src/components/ui/Pill';
+import { Pill, type PillTone } from '../../src/components/ui/Pill';
+import { Tabs } from '../../src/components/ui/Tabs';
 import { Button } from '../../src/components/ui/Button';
 import { RouteGuard } from '../../src/components/RouteGuard';
 import { useApiList, useApiMutation } from '../../src/hooks/useApi';
-import { BUSINESS_ROLES, type Reminder } from '../../src/types';
+import { BUSINESS_ROLES } from '../../src/types';
 import { useTheme } from '../../src/theme';
+import { shortDate, timeOfDay } from '../../src/utils/format';
 
 /**
  * Reminders — GET /reminders, POST /reminders/:id/complete.
  *
  * Completion uses the dedicated /complete endpoint, not a general PATCH with a
  * status field, so the client never sends a status column into a row update.
+ * The endpoint stamps status='DONE' + completed_at server-side.
  *
  * Dispatch is a backend concern: reminders.job retries with exponential backoff
  * (1m → 16m, 5 attempts) before force-marking SENT. The app only reads state and
  * completes; it never tries to drive delivery.
+ *
+ * Field shape mirrors the API/DB exactly (public.reminders): `due_at`,
+ * `description`, and reminder_status ∈ {PENDING, SENT, DONE, SNOOZED}.
  */
 export default function RemindersScreen() {
   return (
@@ -27,11 +33,32 @@ export default function RemindersScreen() {
   );
 }
 
+/** Reflects the real /reminders payload (the shared Reminder type predates the API). */
+interface ReminderRow {
+  id: string;
+  title: string;
+  description?: string | null;
+  due_at: string;
+  status?: string | null;
+  completed_at?: string | null;
+}
+
+const STATUS_TONE: Record<string, PillTone> = {
+  PENDING: 'info',
+  SENT: 'accent',
+  DONE: 'success',
+  SNOOZED: 'warn',
+};
+
+const FILTERS = ['ALL', 'PENDING', 'SENT', 'DONE', 'SNOOZED'] as const;
+type Filter = (typeof FILTERS)[number];
+
 function RemindersList() {
   const { colors, spacing, fontSize } = useTheme();
   const [completingId, setCompletingId] = useState<string | null>(null);
+  const [filter, setFilter] = useState<Filter>('ALL');
 
-  const { items, loading, refreshing, error, onRefresh, refetch } = useApiList<Reminder>(
+  const { items, loading, refreshing, error, onRefresh, refetch } = useApiList<ReminderRow>(
     '/reminders',
     { channel: 'reminders' },
   );
@@ -45,12 +72,29 @@ function RemindersList() {
     void refetch();
   };
 
+  const counts = useMemo(() => {
+    const c: Record<Filter, number> = {
+      ALL: items.length,
+      PENDING: 0,
+      SENT: 0,
+      DONE: 0,
+      SNOOZED: 0,
+    };
+    for (const r of items) {
+      const s = (r.status ?? 'PENDING').toUpperCase();
+      if (s in c && s !== 'ALL') c[s as Filter] += 1;
+    }
+    return c;
+  }, [items]);
+
   // Soonest first — a reminder list is only useful in time order.
-  const sorted = useMemo(
-    () =>
-      [...items].sort((a, b) => new Date(a.remind_at).getTime() - new Date(b.remind_at).getTime()),
-    [items],
-  );
+  const sorted = useMemo(() => {
+    const base =
+      filter === 'ALL'
+        ? items
+        : items.filter((r) => (r.status ?? 'PENDING').toUpperCase() === filter);
+    return [...base].sort((a, b) => new Date(a.due_at).getTime() - new Date(b.due_at).getTime());
+  }, [items, filter]);
 
   return (
     <>
@@ -63,13 +107,28 @@ function RemindersList() {
         onRefresh={onRefresh}
         onRetry={() => void refetch()}
         keyExtractor={(r) => r.id}
-        header={complete.error ? <Banner tone="danger" message={complete.error} /> : undefined}
-        emptyTitle="No reminders"
+        header={
+          <View style={{ gap: spacing.md }}>
+            {complete.error ? <Banner tone="danger" message={complete.error} /> : null}
+            <Tabs
+              items={FILTERS.map((f) => ({
+                key: f,
+                label: f === 'ALL' ? 'All' : f.charAt(0) + f.slice(1).toLowerCase(),
+                count: counts[f],
+              }))}
+              value={filter}
+              onChange={(k) => setFilter(k as Filter)}
+            />
+          </View>
+        }
+        emptyTitle={filter === 'ALL' ? 'No reminders' : `Nothing ${filter.toLowerCase()}`}
         emptyDescription="Reminders you or your team set will appear here."
         renderItem={({ item }) => {
-          const when = new Date(item.remind_at);
-          const overdue = when.getTime() < Date.now() && item.status !== 'COMPLETED';
-          const done = item.status === 'COMPLETED';
+          const status = (item.status ?? 'PENDING').toUpperCase();
+          const when = new Date(item.due_at);
+          const done = status === 'DONE';
+          const overdue = !done && status !== 'SENT' && when.getTime() < Date.now();
+          const actionable = status !== 'DONE' && status !== 'SENT';
           return (
             <Card>
               <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md }}>
@@ -84,12 +143,12 @@ function RemindersList() {
                   >
                     {item.title}
                   </Text>
-                  {item.body ? (
+                  {item.description ? (
                     <Text
                       numberOfLines={3}
                       style={{ fontSize: fontSize.sm, color: colors.muted, marginTop: 2 }}
                     >
-                      {item.body}
+                      {item.description}
                     </Text>
                   ) : null}
                   <Text
@@ -99,24 +158,21 @@ function RemindersList() {
                       marginTop: 6,
                     }}
                   >
-                    {when.toLocaleString(undefined, {
-                      month: 'short',
-                      day: 'numeric',
-                      hour: 'numeric',
-                      minute: '2-digit',
-                    })}
+                    {shortDate(item.due_at)} · {timeOfDay(item.due_at)}
                   </Text>
                 </View>
-                {done ? (
-                  <Pill label="Done" tone="success" size="sm" />
-                ) : overdue ? (
+                {overdue ? (
                   <Pill label="Overdue" tone="danger" size="sm" />
-                ) : item.status ? (
-                  <Pill label={item.status} tone="info" size="sm" />
-                ) : null}
+                ) : (
+                  <Pill
+                    label={status.charAt(0) + status.slice(1).toLowerCase()}
+                    tone={STATUS_TONE[status] ?? 'neutral'}
+                    size="sm"
+                  />
+                )}
               </View>
 
-              {!done ? (
+              {actionable ? (
                 <View style={{ marginTop: spacing.md }}>
                   <Button
                     label="Mark done"

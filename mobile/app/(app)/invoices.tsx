@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { ListScreen, PageHeader } from '../../src/components/ui/Screen';
 import { Card, MetricTile } from '../../src/components/ui/Card';
 import { Pill, INVOICE_STATUS_TONE } from '../../src/components/ui/Pill';
+import { Tabs } from '../../src/components/ui/Tabs';
 import { RouteGuard } from '../../src/components/RouteGuard';
 import { useApiList } from '../../src/hooks/useApi';
 import { useScreenCaptureGuard } from '../../src/security/PrivacyScreen';
@@ -32,7 +33,7 @@ const FILTERS = ['ALL', 'DRAFT', 'SENT', 'PAID', 'OVERDUE'] as const;
 function InvoicesList() {
   useScreenCaptureGuard();
 
-  const { colors, spacing, fontSize, radius } = useTheme();
+  const { colors, spacing, fontSize } = useTheme();
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>('ALL');
 
   const { items, loading, refreshing, error, onRefresh, refetch } = useApiList<Invoice>(
@@ -40,11 +41,36 @@ function InvoicesList() {
     { channel: 'invoices' },
   );
 
+  const isOverdue = (i: Invoice) =>
+    (i.status ?? '').toUpperCase() !== 'PAID' &&
+    !!i.due_date &&
+    new Date(i.due_date).getTime() < Date.now();
+
   const filtered = useMemo(
     () =>
-      filter === 'ALL' ? items : items.filter((i) => (i.status ?? '').toUpperCase() === filter),
+      filter === 'ALL'
+        ? items
+        : filter === 'OVERDUE'
+          ? items.filter(isOverdue)
+          : items.filter((i) => (i.status ?? '').toUpperCase() === filter),
     [items, filter],
   );
+
+  const counts = useMemo(() => {
+    const c: Record<(typeof FILTERS)[number], number> = {
+      ALL: items.length,
+      DRAFT: 0,
+      SENT: 0,
+      PAID: 0,
+      OVERDUE: 0,
+    };
+    for (const i of items) {
+      const s = (i.status ?? 'DRAFT').toUpperCase();
+      if (s === 'DRAFT' || s === 'SENT' || s === 'PAID') c[s] += 1;
+      if (isOverdue(i)) c.OVERDUE += 1;
+    }
+    return c;
+  }, [items]);
 
   const totals = useMemo(() => {
     let outstanding = 0;
@@ -72,45 +98,28 @@ function InvoicesList() {
         header={
           <View style={{ gap: spacing.md }}>
             <View style={{ flexDirection: 'row', gap: spacing.md }}>
-              <MetricTile label="Outstanding" value={money(totals.outstanding)} tone="warn" />
-              <MetricTile label="Collected" value={money(totals.paid)} tone="success" />
+              <MetricTile
+                label="Outstanding"
+                value={money(totals.outstanding)}
+                tone="warn"
+                accent="amber"
+              />
+              <MetricTile
+                label="Collected"
+                value={money(totals.paid)}
+                tone="success"
+                accent="green"
+              />
             </View>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ gap: spacing.sm, paddingVertical: 2 }}
-            >
-              {FILTERS.map((f) => {
-                const active = f === filter;
-                return (
-                  <Pressable
-                    key={f}
-                    onPress={() => setFilter(f)}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: active }}
-                    style={{
-                      paddingHorizontal: spacing.md,
-                      height: 44,
-                      justifyContent: 'center',
-                      borderRadius: radius.pill,
-                      backgroundColor: active ? colors.ink : colors.surface,
-                      borderWidth: 1,
-                      borderColor: active ? colors.ink : colors.border,
-                    }}
-                  >
-                    <Text
-                      style={{
-                        color: active ? colors.bg : colors.ink2,
-                        fontSize: fontSize.sm,
-                        fontWeight: '600',
-                      }}
-                    >
-                      {f === 'ALL' ? 'All' : f.charAt(0) + f.slice(1).toLowerCase()}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
+            <Tabs
+              items={FILTERS.map((f) => ({
+                key: f,
+                label: f === 'ALL' ? 'All' : f.charAt(0) + f.slice(1).toLowerCase(),
+                count: counts[f],
+              }))}
+              value={filter}
+              onChange={(k) => setFilter(k as (typeof FILTERS)[number])}
+            />
           </View>
         }
         emptyTitle={filter === 'ALL' ? 'No invoices' : `Nothing ${filter.toLowerCase()}`}

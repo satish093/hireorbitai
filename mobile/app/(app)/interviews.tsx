@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { ListScreen, PageHeader } from '../../src/components/ui/Screen';
 import { Card } from '../../src/components/ui/Card';
 import { Pill, INTERVIEW_STATUS_TONE } from '../../src/components/ui/Pill';
+import { Tabs } from '../../src/components/ui/Tabs';
 import { RouteGuard } from '../../src/components/RouteGuard';
 import { useApiList } from '../../src/hooks/useApi';
 import { BUSINESS_ROLES, type Interview, type InterviewStatus } from '../../src/types';
@@ -35,7 +36,7 @@ const FILTERS: ('UPCOMING' | 'ALL' | InterviewStatus)[] = [
 ];
 
 function InterviewsList() {
-  const { colors, spacing, fontSize, radius } = useTheme();
+  const { colors, spacing, fontSize } = useTheme();
   const [filter, setFilter] = useState<'UPCOMING' | 'ALL' | InterviewStatus>('UPCOMING');
 
   const { items, loading, refreshing, error, onRefresh, refetch } = useApiList<Interview>(
@@ -43,14 +44,15 @@ function InterviewsList() {
     { channel: 'interviews' },
   );
 
+  const isUpcoming = (i: Interview) =>
+    i.status === 'SCHEDULED' &&
+    !!i.scheduled_at &&
+    new Date(i.scheduled_at).getTime() >= Date.now();
+
   const filtered = useMemo(() => {
-    const now = Date.now();
     let list = items;
     if (filter === 'UPCOMING') {
-      list = items.filter(
-        (i) =>
-          i.status === 'SCHEDULED' && i.scheduled_at && new Date(i.scheduled_at).getTime() >= now,
-      );
+      list = items.filter(isUpcoming);
     } else if (filter !== 'ALL') {
       list = items.filter((i) => i.status === filter);
     }
@@ -60,6 +62,32 @@ function InterviewsList() {
       return at - bt;
     });
   }, [items, filter]);
+
+  const counts = useMemo(() => {
+    const c = {
+      UPCOMING: 0,
+      ALL: items.length,
+      SCHEDULED: 0,
+      COMPLETED: 0,
+      CANCELLED: 0,
+      NO_SHOW: 0,
+    };
+    for (const i of items) {
+      if (i.status === 'SCHEDULED') c.SCHEDULED += 1;
+      else if (i.status === 'COMPLETED') c.COMPLETED += 1;
+      else if (i.status === 'CANCELLED') c.CANCELLED += 1;
+      else if (i.status === 'NO_SHOW') c.NO_SHOW += 1;
+      if (isUpcoming(i)) c.UPCOMING += 1;
+    }
+    return c;
+  }, [items]);
+
+  const tabLabel = (f: (typeof FILTERS)[number]) =>
+    f === 'ALL'
+      ? 'All'
+      : f === 'UPCOMING'
+        ? 'Upcoming'
+        : f.charAt(0) + f.slice(1).toLowerCase().replace('_', ' ');
 
   return (
     <>
@@ -73,46 +101,11 @@ function InterviewsList() {
         onRetry={() => void refetch()}
         keyExtractor={(i) => i.id}
         header={
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ gap: spacing.sm, paddingVertical: 2 }}
-          >
-            {FILTERS.map((f) => {
-              const active = f === filter;
-              return (
-                <Pressable
-                  key={f}
-                  onPress={() => setFilter(f)}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: active }}
-                  style={{
-                    paddingHorizontal: spacing.md,
-                    height: 44,
-                    justifyContent: 'center',
-                    borderRadius: radius.pill,
-                    backgroundColor: active ? colors.ink : colors.surface,
-                    borderWidth: 1,
-                    borderColor: active ? colors.ink : colors.border,
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: active ? colors.bg : colors.ink2,
-                      fontSize: fontSize.sm,
-                      fontWeight: '600',
-                    }}
-                  >
-                    {f === 'ALL'
-                      ? 'All'
-                      : f === 'UPCOMING'
-                        ? 'Upcoming'
-                        : f.charAt(0) + f.slice(1).toLowerCase().replace('_', ' ')}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
+          <Tabs
+            items={FILTERS.map((f) => ({ key: f, label: tabLabel(f), count: counts[f] }))}
+            value={filter}
+            onChange={(k) => setFilter(k as 'UPCOMING' | 'ALL' | InterviewStatus)}
+          />
         }
         emptyTitle={filter === 'UPCOMING' ? 'Nothing scheduled' : 'No interviews'}
         emptyDescription="Interviews booked for your consultants appear here."
