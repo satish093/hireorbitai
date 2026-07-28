@@ -12,6 +12,15 @@ import { onAuthFailure, startResumeRefresh } from '../src/services/api';
 import { AppLockProvider } from '../src/security/AppLock';
 import { PrivacyCover } from '../src/security/PrivacyScreen';
 import { ErrorBoundary } from '../src/components/ErrorBoundary';
+import {
+  useFonts,
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+  Inter_700Bold,
+  Inter_800ExtraBold,
+} from '@expo-google-fonts/inter';
+import { applyInterFont } from '../src/theme/fonts';
 
 // Hold the native splash until the encrypted session read finishes. Without
 // this the app flashes the login screen for a frame before restoring a valid
@@ -20,6 +29,17 @@ void SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function RootLayout() {
   const [ready, setReady] = useState(false);
+
+  // Load Inter (the website's typeface) so the whole app matches it. Applied
+  // globally via applyInterFont() once the files are in memory.
+  const [fontsLoaded] = useFonts({
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
+    Inter_800ExtraBold,
+  });
+  if (fontsLoaded) applyInterFont();
 
   useEffect(() => {
     let cancelled = false;
@@ -35,11 +55,12 @@ export default function RootLayout() {
   }, []);
 
   const onLayout = useCallback(() => {
-    if (ready) void SplashScreen.hideAsync().catch(() => {});
-  }, [ready]);
+    if (ready && fontsLoaded) void SplashScreen.hideAsync().catch(() => {});
+  }, [ready, fontsLoaded]);
 
-  // Keep the native splash up rather than rendering an empty frame.
-  if (!ready) return null;
+  // Keep the native splash up until the session AND the fonts are ready, so the
+  // first frame is already Inter rather than a flash of the system font.
+  if (!ready || !fontsLoaded) return null;
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }} onLayout={onLayout}>
