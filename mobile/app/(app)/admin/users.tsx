@@ -6,23 +6,22 @@ import { Card } from '../../../src/components/ui/Card';
 import { Pill } from '../../../src/components/ui/Pill';
 import { Avatar } from '../../../src/components/ui/Avatar';
 import { SearchInput } from '../../../src/components/ui/Inputs';
+import { Tabs } from '../../../src/components/ui/Tabs';
 import { RouteGuard } from '../../../src/components/RouteGuard';
-import { useApiList } from '../../../src/hooks/useApi';
+import { useApiQuery } from '../../../src/hooks/useApi';
 import { useAuth } from '../../../src/context/AuthContext';
 import { ADMIN_TIER, ROLE_LABEL, outranks, type Role, type UserProfile } from '../../../src/types';
 import { useTheme } from '../../../src/theme';
 
 /**
- * User management — GET /admin/users.
+ * User management — GET /admin/users (paginated) + GET /admin/users/kpi (counts).
  *
  * ADMIN_TIER, or a DEVELOPER holding the `users` capability.
  *
- * Read-only on mobile, deliberately. The web's lifecycle actions (deactivate,
- * suspend, ban, delete, force password change, impersonate) are irreversible or
- * near-irreversible, and they are gated server-side by BOTH assertOutranks() and
- * assertNotLastSuperAdmin(). A mis-tap on a phone is a very different risk from
- * a deliberate click on a desktop admin console, so this screen surfaces state
- * and defers the destructive verbs to the web.
+ * Row lifecycle actions (deactivate, reset, force-password-change) live on the
+ * detail screen, gated by rank the same way the web console gates them. The
+ * list itself surfaces state and the segment the web's UserSegments ribbon
+ * uses, and taps through to /(app)/admin/user/[id].
  *
  * The rank badge makes the boundary visible: a row you do not outrank is one you
  * could not act on anyway — the server would refuse.
@@ -44,38 +43,70 @@ interface AdminUserRow extends Partial<UserProfile> {
   last_login_at?: string | null;
 }
 
+// GET /admin/users returns a paginated envelope, NOT a bare array — useApiList
+// (which only unwraps `data`/`items`) would silently yield []. Fetch the
+// envelope directly and pull `.rows` / `.total`.
+interface AdminUsersResponse {
+  rows: AdminUserRow[];
+  total?: number;
+}
+
+interface UsersKpi {
+  total?: number;
+  recruiters?: number;
+  consultants?: number;
+  managers?: number;
+  pending?: number;
+  locked?: number;
+}
+
 const STATUS_TONE: Record<string, 'success' | 'warn' | 'danger' | 'neutral'> = {
   active: 'success',
   suspended: 'warn',
   deactivated: 'neutral',
+  inactive: 'neutral',
   banned: 'danger',
 };
+
+// Server-side segments (adminUsers.controller `SEGMENTS`). Only the subset the
+// web's UserSegments ribbon leads with.
+type Segment = 'all' | 'recruiters' | 'consultants' | 'managers' | 'pending' | 'locked';
 
 function AdminUsersList() {
   const { profile } = useAuth();
   const router = useRouter();
   const { colors, spacing, fontSize } = useTheme();
   const [query, setQuery] = useState('');
+  const [segment, setSegment] = useState<Segment>('all');
 
-  const { items, loading, refreshing, error, onRefresh, refetch } = useApiList<AdminUserRow>(
+  const params = useMemo(() => (segment === 'all' ? undefined : { segment }), [segment]);
+
+  const { data, loading, refreshing, error, onRefresh, refetch } = useApiQuery<AdminUsersResponse>(
     '/admin/users',
-    { channel: 'users' },
+    { channel: 'users', params },
   );
+  const kpi = useApiQuery<UsersKpi>('/admin/users/kpi', { channel: 'users' });
 
+  const rows = data?.rows ?? [];
+  const total = data?.total ?? rows.length;
+  const k = kpi.data;
+
+  // Search filters the current page client-side (server pagination is out of
+  // scope for the mobile view — the segment already narrows the set server-side).
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter(
+    if (!q) return rows;
+    return rows.filter(
       (u) =>
         u.full_name?.toLowerCase().includes(q) ||
         u.email?.toLowerCase().includes(q) ||
         u.role?.toLowerCase().includes(q),
     );
-  }, [items, query]);
+  }, [rows, query]);
 
   return (
     <>
-      <PageHeader title="Users" subtitle={`${items.length} accounts`} />
+      <PageHeader title="Users" subtitle={`${total} accounts`} />
       <ListScreen
         items={filtered}
         loading={loading}
@@ -89,11 +120,23 @@ function AdminUsersList() {
             <SearchInput
               value={query}
               onChangeText={setQuery}
-              placeholder="Search name, email or role"
+              placeholder="Search this page by name, email or role"
+            />
+            <Tabs
+              value={segment}
+              onChange={(s) => setSegment(s as Segment)}
+              items={[
+                { key: 'all', label: 'All', count: k?.total },
+                { key: 'recruiters', label: 'Recruiters', count: k?.recruiters },
+                { key: 'consultants', label: 'Consultants', count: k?.consultants },
+                { key: 'managers', label: 'Managers', count: k?.managers },
+                { key: 'pending', label: 'Pending', count: k?.pending },
+                { key: 'locked', label: 'Locked', count: k?.locked },
+              ]}
             />
             <Banner
               tone="info"
-              message="Account actions (deactivate, reset, delete) are on the web console — they're irreversible and deliberately not one tap away here."
+              message="Tap a user to open their profile, where lifecycle actions live. Rank guards apply — you can only act on accounts you outrank."
             />
           </View>
         }

@@ -6,7 +6,8 @@ import { RouteGuard } from '../../../src/components/RouteGuard';
 import { useApiList } from '../../../src/hooks/useApi';
 import { invalidate } from '../../../src/hooks/useInvalidate';
 import { api, apiErrorMessage } from '../../../src/services/api';
-import { ADMIN_TIER } from '../../../src/types';
+import { useAuth } from '../../../src/context/AuthContext';
+import { ADMIN_TIER, OWNER_TIER } from '../../../src/types';
 import { useTheme } from '../../../src/theme';
 
 interface FlagRow {
@@ -39,8 +40,16 @@ export default function FeatureFlagsScreen() {
 
 function FeatureFlagsList() {
   const { colors, spacing, fontSize } = useTheme();
+  const { profile } = useAuth();
   const [pendingKey, setPendingKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // WRITES are OWNER_TIER only (SUPER_ADMIN + CEO). CTO / DIRECTOR and a
+  // DEVELOPER with the `feature_flags` capability can READ the list but the
+  // backend rejects PATCH regardless — so the switch is read-only for them,
+  // mirroring the web's `canWrite` gate. Showing an interactive toggle they
+  // can't use would just 403 on tap.
+  const canWrite = !!profile && (OWNER_TIER as readonly string[]).includes(profile.role);
 
   const flags = useApiList<FlagRow>('/feature-flags', { channel: 'feature-flags' });
 
@@ -80,10 +89,17 @@ function FeatureFlagsList() {
         header={
           <View style={{ gap: spacing.md }}>
             {error ? <Banner tone="danger" message={error} /> : null}
-            <Banner
-              tone="warn"
-              message="Turning a flag off hides that module for every user it applies to, immediately."
-            />
+            {canWrite ? (
+              <Banner
+                tone="warn"
+                message="Turning a flag off hides that module for every user it applies to, immediately."
+              />
+            ) : (
+              <Banner
+                tone="info"
+                message="Read-only view. Only Super Admin and CEO can flip feature flags."
+              />
+            )}
           </View>
         }
         emptyTitle="No feature flags"
@@ -109,7 +125,7 @@ function FeatureFlagsList() {
               </View>
               <Switch
                 value={item.enabled}
-                disabled={pendingKey === item.key}
+                disabled={!canWrite || pendingKey === item.key}
                 onValueChange={(next) => void toggle(item, next)}
                 trackColor={{ true: colors.accent, false: colors.borderStrong }}
               />

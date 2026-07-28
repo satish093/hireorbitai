@@ -1,13 +1,18 @@
+import { useState } from 'react';
 import { Text, View } from 'react-native';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { ScreenScroll, Banner } from '../../../../src/components/ui/Screen';
 import { Card, SectionHeader, DetailRow, Divider } from '../../../../src/components/ui/Card';
 import { Pill } from '../../../../src/components/ui/Pill';
 import { Avatar } from '../../../../src/components/ui/Avatar';
+import { Button } from '../../../../src/components/ui/Button';
+import { ConfirmSheet } from '../../../../src/components/ui/Sheet';
 import { SkeletonCard, ErrorState, EmptyState } from '../../../../src/components/ui/States';
 import { RouteGuard } from '../../../../src/components/RouteGuard';
 import { useApiQuery, useApiList } from '../../../../src/hooks/useApi';
 import { useAuth } from '../../../../src/context/AuthContext';
+import { invalidate } from '../../../../src/hooks/useInvalidate';
+import { api, apiErrorMessage } from '../../../../src/services/api';
 import {
   ADMIN_TIER,
   ROLE_LABEL,
@@ -17,7 +22,17 @@ import {
   type UserProfile,
 } from '../../../../src/types';
 import { useTheme } from '../../../../src/theme';
-import { relativeDate } from '../../jobs';
+import { relativeDate } from '../../../../src/utils/format';
+
+/** One confirmable lifecycle action against the target account. */
+interface AccountAction {
+  key: string;
+  title: string;
+  message: string;
+  confirmLabel: string;
+  destructive?: boolean;
+  run: () => Promise<unknown>;
+}
 
 interface AdminUserDetail extends Partial<UserProfile> {
   id: string;
@@ -53,6 +68,10 @@ function AdminUserDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { profile } = useAuth();
   const { colors, spacing, fontSize } = useTheme();
+  const [action, setAction] = useState<AccountAction | null>(null);
+  const [pending, setPending] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [actionNote, setActionNote] = useState<string | null>(null);
 
   const user = useApiQuery<AdminUserDetail>(id ? `/admin/users/${id}` : null, {
     channel: 'users',
@@ -66,6 +85,64 @@ function AdminUserDetail() {
 
   const u = user.data;
   const canAct = profile && u ? outranks(profile.role, u.role) : false;
+  const isSelf = !!profile && !!u && profile.id === u.id;
+  const status = (u?.status ?? 'active').toLowerCase();
+  const isActive = status === 'active';
+  // Every action below hits a verified admin route gated by ADMIN_TIER +
+  // assertOutranks server-side; we additionally hide them unless the caller
+  // outranks the target and isn't acting on themselves (the server refuses
+  // self status-change / force-password-change with a 400).
+  const canManage = !!id && canAct && !isSelf;
+
+  const runAction = async (a: AccountAction) => {
+    setPending(true);
+    setActionError(null);
+    try {
+      await a.run();
+      setAction(null);
+      setActionNote(a.confirmLabel + ' — done.');
+      invalidate('users');
+      await Promise.all([user.refetch(), audit.refetch()]);
+    } catch (err) {
+      setActionError(apiErrorMessage(err, 'That action could not be completed.'));
+    } finally {
+      setPending(false);
+    }
+  };
+
+  const deactivateAction: AccountAction = {
+    key: 'deactivate',
+    title: 'Deactivate account?',
+    message:
+      'They will be signed out of every device and blocked from signing in until reactivated. Their history and relationships are preserved.',
+    confirmLabel: 'Deactivate',
+    destructive: true,
+    run: () => api.patch(`/admin/users/${id}/status`, { status: 'inactive' }),
+  };
+  const reactivateAction: AccountAction = {
+    key: 'reactivate',
+    title: 'Reactivate account?',
+    message: 'This re-enables the account and lets them sign in again.',
+    confirmLabel: 'Reactivate',
+    run: () => api.patch(`/admin/users/${id}/status`, { status: 'active' }),
+  };
+  const resetAction: AccountAction = {
+    key: 'reset',
+    title: 'Send password reset?',
+    message:
+      'Emails a fresh reset link (15-minute expiry) to this user, the same flow as forgot-password.',
+    confirmLabel: 'Send reset email',
+    run: () => api.post(`/admin/users/${id}/send-password-reset`),
+  };
+  const forceChangeAction: AccountAction = {
+    key: 'force',
+    title: 'Force password change?',
+    message:
+      'They will be signed out everywhere and required to set a new password on their next sign-in.',
+    confirmLabel: 'Force change',
+    destructive: true,
+    run: () => api.post(`/admin/users/${id}/force-password-change`),
+  };
 
   return (
     <>
@@ -109,6 +186,54 @@ function AdminUserDetail() {
                 </View>
               ) : null}
             </Card>
+
+            {canManage ? (
+              <Card>
+                <SectionHeader
+                  title="Account actions"
+                  subtitle="Rank-guarded and audited. Reversible except where noted."
+                />
+                {actionError ? <Banner tone="danger" message={actionError} /> : null}
+                {actionNote ? <Banner tone="success" message={actionNote} /> : null}
+                <View style={{ gap: spacing.sm, marginTop: spacing.sm }}>
+                  {isActive ? (
+                    <Button
+                      label="Deactivate account"
+                      variant="danger-ghost"
+                      onPress={() => {
+                        setActionNote(null);
+                        setAction(deactivateAction);
+                      }}
+                    />
+                  ) : (
+                    <Button
+                      label="Reactivate account"
+                      variant="secondary"
+                      onPress={() => {
+                        setActionNote(null);
+                        setAction(reactivateAction);
+                      }}
+                    />
+                  )}
+                  <Button
+                    label="Send password reset email"
+                    variant="secondary"
+                    onPress={() => {
+                      setActionNote(null);
+                      setAction(resetAction);
+                    }}
+                  />
+                  <Button
+                    label="Force password change"
+                    variant="danger-ghost"
+                    onPress={() => {
+                      setActionNote(null);
+                      setAction(forceChangeAction);
+                    }}
+                  />
+                </View>
+              </Card>
+            ) : null}
 
             <Card>
               <SectionHeader title="Account" />
@@ -180,6 +305,17 @@ function AdminUserDetail() {
           </>
         )}
       </ScreenScroll>
+
+      <ConfirmSheet
+        open={!!action}
+        onClose={() => setAction(null)}
+        onConfirm={() => action && void runAction(action)}
+        title={action?.title ?? ''}
+        message={action?.message}
+        confirmLabel={action?.confirmLabel}
+        destructive={action?.destructive}
+        pending={pending}
+      />
     </>
   );
 }
