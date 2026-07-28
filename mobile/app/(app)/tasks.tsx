@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ListScreen, PageHeader } from '../../src/components/ui/Screen';
 import { Card } from '../../src/components/ui/Card';
+import { Tabs, type TabItem } from '../../src/components/ui/Tabs';
 import { Pill, TASK_STATUS_TONE, TASK_PRIORITY_TONE } from '../../src/components/ui/Pill';
 import { Avatar } from '../../src/components/ui/Avatar';
 import { RouteGuard } from '../../src/components/RouteGuard';
@@ -43,7 +44,7 @@ const DONE_STATUSES: TaskStatus[] = ['COMPLETED', 'CANCELLED'];
 
 function TaskList() {
   const router = useRouter();
-  const { colors, spacing, fontSize, radius } = useTheme();
+  const { colors, spacing, fontSize } = useTheme();
   const [filter, setFilter] = useState<TaskStatus | 'ALL' | 'OPEN'>('OPEN');
 
   const { items, loading, refreshing, error, onRefresh, refetch } = useApiList<Task>('/tasks', {
@@ -56,6 +57,19 @@ function TaskList() {
     return items.filter((t) => t.status === filter);
   }, [items, filter]);
 
+  const counts = useMemo(() => {
+    const open = items.filter((t) => !DONE_STATUSES.includes(t.status)).length;
+    const map: Record<string, number> = { ALL: items.length, OPEN: open };
+    for (const t of items) map[t.status] = (map[t.status] ?? 0) + 1;
+    return map;
+  }, [items]);
+
+  const tabs: TabItem[] = STATUS_FILTERS.map((s) => ({
+    key: s,
+    label: s === 'ALL' ? 'All' : s === 'OPEN' ? 'Open' : (TASK_STATUS_LABEL[s as TaskStatus] ?? s),
+    count: counts[s] ?? 0,
+  }));
+
   return (
     <>
       <PageHeader title="Tasks" subtitle={`${items.length} total`} />
@@ -67,50 +81,7 @@ function TaskList() {
         onRefresh={onRefresh}
         onRetry={() => void refetch()}
         keyExtractor={(t) => t.id}
-        header={
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ gap: spacing.sm, paddingVertical: 2 }}
-          >
-            {STATUS_FILTERS.map((s) => {
-              const active = s === filter;
-              const label =
-                s === 'ALL'
-                  ? 'All'
-                  : s === 'OPEN'
-                    ? 'Open'
-                    : (TASK_STATUS_LABEL[s as TaskStatus] ?? s);
-              return (
-                <Pressable
-                  key={s}
-                  onPress={() => setFilter(s)}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: active }}
-                  style={{
-                    paddingHorizontal: spacing.md,
-                    height: 44,
-                    justifyContent: 'center',
-                    borderRadius: radius.pill,
-                    backgroundColor: active ? colors.ink : colors.surface,
-                    borderWidth: 1,
-                    borderColor: active ? colors.ink : colors.border,
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: active ? colors.bg : colors.ink2,
-                      fontSize: fontSize.sm,
-                      fontWeight: '600',
-                    }}
-                  >
-                    {label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-        }
+        header={<Tabs items={tabs} value={filter} onChange={(k) => setFilter(k as never)} />}
         emptyTitle={filter === 'OPEN' ? 'Nothing open' : 'No tasks'}
         emptyDescription="Tasks assigned to you or your team will show up here."
         renderItem={({ item }) => {

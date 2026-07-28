@@ -2,13 +2,57 @@ import { useMemo } from 'react';
 import { Text, View } from 'react-native';
 import { ScreenScroll, PageHeader, Banner } from '../../src/components/ui/Screen';
 import { Card, MetricTile, SectionHeader, Divider } from '../../src/components/ui/Card';
-import { Pill, APPLICATION_STATUS_TONE } from '../../src/components/ui/Pill';
+import {
+  Pill,
+  pillToneColor,
+  APPLICATION_STATUS_TONE,
+  TASK_STATUS_TONE,
+  TASK_PRIORITY_TONE,
+} from '../../src/components/ui/Pill';
+import { StackedBar, LegendRow, BreakdownRow, type Segment } from '../../src/components/ui/Charts';
 import { Button } from '../../src/components/ui/Button';
 import { EmptyState, SkeletonMetricGrid, SkeletonList } from '../../src/components/ui/States';
-import { useApiList } from '../../src/hooks/useApi';
+import { useApiList, useApiQuery } from '../../src/hooks/useApi';
 import { useAuth } from '../../src/context/AuthContext';
-import { MANAGER_TIER, type Application, type Consultant, type Interview } from '../../src/types';
+import {
+  MANAGER_TIER,
+  TASK_STATUSES,
+  TASK_PRIORITIES,
+  TASK_STATUS_LABEL,
+  type Application,
+  type Consultant,
+  type Interview,
+} from '../../src/types';
 import { useTheme } from '../../src/theme';
+
+/** Task metrics payload from /tasks/metrics (mirror of the web ManagerDashboard). */
+interface TaskMetrics {
+  total: number;
+  open: number;
+  critical_open: number;
+  by_status: Record<string, number>;
+  by_priority: Record<string, number>;
+  overdue: number;
+  due_today: number;
+  due_this_week: number;
+  completed_last_7_days: number;
+}
+
+const PRIORITY_LABEL: Record<string, string> = {
+  LOW: 'Low',
+  MEDIUM: 'Medium',
+  HIGH: 'High',
+  CRITICAL: 'Critical',
+};
+
+/** "Monday, 28 Jul" — the date line the web dashboards show under the greeting. */
+function todayLine(): string {
+  return new Date().toLocaleDateString(undefined, {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'short',
+  });
+}
 
 /**
  * Dashboard — one route, three role variants.
@@ -47,12 +91,17 @@ function ManagerDashboard() {
   const { profile } = useAuth();
   const consultants = useApiList<Consultant>('/consultants', { channel: 'consultants' });
   const applications = useApiList<Application>('/applications', { channel: 'applications' });
+  // /tasks/metrics can 403 when the tasks module is off for this account; treat
+  // any error as "no task section" rather than blocking the dashboard.
+  const taskMetrics = useApiQuery<TaskMetrics>('/tasks/metrics', { channel: 'tasks' });
+  const tasks = taskMetrics.error ? undefined : taskMetrics.data;
 
   const loading = consultants.loading || applications.loading;
-  const refreshing = consultants.refreshing || applications.refreshing;
+  const refreshing = consultants.refreshing || applications.refreshing || taskMetrics.refreshing;
   const onRefresh = () => {
     void consultants.refetch();
     void applications.refetch();
+    void taskMetrics.refetch();
   };
 
   const stats = useMemo(() => {
@@ -65,22 +114,33 @@ function ManagerDashboard() {
 
   return (
     <ScreenScroll refreshing={refreshing} onRefresh={onRefresh}>
-      <PageHeader title={greeting(profile?.full_name)} subtitle="Team overview" />
+      <PageHeader title={greeting(profile?.full_name)} subtitle={todayLine()} />
 
       {consultants.error && consultants.items.length === 0 ? (
         <Banner tone="danger" message={consultants.error} />
+      ) : null}
+
+      {tasks && tasks.critical_open > 0 ? (
+        <Banner
+          tone="danger"
+          message={`${tasks.critical_open} critical task${tasks.critical_open > 1 ? 's' : ''} need${
+            tasks.critical_open === 1 ? 's' : ''
+          } attention${tasks.overdue > 0 ? ` · ${tasks.overdue} overdue` : ''}`}
+        />
       ) : null}
 
       {loading ? (
         <SkeletonMetricGrid count={4} />
       ) : (
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
-          <MetricTile label="Active bench" value={stats.active} />
-          <MetricTile label="Placed" value={stats.placed} tone="success" />
-          <MetricTile label="Interviewing" value={stats.interviewing} />
-          <MetricTile label="Offers" value={stats.offers} tone="success" />
+          <MetricTile label="Active bench" value={stats.active} accent="brand" />
+          <MetricTile label="Placed" value={stats.placed} accent="green" tone="success" />
+          <MetricTile label="Interviewing" value={stats.interviewing} accent="blue" />
+          <MetricTile label="Offers" value={stats.offers} accent="green" tone="success" />
         </View>
       )}
+
+      <TaskOverview tasks={tasks} loading={taskMetrics.loading} />
 
       <RecentApplications
         items={applications.items}
@@ -97,6 +157,56 @@ function ManagerDashboard() {
         </View>
       </Card>
     </ScreenScroll>
+  );
+}
+
+/**
+ * Tasks-by-status stacked bar + by-priority breakdown — the mobile port of the
+ * web ManagerDashboard's task widgets. Hidden entirely when /tasks/metrics is
+ * unavailable or there are no tasks, matching the web's null-safe behaviour.
+ */
+function TaskOverview({ tasks, loading }: { tasks?: TaskMetrics; loading?: boolean }) {
+  const { colors } = useTheme();
+
+  if (loading && !tasks) return null;
+  if (!tasks || tasks.total === 0) return null;
+
+  const statusSegments: Segment[] = TASK_STATUSES.map((s) => ({
+    key: s,
+    value: tasks.by_status[s] ?? 0,
+    label: TASK_STATUS_LABEL[s] ?? s,
+    color: pillToneColor(TASK_STATUS_TONE[s] ?? 'neutral', colors),
+  })).filter((seg) => seg.value > 0);
+
+  const priorityTotal = TASK_PRIORITIES.reduce((sum, p) => sum + (tasks.by_priority[p] ?? 0), 0);
+
+  return (
+    <Card>
+      <SectionHeader
+        title="Tasks by status"
+        subtitle={`${tasks.open} open · ${tasks.total} total`}
+      />
+      <StackedBar segments={statusSegments} />
+      <LegendRow segments={statusSegments} />
+
+      <View style={{ height: 1, backgroundColor: colors.border, marginVertical: 16 }} />
+
+      <SectionHeader title="By priority" />
+      <View style={{ gap: 10 }}>
+        {TASK_PRIORITIES.map((p) => (
+          <BreakdownRow
+            key={p}
+            label={PRIORITY_LABEL[p] ?? p}
+            value={tasks.by_priority[p] ?? 0}
+            total={priorityTotal}
+            color={pillToneColor(
+              p === 'CRITICAL' ? 'danger' : (TASK_PRIORITY_TONE[p] ?? 'neutral'),
+              colors,
+            )}
+          />
+        ))}
+      </View>
+    </Card>
   );
 }
 
@@ -124,17 +234,18 @@ function RecruiterDashboard() {
 
   return (
     <ScreenScroll refreshing={refreshing} onRefresh={onRefresh}>
-      <PageHeader title={greeting(profile?.full_name)} subtitle="Your pipeline" />
+      <PageHeader title={greeting(profile?.full_name)} subtitle={todayLine()} />
 
       {consultants.loading ? (
         <SkeletonMetricGrid count={3} />
       ) : (
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
-          <MetricTile label="My consultants" value={consultants.items.length} />
-          <MetricTile label="Submitted (7d)" value={submittedThisWeek} />
+          <MetricTile label="My consultants" value={consultants.items.length} accent="brand" />
+          <MetricTile label="Submitted (7d)" value={submittedThisWeek} accent="blue" />
           <MetricTile
             label="Interviewing"
             value={applications.items.filter((a) => a.status === 'INTERVIEW').length}
+            accent="green"
           />
         </View>
       )}
@@ -190,20 +301,22 @@ function ConsultantDashboard() {
 
   return (
     <ScreenScroll refreshing={refreshing} onRefresh={onRefresh}>
-      <PageHeader title={greeting(profile?.full_name)} subtitle="Your search at a glance" />
+      <PageHeader title={greeting(profile?.full_name)} subtitle={todayLine()} />
 
       {applications.loading ? (
         <SkeletonMetricGrid count={3} />
       ) : (
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
-          <MetricTile label="Submissions" value={applications.items.length} />
+          <MetricTile label="Submissions" value={applications.items.length} accent="brand" />
           <MetricTile
             label="Interviews"
             value={applications.items.filter((a) => a.status === 'INTERVIEW').length}
+            accent="blue"
           />
           <MetricTile
             label="Offers"
             value={applications.items.filter((a) => a.status === 'OFFER').length}
+            accent="green"
             tone="success"
           />
         </View>

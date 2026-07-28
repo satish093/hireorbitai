@@ -40,6 +40,14 @@ function toneColors(tone: PillTone, c: Palette): { bg: string; fg: string; borde
   }
 }
 
+/**
+ * Solid colour for a tone — used by the chart primitives (StackedBar segments,
+ * BreakdownRow bars) so a status keeps the same colour in a badge and in a chart.
+ */
+export function pillToneColor(tone: PillTone, c: Palette): string {
+  return toneColors(tone, c).fg;
+}
+
 export function Pill({ label, tone = 'neutral', dot, size = 'md' }: Props) {
   const { colors, radius, fontSize, spacing } = useTheme();
   const t = toneColors(tone, colors);

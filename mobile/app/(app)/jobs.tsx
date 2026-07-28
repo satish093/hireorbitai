@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { ListScreen, PageHeader } from '../../src/components/ui/Screen';
 import { Card } from '../../src/components/ui/Card';
 import { Pill } from '../../src/components/ui/Pill';
+import { Tabs, type TabItem } from '../../src/components/ui/Tabs';
 import { SearchInput } from '../../src/components/ui/Inputs';
 import { RouteGuard } from '../../src/components/RouteGuard';
 import { useApiList } from '../../src/hooks/useApi';
@@ -30,10 +31,18 @@ export default function JobsScreen() {
   );
 }
 
+// Strict 4-source ingestion policy (LinkedIn, Dice, Monster, CareerBuilder).
+const SOURCES = ['ALL', 'LinkedIn', 'Dice', 'Monster', 'CareerBuilder'] as const;
+
+function jobSource(j: Job): string {
+  return (j.publisher ?? j.source ?? '').toLowerCase();
+}
+
 function JobsList() {
   const router = useRouter();
   const { colors, spacing, fontSize } = useTheme();
   const [query, setQuery] = useState('');
+  const [source, setSource] = useState<string>('ALL');
 
   const { items, loading, refreshing, error, onRefresh, refetch } = useApiList<Job>('/jobs', {
     channel: 'jobs',
@@ -44,14 +53,25 @@ function JobsList() {
   // enough that client filtering is instant and free.
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter(
-      (j) =>
+    return items.filter((j) => {
+      if (source !== 'ALL' && !jobSource(j).includes(source.toLowerCase())) return false;
+      if (!q) return true;
+      return (
         j.title?.toLowerCase().includes(q) ||
         j.company_name?.toLowerCase().includes(q) ||
-        j.location?.toLowerCase().includes(q),
-    );
-  }, [items, query]);
+        j.location?.toLowerCase().includes(q)
+      );
+    });
+  }, [items, query, source]);
+
+  const sourceTabs: TabItem[] = SOURCES.map((s) => ({
+    key: s,
+    label: s === 'ALL' ? 'All' : s,
+    count:
+      s === 'ALL'
+        ? items.length
+        : items.filter((j) => jobSource(j).includes(s.toLowerCase())).length,
+  }));
 
   return (
     <>
@@ -65,11 +85,14 @@ function JobsList() {
         onRetry={() => void refetch()}
         keyExtractor={(j) => j.id}
         header={
-          <SearchInput
-            value={query}
-            onChangeText={setQuery}
-            placeholder="Search title, company, location"
-          />
+          <View style={{ gap: spacing.sm }}>
+            <SearchInput
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Search title, company, location"
+            />
+            <Tabs items={sourceTabs} value={source} onChange={setSource} />
+          </View>
         }
         emptyTitle={query ? 'No matches' : 'No jobs yet'}
         emptyDescription={

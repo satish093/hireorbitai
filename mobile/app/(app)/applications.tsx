@@ -1,10 +1,14 @@
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { ListScreen, PageHeader } from '../../src/components/ui/Screen';
 import { Card } from '../../src/components/ui/Card';
+import { Tabs, type TabItem } from '../../src/components/ui/Tabs';
+import { Sheet, ConfirmSheet } from '../../src/components/ui/Sheet';
+import { SelectInput } from '../../src/components/ui/Inputs';
+import { Button } from '../../src/components/ui/Button';
 import { Pill, APPLICATION_STATUS_TONE } from '../../src/components/ui/Pill';
 import { RouteGuard } from '../../src/components/RouteGuard';
-import { useApiList } from '../../src/hooks/useApi';
+import { useApiList, useApiMutation } from '../../src/hooks/useApi';
 import { useAuth } from '../../src/context/AuthContext';
 import { BUSINESS_ROLES, type Application, type ApplicationStatus } from '../../src/types';
 import { useTheme } from '../../src/theme';
@@ -23,6 +27,10 @@ import { relativeDate } from './jobs';
  * `/mine` is reachable; every operator route inside is separately OPERATOR_TIER
  * gated. Asking for the right one here is not just courtesy: calling
  * `/applications` as a consultant returns 403.
+ *
+ * Operators can change a submission's status or delete it inline via a bottom
+ * Sheet — the mobile equivalent of the web's manage-submission modal
+ * (PATCH/DELETE /applications/:id, both OPERATOR_TIER-gated server-side).
  */
 export default function ApplicationsScreen() {
   return (
@@ -41,10 +49,24 @@ const STATUS_FILTERS: (ApplicationStatus | 'ALL')[] = [
   'REJECTED',
 ];
 
+const EDITABLE_STATUSES: ApplicationStatus[] = [
+  'SUBMITTED',
+  'SCREENING',
+  'INTERVIEW',
+  'OFFER',
+  'REJECTED',
+  'WITHDRAWN',
+];
+
+const titleCase = (s: string) => s.charAt(0) + s.slice(1).toLowerCase();
+
 function ApplicationsList() {
   const { profile } = useAuth();
-  const { colors, spacing, fontSize, radius } = useTheme();
+  const { colors, spacing, fontSize } = useTheme();
   const [status, setStatus] = useState<ApplicationStatus | 'ALL'>('ALL');
+  const [editApp, setEditApp] = useState<Application | null>(null);
+  const [draftStatus, setDraftStatus] = useState<ApplicationStatus>('SUBMITTED');
+  const [confirmDelete, setConfirmDelete] = useState<Application | null>(null);
 
   const isConsultant = profile?.role === 'CONSULTANT';
   const endpoint = isConsultant ? '/applications/mine' : '/applications';
@@ -54,10 +76,44 @@ function ApplicationsList() {
     { channel: 'applications' },
   );
 
+  const patchStatus = useApiMutation('patch', '/applications', { invalidates: ['applications'] });
+  const removeApp = useApiMutation('delete', '/applications', { invalidates: ['applications'] });
+
+  const counts = useMemo(() => {
+    const map: Record<string, number> = { ALL: items.length };
+    for (const a of items) map[a.status] = (map[a.status] ?? 0) + 1;
+    return map;
+  }, [items]);
+
+  const tabs: TabItem[] = STATUS_FILTERS.map((s) => ({
+    key: s,
+    label: s === 'ALL' ? 'All' : titleCase(s),
+    count: counts[s] ?? 0,
+  }));
+
   const filtered = useMemo(
     () => (status === 'ALL' ? items : items.filter((a) => a.status === status)),
     [items, status],
   );
+
+  const openEdit = (app: Application) => {
+    setEditApp(app);
+    setDraftStatus(app.status);
+  };
+
+  const saveStatus = async () => {
+    if (!editApp) return;
+    await patchStatus.mutate({ status: draftStatus }, `/applications/${editApp.id}`);
+    setEditApp(null);
+    void refetch();
+  };
+
+  const doDelete = async () => {
+    if (!confirmDelete) return;
+    await removeApp.mutate(undefined, `/applications/${confirmDelete.id}`);
+    setConfirmDelete(null);
+    void refetch();
+  };
 
   return (
     <>
@@ -73,45 +129,7 @@ function ApplicationsList() {
         onRefresh={onRefresh}
         onRetry={() => void refetch()}
         keyExtractor={(a) => a.id}
-        header={
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ gap: spacing.sm, paddingVertical: 2 }}
-          >
-            {STATUS_FILTERS.map((s) => {
-              const active = s === status;
-              return (
-                <Pressable
-                  key={s}
-                  onPress={() => setStatus(s)}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: active }}
-                  style={{
-                    paddingHorizontal: spacing.md,
-                    // 44px minimum touch target.
-                    height: 44,
-                    justifyContent: 'center',
-                    borderRadius: radius.pill,
-                    backgroundColor: active ? colors.ink : colors.surface,
-                    borderWidth: 1,
-                    borderColor: active ? colors.ink : colors.border,
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: active ? colors.bg : colors.ink2,
-                      fontSize: fontSize.sm,
-                      fontWeight: '600',
-                    }}
-                  >
-                    {s === 'ALL' ? 'All' : s.charAt(0) + s.slice(1).toLowerCase()}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-        }
+        header={<Tabs items={tabs} value={status} onChange={(k) => setStatus(k as never)} />}
         emptyTitle={status === 'ALL' ? 'No applications yet' : `Nothing ${status.toLowerCase()}`}
         emptyDescription={
           isConsultant
@@ -119,7 +137,7 @@ function ApplicationsList() {
             : 'Submit a consultant to a job to start the pipeline.'
         }
         renderItem={({ item }) => (
-          <Card>
+          <Card onPress={isConsultant ? undefined : () => openEdit(item)}>
             <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md }}>
               <View style={{ flex: 1 }}>
                 <Text
@@ -173,6 +191,52 @@ function ApplicationsList() {
             </View>
           </Card>
         )}
+      />
+
+      {/* Operator: manage a submission (status change + delete). */}
+      <Sheet
+        open={!!editApp}
+        onClose={() => setEditApp(null)}
+        title="Manage submission"
+        footer={
+          <View style={{ gap: spacing.sm }}>
+            <Button label="Save" onPress={saveStatus} loading={patchStatus.pending} />
+            <Button
+              label="Delete submission"
+              variant="danger-ghost"
+              onPress={() => {
+                const app = editApp;
+                setEditApp(null);
+                setConfirmDelete(app);
+              }}
+            />
+          </View>
+        }
+      >
+        <View style={{ gap: spacing.md }}>
+          <Text style={{ fontSize: fontSize.md, fontWeight: '600', color: colors.ink }}>
+            {editApp?.job?.title ?? 'Application'}
+          </Text>
+          {patchStatus.error ? (
+            <Text style={{ color: colors.danger, fontSize: fontSize.sm }}>{patchStatus.error}</Text>
+          ) : null}
+          <SelectInput
+            label="Status"
+            value={draftStatus}
+            onChange={(v) => setDraftStatus(v as ApplicationStatus)}
+            options={EDITABLE_STATUSES.map((s) => ({ value: s, label: titleCase(s) }))}
+          />
+        </View>
+      </Sheet>
+
+      <ConfirmSheet
+        open={!!confirmDelete}
+        onClose={() => setConfirmDelete(null)}
+        onConfirm={doDelete}
+        title="Delete submission?"
+        message="This removes the application from the pipeline. This cannot be undone."
+        confirmLabel="Delete"
+        destructive
       />
     </>
   );
