@@ -13,28 +13,30 @@ import { useTheme } from '../../../src/theme';
 
 interface PlanItem {
   id: string;
+  week_no?: number | null;
+  week_label?: string | null;
+  focus_area?: string | null;
   title: string;
-  description?: string | null;
-  done?: boolean | null;
-  order_index?: number | null;
-  target_date?: string | null;
+  item_type?: string | null;
+  duration_min?: number | null;
+  course_id?: string | null;
+  completed?: boolean | null;
 }
 
 interface StudyPlan {
   id: string;
   title?: string | null;
+  rationale?: string | null;
   items?: PlanItem[] | null;
   created_at?: string;
 }
 
 /**
- * AI study plan — GET /training/plans/active, POST /training/plans/generate,
- * PATCH /training/plans/items/:id.
+ * AI study plan — GET /training/plans/active, POST /training/plans/generate (no
+ * body), PATCH /training/plans/items/:id { completed }.
  *
- * Generation spends AI budget, so it is an explicit button rather than
- * something that fires on mount. Ticking an item is optimistic and reverts on
- * failure — a checkbox that silently didn't save is worse than one that visibly
- * refuses.
+ * Generation spends budget, so it is an explicit button rather than firing on
+ * mount. Ticking an item is optimistic and reverts on failure.
  */
 export default function StudyPlanScreen() {
   return (
@@ -51,9 +53,8 @@ function StudyPlanView() {
 
   const plan = useApiQuery<StudyPlan | null>('/training/plans/active', { channel: 'training' });
 
-  const items = [...(plan.data?.items ?? [])].sort(
-    (a, b) => (a.order_index ?? 0) - (b.order_index ?? 0),
-  );
+  // Backend already returns items ordered by week_no, sort_order.
+  const items = plan.data?.items ?? [];
 
   const generate = async () => {
     setGenerating(true);
@@ -69,18 +70,20 @@ function StudyPlanView() {
   };
 
   const toggle = async (item: PlanItem) => {
-    const next = !item.done;
+    const next = !item.completed;
     // Optimistic.
     plan.setData((prev) =>
       prev
         ? {
             ...prev,
-            items: (prev.items ?? []).map((it) => (it.id === item.id ? { ...it, done: next } : it)),
+            items: (prev.items ?? []).map((it) =>
+              it.id === item.id ? { ...it, completed: next } : it,
+            ),
           }
         : null,
     );
     try {
-      await api.patch(`/training/plans/items/${item.id}`, { done: next });
+      await api.patch(`/training/plans/items/${item.id}`, { completed: next });
     } catch (err) {
       // Revert.
       plan.setData((prev) =>
@@ -88,7 +91,7 @@ function StudyPlanView() {
           ? {
               ...prev,
               items: (prev.items ?? []).map((it) =>
-                it.id === item.id ? { ...it, done: !next } : it,
+                it.id === item.id ? { ...it, completed: !next } : it,
               ),
             }
           : null,
@@ -97,7 +100,7 @@ function StudyPlanView() {
     }
   };
 
-  const completed = items.filter((i) => i.done).length;
+  const completed = items.filter((i) => i.completed).length;
 
   return (
     <ScreenScroll refreshing={plan.refreshing} onRefresh={plan.onRefresh} edges={[]}>
@@ -115,7 +118,7 @@ function StudyPlanView() {
           <EmptyState
             compact
             title="No study plan yet"
-            description="Generate a plan based on your assigned courses and skill gaps."
+            description="Generate a plan from the lessons you still have left in your enrolled courses."
           />
           <Button label="Generate my plan" onPress={generate} loading={generating} />
         </Card>
@@ -123,7 +126,10 @@ function StudyPlanView() {
         <>
           <Card padded={false}>
             <View style={{ padding: spacing.lg, paddingBottom: spacing.sm }}>
-              <SectionHeader title={plan.data.title ?? 'Your plan'} />
+              <SectionHeader
+                title={plan.data.title ?? 'Your plan'}
+                subtitle={plan.data.rationale ?? undefined}
+              />
             </View>
 
             {items.map((item, i) => (
@@ -132,7 +138,7 @@ function StudyPlanView() {
                 <Pressable
                   onPress={() => void toggle(item)}
                   accessibilityRole="checkbox"
-                  accessibilityState={{ checked: !!item.done }}
+                  accessibilityState={{ checked: !!item.completed }}
                   style={({ pressed }) => ({
                     flexDirection: 'row',
                     alignItems: 'flex-start',
@@ -149,14 +155,14 @@ function StudyPlanView() {
                       height: 22,
                       borderRadius: 6,
                       borderWidth: 2,
-                      borderColor: item.done ? colors.success : colors.borderStrong,
-                      backgroundColor: item.done ? colors.success : 'transparent',
+                      borderColor: item.completed ? colors.success : colors.borderStrong,
+                      backgroundColor: item.completed ? colors.success : 'transparent',
                       alignItems: 'center',
                       justifyContent: 'center',
                       marginTop: 1,
                     }}
                   >
-                    {item.done ? (
+                    {item.completed ? (
                       <Text style={{ color: '#ffffff', fontSize: 13, fontWeight: '700' }}>✓</Text>
                     ) : null}
                   </View>
@@ -164,26 +170,35 @@ function StudyPlanView() {
                     <Text
                       style={{
                         fontSize: fontSize.base,
-                        color: item.done ? colors.muted : colors.ink,
-                        textDecorationLine: item.done ? 'line-through' : 'none',
+                        color: item.completed ? colors.muted : colors.ink,
+                        textDecorationLine: item.completed ? 'line-through' : 'none',
                       }}
                     >
                       {item.title}
                     </Text>
-                    {item.description ? (
+                    {item.focus_area ? (
                       <Text style={{ fontSize: fontSize.sm, color: colors.muted, marginTop: 2 }}>
-                        {item.description}
+                        {item.focus_area}
                       </Text>
                     ) : null}
-                    {item.target_date ? (
-                      <View style={{ marginTop: 6 }}>
-                        <Pill
-                          label={new Date(item.target_date).toLocaleDateString()}
-                          tone="info"
-                          size="sm"
-                        />
-                      </View>
-                    ) : null}
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        flexWrap: 'wrap',
+                        gap: 6,
+                        marginTop: 6,
+                      }}
+                    >
+                      {item.week_label ? (
+                        <Pill label={item.week_label} tone="info" size="sm" />
+                      ) : null}
+                      {item.item_type ? (
+                        <Pill label={item.item_type} tone="neutral" size="sm" />
+                      ) : null}
+                      {item.duration_min ? (
+                        <Pill label={`${item.duration_min} min`} tone="neutral" size="sm" />
+                      ) : null}
+                    </View>
                   </View>
                 </Pressable>
               </View>

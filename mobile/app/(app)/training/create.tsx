@@ -4,26 +4,29 @@ import { Stack, useRouter } from 'expo-router';
 import { Screen, Banner } from '../../../src/components/ui/Screen';
 import { Card, SectionHeader } from '../../../src/components/ui/Card';
 import { Button } from '../../../src/components/ui/Button';
-import { FormInput } from '../../../src/components/ui/Inputs';
+import { FormInput, SelectInput } from '../../../src/components/ui/Inputs';
 import { RouteGuard } from '../../../src/components/RouteGuard';
 import { api, apiErrorMessage } from '../../../src/services/api';
 import { invalidate } from '../../../src/hooks/useInvalidate';
 import { useAuth } from '../../../src/context/AuthContext';
-import { ADMIN_TIER, MANAGER_TIER, type TrainingCourse } from '../../../src/types';
+import { ADMIN_TIER, MANAGER_TIER } from '../../../src/types';
 import { useTheme } from '../../../src/theme';
+
+interface CourseResponse {
+  id: string;
+}
+
+type Difficulty = 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED';
 
 /**
  * Create a course — POST /training/courses, or POST /training/courses/generate.
  *
- * Two paths, with deliberately different gates mirroring the router:
- *   • manual create   → MANAGER_TIER
- *   • AI generate     → ADMIN_TIER only, because it spends real AI budget and
- *                       runs long. The button is hidden, not just disabled, for
- *                       anyone below that tier.
+ *   • manual create   → MANAGER_TIER. Requires title + category.
+ *   • AI generate     → ADMIN_TIER. Payload is `.strict()` server-side, so only
+ *                       title/category/difficulty are sent (NOT description).
  *
- * Generation is asynchronous on the server. This screen kicks it off and sends
- * the user to AI Activity to watch it, rather than blocking on a request that
- * can outlive the screen.
+ * Generation is asynchronous on the server; this screen kicks it off and sends
+ * the user to AI Activity to watch it.
  */
 export default function CreateCourseScreen() {
   return (
@@ -33,6 +36,12 @@ export default function CreateCourseScreen() {
   );
 }
 
+const DIFFICULTIES: { value: Difficulty; label: string }[] = [
+  { value: 'BEGINNER', label: 'Beginner' },
+  { value: 'INTERMEDIATE', label: 'Intermediate' },
+  { value: 'ADVANCED', label: 'Advanced' },
+];
+
 function CreateCourse() {
   const { profile } = useAuth();
   const router = useRouter();
@@ -41,25 +50,24 @@ function CreateCourse() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('');
+  const [difficulty, setDifficulty] = useState<Difficulty>('BEGINNER');
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<'manual' | 'ai' | null>(null);
 
   const canGenerate = !!profile && (ADMIN_TIER as readonly string[]).includes(profile.role);
-  const canSubmit = title.trim().length > 0 && pending === null;
-
-  const payload = () => {
-    const body: Record<string, unknown> = { title: title.trim() };
-    if (description.trim()) body.description = description.trim();
-    if (category.trim()) body.category = category.trim();
-    return body;
-  };
+  const canSubmit = title.trim().length > 0 && category.trim().length > 0 && pending === null;
 
   const createManual = async () => {
     if (!canSubmit) return;
     setPending('manual');
     setError(null);
     try {
-      const { data } = await api.post<TrainingCourse>('/training/courses', payload());
+      const { data } = await api.post<CourseResponse>('/training/courses', {
+        title: title.trim(),
+        category: category.trim(),
+        difficulty,
+        ...(description.trim() ? { description: description.trim() } : {}),
+      });
       invalidate('training');
       if (data?.id) router.replace(`/(app)/training/course/${data.id}`);
       else router.replace('/(app)/training/courses');
@@ -75,9 +83,13 @@ function CreateCourse() {
     setPending('ai');
     setError(null);
     try {
-      await api.post('/training/courses/generate', payload());
+      // generateCourseSchema is `.strict()` — send only accepted fields.
+      await api.post('/training/courses/generate', {
+        title: title.trim(),
+        category: category.trim(),
+        difficulty,
+      });
       invalidate('training');
-      // Generation continues server-side; the activity log is where it's visible.
       router.replace('/(app)/training/ai-activity');
     } catch (err) {
       setError(apiErrorMessage(err, 'Could not start generation.'));
@@ -114,6 +126,13 @@ function CreateCourse() {
                 value={category}
                 onChangeText={setCategory}
                 placeholder="e.g. Compliance"
+                required
+              />
+              <SelectInput
+                label="Difficulty"
+                value={difficulty}
+                options={DIFFICULTIES}
+                onChange={setDifficulty}
               />
               <FormInput
                 label="Description"
@@ -142,7 +161,7 @@ function CreateCourse() {
                     marginBottom: spacing.md,
                   }}
                 >
-                  Builds an outline, lesson bodies and quizzes from the title and description. This
+                  Builds an outline, lesson bodies and quizzes from the title and category. This
                   runs in the background and spends AI budget — you&apos;ll be taken to the activity
                   log to watch it.
                 </Text>

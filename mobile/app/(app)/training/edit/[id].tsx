@@ -4,26 +4,23 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Screen, Banner } from '../../../../src/components/ui/Screen';
 import { Card, SectionHeader } from '../../../../src/components/ui/Card';
 import { Button } from '../../../../src/components/ui/Button';
-import { FormInput } from '../../../../src/components/ui/Inputs';
+import { FormInput, SelectInput } from '../../../../src/components/ui/Inputs';
 import { ConfirmSheet } from '../../../../src/components/ui/Sheet';
 import { SkeletonCard } from '../../../../src/components/ui/States';
 import { RouteGuard } from '../../../../src/components/RouteGuard';
 import { useApiQuery } from '../../../../src/hooks/useApi';
 import { invalidate } from '../../../../src/hooks/useInvalidate';
 import { api, apiErrorMessage } from '../../../../src/services/api';
-import { MANAGER_TIER, type TrainingCourse } from '../../../../src/types';
+import { MANAGER_TIER } from '../../../../src/types';
 import { useTheme } from '../../../../src/theme';
 
 /**
- * Edit a course — metadata, publish, delete.
- *
- * MANAGER_TIER.
+ * Edit a course — metadata, publish, delete. MANAGER_TIER.
  *
  * Scope note: this edits COURSE METADATA and lifecycle. Authoring lesson bodies
- * is not here — a lesson body runs to thousands of words (the generated content
- * SQL files are 40–70 KB per course) and a phone is the wrong tool for writing
- * one. Publishing, renaming, recategorising and deleting are the actions people
- * genuinely need away from a desk, and those are all here.
+ * lives on the web console. Save uses PUT /training/courses/:id (there is no
+ * PATCH route); publish uses POST /training/courses/:id/publish; delete uses
+ * DELETE (admin-tier, enforced server-side).
  */
 export default function EditCourseScreen() {
   return (
@@ -33,12 +30,28 @@ export default function EditCourseScreen() {
   );
 }
 
+type Difficulty = 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED';
+const DIFFICULTIES: { value: Difficulty; label: string }[] = [
+  { value: 'BEGINNER', label: 'Beginner' },
+  { value: 'INTERMEDIATE', label: 'Intermediate' },
+  { value: 'ADVANCED', label: 'Advanced' },
+];
+
+interface CourseData {
+  id: string;
+  title: string;
+  description?: string | null;
+  category?: string | null;
+  difficulty?: string | null;
+  status?: string | null;
+}
+
 function EditCourse() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { colors, spacing, fontSize } = useTheme();
 
-  const course = useApiQuery<TrainingCourse>(id ? `/training/courses/${id}` : null, {
+  const course = useApiQuery<CourseData>(id ? `/training/courses/${id}` : null, {
     channel: 'training',
     enabled: !!id,
   });
@@ -46,6 +59,7 @@ function EditCourse() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('');
+  const [difficulty, setDifficulty] = useState<Difficulty>('BEGINNER');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<'save' | 'publish' | 'delete' | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -55,19 +69,23 @@ function EditCourse() {
     setTitle(course.data.title ?? '');
     setDescription(course.data.description ?? '');
     setCategory(course.data.category ?? '');
+    const d = (course.data.difficulty ?? 'BEGINNER') as Difficulty;
+    setDifficulty(DIFFICULTIES.some((x) => x.value === d) ? d : 'BEGINNER');
   }, [course.data?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const published = course.data?.status === 'ACTIVE';
+
   const save = async () => {
-    if (!title.trim()) return;
+    if (!title.trim() || !category.trim()) return;
     setBusy('save');
     setError(null);
     try {
-      // Only the three editable fields — never a spread of local state, so a
-      // server-controlled column can't ride along.
-      await api.patch(`/training/courses/${id}`, {
+      // Only the editable fields — PUT is the update route (no PATCH exists).
+      await api.put(`/training/courses/${id}`, {
         title: title.trim(),
         description: description.trim() || null,
-        category: category.trim() || null,
+        category: category.trim(),
+        difficulty,
       });
       invalidate('training');
       await course.refetch();
@@ -127,7 +145,18 @@ function EditCourse() {
                 <Card>
                   <SectionHeader title="Details" />
                   <FormInput label="Title" value={title} onChangeText={setTitle} required />
-                  <FormInput label="Category" value={category} onChangeText={setCategory} />
+                  <FormInput
+                    label="Category"
+                    value={category}
+                    onChangeText={setCategory}
+                    required
+                  />
+                  <SelectInput
+                    label="Difficulty"
+                    value={difficulty}
+                    options={DIFFICULTIES}
+                    onChange={setDifficulty}
+                  />
                   <FormInput
                     label="Description"
                     value={description}
@@ -137,7 +166,7 @@ function EditCourse() {
                   <Button
                     label="Save changes"
                     onPress={save}
-                    disabled={!title.trim() || busy !== null}
+                    disabled={!title.trim() || !category.trim() || busy !== null}
                     loading={busy === 'save'}
                   />
                 </Card>
@@ -157,7 +186,7 @@ function EditCourse() {
                   </View>
                 </Card>
 
-                {!course.data?.is_published ? (
+                {!published ? (
                   <Card>
                     <SectionHeader
                       title="Publish"

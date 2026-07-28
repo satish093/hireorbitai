@@ -1,24 +1,23 @@
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { ListScreen, PageHeader } from '../../../src/components/ui/Screen';
 import { Card } from '../../../src/components/ui/Card';
 import { Pill } from '../../../src/components/ui/Pill';
+import { Tabs } from '../../../src/components/ui/Tabs';
 import { Avatar } from '../../../src/components/ui/Avatar';
 import { RouteGuard } from '../../../src/components/RouteGuard';
 import { useApiList } from '../../../src/hooks/useApi';
-import { MANAGER_TIER, type TrainingAssignment, type UserRef } from '../../../src/types';
+import { MANAGER_TIER, type UserRef } from '../../../src/types';
 import { useTheme } from '../../../src/theme';
-
-interface AssignmentRow extends TrainingAssignment {
-  user?: UserRef | null;
-}
+import { shortDate } from '../../../src/utils/format';
 
 /**
  * Assignment tracking — GET /training/assignments. MANAGER_TIER.
  *
- * The org-wide view of who has been assigned what. Compliance training has due
- * dates that matter (I-983, security awareness), so overdue is filtered first
- * and coloured — that is the state anyone opens this screen to chase.
+ * The org-wide view of who has been assigned what. Rows are
+ * `training_assignments` (progress_percentage / due_date / status) with an
+ * embedded `assignee` (the target user) and `course`. Compliance training has
+ * due dates that matter, so overdue is surfaced first and coloured.
  */
 export default function TrainingAssignmentsScreen() {
   return (
@@ -28,26 +27,54 @@ export default function TrainingAssignmentsScreen() {
   );
 }
 
-const FILTERS = ['OVERDUE', 'ALL', 'IN_PROGRESS', 'COMPLETE'] as const;
+interface AssignmentRow {
+  id: string;
+  course_id: string;
+  status?: string | null;
+  progress_percentage?: number | null;
+  due_date?: string | null;
+  completed_at?: string | null;
+  course?: { id?: string; title?: string | null } | null;
+  assignee?: UserRef | null;
+}
+
+type Filter = 'all' | 'in_progress' | 'overdue' | 'completed';
+
+function isDone(a: AssignmentRow): boolean {
+  return a.status === 'COMPLETED' || !!a.completed_at || (a.progress_percentage ?? 0) >= 100;
+}
+function isOverdue(a: AssignmentRow): boolean {
+  if (isDone(a)) return false;
+  if (a.status === 'OVERDUE') return true;
+  return !!a.due_date && new Date(a.due_date).getTime() < Date.now();
+}
 
 function AssignmentsList() {
   const { colors, spacing, fontSize, radius } = useTheme();
-  const [filter, setFilter] = useState<(typeof FILTERS)[number]>('ALL');
+  const [filter, setFilter] = useState<Filter>('all');
 
   const { items, loading, refreshing, error, onRefresh, refetch } = useApiList<AssignmentRow>(
     '/training/assignments',
     { channel: 'training' },
   );
 
+  const counts = useMemo(
+    () => ({
+      all: items.length,
+      in_progress: items.filter((a) => !isDone(a) && (a.progress_percentage ?? 0) > 0).length,
+      overdue: items.filter(isOverdue).length,
+      completed: items.filter(isDone).length,
+    }),
+    [items],
+  );
+
   const filtered = useMemo(() => {
-    const now = Date.now();
-    const isDone = (a: AssignmentRow) => !!a.completed_at || (a.progress_percent ?? 0) >= 100;
     switch (filter) {
-      case 'OVERDUE':
-        return items.filter((a) => !isDone(a) && !!a.due_at && new Date(a.due_at).getTime() < now);
-      case 'IN_PROGRESS':
-        return items.filter((a) => !isDone(a) && (a.progress_percent ?? 0) > 0);
-      case 'COMPLETE':
+      case 'overdue':
+        return items.filter(isOverdue);
+      case 'in_progress':
+        return items.filter((a) => !isDone(a) && (a.progress_percentage ?? 0) > 0);
+      case 'completed':
         return items.filter(isDone);
       default:
         return items;
@@ -66,56 +93,30 @@ function AssignmentsList() {
         onRetry={() => void refetch()}
         keyExtractor={(a) => a.id}
         header={
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ gap: spacing.sm, paddingVertical: 2 }}
-          >
-            {FILTERS.map((f) => {
-              const active = f === filter;
-              return (
-                <Pressable
-                  key={f}
-                  onPress={() => setFilter(f)}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: active }}
-                  style={{
-                    paddingHorizontal: spacing.md,
-                    height: 44,
-                    justifyContent: 'center',
-                    borderRadius: radius.pill,
-                    backgroundColor: active ? colors.ink : colors.surface,
-                    borderWidth: 1,
-                    borderColor: active ? colors.ink : colors.border,
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: active ? colors.bg : colors.ink2,
-                      fontSize: fontSize.sm,
-                      fontWeight: '600',
-                    }}
-                  >
-                    {f === 'ALL' ? 'All' : f.charAt(0) + f.slice(1).toLowerCase().replace('_', ' ')}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
+          <Tabs
+            value={filter}
+            onChange={(k) => setFilter(k as Filter)}
+            items={[
+              { key: 'all', label: 'All', count: counts.all },
+              { key: 'in_progress', label: 'In progress', count: counts.in_progress },
+              { key: 'overdue', label: 'Overdue', count: counts.overdue },
+              { key: 'completed', label: 'Complete', count: counts.completed },
+            ]}
+          />
         }
-        emptyTitle={filter === 'OVERDUE' ? 'Nothing overdue' : 'No assignments'}
+        emptyTitle={filter === 'overdue' ? 'Nothing overdue' : 'No assignments'}
         emptyDescription="Assign a course to your team to start tracking."
         renderItem={({ item }) => {
-          const pct = Math.max(0, Math.min(100, Math.round(item.progress_percent ?? 0)));
-          const done = !!item.completed_at || pct >= 100;
-          const overdue = !done && !!item.due_at && new Date(item.due_at).getTime() < Date.now();
+          const pct = Math.max(0, Math.min(100, Math.round(item.progress_percentage ?? 0)));
+          const done = isDone(item);
+          const overdue = isOverdue(item);
           return (
             <Card>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
                 <Avatar
-                  id={item.user?.id ?? item.user_id}
-                  name={item.user?.full_name}
-                  email={item.user?.email}
+                  id={item.assignee?.id}
+                  name={item.assignee?.full_name}
+                  email={item.assignee?.email}
                   size={36}
                 />
                 <View style={{ flex: 1 }}>
@@ -123,7 +124,7 @@ function AssignmentsList() {
                     numberOfLines={1}
                     style={{ fontSize: fontSize.base, fontWeight: '600', color: colors.ink }}
                   >
-                    {item.user?.full_name?.trim() || item.user?.email || 'Assigned user'}
+                    {item.assignee?.full_name?.trim() || item.assignee?.email || 'Assigned user'}
                   </Text>
                   <Text numberOfLines={1} style={{ fontSize: fontSize.sm, color: colors.muted }}>
                     {item.course?.title ?? 'Course'}
@@ -159,7 +160,7 @@ function AssignmentsList() {
                   }}
                 />
               </View>
-              {item.due_at ? (
+              {item.due_date ? (
                 <Text
                   style={{
                     fontSize: fontSize.xs,
@@ -167,7 +168,7 @@ function AssignmentsList() {
                     marginTop: 6,
                   }}
                 >
-                  Due {new Date(item.due_at).toLocaleDateString()}
+                  Due {shortDate(item.due_date)}
                 </Text>
               ) : null}
             </Card>

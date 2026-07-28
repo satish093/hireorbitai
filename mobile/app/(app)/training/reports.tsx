@@ -1,30 +1,40 @@
 import { Text, View } from 'react-native';
 import { ScreenScroll, PageHeader, Banner } from '../../../src/components/ui/Screen';
 import { Card, MetricTile, SectionHeader, Divider } from '../../../src/components/ui/Card';
-import { Pill } from '../../../src/components/ui/Pill';
+import {
+  StackedBar,
+  LegendRow,
+  BreakdownRow,
+  type Segment,
+} from '../../../src/components/ui/Charts';
 import { SkeletonMetricGrid, EmptyState } from '../../../src/components/ui/States';
 import { RouteGuard } from '../../../src/components/RouteGuard';
-import { useApiList } from '../../../src/hooks/useApi';
+import { useApiQuery } from '../../../src/hooks/useApi';
 import { MANAGER_TIER } from '../../../src/types';
 import { useTheme } from '../../../src/theme';
 
-interface ComplianceRow {
-  user_id?: string;
-  full_name?: string | null;
-  email?: string | null;
-  assigned?: number | null;
-  completed?: number | null;
-  overdue?: number | null;
-  compliance_percent?: number | null;
+interface Reports {
+  total_courses: number;
+  active_courses: number;
+  total_assignments: number;
+  completed_assignments: number;
+  in_progress_assignments: number;
+  overdue_assignments: number;
+  failed_assignments: number;
+  completion_rate: number;
+  quiz_pass_rate: number;
+  avg_time_spent_minutes: number;
+  total_time_spent_minutes: number;
+  top_consultants: Array<{ user_id: string; completed: number }>;
+  by_category: Array<{ category: string; courses: number }>;
 }
 
 /**
- * Training compliance — GET /training/compliance. MANAGER_TIER.
+ * Training reports — GET /training/reports. MANAGER_TIER.
  *
- * The web calls this "Reports"; the data underneath is a compliance roster, so
- * that is what is shown. This module has real regulatory weight — I-983 and
- * security-awareness training are tracked here — which is why the roll-up leads
- * with the number of people who are NOT compliant rather than an average.
+ * Workspace effectiveness roll-up: course catalog totals, assignment
+ * completion, quiz pass rate, and per-category course counts. Group leads see
+ * their group's slice (scoped server-side).
  */
 export default function TrainingReportsScreen() {
   return (
@@ -35,123 +45,131 @@ export default function TrainingReportsScreen() {
 }
 
 function TrainingReports() {
-  const { colors, spacing, fontSize, radius } = useTheme();
+  const { colors, spacing, fontSize } = useTheme();
 
-  const { items, loading, refreshing, error, onRefresh } = useApiList<ComplianceRow>(
-    '/training/compliance',
-    { channel: 'training' },
-  );
-
-  // Explicit accumulator type — without it TS infers ComplianceRow from the
-  // element type and rejects `nonCompliant`, which only exists on the roll-up.
-  interface Totals {
-    assigned: number;
-    completed: number;
-    overdue: number;
-    nonCompliant: number;
-  }
-
-  const totals = items.reduce<Totals>(
-    (acc, r) => {
-      acc.assigned += r.assigned ?? 0;
-      acc.completed += r.completed ?? 0;
-      acc.overdue += r.overdue ?? 0;
-      if ((r.overdue ?? 0) > 0) acc.nonCompliant += 1;
-      return acc;
+  const { data, loading, refreshing, error, onRefresh } = useApiQuery<Reports>(
+    '/training/reports',
+    {
+      channel: 'training',
     },
-    { assigned: 0, completed: 0, overdue: 0, nonCompliant: 0 },
   );
 
-  const overallPct =
-    totals.assigned > 0 ? Math.round((totals.completed / totals.assigned) * 100) : 100;
+  const statusSegments: Segment[] = data
+    ? [
+        {
+          key: 'completed',
+          label: 'Completed',
+          value: data.completed_assignments,
+          color: colors.success,
+        },
+        {
+          key: 'in_progress',
+          label: 'In progress',
+          value: data.in_progress_assignments,
+          color: colors.accent,
+        },
+        { key: 'overdue', label: 'Overdue', value: data.overdue_assignments, color: colors.danger },
+        { key: 'failed', label: 'Failed', value: data.failed_assignments, color: colors.warn },
+      ]
+    : [];
+  const maxCat = data ? Math.max(1, ...data.by_category.map((c) => c.courses)) : 1;
 
   return (
     <ScreenScroll refreshing={refreshing} onRefresh={onRefresh} edges={[]}>
-      <PageHeader title="Training reports" subtitle={`${items.length} people`} />
+      <PageHeader
+        title="Training reports"
+        subtitle={data ? `${data.total_assignments} assignments` : 'Workspace effectiveness'}
+      />
 
       {error ? <Banner tone="danger" message={error} /> : null}
 
-      {loading && items.length === 0 ? (
-        <SkeletonMetricGrid count={3} />
-      ) : (
+      {loading && !data ? (
+        <SkeletonMetricGrid count={4} />
+      ) : !data ? null : (
         <>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md }}>
             <MetricTile
-              label="Not compliant"
-              value={totals.nonCompliant}
-              tone={totals.nonCompliant > 0 ? 'danger' : 'success'}
-              hint="people with overdue training"
+              label="Active courses"
+              value={`${data.active_courses}/${data.total_courses}`}
+              accent="blue"
             />
-            <MetricTile label="Overdue items" value={totals.overdue} tone="warn" />
-            <MetricTile label="Completion" value={`${overallPct}%`} />
+            <MetricTile label="Assignments" value={data.total_assignments} accent="slate" />
+            <MetricTile
+              label="Completed"
+              value={data.completed_assignments}
+              accent="green"
+              tone="success"
+            />
+            <MetricTile
+              label="Overdue"
+              value={data.overdue_assignments}
+              accent="amber"
+              tone={data.overdue_assignments > 0 ? 'warn' : 'default'}
+            />
+            <MetricTile label="Completion" value={`${data.completion_rate}%`} accent="brand" />
+            <MetricTile label="Quiz pass rate" value={`${data.quiz_pass_rate}%`} accent="brand" />
           </View>
+
+          <Card>
+            <SectionHeader
+              title="Assignment status"
+              subtitle={`${data.avg_time_spent_minutes} min avg time spent`}
+            />
+            <StackedBar segments={statusSegments} height={10} />
+            <LegendRow segments={statusSegments} />
+          </Card>
+
+          <Card>
+            <SectionHeader title="Courses by category" />
+            {data.by_category.length === 0 ? (
+              <EmptyState compact title="No courses yet" />
+            ) : (
+              <View style={{ gap: spacing.md }}>
+                {[...data.by_category]
+                  .sort((a, b) => b.courses - a.courses)
+                  .map((c) => (
+                    <BreakdownRow
+                      key={c.category}
+                      label={c.category}
+                      value={c.courses}
+                      total={maxCat}
+                      color={colors.accent}
+                    />
+                  ))}
+              </View>
+            )}
+          </Card>
 
           <Card padded={false}>
             <View style={{ padding: spacing.lg, paddingBottom: spacing.sm }}>
-              <SectionHeader title="By person" />
+              <SectionHeader title="Top by completions" />
             </View>
-
-            {items.length === 0 ? (
+            {data.top_consultants.length === 0 ? (
               <View style={{ paddingBottom: spacing.lg }}>
-                <EmptyState compact title="No training assigned yet" />
+                <EmptyState compact title="No completions yet" />
               </View>
             ) : (
-              [...items]
-                // Worst first — the point of the screen is finding who to chase.
-                .sort((a, b) => (b.overdue ?? 0) - (a.overdue ?? 0))
-                .map((row, i) => {
-                  const pct = Math.round(
-                    row.compliance_percent ??
-                      ((row.completed ?? 0) / Math.max(1, row.assigned ?? 0)) * 100,
-                  );
-                  const bad = (row.overdue ?? 0) > 0;
-                  return (
-                    <View key={row.user_id ?? row.email ?? i}>
-                      {i > 0 ? <Divider inset={spacing.lg} /> : null}
-                      <View style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.md }}>
-                        <View
-                          style={{
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            gap: spacing.sm,
-                          }}
-                        >
-                          <Text
-                            numberOfLines={1}
-                            style={{ flex: 1, fontSize: fontSize.base, color: colors.ink }}
-                          >
-                            {row.full_name?.trim() || row.email || 'Unknown'}
-                          </Text>
-                          {bad ? (
-                            <Pill label={`${row.overdue} overdue`} tone="danger" size="sm" />
-                          ) : (
-                            <Pill label="On track" tone="success" size="sm" />
-                          )}
-                        </View>
-                        <View
-                          style={{
-                            height: 6,
-                            borderRadius: radius.pill,
-                            backgroundColor: colors.hover,
-                            overflow: 'hidden',
-                            marginTop: spacing.sm,
-                          }}
-                        >
-                          <View
-                            style={{
-                              width: `${Math.max(0, Math.min(100, pct))}%`,
-                              height: '100%',
-                              backgroundColor: bad ? colors.danger : colors.success,
-                            }}
-                          />
-                        </View>
-                        <Text style={{ fontSize: fontSize.xs, color: colors.faint, marginTop: 4 }}>
-                          {row.completed ?? 0} of {row.assigned ?? 0} complete
-                        </Text>
-                      </View>
-                    </View>
-                  );
-                })
+              data.top_consultants.map((t, i) => (
+                <View key={t.user_id}>
+                  {i > 0 ? <Divider inset={spacing.lg} /> : null}
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      paddingHorizontal: spacing.lg,
+                      paddingVertical: spacing.md,
+                    }}
+                  >
+                    <Text style={{ fontSize: fontSize.sm, color: colors.muted }}>
+                      {t.user_id.slice(0, 8)}…
+                    </Text>
+                    <Text style={{ fontSize: fontSize.base, fontWeight: '700', color: colors.ink }}>
+                      {t.completed}
+                    </Text>
+                  </View>
+                </View>
+              ))
             )}
           </Card>
         </>

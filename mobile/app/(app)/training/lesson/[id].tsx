@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { Text, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { Linking, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { ScreenScroll, Banner } from '../../../../src/components/ui/Screen';
 import { Card, SectionHeader } from '../../../../src/components/ui/Card';
@@ -7,24 +7,38 @@ import { Button } from '../../../../src/components/ui/Button';
 import { SkeletonCard, ErrorState } from '../../../../src/components/ui/States';
 import { RouteGuard } from '../../../../src/components/RouteGuard';
 import { useApiQuery } from '../../../../src/hooks/useApi';
-import { BUSINESS_ROLES, type TrainingCourse, type TrainingLesson } from '../../../../src/types';
+import { api, apiErrorMessage } from '../../../../src/services/api';
+import { invalidate } from '../../../../src/hooks/useInvalidate';
+import { BUSINESS_ROLES } from '../../../../src/types';
 import { useTheme } from '../../../../src/theme';
 
-interface CourseResponse extends TrainingCourse {
-  lessons?: TrainingLesson[];
+interface Lesson {
+  id: string;
+  title: string;
+  content?: string | null;
+  lesson_order?: number | null;
+  estimated_minutes?: number | null;
+  video_url?: string | null;
+  document_url?: string | null;
+}
+interface CourseResponse {
+  id: string;
+  title: string;
+  lessons?: Lesson[];
 }
 
 /**
  * Lesson viewer.
  *
- * There is deliberately no GET /training/lessons/:id on the backend — lesson
- * bodies are returned as part of GET /training/courses/:id. So this screen takes
- * the course id as a query param and selects the lesson locally, rather than
- * inventing an endpoint that doesn't exist.
+ * There is no GET /training/lessons/:id on the backend — lesson bodies are
+ * returned as part of GET /training/courses/:id. So this screen takes the
+ * course id as a query param and selects the lesson locally.
  *
- * Bodies are markdown-ish text authored by the generator. React Native renders
- * no markup, so the light-touch renderer below handles the constructs that
- * actually appear (headings, bullets, bold) and leaves everything else as text.
+ * When opened from an assignment (assignmentId present), a verified
+ * PUT /training/assignments/:id/progress marks the lesson complete.
+ *
+ * Bodies are markdown-ish text authored by the generator; RN renders no markup,
+ * so the light-touch renderer below handles the constructs that actually appear.
  */
 export default function LessonViewerScreen() {
   return (
@@ -43,6 +57,10 @@ function LessonViewer() {
   const router = useRouter();
   const { colors, spacing, fontSize } = useTheme();
 
+  const [marking, setMarking] = useState(false);
+  const [done, setDone] = useState(false);
+  const [markError, setMarkError] = useState<string | null>(null);
+
   const course = useApiQuery<CourseResponse>(courseId ? `/training/courses/${courseId}` : null, {
     channel: 'training',
     enabled: !!courseId,
@@ -53,7 +71,26 @@ function LessonViewer() {
     [course.data, id],
   );
 
-  const blocks = useMemo(() => parseBody(lesson?.body ?? ''), [lesson?.body]);
+  const blocks = useMemo(() => parseBody(lesson?.content ?? ''), [lesson?.content]);
+
+  const markComplete = async () => {
+    if (!assignmentId || !lesson) return;
+    setMarking(true);
+    setMarkError(null);
+    try {
+      // Only the fields updateProgress accepts — lesson_id + completed.
+      await api.put(`/training/assignments/${assignmentId}/progress`, {
+        lesson_id: lesson.id,
+        completed: true,
+      });
+      setDone(true);
+      invalidate('training');
+    } catch (err) {
+      setMarkError(apiErrorMessage(err, 'Could not mark this lesson complete.'));
+    } finally {
+      setMarking(false);
+    }
+  };
 
   if (!courseId) {
     return (
@@ -85,10 +122,19 @@ function LessonViewer() {
               <Text style={{ fontSize: fontSize.xl, fontWeight: '700', color: colors.ink }}>
                 {lesson.title}
               </Text>
-              {lesson.duration_minutes ? (
+              {lesson.estimated_minutes ? (
                 <Text style={{ fontSize: fontSize.sm, color: colors.muted, marginTop: 4 }}>
-                  About {lesson.duration_minutes} minutes
+                  About {lesson.estimated_minutes} minutes
                 </Text>
+              ) : null}
+              {lesson.video_url ? (
+                <View style={{ marginTop: spacing.md }}>
+                  <Button
+                    label="Watch video"
+                    variant="secondary"
+                    onPress={() => void Linking.openURL(lesson.video_url!)}
+                  />
+                </View>
               ) : null}
             </Card>
 
@@ -114,7 +160,29 @@ function LessonViewer() {
                   </Text>
                 ))
               )}
+              {lesson.document_url ? (
+                <View style={{ marginTop: spacing.md }}>
+                  <Button
+                    label="Open attachment"
+                    variant="secondary"
+                    onPress={() => void Linking.openURL(lesson.document_url!)}
+                  />
+                </View>
+              ) : null}
             </Card>
+
+            {assignmentId ? (
+              <Card>
+                <SectionHeader title="Progress" />
+                {markError ? <Banner tone="danger" message={markError} /> : null}
+                <Button
+                  label={done ? '✓ Marked complete' : 'Mark lesson complete'}
+                  onPress={markComplete}
+                  loading={marking}
+                  disabled={done || marking}
+                />
+              </Card>
+            ) : null}
 
             <Card>
               <SectionHeader title="Check your understanding" />
