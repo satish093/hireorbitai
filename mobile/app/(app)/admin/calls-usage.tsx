@@ -1,5 +1,8 @@
-import { Text, View } from 'react-native';
-import { ScreenScroll, PageHeader, Banner } from '../../../src/components/ui/Screen';
+import { RefreshControl, ScrollView, Text, View } from 'react-native';
+import { Stack } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Screen, Banner } from '../../../src/components/ui/Screen';
+import { PageTopBar } from '../../../src/components/ui/TopBar';
 import {
   Card,
   MetricTile,
@@ -41,6 +44,7 @@ export default function CallsUsageScreen() {
 
 function CallsUsageView() {
   const { colors, spacing, fontSize, radius } = useTheme();
+  const insets = useSafeAreaInsets();
 
   const { data, loading, refreshing, error, onRefresh } = useApiQuery<CallsUsage>('/calls-usage');
 
@@ -51,69 +55,86 @@ function CallsUsageView() {
   const critical = pct >= 90;
 
   return (
-    <ScreenScroll refreshing={refreshing} onRefresh={onRefresh} edges={[]}>
-      <PageHeader title="Call usage" subtitle={data?.month ?? 'This month'} />
+    <Screen edges={['top']}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <PageTopBar title="Call usage" subtitle={data?.month ?? 'This month'} showBack />
+      <ScrollView
+        contentContainerStyle={{
+          padding: spacing.lg,
+          paddingBottom: spacing['4xl'] + insets.bottom,
+          gap: spacing.lg,
+        }}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl
+            refreshing={!!refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.accent}
+            colors={[colors.accent]}
+          />
+        }
+      >
+        {error ? <Banner tone="danger" message={error} /> : null}
 
-      {error ? <Banner tone="danger" message={error} /> : null}
+        {loading && !data ? (
+          <SkeletonMetricGrid count={3} />
+        ) : (
+          <>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md }}>
+              <MetricTile
+                label="Remaining"
+                value={remaining === null ? '∞' : `${Math.round(remaining)}h`}
+                tone={critical ? 'danger' : 'success'}
+                hint={cap > 0 ? `of ${cap}h cap` : 'no cap set'}
+              />
+              <MetricTile label="Used" value={`${Math.round(used)}h`} />
+              <MetricTile label="Calls" value={data?.calls_count ?? 0} />
+            </View>
 
-      {loading && !data ? (
-        <SkeletonMetricGrid count={3} />
-      ) : (
-        <>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md }}>
-            <MetricTile
-              label="Remaining"
-              value={remaining === null ? '∞' : `${Math.round(remaining)}h`}
-              tone={critical ? 'danger' : 'success'}
-              hint={cap > 0 ? `of ${cap}h cap` : 'no cap set'}
-            />
-            <MetricTile label="Used" value={`${Math.round(used)}h`} />
-            <MetricTile label="Calls" value={data?.calls_count ?? 0} />
-          </View>
-
-          {cap > 0 ? (
-            <Card>
-              <SectionHeader title="Budget" />
-              <View
-                style={{
-                  height: 10,
-                  borderRadius: radius.pill,
-                  backgroundColor: colors.hover,
-                  overflow: 'hidden',
-                }}
-              >
+            {cap > 0 ? (
+              <Card>
+                <SectionHeader title="Budget" />
                 <View
                   style={{
-                    width: `${pct}%`,
-                    height: '100%',
-                    backgroundColor: critical
-                      ? colors.danger
-                      : pct >= 70
-                        ? colors.warn
-                        : colors.success,
+                    height: 10,
+                    borderRadius: radius.pill,
+                    backgroundColor: colors.hover,
+                    overflow: 'hidden',
                   }}
-                />
-              </View>
-              <Text style={{ fontSize: fontSize.sm, color: colors.muted, marginTop: spacing.sm }}>
-                {pct}% of this month&apos;s capacity used
-              </Text>
+                >
+                  <View
+                    style={{
+                      width: `${pct}%`,
+                      height: '100%',
+                      backgroundColor: critical
+                        ? colors.danger
+                        : pct >= 70
+                          ? colors.warn
+                          : colors.success,
+                    }}
+                  />
+                </View>
+                <Text style={{ fontSize: fontSize.sm, color: colors.muted, marginTop: spacing.sm }}>
+                  {pct}% of this month&apos;s capacity used
+                </Text>
 
-              <View style={{ marginTop: spacing.md }}>
-                <DetailRow label="Cap" value={`${cap} hours`} />
-                <Divider />
-                <DetailRow label="Resets" value="1st of next month (UTC)" />
-              </View>
-            </Card>
-          ) : null}
+                <View style={{ marginTop: spacing.md }}>
+                  <DetailRow label="Cap" value={`${cap} hours`} />
+                  <Divider />
+                  <DetailRow label="Resets" value="1st of next month (UTC)" />
+                </View>
+              </Card>
+            ) : null}
 
-          {critical ? (
-            <Banner
-              tone="danger"
-              message="Nearly at the monthly cap. Once it's reached, starting a call returns 503 for everyone until the month rolls over."
-            />
-          ) : null}
-        </>
-      )}
-    </ScreenScroll>
+            {critical ? (
+              <Banner
+                tone="danger"
+                message="Nearly at the monthly cap. Once it's reached, starting a call returns 503 for everyone until the month rolls over."
+              />
+            ) : null}
+          </>
+        )}
+      </ScrollView>
+    </Screen>
   );
 }

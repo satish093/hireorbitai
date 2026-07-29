@@ -1,7 +1,9 @@
 import { useState } from 'react';
-import { Text, View } from 'react-native';
+import { RefreshControl, ScrollView, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { ScreenScroll, Banner } from '../../../../src/components/ui/Screen';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Screen, Banner } from '../../../../src/components/ui/Screen';
+import { PageTopBar } from '../../../../src/components/ui/TopBar';
 import { Card, SectionHeader, DetailRow, Divider } from '../../../../src/components/ui/Card';
 import { Pill } from '../../../../src/components/ui/Pill';
 import { Avatar } from '../../../../src/components/ui/Avatar';
@@ -22,7 +24,7 @@ import {
   type UserProfile,
 } from '../../../../src/types';
 import { useTheme } from '../../../../src/theme';
-import { relativeDate } from '../../../../src/utils/format';
+import { relativeDate, shortDate } from '../../../../src/utils/format';
 
 /** One confirmable lifecycle action against the target account. */
 interface AccountAction {
@@ -68,6 +70,7 @@ function AdminUserDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { profile } = useAuth();
   const { colors, spacing, fontSize } = useTheme();
+  const insets = useSafeAreaInsets();
   const [action, setAction] = useState<AccountAction | null>(null);
   const [pending, setPending] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -145,9 +148,25 @@ function AdminUserDetail() {
   };
 
   return (
-    <>
-      <Stack.Screen options={{ title: 'User' }} />
-      <ScreenScroll refreshing={user.refreshing} onRefresh={user.onRefresh} edges={[]}>
+    <Screen edges={['top']}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <PageTopBar showBack title="User" />
+      <ScrollView
+        contentContainerStyle={{
+          padding: spacing.lg,
+          paddingBottom: spacing['4xl'] + insets.bottom,
+          gap: spacing.lg,
+        }}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl
+            refreshing={!!user.refreshing}
+            onRefresh={user.onRefresh}
+            tintColor={colors.accent}
+            colors={[colors.accent]}
+          />
+        }
+      >
         {user.loading && !u ? (
           <SkeletonCard />
         ) : user.error && !u ? (
@@ -246,10 +265,7 @@ function AdminUserDetail() {
                 value={u.last_login_at ? relativeDate(u.last_login_at) : 'Never'}
               />
               <Divider />
-              <DetailRow
-                label="Created"
-                value={u.created_at ? new Date(u.created_at).toLocaleDateString() : '—'}
-              />
+              <DetailRow label="Created" value={u.created_at ? shortDate(u.created_at) : '—'} />
               <Divider />
               <DetailRow
                 label="Temp password"
@@ -304,7 +320,7 @@ function AdminUserDetail() {
             </Card>
           </>
         )}
-      </ScreenScroll>
+      </ScrollView>
 
       <ConfirmSheet
         open={!!action}
@@ -316,6 +332,6 @@ function AdminUserDetail() {
         destructive={action?.destructive}
         pending={pending}
       />
-    </>
+    </Screen>
   );
 }

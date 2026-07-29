@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react';
-import { Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
-import { ListScreen, PageHeader, Banner } from '../../../src/components/ui/Screen';
-import { Card } from '../../../src/components/ui/Card';
-import { Pill } from '../../../src/components/ui/Pill';
+import { Pressable, Text, View } from 'react-native';
+import { Stack, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Screen, ListScreen, Banner } from '../../../src/components/ui/Screen';
+import { PageTopBar } from '../../../src/components/ui/TopBar';
+import { Divider } from '../../../src/components/ui/Card';
+import { pillToneColor, type PillTone } from '../../../src/components/ui/Pill';
 import { Avatar } from '../../../src/components/ui/Avatar';
 import { SearchInput } from '../../../src/components/ui/Inputs';
 import { Tabs } from '../../../src/components/ui/Tabs';
@@ -23,8 +25,8 @@ import { useTheme } from '../../../src/theme';
  * list itself surfaces state and the segment the web's UserSegments ribbon
  * uses, and taps through to /(app)/admin/user/[id].
  *
- * The rank badge makes the boundary visible: a row you do not outrank is one you
- * could not act on anyway — the server would refuse.
+ * The "outranks you" hint makes the boundary visible: a row you do not outrank
+ * is one you could not act on anyway — the server would refuse.
  */
 export default function AdminUsersScreen() {
   return (
@@ -60,13 +62,15 @@ interface UsersKpi {
   locked?: number;
 }
 
-const STATUS_TONE: Record<string, 'success' | 'warn' | 'danger' | 'neutral'> = {
+const STATUS_TONE: Record<string, PillTone> = {
   active: 'success',
   suspended: 'warn',
   deactivated: 'neutral',
   inactive: 'neutral',
   banned: 'danger',
 };
+
+const titleCase = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : s);
 
 // Server-side segments (adminUsers.controller `SEGMENTS`). Only the subset the
 // web's UserSegments ribbon leads with.
@@ -76,6 +80,7 @@ function AdminUsersList() {
   const { profile } = useAuth();
   const router = useRouter();
   const { colors, spacing, fontSize } = useTheme();
+  const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
   const [segment, setSegment] = useState<Segment>('all');
 
@@ -105,8 +110,9 @@ function AdminUsersList() {
   }, [rows, query]);
 
   return (
-    <>
-      <PageHeader title="Users" subtitle={`${total} accounts`} />
+    <Screen edges={['top']}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <PageTopBar title="Users" subtitle={`${total} accounts`} showBack />
       <ListScreen
         items={filtered}
         loading={loading}
@@ -115,8 +121,15 @@ function AdminUsersList() {
         onRefresh={onRefresh}
         onRetry={() => void refetch()}
         keyExtractor={(u) => u.id}
+        ItemSeparatorComponent={() => <Divider inset={56} />}
+        contentContainerStyle={{
+          paddingHorizontal: spacing.lg,
+          paddingTop: spacing.sm,
+          paddingBottom: spacing['4xl'] + insets.bottom,
+          flexGrow: 1,
+        }}
         header={
-          <View style={{ gap: spacing.md }}>
+          <View style={{ gap: spacing.sm, marginBottom: spacing.xs }}>
             <SearchInput
               value={query}
               onChangeText={setQuery}
@@ -141,57 +154,69 @@ function AdminUsersList() {
           </View>
         }
         emptyTitle={query ? 'No matches' : 'No users'}
+        emptyDescription={
+          query
+            ? 'Try a different name, email or role.'
+            : 'Accounts appear here as they are created.'
+        }
         renderItem={({ item }) => {
           const canAct = profile ? outranks(profile.role, item.role) : false;
           const status = (item.status ?? 'active').toLowerCase();
+          const sub = [item.group_name, canAct ? null : 'outranks you'].filter(Boolean).join(' · ');
           return (
-            <Card onPress={() => router.push(`/(app)/admin/user/${item.id}`)}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-                <Avatar
-                  id={item.id}
-                  name={item.full_name}
-                  email={item.email}
-                  uri={item.avatar_url}
-                  size={44}
-                />
-                <View style={{ flex: 1 }}>
-                  <Text
-                    numberOfLines={1}
-                    style={{ fontSize: fontSize.md, fontWeight: '600', color: colors.ink }}
-                  >
-                    {item.full_name?.trim() || item.email}
-                  </Text>
-                  <Text numberOfLines={1} style={{ fontSize: fontSize.sm, color: colors.muted }}>
-                    {item.email}
-                  </Text>
-                </View>
-                <View style={{ alignItems: 'flex-end', gap: 6 }}>
-                  <Pill label={ROLE_LABEL[item.role] ?? item.role} tone="brand" size="sm" />
-                  <Pill label={status} tone={STATUS_TONE[status] ?? 'neutral'} size="sm" />
-                </View>
-              </View>
-
-              <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: spacing.sm,
-                  marginTop: spacing.sm,
-                }}
-              >
-                {item.group_name ? (
-                  <Text style={{ fontSize: fontSize.xs, color: colors.faint }}>
-                    {item.group_name}
+            <Pressable
+              onPress={() => router.push(`/(app)/admin/user/${item.id}`)}
+              accessibilityRole="button"
+              style={({ pressed }) => ({
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: spacing.md,
+                paddingVertical: 12,
+                backgroundColor: pressed ? colors.hover : 'transparent',
+              })}
+            >
+              <Avatar
+                id={item.id}
+                name={item.full_name}
+                email={item.email}
+                uri={item.avatar_url}
+                size={44}
+              />
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text
+                  numberOfLines={1}
+                  style={{ fontSize: fontSize.md, fontWeight: '600', color: colors.ink }}
+                >
+                  {item.full_name?.trim() || item.email}
+                </Text>
+                <Text numberOfLines={1} style={{ fontSize: fontSize.sm, color: colors.muted }}>
+                  {ROLE_LABEL[item.role] ?? item.role} · {item.email}
+                </Text>
+                {sub ? (
+                  <Text numberOfLines={1} style={{ fontSize: fontSize.xs, color: colors.faint }}>
+                    {sub}
                   </Text>
                 ) : null}
-                {!canAct ? (
-                  <Text style={{ fontSize: fontSize.xs, color: colors.faint }}>· outranks you</Text>
-                ) : null}
               </View>
-            </Card>
+              <StatusText
+                label={titleCase(status)}
+                color={pillToneColor(STATUS_TONE[status] ?? 'neutral', colors)}
+              />
+            </Pressable>
           );
         }}
       />
-    </>
+    </Screen>
+  );
+}
+
+/** Inline status = a small colored dot + colored text (the website's row status). */
+function StatusText({ label, color }: { label: string; color: string }) {
+  const { fontSize } = useTheme();
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+      <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: color }} />
+      <Text style={{ fontSize: fontSize.sm, fontWeight: '600', color }}>{label}</Text>
+    </View>
   );
 }

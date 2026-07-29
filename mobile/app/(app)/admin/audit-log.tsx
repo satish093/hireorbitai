@@ -1,8 +1,11 @@
 import { useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
-import { ListScreen, PageHeader } from '../../../src/components/ui/Screen';
-import { Card } from '../../../src/components/ui/Card';
-import { Pill, type PillTone } from '../../../src/components/ui/Pill';
+import { Stack } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Screen, ListScreen } from '../../../src/components/ui/Screen';
+import { PageTopBar } from '../../../src/components/ui/TopBar';
+import { Divider } from '../../../src/components/ui/Card';
+import { pillToneColor, type PillTone } from '../../../src/components/ui/Pill';
 import { Tabs } from '../../../src/components/ui/Tabs';
 import { RouteGuard } from '../../../src/components/RouteGuard';
 import { useApiList } from '../../../src/hooks/useApi';
@@ -50,6 +53,7 @@ const BUCKET_TEST: Record<Exclude<Bucket, 'all'>, (a: string) => boolean> = {
 
 function AuditLog() {
   const { colors, spacing, fontSize } = useTheme();
+  const insets = useSafeAreaInsets();
   const [bucket, setBucket] = useState<Bucket>('all');
 
   const { items, loading, refreshing, error, onRefresh, refetch } = useApiList<AuditLogEntry>(
@@ -76,8 +80,9 @@ function AuditLog() {
   );
 
   return (
-    <>
-      <PageHeader title="Audit log" subtitle={`${items.length} recent events`} />
+    <Screen edges={['top']}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <PageTopBar title="Audit log" subtitle={`${items.length} recent events`} showBack />
       <ListScreen
         items={filtered}
         loading={loading}
@@ -86,64 +91,78 @@ function AuditLog() {
         onRefresh={onRefresh}
         onRetry={() => void refetch()}
         keyExtractor={(e) => e.id}
+        ItemSeparatorComponent={() => <Divider />}
+        contentContainerStyle={{
+          paddingHorizontal: spacing.lg,
+          paddingTop: spacing.sm,
+          paddingBottom: spacing['4xl'] + insets.bottom,
+          flexGrow: 1,
+        }}
         header={
-          <Tabs
-            value={bucket}
-            onChange={(b) => setBucket(b as Bucket)}
-            items={[
-              { key: 'all', label: 'All', count: items.length },
-              { key: 'auth', label: 'Auth', count: counts.auth },
-              { key: 'users', label: 'Users', count: counts.users },
-              { key: 'groups', label: 'Groups', count: counts.groups },
-              { key: 'denied', label: 'Denied', count: counts.denied },
-            ]}
-          />
+          <View style={{ marginBottom: spacing.xs }}>
+            <Tabs
+              value={bucket}
+              onChange={(b) => setBucket(b as Bucket)}
+              items={[
+                { key: 'all', label: 'All', count: items.length },
+                { key: 'auth', label: 'Auth', count: counts.auth },
+                { key: 'users', label: 'Users', count: counts.users },
+                { key: 'groups', label: 'Groups', count: counts.groups },
+                { key: 'denied', label: 'Denied', count: counts.denied },
+              ]}
+            />
+          </View>
         }
         emptyTitle="No audit events"
         emptyDescription="Security-relevant actions are recorded here."
-        renderItem={({ item }) => (
-          <Card>
-            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md }}>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: fontSize.base, fontWeight: '600', color: colors.ink }}>
-                  {item.action.replace(/_/g, ' ').toLowerCase()}
-                </Text>
-                {item.email ? (
-                  <Text
-                    numberOfLines={1}
-                    style={{ fontSize: fontSize.sm, color: colors.ink2, marginTop: 2 }}
-                  >
-                    {item.email}
+        renderItem={({ item }) => {
+          const tone = toneFor(item.action);
+          const color = pillToneColor(tone, colors);
+          return (
+            <View style={{ paddingVertical: 12 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md }}>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={{ fontSize: fontSize.base, fontWeight: '600', color: colors.ink }}>
+                    {item.action.replace(/_/g, ' ').toLowerCase()}
                   </Text>
-                ) : null}
-                <Text style={{ fontSize: fontSize.xs, color: colors.faint, marginTop: 4 }}>
-                  {relativeDate(item.created_at)}
-                  {item.ip_address ? ` · ${item.ip_address}` : ''}
-                </Text>
+                  {item.email ? (
+                    <Text
+                      numberOfLines={1}
+                      style={{ fontSize: fontSize.sm, color: colors.ink2, marginTop: 2 }}
+                    >
+                      {item.email}
+                    </Text>
+                  ) : null}
+                  <Text style={{ fontSize: fontSize.xs, color: colors.faint, marginTop: 4 }}>
+                    {relativeDate(item.created_at)}
+                    {item.ip_address ? ` · ${item.ip_address}` : ''}
+                  </Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                  <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: color }} />
+                  <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color }}>
+                    {tone.toUpperCase()}
+                  </Text>
+                </View>
               </View>
-              <Pill
-                label={toneFor(item.action).toUpperCase()}
-                tone={toneFor(item.action)}
-                size="sm"
-              />
-            </View>
 
-            {item.metadata && Object.keys(item.metadata).length > 0 ? (
-              <Text
-                numberOfLines={3}
-                style={{
-                  fontSize: fontSize.xs,
-                  color: colors.muted,
-                  marginTop: spacing.sm,
-                  fontFamily: 'monospace',
-                }}
-              >
-                {JSON.stringify(item.metadata)}
-              </Text>
-            ) : null}
-          </Card>
-        )}
+              {item.metadata && Object.keys(item.metadata).length > 0 ? (
+                <Text
+                  numberOfLines={3}
+                  style={{
+                    fontSize: fontSize.xs,
+                    color: colors.muted,
+                    marginTop: spacing.sm,
+                    fontFamily: 'monospace',
+                  }}
+                >
+                  {JSON.stringify(item.metadata)}
+                </Text>
+              ) : null}
+            </View>
+          );
+        }}
       />
-    </>
+    </Screen>
   );
 }

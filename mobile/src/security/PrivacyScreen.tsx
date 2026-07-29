@@ -25,8 +25,9 @@
  * API — it only detects it. So on iOS, treat this as detection, not prevention.
  */
 
-import { useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { AppState, Platform, StyleSheet, Text, View, type AppStateStatus } from 'react-native';
+import { useFocusEffect } from 'expo-router';
 import * as ScreenCapture from 'expo-screen-capture';
 import { useTheme } from '../theme';
 
@@ -77,21 +78,23 @@ export function PrivacyCover({ children }: { children: ReactNode }) {
  *   }
  */
 export function useScreenCaptureGuard(active = true): void {
-  useEffect(() => {
-    if (!active) return;
-    let released = false;
-
-    void ScreenCapture.preventScreenCaptureAsync('hireorbitai-sensitive').catch(() => {
-      // Unsupported on some devices/emulators. Failing to harden must never
-      // crash the screen the user came to read.
-    });
-
-    return () => {
-      if (released) return;
-      released = true;
-      void ScreenCapture.allowScreenCaptureAsync('hireorbitai-sensitive').catch(() => {});
-    };
-  }, [active]);
+  // MUST be tied to FOCUS, not mount. Expo Router's <Tabs> keeps screens mounted
+  // after you navigate away, so a mount/unmount effect would set FLAG_SECURE on
+  // entering the chat/invoices and NEVER release it — leaving the whole app
+  // unable to screenshot / screen-record / cast until a restart. useFocusEffect
+  // applies the guard when the screen is focused and releases it on blur.
+  useFocusEffect(
+    useCallback(() => {
+      if (!active) return;
+      void ScreenCapture.preventScreenCaptureAsync('hireorbitai-sensitive').catch(() => {
+        // Unsupported on some devices/emulators. Failing to harden must never
+        // crash the screen the user came to read.
+      });
+      return () => {
+        void ScreenCapture.allowScreenCaptureAsync('hireorbitai-sensitive').catch(() => {});
+      };
+    }, [active]),
+  );
 }
 
 /**

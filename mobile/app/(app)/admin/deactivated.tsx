@@ -1,8 +1,11 @@
 import { useState } from 'react';
 import { Text, View } from 'react-native';
-import { ListScreen, PageHeader, Banner } from '../../../src/components/ui/Screen';
-import { Card } from '../../../src/components/ui/Card';
-import { Pill } from '../../../src/components/ui/Pill';
+import { Stack } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Screen, ListScreen, Banner } from '../../../src/components/ui/Screen';
+import { PageTopBar } from '../../../src/components/ui/TopBar';
+import { Divider } from '../../../src/components/ui/Card';
+import { pillToneColor } from '../../../src/components/ui/Pill';
 import { Avatar } from '../../../src/components/ui/Avatar';
 import { Button } from '../../../src/components/ui/Button';
 import { ConfirmSheet } from '../../../src/components/ui/Sheet';
@@ -33,7 +36,7 @@ interface DeactivatedRow extends Partial<UserProfile> {
  * Reactivation IS available here — POST /users/:id/reactivate, the same endpoint
  * the web console uses, gated by ADMIN_TIER (requireAdmin) plus the server's own
  * rank guard (assertCanManageTarget) that refuses an equal-or-higher target. The
- * confirm sheet guards the mis-tap; the row badge makes an unactionable target
+ * confirm sheet guards the mis-tap; the row hint makes an unactionable target
  * (one you don't outrank) obvious before you try.
  */
 export default function DeactivatedScreen() {
@@ -46,6 +49,7 @@ export default function DeactivatedScreen() {
 
 function DeactivatedList() {
   const { colors, spacing, fontSize } = useTheme();
+  const insets = useSafeAreaInsets();
   const { profile } = useAuth();
   const [confirm, setConfirm] = useState<DeactivatedRow | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -79,8 +83,9 @@ function DeactivatedList() {
   };
 
   return (
-    <>
-      <PageHeader title="Deactivated" subtitle={`${items.length} accounts`} />
+    <Screen edges={['top']}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <PageTopBar title="Deactivated" subtitle={`${items.length} accounts`} showBack />
       <ListScreen
         items={items}
         loading={loading}
@@ -89,8 +94,15 @@ function DeactivatedList() {
         onRefresh={onRefresh}
         onRetry={() => void refetch()}
         keyExtractor={(u) => u.id}
+        ItemSeparatorComponent={() => <Divider />}
+        contentContainerStyle={{
+          paddingHorizontal: spacing.lg,
+          paddingTop: spacing.sm,
+          paddingBottom: spacing['4xl'] + insets.bottom,
+          flexGrow: 1,
+        }}
         header={
-          <View style={{ gap: spacing.md }}>
+          <View style={{ gap: spacing.sm, marginBottom: spacing.xs }}>
             {error ? <Banner tone="danger" message={error} /> : null}
             <Banner
               tone="info"
@@ -103,10 +115,10 @@ function DeactivatedList() {
         renderItem={({ item }) => {
           const canAct = profile ? outranks(profile.role, item.role) : false;
           return (
-            <Card>
+            <View style={{ paddingVertical: 12, gap: spacing.sm }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-                <Avatar id={item.id} name={item.full_name} email={item.email} size={40} />
-                <View style={{ flex: 1 }}>
+                <Avatar id={item.id} name={item.full_name} email={item.email} size={44} />
+                <View style={{ flex: 1, minWidth: 0 }}>
                   <Text
                     numberOfLines={1}
                     style={{ fontSize: fontSize.md, fontWeight: '600', color: colors.ink }}
@@ -114,36 +126,49 @@ function DeactivatedList() {
                     {item.full_name?.trim() || item.email}
                   </Text>
                   <Text numberOfLines={1} style={{ fontSize: fontSize.sm, color: colors.muted }}>
-                    {item.email}
+                    {ROLE_LABEL[item.role] ?? item.role} · {item.email}
                   </Text>
                   {item.updated_at ? (
-                    <Text style={{ fontSize: fontSize.xs, color: colors.faint, marginTop: 2 }}>
+                    <Text style={{ fontSize: fontSize.xs, color: colors.faint }}>
                       Deactivated {relativeDate(item.updated_at)}
                     </Text>
                   ) : null}
                 </View>
-                <View style={{ alignItems: 'flex-end', gap: 6 }}>
-                  <Pill label={ROLE_LABEL[item.role] ?? item.role} tone="neutral" size="sm" />
-                  <Pill label={item.status ?? 'deactivated'} tone="danger" size="sm" />
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <View
+                    style={{
+                      width: 7,
+                      height: 7,
+                      borderRadius: 4,
+                      backgroundColor: pillToneColor('danger', colors),
+                    }}
+                  />
+                  <Text
+                    style={{
+                      fontSize: fontSize.sm,
+                      fontWeight: '600',
+                      color: pillToneColor('danger', colors),
+                    }}
+                  >
+                    {item.status ?? 'Deactivated'}
+                  </Text>
                 </View>
               </View>
 
               {canAct ? (
-                <View style={{ marginTop: spacing.md }}>
-                  <Button
-                    label="Reactivate"
-                    variant="secondary"
-                    size="sm"
-                    loading={busyId === item.id}
-                    onPress={() => setConfirm(item)}
-                  />
-                </View>
+                <Button
+                  label="Reactivate"
+                  variant="secondary"
+                  size="sm"
+                  loading={busyId === item.id}
+                  onPress={() => setConfirm(item)}
+                />
               ) : (
-                <Text style={{ fontSize: fontSize.xs, color: colors.faint, marginTop: spacing.sm }}>
+                <Text style={{ fontSize: fontSize.xs, color: colors.faint }}>
                   Outranks you — reactivation is refused server-side.
                 </Text>
               )}
-            </Card>
+            </View>
           );
         }}
       />
@@ -161,6 +186,6 @@ function DeactivatedList() {
         confirmLabel="Reactivate"
         pending={!!busyId}
       />
-    </>
+    </Screen>
   );
 }

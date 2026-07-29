@@ -1,7 +1,9 @@
 import { Text, View } from 'react-native';
-import { ListScreen, PageHeader } from '../../../src/components/ui/Screen';
-import { Card } from '../../../src/components/ui/Card';
-import { Pill } from '../../../src/components/ui/Pill';
+import { Stack } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Screen, ListScreen } from '../../../src/components/ui/Screen';
+import { PageTopBar } from '../../../src/components/ui/TopBar';
+import { Divider } from '../../../src/components/ui/Card';
 import { RouteGuard } from '../../../src/components/RouteGuard';
 import { useApiList } from '../../../src/hooks/useApi';
 import { ADMIN_TIER, type UserGroup } from '../../../src/types';
@@ -32,6 +34,7 @@ export default function UserGroupsScreen() {
 
 function UserGroupsList() {
   const { colors, spacing, fontSize } = useTheme();
+  const insets = useSafeAreaInsets();
 
   const { items, loading, refreshing, error, onRefresh, refetch } = useApiList<GroupRow>(
     '/user-groups',
@@ -39,8 +42,9 @@ function UserGroupsList() {
   );
 
   return (
-    <>
-      <PageHeader title="User groups" subtitle={`${items.length} groups`} />
+    <Screen edges={['top']}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <PageTopBar title="User groups" subtitle={`${items.length} groups`} showBack />
       <ListScreen
         items={items}
         loading={loading}
@@ -49,37 +53,43 @@ function UserGroupsList() {
         onRefresh={onRefresh}
         onRetry={() => void refetch()}
         keyExtractor={(g) => g.id}
+        ItemSeparatorComponent={() => <Divider />}
+        contentContainerStyle={{
+          paddingHorizontal: spacing.lg,
+          paddingTop: spacing.sm,
+          paddingBottom: spacing['4xl'] + insets.bottom,
+          flexGrow: 1,
+        }}
         emptyTitle="No groups"
         emptyDescription="Groups partition the workspace into separate teams."
         renderItem={({ item }) => (
-          <Card>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-              <View style={{ flex: 1 }}>
-                <Text
-                  numberOfLines={1}
-                  style={{ fontSize: fontSize.md, fontWeight: '600', color: colors.ink }}
-                >
-                  {item.name}
-                </Text>
-                <Text style={{ fontSize: fontSize.sm, color: colors.muted, marginTop: 2 }}>
-                  {item.slug}
-                </Text>
-                {item.email ? (
-                  <Text
-                    numberOfLines={1}
-                    style={{ fontSize: fontSize.xs, color: colors.faint, marginTop: 2 }}
-                  >
-                    {item.email}
-                  </Text>
-                ) : null}
-              </View>
-              {typeof item.member_count === 'number' ? (
-                <Pill label={`${item.member_count} members`} tone="brand" size="sm" />
-              ) : null}
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: spacing.md,
+              paddingVertical: 12,
+            }}
+          >
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text
+                numberOfLines={1}
+                style={{ fontSize: fontSize.md, fontWeight: '600', color: colors.ink }}
+              >
+                {item.name}
+              </Text>
+              <Text numberOfLines={1} style={{ fontSize: fontSize.sm, color: colors.muted }}>
+                {item.email ? `${item.slug} · ${item.email}` : item.slug}
+              </Text>
             </View>
-          </Card>
+            {typeof item.member_count === 'number' ? (
+              <Text style={{ fontSize: fontSize.sm, fontWeight: '600', color: colors.ink2 }}>
+                {item.member_count} {item.member_count === 1 ? 'member' : 'members'}
+              </Text>
+            ) : null}
+          </View>
         )}
       />
-    </>
+    </Screen>
   );
 }

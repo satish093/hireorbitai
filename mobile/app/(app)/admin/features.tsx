@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import { Switch, Text, View } from 'react-native';
-import { ListScreen, PageHeader, Banner } from '../../../src/components/ui/Screen';
-import { Card } from '../../../src/components/ui/Card';
+import { Stack } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Screen, ListScreen, Banner } from '../../../src/components/ui/Screen';
+import { PageTopBar } from '../../../src/components/ui/TopBar';
+import { Divider } from '../../../src/components/ui/Card';
 import { RouteGuard } from '../../../src/components/RouteGuard';
 import { useApiList } from '../../../src/hooks/useApi';
 import { invalidate } from '../../../src/hooks/useInvalidate';
@@ -40,6 +43,7 @@ export default function FeatureFlagsScreen() {
 
 function FeatureFlagsList() {
   const { colors, spacing, fontSize } = useTheme();
+  const insets = useSafeAreaInsets();
   const { profile } = useAuth();
   const [pendingKey, setPendingKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -76,8 +80,9 @@ function FeatureFlagsList() {
   };
 
   return (
-    <>
-      <PageHeader title="Feature flags" subtitle={`${flags.items.length} modules`} />
+    <Screen edges={['top']}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <PageTopBar title="Feature flags" subtitle={`${flags.items.length} modules`} showBack />
       <ListScreen
         items={flags.items}
         loading={flags.loading}
@@ -86,8 +91,15 @@ function FeatureFlagsList() {
         onRefresh={flags.onRefresh}
         onRetry={() => void flags.refetch()}
         keyExtractor={(f) => f.key}
+        ItemSeparatorComponent={() => <Divider />}
+        contentContainerStyle={{
+          paddingHorizontal: spacing.lg,
+          paddingTop: spacing.sm,
+          paddingBottom: spacing['4xl'] + insets.bottom,
+          flexGrow: 1,
+        }}
         header={
-          <View style={{ gap: spacing.md }}>
+          <View style={{ gap: spacing.sm, marginBottom: spacing.xs }}>
             {error ? <Banner tone="danger" message={error} /> : null}
             {canWrite ? (
               <Banner
@@ -104,35 +116,40 @@ function FeatureFlagsList() {
         }
         emptyTitle="No feature flags"
         renderItem={({ item }) => (
-          <Card>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-              <View style={{ flex: 1 }}>
-                <Text
-                  style={{
-                    fontSize: fontSize.md,
-                    fontWeight: '600',
-                    color: colors.ink,
-                    textTransform: 'capitalize',
-                  }}
-                >
-                  {item.key.replace(/_/g, ' ')}
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: spacing.md,
+              paddingVertical: 12,
+            }}
+          >
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text
+                style={{
+                  fontSize: fontSize.md,
+                  fontWeight: '600',
+                  color: colors.ink,
+                  textTransform: 'capitalize',
+                }}
+              >
+                {item.key.replace(/_/g, ' ')}
+              </Text>
+              {item.description ? (
+                <Text style={{ fontSize: fontSize.sm, color: colors.muted, marginTop: 2 }}>
+                  {item.description}
                 </Text>
-                {item.description ? (
-                  <Text style={{ fontSize: fontSize.sm, color: colors.muted, marginTop: 2 }}>
-                    {item.description}
-                  </Text>
-                ) : null}
-              </View>
-              <Switch
-                value={item.enabled}
-                disabled={!canWrite || pendingKey === item.key}
-                onValueChange={(next) => void toggle(item, next)}
-                trackColor={{ true: colors.accent, false: colors.borderStrong }}
-              />
+              ) : null}
             </View>
-          </Card>
+            <Switch
+              value={item.enabled}
+              disabled={!canWrite || pendingKey === item.key}
+              onValueChange={(next) => void toggle(item, next)}
+              trackColor={{ true: colors.accent, false: colors.borderStrong }}
+            />
+          </View>
         )}
       />
-    </>
+    </Screen>
   );
 }
