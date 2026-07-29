@@ -30,6 +30,7 @@ const GROUP_SCREENS = [
   'tasks-assigned',
   'messages',
   'my-resume',
+  'resume-view',
   'applications',
   'consultants',
   'recruiters',

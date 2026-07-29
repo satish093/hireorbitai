@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Screen, ListScreen, Banner } from '../../src/components/ui/Screen';
 import { PageTopBar } from '../../src/components/ui/TopBar';
@@ -38,6 +39,7 @@ export default function ResumesScreen() {
 function ResumesView() {
   useScreenCaptureGuard();
 
+  const router = useRouter();
   const { colors, spacing, fontSize } = useTheme();
   const insets = useSafeAreaInsets();
   const [consultantId, setConsultantId] = useState<string | null>(null);
@@ -65,12 +67,23 @@ function ResumesView() {
       }));
   }, [consultants.items, query]);
 
-  const openResume = async (id: string) => {
+  const openResume = async (id: string, fileName?: string) => {
     try {
       const { data } = await api.get<{ url?: string; download_url?: string }>(
         `/resumes/${id}/download-url`,
       );
-      await openInAppBrowser(data?.url ?? data?.download_url);
+      const url = data?.url ?? data?.download_url;
+      if (!url) throw new Error('no url');
+      // PDFs render in the in-app viewer (stays in the app). Non-PDFs (e.g. .docx)
+      // have no safe in-app renderer, so they open in the in-app browser tab.
+      if ((fileName ?? '').toLowerCase().endsWith('.pdf')) {
+        router.push({
+          pathname: '/(app)/resume-view',
+          params: { url, name: fileName ?? 'Résumé' },
+        });
+      } else {
+        await openInAppBrowser(url);
+      }
     } catch {
       Alert.alert('Could not open', 'The download link could not be created. Try again.');
     }
@@ -126,7 +139,7 @@ function ResumesView() {
         }
         renderItem={({ item }) => (
           <Pressable
-            onPress={() => void openResume(item.id)}
+            onPress={() => void openResume(item.id, item.file_name)}
             accessibilityRole="button"
             accessibilityLabel={`Open ${item.file_name}`}
             style={({ pressed }) => ({

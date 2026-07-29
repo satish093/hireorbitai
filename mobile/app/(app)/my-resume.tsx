@@ -1,4 +1,5 @@
 import { Alert, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Screen, Banner } from '../../src/components/ui/Screen';
 import { PageTopBar } from '../../src/components/ui/TopBar';
@@ -41,6 +42,7 @@ function MyResume() {
 
   const { colors, spacing, fontSize } = useTheme();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { profile } = useAuth();
 
   // There is no /resumes/mine endpoint. The real one is
@@ -62,12 +64,22 @@ function MyResume() {
    * backend HMAC-signs them with an expiry, so a URL baked into a cached list
    * would already be dead by the time the user taps it.
    */
-  const openResume = async (id: string) => {
+  const openResume = async (id: string, fileName?: string) => {
     try {
       const { data } = await api.get<{ url?: string; download_url?: string }>(
         `/resumes/${id}/download-url`,
       );
-      await openInAppBrowser(data?.url ?? data?.download_url);
+      const url = data?.url ?? data?.download_url;
+      if (!url) throw new Error('no url');
+      // PDFs render in the in-app viewer; non-PDFs open in the in-app browser tab.
+      if ((fileName ?? '').toLowerCase().endsWith('.pdf')) {
+        router.push({
+          pathname: '/(app)/resume-view',
+          params: { url, name: fileName ?? 'Résumé' },
+        });
+      } else {
+        await openInAppBrowser(url);
+      }
     } catch {
       Alert.alert('Could not open', 'The download link could not be created. Try again.');
     }
@@ -131,7 +143,7 @@ function MyResume() {
                 <Button
                   label="Open résumé"
                   variant="secondary"
-                  onPress={() => void openResume(current.id)}
+                  onPress={() => void openResume(current.id, current.file_name)}
                 />
               </View>
             </Card>
@@ -169,7 +181,7 @@ function MyResume() {
                         size="sm"
                         variant="ghost"
                         block={false}
-                        onPress={() => void openResume(r.id)}
+                        onPress={() => void openResume(r.id, r.file_name)}
                       />
                     </View>
                   </View>
