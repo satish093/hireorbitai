@@ -22,6 +22,7 @@
  */
 
 import { Alert, Linking } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
 
 export function isSafeHttpsUrl(raw: string | undefined | null): raw is string {
   if (!raw) return false;
@@ -54,6 +55,42 @@ export async function openExternalUrl(raw: string | undefined | null): Promise<b
     return true;
   } catch {
     return false;
+  }
+}
+
+/**
+ * Open a document (resume, invoice PDF, etc.) IN-APP instead of downloading it.
+ *
+ * `openExternalUrl` hands the URL to the OS, which routes a document to the
+ * download manager — the file leaves the app. This opens the same https URL in
+ * an in-app browser tab (Android Custom Tab / iOS SafariViewController), so a
+ * PDF the backend serves inline (Content-Disposition: inline) renders on top of
+ * the app and the user stays in HireOrbit. Same https-only guard as external
+ * links. Returns true when it was opened.
+ *
+ * Note: the backend serves images/PDFs inline and everything else as an
+ * attachment (defence in depth), so a non-PDF (e.g. .docx) will still download —
+ * there is no safe in-app renderer for those without routing the file through a
+ * third-party viewer, which we deliberately avoid for PII documents.
+ */
+export async function openInAppBrowser(raw: string | undefined | null): Promise<boolean> {
+  if (!isSafeHttpsUrl(raw)) {
+    Alert.alert(
+      'Link blocked',
+      'That link isn’t a valid secure (https) address, so it wasn’t opened.',
+    );
+    return false;
+  }
+  try {
+    await WebBrowser.openBrowserAsync(raw, {
+      enableBarCollapsing: true,
+      showTitle: true,
+    });
+    return true;
+  } catch {
+    // In-app browser unavailable for some reason — fall back to the OS handler
+    // rather than leaving the tap dead.
+    return openExternalUrl(raw);
   }
 }
 

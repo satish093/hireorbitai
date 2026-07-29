@@ -11,7 +11,7 @@ import { useApiList } from '../../src/hooks/useApi';
 import { useAuth } from '../../src/context/AuthContext';
 import { api } from '../../src/services/api';
 import { useScreenCaptureGuard } from '../../src/security/PrivacyScreen';
-import { openExternalUrl } from '../../src/utils/safeUrl';
+import { openInAppBrowser } from '../../src/utils/safeUrl';
 import type { Resume } from '../../src/types';
 import { useTheme } from '../../src/theme';
 import { relativeDate } from './jobs';
@@ -67,7 +67,7 @@ function MyResume() {
       const { data } = await api.get<{ url?: string; download_url?: string }>(
         `/resumes/${id}/download-url`,
       );
-      await openExternalUrl(data?.url ?? data?.download_url);
+      await openInAppBrowser(data?.url ?? data?.download_url);
     } catch {
       Alert.alert('Could not open', 'The download link could not be created. Try again.');
     }
