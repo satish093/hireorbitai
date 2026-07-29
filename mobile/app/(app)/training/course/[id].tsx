@@ -9,7 +9,8 @@ import { Button } from '../../../../src/components/ui/Button';
 import { SkeletonCard, ErrorState, EmptyState } from '../../../../src/components/ui/States';
 import { RouteGuard } from '../../../../src/components/RouteGuard';
 import { useApiQuery } from '../../../../src/hooks/useApi';
-import { BUSINESS_ROLES } from '../../../../src/types';
+import { useAuth } from '../../../../src/context/AuthContext';
+import { BUSINESS_ROLES, MANAGER_TIER } from '../../../../src/types';
 import { useTheme } from '../../../../src/theme';
 import { shortDate } from '../../../../src/utils/format';
 
@@ -61,8 +62,13 @@ interface CourseResponse {
 function CourseDetail() {
   const { id, assignmentId } = useLocalSearchParams<{ id: string; assignmentId?: string }>();
   const router = useRouter();
+  const { profile } = useAuth();
   const { colors, spacing, fontSize } = useTheme();
   const insets = useSafeAreaInsets();
+
+  // Manager-tier authors get an Edit entry point (metadata / publish / delete).
+  // Learners only ever see the read-only course.
+  const canEdit = !!profile && (MANAGER_TIER as readonly string[]).includes(profile.role);
 
   const { data, loading, refreshing, error, onRefresh, refetch } = useApiQuery<CourseResponse>(
     id ? `/training/courses/${id}` : null,
@@ -85,7 +91,21 @@ function CourseDetail() {
     <>
       <Stack.Screen options={{ headerShown: false }} />
       <Screen>
-        <PageTopBar title={data?.title ?? 'Course'} showBack />
+        <PageTopBar
+          title={data?.title ?? 'Course'}
+          showBack
+          right={
+            canEdit && id ? (
+              <Button
+                label="Edit"
+                href={`/(app)/training/edit/${id}`}
+                size="sm"
+                block={false}
+                variant="secondary"
+              />
+            ) : undefined
+          }
+        />
         <ScrollView
           style={{ flex: 1 }}
           keyboardShouldPersistTaps="handled"

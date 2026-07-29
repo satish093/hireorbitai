@@ -6,6 +6,7 @@ import { Card, SectionHeader } from '../../src/components/ui/Card';
 import { Button } from '../../src/components/ui/Button';
 import { FormInput } from '../../src/components/ui/Inputs';
 import { RouteGuard } from '../../src/components/RouteGuard';
+import { useAuth } from '../../src/context/AuthContext';
 import { api, apiErrorMessage } from '../../src/services/api';
 import { OPERATOR_TIER } from '../../src/types';
 import { useTheme } from '../../src/theme';
@@ -34,14 +35,21 @@ export default function AIEmailScreen() {
 
 function AIEmail() {
   const { colors, spacing, fontSize } = useTheme();
+  const { profile } = useAuth();
 
   const [consultant, setConsultant] = useState('');
   const [role, setRole] = useState('');
-  const [notes, setNotes] = useState('');
+  const [skills, setSkills] = useState('');
+  const [vendor, setVendor] = useState('');
   const [draft, setDraft] = useState('');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+
+  // recruiterName is required server-side; the sender IS the signed-in
+  // recruiter, so it's derived rather than asked for (mirrors the web form's
+  // recruiterName field, prefilled here from the session).
+  const recruiterName = profile?.full_name?.trim() || profile?.email || 'Recruiter';
 
   const canSubmit = consultant.trim().length > 0 && role.trim().length > 0 && !pending;
 
@@ -51,15 +59,21 @@ function AIEmail() {
     setError(null);
     setCopied(false);
     try {
-      const { data } = await api.post<{ email?: string; body?: string; text?: string }>(
-        '/ai/vendor-email',
-        {
-          consultant_name: consultant.trim(),
-          role: role.trim(),
-          notes: notes.trim() || undefined,
-        },
-      );
-      setDraft(data?.email ?? data?.body ?? data?.text ?? '');
+      // Backend contract (ai.controller vendorEmail): camelCase fields,
+      // consultantName + jobTitle + recruiterName required; returns { subject, body }.
+      const { data } = await api.post<{ subject?: string; body?: string }>('/ai/vendor-email', {
+        consultantName: consultant.trim(),
+        jobTitle: role.trim(),
+        recruiterName,
+        vendorName: vendor.trim() || undefined,
+        consultantSkills: skills
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean),
+      });
+      const subject = data?.subject?.trim();
+      const body = data?.body?.trim() ?? '';
+      setDraft(subject ? `Subject: ${subject}\n\n${body}` : body);
     } catch (err) {
       setError(apiErrorMessage(err, 'Could not draft the email.'));
     } finally {
@@ -103,11 +117,16 @@ function AIEmail() {
               required
             />
             <FormInput
-              label="Anything to emphasise"
-              value={notes}
-              onChangeText={setNotes}
-              placeholder="Optional — rate, availability, standout skills"
-              multiline
+              label="Key skills"
+              value={skills}
+              onChangeText={setSkills}
+              placeholder="Optional — comma separated, e.g. Java, AWS, Kafka"
+            />
+            <FormInput
+              label="Vendor"
+              value={vendor}
+              onChangeText={setVendor}
+              placeholder="Optional — who you're pitching to"
             />
             <Button
               label="Draft email"

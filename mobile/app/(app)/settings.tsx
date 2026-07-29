@@ -41,7 +41,7 @@ function Settings() {
     setSavingAlerts(true);
     setError(null);
     try {
-      await api.post('/auth/job-alerts', { job_alerts: next });
+      await api.post('/auth/job-alerts', { enabled: next });
       await refreshProfile();
     } catch (err) {
       setJobAlerts(!next); // revert

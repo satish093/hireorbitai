@@ -1,14 +1,27 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Screen, ListScreen } from '../../src/components/ui/Screen';
 import { PageTopBar } from '../../src/components/ui/TopBar';
 import { Divider } from '../../src/components/ui/Card';
 import { Tabs, type TabItem } from '../../src/components/ui/Tabs';
+import { Sheet } from '../../src/components/ui/Sheet';
+import { Button } from '../../src/components/ui/Button';
+import { FormInput, SelectInput } from '../../src/components/ui/Inputs';
 import { RouteGuard } from '../../src/components/RouteGuard';
-import { useApiList } from '../../src/hooks/useApi';
-import { BUSINESS_ROLES, TASK_STATUS_LABEL, type Task, type TaskStatus } from '../../src/types';
+import { useApiList, useApiMutation } from '../../src/hooks/useApi';
+import { useAuth } from '../../src/context/AuthContext';
+import {
+  BUSINESS_ROLES,
+  TASK_PRIORITIES,
+  TASK_STATUS_LABEL,
+  isManagerOrUp,
+  type Task,
+  type TaskStatus,
+  type TaskPriority,
+  type UserRef,
+} from '../../src/types';
 import { useTheme, type Palette } from '../../src/theme';
 
 /**
@@ -42,13 +55,35 @@ const DONE_STATUSES: TaskStatus[] = ['COMPLETED', 'CANCELLED'];
 
 function TaskList() {
   const router = useRouter();
+  const { profile } = useAuth();
   const { colors, spacing, fontSize } = useTheme();
   const insets = useSafeAreaInsets();
   const [filter, setFilter] = useState<TaskStatus | 'ALL' | 'OPEN'>('OPEN');
 
+  // Only MANAGER_TIER may create (POST /tasks is role-gated); mirror that here so
+  // the affordance never attaches for a recruiter/consultant who'd get a 403.
+  const canCreate = isManagerOrUp(profile?.role);
+  const [createOpen, setCreateOpen] = useState(false);
+
+  // The dashboard's "+ New task" button deep-links here with ?new=1.
+  const params = useLocalSearchParams<{ new?: string }>();
+  useEffect(() => {
+    if (params.new === '1' && canCreate) setCreateOpen(true);
+  }, [params.new, canCreate]);
+
   const { items, loading, refreshing, error, onRefresh, refetch } = useApiList<Task>('/tasks', {
     channel: 'tasks',
   });
+
+  // Status-only toggle from the row checkbox. urlOverride carries the row id, so
+  // one mutation serves every row. invalidates:['tasks'] refetches this list.
+  const toggleStatus = useApiMutation<{ status: TaskStatus }, Task>('patch', '/tasks', {
+    invalidates: ['tasks'],
+  });
+  const toggleDone = (t: Task) => {
+    const next: TaskStatus = DONE_STATUSES.includes(t.status) ? 'TODO' : 'COMPLETED';
+    void toggleStatus.mutate({ status: next }, `/tasks/${t.id}/status`);
+  };
 
   const filtered = useMemo(() => {
     if (filter === 'ALL') return items;
@@ -71,7 +106,25 @@ function TaskList() {
 
   return (
     <Screen edges={['top']}>
-      <PageTopBar title="Tasks" subtitle={`${items.length} total`} />
+      <PageTopBar
+        title="Tasks"
+        subtitle={`${items.length} total`}
+        right={
+          canCreate ? (
+            <Pressable
+              onPress={() => setCreateOpen(true)}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="New task"
+              style={{ height: 36, paddingHorizontal: spacing.sm, justifyContent: 'center' }}
+            >
+              <Text style={{ color: colors.accent, fontSize: fontSize.md, fontWeight: '700' }}>
+                + New
+              </Text>
+            </Pressable>
+          ) : null
+        }
+      />
       <ListScreen
         items={filtered}
         loading={loading}
@@ -104,7 +157,14 @@ function TaskList() {
                 paddingVertical: spacing.md,
               })}
             >
-              <View
+              {/* Nested Pressable: tapping the checkbox toggles COMPLETED and does
+                  NOT bubble to the row's navigate handler. */}
+              <Pressable
+                onPress={() => toggleDone(item)}
+                hitSlop={10}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: done }}
+                accessibilityLabel={done ? 'Mark task incomplete' : 'Mark task complete'}
                 style={{
                   width: 22,
                   height: 22,
@@ -120,7 +180,7 @@ function TaskList() {
                 {done ? (
                   <Text style={{ color: '#ffffff', fontSize: 12, fontWeight: '800' }}>✓</Text>
                 ) : null}
-              </View>
+              </Pressable>
 
               <View style={{ flex: 1 }}>
                 <Text
@@ -166,7 +226,125 @@ function TaskList() {
           );
         }}
       />
+
+      {canCreate ? <NewTaskSheet open={createOpen} onClose={() => setCreateOpen(false)} /> : null}
     </Screen>
+  );
+}
+
+/** Assignee shape returned by GET /tasks/assignees (lean picker projection). */
+type Assignee = Pick<UserRef, 'id' | 'full_name' | 'email' | 'role'>;
+
+/**
+ * Manager create-task sheet — mirrors the web CreateTaskModal's everyday path:
+ * title (required), description, priority, optional assignee. POST /tasks is
+ * MANAGER_TIER-gated, matching canCreate at the call site.
+ */
+function NewTaskSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { colors, spacing, fontSize } = useTheme();
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [priority, setPriority] = useState<TaskPriority>('MEDIUM');
+  const [assigneeId, setAssigneeId] = useState<string>('');
+
+  // Only fetch the assignee list while the sheet is open (manager-only endpoint).
+  const assignees = useApiList<Assignee>(open ? '/tasks/assignees' : null, {
+    channel: 'tasks',
+    enabled: open,
+  });
+
+  const create = useApiMutation<
+    {
+      title: string;
+      description: string | null;
+      priority: TaskPriority;
+      assignee_id: string | null;
+    },
+    Task
+  >('post', '/tasks', { invalidates: ['tasks'] });
+
+  const reset = () => {
+    setTitle('');
+    setDescription('');
+    setPriority('MEDIUM');
+    setAssigneeId('');
+    create.reset();
+  };
+
+  const close = () => {
+    reset();
+    onClose();
+  };
+
+  const submit = async () => {
+    const t = title.trim();
+    if (!t) return;
+    const created = await create.mutate({
+      title: t,
+      description: description.trim() || null,
+      priority,
+      assignee_id: assigneeId || null,
+    });
+    if (created) close();
+  };
+
+  const assigneeOptions = [
+    { value: '', label: 'Unassigned' },
+    ...assignees.items.map((a) => ({ value: a.id, label: a.full_name ?? a.email })),
+  ];
+
+  return (
+    <Sheet
+      open={open}
+      onClose={close}
+      title="New task"
+      footer={
+        <Button
+          label="Create task"
+          onPress={submit}
+          disabled={!title.trim() || create.pending}
+          loading={create.pending}
+        />
+      }
+    >
+      <View>
+        <FormInput
+          label="Title"
+          value={title}
+          onChangeText={setTitle}
+          placeholder="What needs doing?"
+          required
+        />
+        <FormInput
+          label="Description"
+          value={description}
+          onChangeText={setDescription}
+          placeholder="Add context (optional)"
+          multiline
+        />
+        <SelectInput
+          label="Priority"
+          value={priority}
+          onChange={(v) => setPriority(v as TaskPriority)}
+          options={TASK_PRIORITIES.map((p) => ({
+            value: p,
+            label: p.charAt(0) + p.slice(1).toLowerCase(),
+          }))}
+        />
+        <SelectInput
+          label="Assignee"
+          value={assigneeId}
+          onChange={setAssigneeId}
+          options={assigneeOptions}
+          placeholder={assignees.loading ? 'Loading…' : 'Unassigned'}
+        />
+        {create.error ? (
+          <Text style={{ fontSize: fontSize.sm, color: colors.danger, marginTop: spacing.xs }}>
+            {create.error}
+          </Text>
+        ) : null}
+      </View>
+    </Sheet>
   );
 }
 

@@ -79,8 +79,25 @@ function Profile() {
     setSaving(true);
     setError(null);
     try {
+      // first_name / last_name are optional-but-NOT-nullable in the server's
+      // strict schema, so an empty one must be OMITTED — sending null 400s.
+      // The address / contact fields ARE nullable, so empty clears them.
+      const NULLABLE = new Set([
+        'phone',
+        'address_line1',
+        'address_line2',
+        'city',
+        'state',
+        'postal_code',
+        'country',
+        'linkedin_url',
+      ]);
       const payload: Record<string, string | null> = {};
-      for (const [k, v] of Object.entries(form)) payload[k] = v.trim() || null;
+      for (const [k, v] of Object.entries(form)) {
+        const t = v.trim();
+        if (NULLABLE.has(k)) payload[k] = t || null;
+        else if (t) payload[k] = t;
+      }
       await api.patch(`/users/${profile.id}`, payload);
       await refreshProfile();
       setSaved(true);

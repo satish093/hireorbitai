@@ -7,9 +7,10 @@ import { Card, SectionHeader, Divider } from '../../src/components/ui/Card';
 import { Pill, INTERVIEW_STATUS_TONE } from '../../src/components/ui/Pill';
 import { SkeletonList, EmptyState } from '../../src/components/ui/States';
 import { RouteGuard } from '../../src/components/RouteGuard';
-import { useApiList } from '../../src/hooks/useApi';
+import { useApiList, useApiMutation } from '../../src/hooks/useApi';
 import { BUSINESS_ROLES, type Interview } from '../../src/types';
 import { useTheme } from '../../src/theme';
+import { AddReminderSheet } from './reminders';
 
 /** Reflects the real /reminders payload (public.reminders: due_at + description). */
 interface ReminderRow {
@@ -59,9 +60,28 @@ function CalendarAgenda() {
   const { colors, spacing, fontSize, radius } = useTheme();
   const insets = useSafeAreaInsets();
   const [days, setDays] = useState<(typeof RANGES)[number]['key']>(7);
+  const [addOpen, setAddOpen] = useState(false);
 
   const interviews = useApiList<Interview>('/interviews', { channel: 'interviews' });
   const reminders = useApiList<ReminderRow>('/reminders', { channel: 'reminders' });
+
+  const createReminder = useApiMutation<{ title: string; due_at: string; description?: string }>(
+    'post',
+    '/reminders',
+    { invalidates: ['reminders'] },
+  );
+
+  const onAddReminder = async (payload: {
+    title: string;
+    due_at: string;
+    description?: string;
+  }) => {
+    const created = await createReminder.mutate(payload);
+    if (created) {
+      setAddOpen(false);
+      void reminders.refetch();
+    }
+  };
 
   const loading = interviews.loading || reminders.loading;
   const refreshing = interviews.refreshing || reminders.refreshing;
@@ -119,7 +139,30 @@ function CalendarAgenda() {
 
   return (
     <Screen edges={['top']}>
-      <PageTopBar title="Calendar" showBack />
+      <PageTopBar
+        title="Calendar"
+        showBack
+        right={
+          <Pressable
+            onPress={() => setAddOpen(true)}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Add reminder to calendar"
+            style={{
+              height: 36,
+              paddingHorizontal: spacing.md,
+              borderRadius: radius.pill,
+              backgroundColor: colors.accent,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Text style={{ color: colors.accentFg, fontSize: fontSize.sm, fontWeight: '700' }}>
+              + Add
+            </Text>
+          </Pressable>
+        }
+      />
       <ScrollView
         contentContainerStyle={{
           padding: spacing.lg,
@@ -254,6 +297,14 @@ function CalendarAgenda() {
           ))
         )}
       </ScrollView>
+
+      <AddReminderSheet
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        onSubmit={onAddReminder}
+        pending={createReminder.pending}
+        error={createReminder.error}
+      />
     </Screen>
   );
 }

@@ -247,7 +247,12 @@ function ManagerDashboard() {
       {/* Action buttons */}
       <View style={{ flexDirection: 'row', gap: spacing.sm }}>
         <Button label="↻ Manage jobs" variant="secondary" href="/(app)/jobs" block={false} />
-        <Button label="+ New task" variant="primary" href="/(app)/tasks" block={false} />
+        <Button
+          label="+ New task"
+          variant="primary"
+          href={{ pathname: '/(app)/tasks', params: { new: '1' } }}
+          block={false}
+        />
       </View>
 
       {/* Task KPIs */}

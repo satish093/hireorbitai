@@ -6,14 +6,19 @@ import { PageTopBar } from '../../src/components/ui/TopBar';
 import { Divider } from '../../src/components/ui/Card';
 import { Tabs, type TabItem } from '../../src/components/ui/Tabs';
 import { Sheet, ConfirmSheet } from '../../src/components/ui/Sheet';
-import { SelectInput } from '../../src/components/ui/Inputs';
+import { SelectInput, FormInput } from '../../src/components/ui/Inputs';
 import { Button } from '../../src/components/ui/Button';
 import { Avatar } from '../../src/components/ui/Avatar';
 import { APPLICATION_STATUS_TONE, pillToneColor } from '../../src/components/ui/Pill';
 import { RouteGuard } from '../../src/components/RouteGuard';
 import { useApiList, useApiMutation } from '../../src/hooks/useApi';
 import { useAuth } from '../../src/context/AuthContext';
-import { BUSINESS_ROLES, type Application, type ApplicationStatus } from '../../src/types';
+import {
+  ADMIN_TIER,
+  BUSINESS_ROLES,
+  type Application,
+  type ApplicationStatus,
+} from '../../src/types';
 import { useTheme } from '../../src/theme';
 import { relativeDate } from './jobs';
 
@@ -62,9 +67,15 @@ function ApplicationsList() {
   const [status, setStatus] = useState<ApplicationStatus | 'ALL'>('ALL');
   const [editApp, setEditApp] = useState<Application | null>(null);
   const [draftStatus, setDraftStatus] = useState<ApplicationStatus>('SUBMITTED');
+  const [draftNotes, setDraftNotes] = useState('');
+  const [draftRejection, setDraftRejection] = useState('');
   const [confirmDelete, setConfirmDelete] = useState<Application | null>(null);
 
   const isConsultant = profile?.role === 'CONSULTANT';
+  // Hard-delete is ADMIN_TIER-only server-side (DELETE /applications/:id). Only
+  // show the delete affordance to callers who can actually complete it — every
+  // other operator would get a 404 from the ownership/tier gate.
+  const canDelete = !!profile && (ADMIN_TIER as readonly string[]).includes(profile.role);
   const endpoint = isConsultant ? '/applications/mine' : '/applications';
 
   const { items, loading, refreshing, error, onRefresh, refetch } = useApiList<Application>(
@@ -95,11 +106,24 @@ function ApplicationsList() {
   const openEdit = (app: Application) => {
     setEditApp(app);
     setDraftStatus(app.status);
+    setDraftNotes(app.notes ?? '');
+    setDraftRejection(
+      (app as Application & { rejection_reason?: string | null }).rejection_reason ?? '',
+    );
   };
 
   const saveStatus = async () => {
     if (!editApp) return;
-    await patchStatus.mutate({ status: draftStatus }, `/applications/${editApp.id}`);
+    const ok = await patchStatus.mutate(
+      {
+        status: draftStatus,
+        notes: draftNotes.trim() || null,
+        // Only carry a rejection reason while REJECTED; clear it otherwise.
+        rejection_reason: draftStatus === 'REJECTED' ? draftRejection.trim() || null : null,
+      },
+      `/applications/${editApp.id}`,
+    );
+    if (!ok) return;
     setEditApp(null);
     void refetch();
   };
@@ -230,15 +254,18 @@ function ApplicationsList() {
         footer={
           <View style={{ gap: spacing.sm }}>
             <Button label="Save" onPress={saveStatus} loading={patchStatus.pending} />
-            <Button
-              label="Delete submission"
-              variant="danger-ghost"
-              onPress={() => {
-                const app = editApp;
-                setEditApp(null);
-                setConfirmDelete(app);
-              }}
-            />
+            {canDelete ? (
+              <Button
+                label="Delete submission"
+                variant="danger-ghost"
+                disabled={patchStatus.pending}
+                onPress={() => {
+                  const app = editApp;
+                  setEditApp(null);
+                  setConfirmDelete(app);
+                }}
+              />
+            ) : null}
           </View>
         }
       >
@@ -254,6 +281,21 @@ function ApplicationsList() {
             value={draftStatus}
             onChange={(v) => setDraftStatus(v as ApplicationStatus)}
             options={EDITABLE_STATUSES.map((s) => ({ value: s, label: titleCase(s) }))}
+          />
+          {draftStatus === 'REJECTED' ? (
+            <FormInput
+              label="Rejection reason"
+              value={draftRejection}
+              onChangeText={setDraftRejection}
+              placeholder="e.g. Rate too high, role filled"
+            />
+          ) : null}
+          <FormInput
+            label="Notes"
+            value={draftNotes}
+            onChangeText={setDraftNotes}
+            placeholder="Internal notes…"
+            multiline
           />
         </View>
       </Sheet>

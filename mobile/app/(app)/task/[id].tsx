@@ -1,22 +1,25 @@
 import { useState } from 'react';
 import { RefreshControl, ScrollView, Text, View } from 'react-native';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Screen, Banner } from '../../../src/components/ui/Screen';
 import { PageTopBar } from '../../../src/components/ui/TopBar';
 import { Card, SectionHeader, DetailRow, Divider } from '../../../src/components/ui/Card';
 import { Pill, TASK_STATUS_TONE, TASK_PRIORITY_TONE } from '../../../src/components/ui/Pill';
 import { Button } from '../../../src/components/ui/Button';
+import { ConfirmSheet } from '../../../src/components/ui/Sheet';
 import { Avatar } from '../../../src/components/ui/Avatar';
 import { SelectInput } from '../../../src/components/ui/Inputs';
 import { FormInput } from '../../../src/components/ui/Inputs';
 import { SkeletonCard, ErrorState, EmptyState } from '../../../src/components/ui/States';
 import { RouteGuard } from '../../../src/components/RouteGuard';
 import { useApiQuery, useApiList, useApiMutation } from '../../../src/hooks/useApi';
+import { useAuth } from '../../../src/context/AuthContext';
 import {
   BUSINESS_ROLES,
   TASK_STATUSES,
   TASK_STATUS_LABEL,
+  isManagerOrUp,
   type Task,
   type TaskComment,
   type TaskStatus,
@@ -42,9 +45,26 @@ export default function TaskDetailScreen() {
 
 function TaskDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const router = useRouter();
+  const { profile } = useAuth();
   const { colors, spacing, fontSize } = useTheme();
   const insets = useSafeAreaInsets();
   const [comment, setComment] = useState('');
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  // DELETE /tasks/:id is MANAGER_TIER-gated server-side; only offer it to those
+  // callers so a recruiter/consultant never sees a button that would 404.
+  const canDelete = isManagerOrUp(profile?.role);
+  const removeTask = useApiMutation<undefined, { ok: boolean }>('delete', `/tasks/${id}`, {
+    invalidates: ['tasks'],
+  });
+  const doDelete = async () => {
+    const ok = await removeTask.mutate();
+    if (ok) {
+      setConfirmDelete(false);
+      router.back();
+    }
+  };
 
   const task = useApiQuery<Task>(id ? `/tasks/${id}` : null, {
     channel: 'tasks',
@@ -267,9 +287,28 @@ function TaskDetail() {
                 />
               </View>
             </Card>
+
+            {canDelete ? (
+              <Button
+                label="Delete task"
+                variant="danger-ghost"
+                onPress={() => setConfirmDelete(true)}
+              />
+            ) : null}
           </>
         )}
       </ScrollView>
+
+      <ConfirmSheet
+        open={confirmDelete}
+        onClose={() => setConfirmDelete(false)}
+        onConfirm={doDelete}
+        title="Delete task?"
+        message="This permanently removes the task and its comments. This cannot be undone."
+        confirmLabel="Delete"
+        destructive
+        pending={removeTask.pending}
+      />
     </Screen>
   );
 }
