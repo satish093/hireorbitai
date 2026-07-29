@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Switch, Text, View } from 'react-native';
-import { Stack } from 'expo-router';
-import { ScreenScroll, PageHeader, Banner } from '../../src/components/ui/Screen';
+import { ScrollView, Switch, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Screen, Banner } from '../../src/components/ui/Screen';
+import { PageTopBar } from '../../src/components/ui/TopBar';
 import { Card, SectionHeader, Divider } from '../../src/components/ui/Card';
 import { Button } from '../../src/components/ui/Button';
 import { SelectInput } from '../../src/components/ui/Inputs';
@@ -30,6 +31,7 @@ export default function SettingsScreen() {
 function Settings() {
   const { profile, refreshProfile } = useAuth();
   const { colors, spacing, fontSize, mode, setMode } = useTheme();
+  const insets = useSafeAreaInsets();
   const appLock = useAppLock();
 
   const [jobAlerts, setJobAlerts] = useState<boolean>(profile?.job_alerts !== false);
@@ -52,11 +54,17 @@ function Settings() {
   };
 
   return (
-    <>
-      <Stack.Screen options={{ headerShown: true, title: 'Settings' }} />
-      <ScreenScroll edges={[]}>
-        <PageHeader title="Settings" />
-
+    <Screen edges={['top']}>
+      <PageTopBar title="Settings" showBack />
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{
+          padding: spacing.lg,
+          paddingBottom: spacing['4xl'] + insets.bottom,
+          gap: spacing.md,
+        }}
+        keyboardShouldPersistTaps="handled"
+      >
         {error ? <Banner tone="danger" message={error} /> : null}
 
         <Card>
@@ -161,7 +169,7 @@ function Settings() {
             Signed in as {profile?.email ?? '—'}
           </Text>
         </Card>
-      </ScreenScroll>
-    </>
+      </ScrollView>
+    </Screen>
   );
 }

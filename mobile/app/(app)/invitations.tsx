@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
-import { ListScreen, PageHeader, Banner } from '../../src/components/ui/Screen';
-import { Card } from '../../src/components/ui/Card';
-import { Pill, type PillTone } from '../../src/components/ui/Pill';
+import { Screen, ListScreen, Banner } from '../../src/components/ui/Screen';
+import { PageTopBar } from '../../src/components/ui/TopBar';
+import { Divider } from '../../src/components/ui/Card';
+import { pillToneColor, type PillTone } from '../../src/components/ui/Pill';
 import { Button } from '../../src/components/ui/Button';
 import { Tabs } from '../../src/components/ui/Tabs';
 import { ConfirmSheet } from '../../src/components/ui/Sheet';
@@ -73,6 +75,7 @@ function statusTone(inv: InvitationRow): PillTone {
 
 function InvitationsList() {
   const { colors, spacing, fontSize } = useTheme();
+  const insets = useSafeAreaInsets();
   const [tab, setTab] = useState<'all' | 'pending' | 'accepted' | 'expired' | 'revoked'>('all');
   const [confirm, setConfirm] = useState<InvitationRow | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -127,8 +130,8 @@ function InvitationsList() {
   };
 
   return (
-    <>
-      <PageHeader title="Invitations" subtitle={`${items.length} sent`} />
+    <Screen edges={['top']}>
+      <PageTopBar title="Invitations" subtitle={`${items.length} sent`} showBack />
       <ListScreen
         items={filtered}
         loading={loading}
@@ -137,8 +140,15 @@ function InvitationsList() {
         onRefresh={onRefresh}
         onRetry={() => void refetch()}
         keyExtractor={(i) => i.id}
+        ItemSeparatorComponent={() => <Divider />}
+        contentContainerStyle={{
+          paddingHorizontal: spacing.lg,
+          paddingTop: spacing.sm,
+          paddingBottom: spacing['4xl'] + insets.bottom,
+          flexGrow: 1,
+        }}
         header={
-          <View style={{ gap: spacing.md }}>
+          <View style={{ gap: spacing.md, marginBottom: spacing.xs }}>
             {error ? <Banner tone="danger" message={error} /> : null}
             {notice ? <Banner tone="success" message={notice} /> : null}
             <Banner
@@ -164,29 +174,35 @@ function InvitationsList() {
           const bucket = bucketOf(item);
           const expired = bucket === 'expired';
           const pending = bucket === 'pending';
+          const meta = [
+            `Sent ${relativeDate(item.created_at)}`,
+            ROLE_LABEL[item.role] ?? item.role,
+            item.expires_at
+              ? expired
+                ? 'expired'
+                : `expires ${new Date(item.expires_at).toLocaleDateString()}`
+              : null,
+          ]
+            .filter(Boolean)
+            .join(' · ');
           return (
-            <Card>
+            <View style={{ paddingVertical: 12 }}>
               <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md }}>
-                <View style={{ flex: 1 }}>
+                <View style={{ flex: 1, minWidth: 0 }}>
                   <Text
                     numberOfLines={1}
                     style={{ fontSize: fontSize.md, fontWeight: '600', color: colors.ink }}
                   >
                     {item.email}
                   </Text>
-                  <Text style={{ fontSize: fontSize.xs, color: colors.faint, marginTop: 4 }}>
-                    Sent {relativeDate(item.created_at)}
-                    {item.expires_at
-                      ? expired
-                        ? ' · expired'
-                        : ` · expires ${new Date(item.expires_at).toLocaleDateString()}`
-                      : ''}
+                  <Text numberOfLines={2} style={{ fontSize: fontSize.sm, color: colors.muted }}>
+                    {meta}
                   </Text>
                 </View>
-                <View style={{ alignItems: 'flex-end', gap: 6 }}>
-                  <Pill label={ROLE_LABEL[item.role] ?? item.role} tone="brand" size="sm" />
-                  <Pill label={expired ? 'expired' : bucket} tone={statusTone(item)} size="sm" />
-                </View>
+                <StatusText
+                  label={expired ? 'expired' : bucket}
+                  color={pillToneColor(statusTone(item), colors)}
+                />
               </View>
 
               {pending ? (
@@ -218,7 +234,7 @@ function InvitationsList() {
                   </View>
                 </View>
               ) : null}
-            </Card>
+            </View>
           );
         }}
       />
@@ -237,6 +253,17 @@ function InvitationsList() {
         destructive
         pending={!!busyId}
       />
-    </>
+    </Screen>
+  );
+}
+
+/** Inline status = a small colored dot + colored text (the website's row status). */
+function StatusText({ label, color }: { label: string; color: string }) {
+  const { fontSize } = useTheme();
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+      <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: color }} />
+      <Text style={{ fontSize: fontSize.sm, fontWeight: '600', color }}>{label}</Text>
+    </View>
   );
 }

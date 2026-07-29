@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, Share, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
-import { Screen, PageHeader, Banner } from '../../src/components/ui/Screen';
+import { Screen, Banner } from '../../src/components/ui/Screen';
+import { PageTopBar } from '../../src/components/ui/TopBar';
 import { Card, SectionHeader } from '../../src/components/ui/Card';
 import { Button } from '../../src/components/ui/Button';
 import { FormInput } from '../../src/components/ui/Inputs';
@@ -35,6 +37,7 @@ export default function AIEmailScreen() {
 
 function AIEmail() {
   const { colors, spacing, fontSize } = useTheme();
+  const insets = useSafeAreaInsets();
   const { profile } = useAuth();
 
   const [consultant, setConsultant] = useState('');
@@ -87,17 +90,21 @@ function AIEmail() {
   };
 
   return (
-    <Screen edges={['bottom']}>
+    <Screen edges={['top']}>
+      <PageTopBar title="AI email" subtitle="Draft a vendor pitch" showBack />
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
-          contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg }}
+          style={{ flex: 1 }}
+          contentContainerStyle={{
+            padding: spacing.lg,
+            paddingBottom: spacing['4xl'] + insets.bottom,
+            gap: spacing.md,
+          }}
           keyboardShouldPersistTaps="handled"
         >
-          <PageHeader title="AI email" subtitle="Draft a vendor pitch" />
-
           {error ? <Banner tone="danger" message={error} /> : null}
 
           <Card>

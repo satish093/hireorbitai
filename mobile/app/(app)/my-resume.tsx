@@ -1,5 +1,7 @@
-import { Alert, Text, View } from 'react-native';
-import { ScreenScroll, PageHeader, Banner } from '../../src/components/ui/Screen';
+import { Alert, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Screen, Banner } from '../../src/components/ui/Screen';
+import { PageTopBar } from '../../src/components/ui/TopBar';
 import { Card, SectionHeader, Divider, DetailRow } from '../../src/components/ui/Card';
 import { Pill } from '../../src/components/ui/Pill';
 import { Button } from '../../src/components/ui/Button';
@@ -38,6 +40,7 @@ function MyResume() {
   useScreenCaptureGuard();
 
   const { colors, spacing, fontSize } = useTheme();
+  const insets = useSafeAreaInsets();
   const { profile } = useAuth();
 
   // There is no /resumes/mine endpoint. The real one is
@@ -71,98 +74,116 @@ function MyResume() {
   };
 
   return (
-    <ScreenScroll refreshing={refreshing} onRefresh={onRefresh}>
-      <PageHeader
+    <Screen edges={['top']}>
+      <PageTopBar
         title="My résumé"
         subtitle={`${items.length} version${items.length === 1 ? '' : 's'}`}
+        showBack
       />
-
-      {error ? <Banner tone="danger" message={error} /> : null}
-
-      {loading ? (
-        <SkeletonList count={2} />
-      ) : !current ? (
-        <Card>
-          <EmptyState
-            compact
-            title="No résumé uploaded"
-            description="Your recruiter can upload one for you, or you can add it from the web app."
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{
+          padding: spacing.lg,
+          paddingBottom: spacing['4xl'] + insets.bottom,
+          gap: spacing.md,
+        }}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl
+            refreshing={!!refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.accent}
+            colors={[colors.accent]}
           />
-        </Card>
-      ) : (
-        <>
+        }
+      >
+        {error ? <Banner tone="danger" message={error} /> : null}
+
+        {loading ? (
+          <SkeletonList count={2} />
+        ) : !current ? (
           <Card>
-            <SectionHeader
-              title="Current version"
-              action={<Pill label="Current" tone="success" size="sm" />}
+            <EmptyState
+              compact
+              title="No résumé uploaded"
+              description="Your recruiter can upload one for you, or you can add it from the web app."
             />
-            <Text
-              numberOfLines={2}
-              style={{ fontSize: fontSize.md, fontWeight: '600', color: colors.ink }}
-            >
-              {current.file_name}
-            </Text>
-            <View style={{ marginTop: spacing.sm }}>
-              <DetailRow label="Version" value={current.version ?? 1} />
-              <Divider />
-              <DetailRow label="Uploaded" value={relativeDate(current.created_at)} />
-            </View>
-            <View style={{ marginTop: spacing.lg }}>
-              <Button
-                label="Open résumé"
-                variant="secondary"
-                onPress={() => void openResume(current.id)}
-              />
-            </View>
           </Card>
-
-          {older.length > 0 ? (
-            <Card padded={false}>
-              <View style={{ padding: spacing.lg, paddingBottom: spacing.sm }}>
-                <SectionHeader title="Earlier versions" />
+        ) : (
+          <>
+            <Card>
+              <SectionHeader
+                title="Current version"
+                action={<Pill label="Current" tone="success" size="sm" />}
+              />
+              <Text
+                numberOfLines={2}
+                style={{ fontSize: fontSize.md, fontWeight: '600', color: colors.ink }}
+              >
+                {current.file_name}
+              </Text>
+              <View style={{ marginTop: spacing.sm }}>
+                <DetailRow label="Version" value={current.version ?? 1} />
+                <Divider />
+                <DetailRow label="Uploaded" value={relativeDate(current.created_at)} />
               </View>
-              {older.map((r, i) => (
-                <View key={r.id}>
-                  {i > 0 ? <Divider /> : null}
-                  <View
-                    style={{
-                      paddingHorizontal: spacing.lg,
-                      paddingVertical: spacing.md,
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: spacing.md,
-                    }}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <Text
-                        numberOfLines={1}
-                        style={{ fontSize: fontSize.base, color: colors.ink }}
-                      >
-                        {r.file_name}
-                      </Text>
-                      <Text style={{ fontSize: fontSize.xs, color: colors.faint, marginTop: 2 }}>
-                        v{r.version ?? '—'} · {relativeDate(r.created_at)}
-                      </Text>
-                    </View>
-                    <Button
-                      label="Open"
-                      size="sm"
-                      variant="ghost"
-                      block={false}
-                      onPress={() => void openResume(r.id)}
-                    />
-                  </View>
-                </View>
-              ))}
+              <View style={{ marginTop: spacing.lg }}>
+                <Button
+                  label="Open résumé"
+                  variant="secondary"
+                  onPress={() => void openResume(current.id)}
+                />
+              </View>
             </Card>
-          ) : null}
-        </>
-      )}
 
-      <Banner
-        tone="info"
-        message="Screenshots are blocked on this screen because your résumé contains personal information."
-      />
-    </ScreenScroll>
+            {older.length > 0 ? (
+              <Card padded={false}>
+                <View style={{ padding: spacing.lg, paddingBottom: spacing.sm }}>
+                  <SectionHeader title="Earlier versions" />
+                </View>
+                {older.map((r, i) => (
+                  <View key={r.id}>
+                    {i > 0 ? <Divider /> : null}
+                    <View
+                      style={{
+                        paddingHorizontal: spacing.lg,
+                        paddingVertical: spacing.md,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: spacing.md,
+                      }}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text
+                          numberOfLines={1}
+                          style={{ fontSize: fontSize.base, color: colors.ink }}
+                        >
+                          {r.file_name}
+                        </Text>
+                        <Text style={{ fontSize: fontSize.xs, color: colors.faint, marginTop: 2 }}>
+                          v{r.version ?? '—'} · {relativeDate(r.created_at)}
+                        </Text>
+                      </View>
+                      <Button
+                        label="Open"
+                        size="sm"
+                        variant="ghost"
+                        block={false}
+                        onPress={() => void openResume(r.id)}
+                      />
+                    </View>
+                  </View>
+                ))}
+              </Card>
+            ) : null}
+          </>
+        )}
+
+        <Banner
+          tone="info"
+          message="Screenshots are blocked on this screen because your résumé contains personal information."
+        />
+      </ScrollView>
+    </Screen>
   );
 }

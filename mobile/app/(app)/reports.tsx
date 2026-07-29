@@ -1,6 +1,8 @@
 import { useState } from 'react';
-import { Text, View } from 'react-native';
-import { ScreenScroll, PageHeader, Banner } from '../../src/components/ui/Screen';
+import { RefreshControl, ScrollView, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Screen, Banner } from '../../src/components/ui/Screen';
+import { PageTopBar } from '../../src/components/ui/TopBar';
 import { Card, MetricTile, SectionHeader, DetailRow, Divider } from '../../src/components/ui/Card';
 import type { MetricAccent } from '../../src/components/ui/Card';
 import { Tabs } from '../../src/components/ui/Tabs';
@@ -45,33 +47,52 @@ const TABS = [
 ] as const;
 
 function Reports() {
+  const { colors, spacing } = useTheme();
+  const insets = useSafeAreaInsets();
   const [tab, setTab] = useState<(typeof TABS)[number]['key']>('manager-summary');
 
   const report = useApiQuery<Record<string, unknown>>(`/reports/${tab}`, { channel: 'reports' });
 
   return (
-    <ScreenScroll refreshing={report.refreshing} onRefresh={report.onRefresh}>
-      <PageHeader title="Analytics" />
+    <Screen edges={['top']}>
+      <PageTopBar title="Analytics" showBack />
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{
+          padding: spacing.lg,
+          paddingBottom: spacing['4xl'] + insets.bottom,
+          gap: spacing.md,
+        }}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl
+            refreshing={!!report.refreshing}
+            onRefresh={report.onRefresh}
+            tintColor={colors.accent}
+            colors={[colors.accent]}
+          />
+        }
+      >
+        <Tabs
+          items={TABS.map((t) => ({ key: t.key, label: t.label }))}
+          value={tab}
+          onChange={(k) => setTab(k as (typeof TABS)[number]['key'])}
+        />
 
-      <Tabs
-        items={TABS.map((t) => ({ key: t.key, label: t.label }))}
-        value={tab}
-        onChange={(k) => setTab(k as (typeof TABS)[number]['key'])}
-      />
+        {report.error ? <Banner tone="danger" message={report.error} /> : null}
 
-      {report.error ? <Banner tone="danger" message={report.error} /> : null}
+        {report.loading && !report.data ? (
+          <SkeletonMetricGrid count={4} />
+        ) : (
+          <ReportBody data={report.data} />
+        )}
 
-      {report.loading && !report.data ? (
-        <SkeletonMetricGrid count={4} />
-      ) : (
-        <ReportBody data={report.data} />
-      )}
-
-      <Banner
-        tone="info"
-        message="Some metrics in this module aren't wired to a data source yet on the server. Anything unavailable is shown as “—” rather than estimated."
-      />
-    </ScreenScroll>
+        <Banner
+          tone="info"
+          message="Some metrics in this module aren't wired to a data source yet on the server. Anything unavailable is shown as “—” rather than estimated."
+        />
+      </ScrollView>
+    </Screen>
   );
 }
 

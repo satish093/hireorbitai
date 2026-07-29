@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
-import { Stack } from 'expo-router';
-import { Screen, PageHeader, Banner } from '../../src/components/ui/Screen';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Screen, Banner } from '../../src/components/ui/Screen';
+import { PageTopBar } from '../../src/components/ui/TopBar';
 import { Card, SectionHeader, DetailRow, Divider } from '../../src/components/ui/Card';
 import { Avatar } from '../../src/components/ui/Avatar';
 import { Pill } from '../../src/components/ui/Pill';
@@ -34,6 +35,7 @@ export default function ProfileScreen() {
 function Profile() {
   const { profile, refreshProfile } = useAuth();
   const { colors, spacing, fontSize } = useTheme();
+  const insets = useSafeAreaInsets();
 
   const [form, setForm] = useState({
     first_name: '',
@@ -109,110 +111,109 @@ function Profile() {
   };
 
   return (
-    <>
-      <Stack.Screen options={{ headerShown: true, title: 'My profile' }} />
-      <Screen edges={['bottom']}>
-        <KeyboardAvoidingView
+    <Screen edges={['top']}>
+      <PageTopBar title="My profile" showBack />
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ScrollView
           style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          contentContainerStyle={{
+            padding: spacing.lg,
+            paddingBottom: spacing['4xl'] + insets.bottom,
+            gap: spacing.md,
+          }}
+          keyboardShouldPersistTaps="handled"
         >
-          <ScrollView
-            contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg }}
-            keyboardShouldPersistTaps="handled"
-          >
-            <PageHeader title="My profile" />
-
-            <Card>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-                <Avatar
-                  id={profile?.id}
-                  name={profile?.full_name}
-                  email={profile?.email}
-                  uri={profile?.avatar_url}
-                  size={56}
-                />
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: fontSize.lg, fontWeight: '700', color: colors.ink }}>
-                    {profile?.full_name?.trim() || profile?.email}
-                  </Text>
-                  <Text style={{ fontSize: fontSize.sm, color: colors.muted }}>
-                    {profile?.email}
-                  </Text>
-                  <View style={{ marginTop: 6 }}>
-                    <Pill label={profile ? ROLE_LABEL[profile.role] : '—'} tone="brand" size="sm" />
-                  </View>
+          <Card>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+              <Avatar
+                id={profile?.id}
+                name={profile?.full_name}
+                email={profile?.email}
+                uri={profile?.avatar_url}
+                size={56}
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: fontSize.lg, fontWeight: '700', color: colors.ink }}>
+                  {profile?.full_name?.trim() || profile?.email}
+                </Text>
+                <Text style={{ fontSize: fontSize.sm, color: colors.muted }}>{profile?.email}</Text>
+                <View style={{ marginTop: 6 }}>
+                  <Pill label={profile ? ROLE_LABEL[profile.role] : '—'} tone="brand" size="sm" />
                 </View>
               </View>
+            </View>
 
-              <View style={{ marginTop: spacing.lg }}>
-                <DetailRow label="Role" value={profile ? ROLE_LABEL[profile.role] : '—'} />
-                <Divider />
-                <DetailRow label="Account" value={profile?.is_active ? 'Active' : 'Inactive'} />
-              </View>
-              <Text style={{ fontSize: fontSize.xs, color: colors.faint, marginTop: spacing.sm }}>
-                Your role and group are set by an administrator.
-              </Text>
-            </Card>
+            <View style={{ marginTop: spacing.lg }}>
+              <DetailRow label="Role" value={profile ? ROLE_LABEL[profile.role] : '—'} />
+              <Divider />
+              <DetailRow label="Account" value={profile?.is_active ? 'Active' : 'Inactive'} />
+            </View>
+            <Text style={{ fontSize: fontSize.xs, color: colors.faint, marginTop: spacing.sm }}>
+              Your role and group are set by an administrator.
+            </Text>
+          </Card>
 
-            {error ? <Banner tone="danger" message={error} /> : null}
-            {saved ? <Banner tone="success" message="Profile saved." /> : null}
+          {error ? <Banner tone="danger" message={error} /> : null}
+          {saved ? <Banner tone="success" message="Profile saved." /> : null}
 
-            <Card>
-              <SectionHeader title="Personal details" />
-              <FormInput
-                label="First name"
-                value={form.first_name}
-                onChangeText={set('first_name')}
-              />
-              <FormInput label="Last name" value={form.last_name} onChangeText={set('last_name')} />
-              <FormInput
-                label="Phone"
-                value={form.phone}
-                onChangeText={set('phone')}
-                keyboardType="phone-pad"
-              />
-              <FormInput
-                label="LinkedIn"
-                value={form.linkedin_url}
-                onChangeText={set('linkedin_url')}
-                placeholder="https://linkedin.com/in/…"
-                autoCapitalize="none"
-                keyboardType="url"
-                error={linkedinInvalid ? 'Must be a full https:// address.' : null}
-              />
-            </Card>
-
-            <Card>
-              <SectionHeader title="Address" />
-              <FormInput
-                label="Address"
-                value={form.address_line1}
-                onChangeText={set('address_line1')}
-              />
-              <FormInput
-                label="Apt / Suite"
-                value={form.address_line2}
-                onChangeText={set('address_line2')}
-              />
-              <FormInput label="City" value={form.city} onChangeText={set('city')} />
-              <FormInput label="State / Province" value={form.state} onChangeText={set('state')} />
-              <FormInput
-                label="Postal code"
-                value={form.postal_code}
-                onChangeText={set('postal_code')}
-              />
-              <FormInput label="Country" value={form.country} onChangeText={set('country')} />
-            </Card>
-
-            <Button
-              label="Save profile"
-              onPress={save}
-              loading={saving}
-              disabled={saving || linkedinInvalid}
+          <Card>
+            <SectionHeader title="Personal details" />
+            <FormInput
+              label="First name"
+              value={form.first_name}
+              onChangeText={set('first_name')}
             />
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </Screen>
-    </>
+            <FormInput label="Last name" value={form.last_name} onChangeText={set('last_name')} />
+            <FormInput
+              label="Phone"
+              value={form.phone}
+              onChangeText={set('phone')}
+              keyboardType="phone-pad"
+            />
+            <FormInput
+              label="LinkedIn"
+              value={form.linkedin_url}
+              onChangeText={set('linkedin_url')}
+              placeholder="https://linkedin.com/in/…"
+              autoCapitalize="none"
+              keyboardType="url"
+              error={linkedinInvalid ? 'Must be a full https:// address.' : null}
+            />
+          </Card>
+
+          <Card>
+            <SectionHeader title="Address" />
+            <FormInput
+              label="Address"
+              value={form.address_line1}
+              onChangeText={set('address_line1')}
+            />
+            <FormInput
+              label="Apt / Suite"
+              value={form.address_line2}
+              onChangeText={set('address_line2')}
+            />
+            <FormInput label="City" value={form.city} onChangeText={set('city')} />
+            <FormInput label="State / Province" value={form.state} onChangeText={set('state')} />
+            <FormInput
+              label="Postal code"
+              value={form.postal_code}
+              onChangeText={set('postal_code')}
+            />
+            <FormInput label="Country" value={form.country} onChangeText={set('country')} />
+          </Card>
+
+          <Button
+            label="Save profile"
+            onPress={save}
+            loading={saving}
+            disabled={saving || linkedinInvalid}
+          />
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </Screen>
   );
 }
