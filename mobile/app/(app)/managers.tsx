@@ -10,14 +10,15 @@ import { Avatar } from '../../src/components/ui/Avatar';
 import { SearchInput } from '../../src/components/ui/Inputs';
 import { RouteGuard } from '../../src/components/RouteGuard';
 import { useApiList } from '../../src/hooks/useApi';
-import { MANAGER_TIER, ROLE_LABEL, type Role, type UserRef } from '../../src/types';
+import { useGroups } from '../../src/hooks/useGroups';
+import { MANAGER_TIER, ROLE_LABEL, type Role, type Manager } from '../../src/types';
 import { useTheme } from '../../src/theme';
+import { shortDate, relativeDate } from '../../src/utils/format';
 
 /** GET /managers returns the user row plus their group-lead context. */
-interface ManagerRow extends UserRef {
-  group_name?: string | null;
-  recruiter_count?: number | null;
-}
+type ManagerRow = Manager;
+const titleCaseStatus = (s?: string | null) =>
+  s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : '—';
 
 /**
  * Manager directory — GET /managers. MANAGER_TIER and above.
@@ -38,6 +39,7 @@ export default function ManagersScreen() {
 function ManagersList() {
   const { colors, spacing, fontSize } = useTheme();
   const insets = useSafeAreaInsets();
+  const { groupName } = useGroups();
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<ManagerRow | null>(null);
 
@@ -53,9 +55,9 @@ function ManagersList() {
       (m) =>
         m.full_name?.toLowerCase().includes(q) ||
         m.email?.toLowerCase().includes(q) ||
-        m.group_name?.toLowerCase().includes(q),
+        groupName(m.group_id)?.toLowerCase().includes(q),
     );
-  }, [items, query]);
+  }, [items, query, groupName]);
 
   return (
     <Screen edges={['top']}>
@@ -83,7 +85,7 @@ function ManagersList() {
         emptyTitle={query ? 'No matches' : 'No managers'}
         renderItem={({ item }) => {
           const meta =
-            item.group_name ??
+            groupName(item.group_id) ??
             (typeof item.recruiter_count === 'number'
               ? `${item.recruiter_count} recruiter${item.recruiter_count === 1 ? '' : 's'}`
               : 'No group assigned');
@@ -158,13 +160,30 @@ function ManagersList() {
             <View>
               <DetailRow label="Email" value={selected.email ?? '—'} />
               <Divider />
-              <DetailRow label="Group" value={selected.group_name ?? '—'} />
+              <DetailRow
+                label="Role"
+                value={selected.role ? (ROLE_LABEL[selected.role as Role] ?? selected.role) : '—'}
+              />
+              <Divider />
+              <DetailRow label="Group" value={groupName(selected.group_id) ?? '—'} />
               <Divider />
               <DetailRow
                 label="Recruiters"
                 value={
                   typeof selected.recruiter_count === 'number' ? selected.recruiter_count : '—'
                 }
+              />
+              <Divider />
+              <DetailRow label="Status" value={titleCaseStatus(selected.status)} />
+              <Divider />
+              <DetailRow
+                label="Last login"
+                value={selected.last_login_at ? relativeDate(selected.last_login_at) : 'Never'}
+              />
+              <Divider />
+              <DetailRow
+                label="Joined"
+                value={selected.created_at ? shortDate(selected.created_at) : '—'}
               />
             </View>
           </View>

@@ -124,7 +124,7 @@ export function hasCapability(
   return _isPageAccessCap(cap) || profile.role === 'DEVELOPER';
 }
 
-export type MarketingStatus = 'ACTIVE' | 'PAUSED' | 'PLACED';
+export type MarketingStatus = 'ACTIVE' | 'PAUSED' | 'PLACED' | 'DEACTIVATED';
 
 export type ApplicationStatus =
   | 'SUBMITTED'
@@ -144,6 +144,7 @@ export interface UserRef {
   role?: Role;
   group_id?: string | null;
   avatar_url?: string | null;
+  phone?: string | null;
 }
 
 export interface Task {
@@ -279,6 +280,29 @@ export interface Consultant {
   onboarded_at?: string | null;
   created_at: string;
   user?: UserRef | null;
+  // Extended profile columns (consultants.* — the API returns these; the detail
+  // view surfaces them, mirroring the web's Consultants drawer + row).
+  primary_skill?: string | null;
+  total_experience_years?: number | string | null;
+  current_location?: string | null;
+  preferred_locations?: string[] | null;
+  // NUMERIC/BIGINT come back as STRINGS via node-postgres — coerce before math.
+  expected_rate?: number | string | null;
+  linkedin_url?: string | null;
+  github_url?: string | null;
+  portfolio_url?: string | null;
+  relocation?: boolean | null;
+  remote_only?: boolean | null;
+  notes?: string | null;
+  /** The recruiter this consultant is assigned to (embedded join). */
+  recruiter?: { id: string; team?: string | null; user?: UserRef | null } | null;
+}
+
+/** One recruiter→manager edge from the recruiter_managers junction. */
+export interface ManagerLink {
+  is_primary?: boolean | null;
+  assigned_at?: string | null;
+  manager?: UserRef | null;
 }
 
 export interface Recruiter {
@@ -289,6 +313,32 @@ export interface Recruiter {
   status?: string | null;
   created_at: string;
   user?: UserRef | null;
+  // Extended fields the API already returns but the mobile type historically
+  // omitted — surfaced in the detail sheet to match the web Recruiters table.
+  marketing_status?: MarketingStatus | null;
+  target_submissions_per_week?: number | string | null;
+  /** Server-computed count of the recruiter's active consultants. */
+  consultant_count?: number | null;
+  notes?: string | null;
+  /** Legacy single primary manager (fallback when `managers` is empty). */
+  manager?: UserRef | null;
+  /** Many-to-many manager edges — the "Reports to" list. */
+  managers?: ManagerLink[] | null;
+}
+
+/** A row from GET /managers (users with role MANAGER | HR_MANAGER). */
+export interface Manager {
+  id: string;
+  email: string;
+  full_name?: string | null;
+  role?: Role;
+  status?: string | null;
+  group_id?: string | null;
+  /** Server-computed count of recruiters reporting to this manager. */
+  recruiter_count?: number | null;
+  last_login_at?: string | null;
+  created_at?: string | null;
+  avatar_url?: string | null;
 }
 
 export interface Reminder {
