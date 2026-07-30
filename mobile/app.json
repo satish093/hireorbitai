@@ -25,7 +25,9 @@
         "NSCameraUsageDescription": "Attach photos to messages, tasks and work-authorization documents.",
         "NSPhotoLibraryUsageDescription": "Attach images and documents to messages, tasks and resumes.",
         "NSMicrophoneUsageDescription": "Make and receive voice calls with your recruiting team.",
-        "UIBackgroundModes": ["remote-notification"]
+        "NSFaceIDUsageDescription": "Unlock HireOrbit AI with Face ID so your recruiting data stays protected on this device.",
+        "UIBackgroundModes": ["remote-notification"],
+        "ITSAppUsesNonExemptEncryption": false
       },
       "associatedDomains": ["applinks:hireorbitai.com"]
     },
