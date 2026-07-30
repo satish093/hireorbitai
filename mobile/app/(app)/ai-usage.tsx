@@ -112,20 +112,25 @@ function AIUsage() {
         {summary.loading && !summary.data ? (
           <SkeletonMetricGrid count={3} />
         ) : (
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md }}>
-            <MetricTile
-              label="Spend"
-              value={`$${(summary.data?.total_cost_usd ?? 0).toFixed(2)}`}
-              tone={(summary.data?.total_cost_usd ?? 0) > 50 ? 'warn' : 'default'}
-              accent={(summary.data?.total_cost_usd ?? 0) > 50 ? 'red' : 'amber'}
-            />
-            <MetricTile
-              label="Tokens"
-              value={compactNumber(summary.data?.total_tokens ?? 0)}
-              accent="blue"
-            />
-            <MetricTile label="Requests" value={summary.data?.request_count ?? 0} accent="brand" />
-          </View>
+          (() => {
+            // Postgres returns NUMERIC/BIGINT columns as STRINGS via node-postgres,
+            // so coerce before any Number method (.toFixed on a string throws).
+            const spend = Number(summary.data?.total_cost_usd ?? 0) || 0;
+            const tokens = Number(summary.data?.total_tokens ?? 0) || 0;
+            const requests = Number(summary.data?.request_count ?? 0) || 0;
+            return (
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md }}>
+                <MetricTile
+                  label="Spend"
+                  value={`$${spend.toFixed(2)}`}
+                  tone={spend > 50 ? 'warn' : 'default'}
+                  accent={spend > 50 ? 'red' : 'amber'}
+                />
+                <MetricTile label="Tokens" value={compactNumber(tokens)} accent="blue" />
+                <MetricTile label="Requests" value={requests} accent="brand" />
+              </View>
+            );
+          })()
         )}
 
         {breakdown.total > 0 ? (
@@ -184,7 +189,7 @@ function AIUsage() {
                   </View>
                   <View style={{ alignItems: 'flex-end', gap: 4 }}>
                     <Text style={{ fontSize: fontSize.sm, fontWeight: '600', color: colors.ink }}>
-                      ${(log.cost_usd ?? 0).toFixed(4)}
+                      ${(Number(log.cost_usd ?? 0) || 0).toFixed(4)}
                     </Text>
                     {log.provider ? <Pill label={log.provider} tone="neutral" size="sm" /> : null}
                   </View>
