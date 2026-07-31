@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Screen, ListScreen, Banner } from '../../src/components/ui/Screen';
 import { PageTopBar } from '../../src/components/ui/TopBar';
@@ -67,6 +68,7 @@ function sourceColor(src: string, colors: ReturnType<typeof useTheme>['colors'])
 
 function JobsList() {
   const { profile } = useAuth();
+  const router = useRouter();
   const { colors, spacing, fontSize } = useTheme();
   const insets = useSafeAreaInsets();
 
@@ -347,13 +349,27 @@ function JobsList() {
                 ? 'Try describing the role differently.'
                 : 'Jobs appear here once the ingestion job has run.'
         }
-        renderItem={({ item }) => <JobCard job={item} onToggleLike={() => toggleLike(item)} />}
+        renderItem={({ item }) => (
+          <JobCard
+            job={item}
+            onToggleLike={() => toggleLike(item)}
+            onOpen={() => router.push(`/(app)/job/${item.id}`)}
+          />
+        )}
       />
     </Screen>
   );
 }
 
-function JobCard({ job, onToggleLike }: { job: Job; onToggleLike: () => void }) {
+function JobCard({
+  job,
+  onToggleLike,
+  onOpen,
+}: {
+  job: Job;
+  onToggleLike: () => void;
+  onOpen: () => void;
+}) {
   const { colors, spacing, fontSize } = useTheme();
 
   const matched = job.match_matched_skills ?? [];
@@ -367,7 +383,7 @@ function JobCard({ job, onToggleLike }: { job: Job; onToggleLike: () => void }) 
       : null;
 
   return (
-    <Card style={{ marginBottom: spacing.md }}>
+    <Card style={{ marginBottom: spacing.md }} onPress={onOpen}>
       <View style={{ flexDirection: 'row', gap: spacing.md }}>
         <Avatar id={job.id} name={job.company_name ?? job.title} size={40} />
         <View style={{ flex: 1, minWidth: 0 }}>
