@@ -4,9 +4,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Screen, ListScreen } from '../../src/components/ui/Screen';
 import { PageTopBar } from '../../src/components/ui/TopBar';
 import { MetricTile, Divider } from '../../src/components/ui/Card';
+import { Button } from '../../src/components/ui/Button';
 import { INVOICE_STATUS_TONE, pillToneColor } from '../../src/components/ui/Pill';
 import { Tabs } from '../../src/components/ui/Tabs';
 import { RouteGuard } from '../../src/components/RouteGuard';
+import { InvoiceCreateSheet } from '../../src/components/InvoiceCreateSheet';
 import { useApiList } from '../../src/hooks/useApi';
 import { useScreenCaptureGuard } from '../../src/security/PrivacyScreen';
 import { MANAGER_TIER, type Invoice } from '../../src/types';
@@ -38,6 +40,7 @@ function InvoicesList() {
   const { colors, spacing, fontSize } = useTheme();
   const insets = useSafeAreaInsets();
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>('ALL');
+  const [addOpen, setAddOpen] = useState(false);
 
   const { items, loading, refreshing, error, onRefresh, refetch } = useApiList<Invoice>(
     '/invoices',
@@ -112,13 +115,16 @@ function InvoicesList() {
         }}
         header={
           <View style={{ gap: spacing.md, marginBottom: spacing.xs }}>
-            <View>
-              <Text style={{ fontSize: fontSize.xl, fontWeight: '800', color: colors.ink }}>
-                Invoices
-              </Text>
-              <Text style={{ fontSize: fontSize.sm, color: colors.muted, marginTop: 4 }}>
-                Create, approve, deliver, and track company invoices.
-              </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md }}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: fontSize.xl, fontWeight: '800', color: colors.ink }}>
+                  Invoices
+                </Text>
+                <Text style={{ fontSize: fontSize.sm, color: colors.muted, marginTop: 4 }}>
+                  Create, approve, deliver, and track company invoices.
+                </Text>
+              </View>
+              <Button label="New" size="sm" block={false} onPress={() => setAddOpen(true)} />
             </View>
             <View style={{ flexDirection: 'row', gap: spacing.md }}>
               <MetricTile label="Total invoiced" value={money(totals.invoiced)} accent="blue" />
@@ -218,6 +224,15 @@ function InvoicesList() {
               </View>
             </View>
           );
+        }}
+      />
+
+      <InvoiceCreateSheet
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        onCreated={() => {
+          setAddOpen(false);
+          void refetch();
         }}
       />
     </Screen>

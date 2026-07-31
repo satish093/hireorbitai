@@ -201,12 +201,23 @@ export interface Job {
   publisher?: string | null;
   apply_url?: string | null;
   employment_type?: string | null;
+  seniority?: string | null;
   salary_min?: number | null;
   salary_max?: number | null;
   posted_at?: string | null;
   created_at: string;
   is_remote?: boolean | null;
   skills?: string[] | null;
+  // Resume-aware match fields — present on /jobs/recommended when a consultant
+  // is targeted (consultant_id + min_match). Absent otherwise.
+  match_score?: number | null;
+  match_why?: string | null;
+  match_matched_skills?: string[] | null;
+  match_missing_skills?: string[] | null;
+  // Saved/applied state.
+  liked?: boolean | null;
+  application_id?: string | null;
+  application_status?: string | null;
 }
 
 export interface Application {

@@ -11,6 +11,27 @@ export default function ClientsScreen() {
         endpoint="/clients"
         channel="clients"
         emptyDescription="Client companies your team places into will appear here."
+        extraRows={(c) => [
+          { label: 'Industry', value: c.industry },
+          { label: 'Location', value: c.location },
+        ]}
+        create={{
+          buttonLabel: '+ New client',
+          sheetTitle: 'New client',
+          sheetSubtitle: 'Create a client company your team places consultants into.',
+          fields: [
+            { key: 'company_name', label: 'Company *', required: true },
+            { key: 'industry', label: 'Industry' },
+            { key: 'location', label: 'Location' },
+            { key: 'contact_name', label: 'Contact name' },
+            {
+              key: 'contact_email',
+              label: 'Contact email',
+              keyboardType: 'email-address',
+              autoCapitalize: 'none',
+            },
+          ],
+        }}
       />
     </RouteGuard>
   );
