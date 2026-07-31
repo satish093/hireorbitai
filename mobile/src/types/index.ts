@@ -443,6 +443,9 @@ export interface UserGroup {
   name: string;
   slug: string;
   email?: string | null;
+  color?: string | null;
+  is_active?: boolean | null;
+  member_count?: number | null;
   logo_url?: string | null;
   created_at: string;
 }

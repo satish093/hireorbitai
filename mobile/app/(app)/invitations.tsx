@@ -195,7 +195,7 @@ function InvitationsList() {
     <Screen edges={['top']}>
       <PageTopBar
         title="Invitations"
-        subtitle={`${items.length} sent`}
+        subtitle="Send role-scoped invites by email."
         showBack
         right={
           invitableRoles.length > 0 ? (
@@ -207,7 +207,7 @@ function InvitationsList() {
               style={{ height: 36, paddingHorizontal: spacing.sm, justifyContent: 'center' }}
             >
               <Text style={{ color: colors.accent, fontSize: fontSize.md, fontWeight: '700' }}>
-                + Invite
+                + Invite user
               </Text>
             </Pressable>
           ) : null
