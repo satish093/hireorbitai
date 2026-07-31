@@ -51,10 +51,13 @@ const GROUP_SCREENS = [
   // Folders with their own nested layout/stack.
   'admin',
   'training',
-  // Dynamic-only detail folders — pushed from a row, never a tab.
-  'job',
-  'task',
-  'chat',
+  // Dynamic-only detail folders — pushed from a row, never a tab. These must be
+  // the FULL route names (folder/[param]); expo-router has no bare 'job'/'task'/
+  // 'chat' route, so registering the bare name is a no-op that logs
+  // "No route named …" and lets the real route auto-mount as a phantom tab.
+  'job/[id]',
+  'task/[id]',
+  'chat/[peerId]',
   // Kept only as a redirect so a stray /more lands somewhere sane.
   'more',
 ] as const;
