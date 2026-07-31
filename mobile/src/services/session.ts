@@ -99,7 +99,20 @@ export function setSession(s: StoredSession | null): void {
   memory = s;
   hydrated = true;
   notify();
-  void persist(s);
+  pendingWrite = persist(s);
+  void pendingWrite;
+}
+
+// The most recent background persist. The refresh path awaits it (flushSession)
+// so a ROTATED refresh token is durably in the Keychain before we proceed — the
+// backend deletes the old token on rotation, so if the OS kills the app in the
+// fire-and-forget write window the next cold start would otherwise reload the
+// dead token, refresh 401s, and the user is wrongly signed out.
+let pendingWrite: Promise<void> = Promise.resolve();
+
+/** Resolves once the latest setSession() write has hit secure storage. */
+export function flushSession(): Promise<void> {
+  return pendingWrite;
 }
 
 async function persist(s: StoredSession | null): Promise<void> {

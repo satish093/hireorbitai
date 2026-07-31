@@ -30,6 +30,7 @@ import { AppState, type AppStateStatus } from 'react-native';
 import { config as appConfig } from '../config/env';
 import {
   clearSession,
+  flushSession,
   getSession,
   isAccessTokenExpired,
   isAccessTokenStale,
@@ -198,6 +199,11 @@ async function refreshIfNeeded(force = false): Promise<void> {
             expires_at: data.expires_at ?? Math.floor(Date.now() / 1000) + 3600,
             user: sess.user,
           });
+          // Durably persist the ROTATED token before proceeding. The backend
+          // deletes the old refresh token on rotation, so a kill in the
+          // fire-and-forget write window would otherwise leave the Keychain
+          // holding a dead token → next cold start 401s → wrongful sign-out.
+          await flushSession();
         }
         // Empty/garbage response — leave the session alone. Worst case the next
         // call 401s and the response interceptor signs the user out cleanly.
