@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Linking, Text, View, type KeyboardTypeOptions } from 'react-native';
-import { ListScreen, PageHeader, Banner } from './ui/Screen';
+import { Screen, ListScreen, PageHeader, Banner } from './ui/Screen';
 import { Card, DetailRow, Divider } from './ui/Card';
 import { Button } from './ui/Button';
 import { Sheet } from './ui/Sheet';
@@ -90,7 +90,7 @@ export function PartnerDirectory({
   }, [items, query]);
 
   return (
-    <>
+    <Screen edges={['top']}>
       <PageHeader
         title={title}
         subtitle={`${items.length} total`}
@@ -210,7 +210,7 @@ export function PartnerDirectory({
           }}
         />
       ) : null}
-    </>
+    </Screen>
   );
 }
 
