@@ -12,6 +12,7 @@ import { onAuthFailure, startResumeRefresh } from '../src/services/api';
 import { AppLockProvider } from '../src/security/AppLock';
 import { PrivacyCover } from '../src/security/PrivacyScreen';
 import { ErrorBoundary } from '../src/components/ErrorBoundary';
+import { UpdateGate } from '../src/components/UpdateGate';
 import {
   useFonts,
   Inter_400Regular,
@@ -70,15 +71,20 @@ export default function RootLayout() {
               over everything, including a lock screen or an error boundary,
               the instant the OS starts snapshotting for the app switcher. */}
           <PrivacyCover>
-            <AuthProvider>
-              <AppLockProvider>
-                <FeatureFlagsProvider>
-                  <ErrorBoundary>
-                    <AppShell />
-                  </ErrorBoundary>
-                </FeatureFlagsProvider>
-              </AppLockProvider>
-            </AuthProvider>
+            {/* UpdateGate wraps AuthProvider, not the reverse: a build below
+                the floor must never reach the auth handshake, since the API
+                shape it expects may no longer exist. */}
+            <UpdateGate>
+              <AuthProvider>
+                <AppLockProvider>
+                  <FeatureFlagsProvider>
+                    <ErrorBoundary>
+                      <AppShell />
+                    </ErrorBoundary>
+                  </FeatureFlagsProvider>
+                </AppLockProvider>
+              </AuthProvider>
+            </UpdateGate>
           </PrivacyCover>
         </ThemeProvider>
       </SafeAreaProvider>

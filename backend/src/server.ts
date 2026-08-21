@@ -211,7 +211,17 @@ function rateLimitKey(req: import('express').Request): string {
 //                        but abusive token-guessing still gets blocked.
 function skipGlobal(req: import('express').Request): boolean {
   const p = req.path;
-  return p === '/health' || p === '/ready' || p === '/auth/refresh' || p === '/api/auth/refresh';
+  return (
+    p === '/health' ||
+    p === '/ready' ||
+    p === '/auth/refresh' ||
+    p === '/api/auth/refresh' ||
+    // The update gate must answer even for a client that has burned its
+    // budget — otherwise a rate-limited user is stuck on a version check that
+    // 429s, with no way to be told to update.
+    p === '/app-version' ||
+    p === '/api/app-version'
+  );
 }
 
 const globalLimiter = rateLimit({
