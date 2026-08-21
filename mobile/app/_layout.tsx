@@ -9,6 +9,8 @@ import { FeatureFlagsProvider } from '../src/hooks/useFeatureFlags';
 import { ThemeProvider, useTheme } from '../src/theme';
 import { hydrateSession } from '../src/services/session';
 import { onAuthFailure, startResumeRefresh } from '../src/services/api';
+import * as Notifications from 'expo-notifications';
+import { configureNotificationHandler } from '../src/services/push';
 import { AppLockProvider } from '../src/security/AppLock';
 import { PrivacyCover } from '../src/security/PrivacyScreen';
 import { ErrorBoundary } from '../src/components/ErrorBoundary';
@@ -27,6 +29,9 @@ import { applyInterFont } from '../src/theme/fonts';
 // this the app flashes the login screen for a frame before restoring a valid
 // session — which reads as "it logged me out" every cold start.
 void SplashScreen.preventAutoHideAsync().catch(() => {});
+
+// Show push banners even in the foreground, and route on tap (below).
+configureNotificationHandler();
 
 export default function RootLayout() {
   const [ready, setReady] = useState(false);
@@ -106,9 +111,32 @@ function AppShell() {
     // Refresh an expired token when the app returns from the background —
     // without this, the first request after a resume 401s and boots the user.
     const stopResume = startResumeRefresh();
+
+    // Deep-link on notification tap. `data.type` decides the destination; the
+    // route guards still apply, so an unauthenticated tap lands on /login.
+    const routeFor = (data: Record<string, unknown> | undefined) => {
+      if (!data) return null;
+      if (data.type === 'message' && data.peer_id) return `/(app)/chat/${data.peer_id}`;
+      if (data.type === 'reminder') return '/(app)/reminders';
+      if (data.type === 'interview') return '/(app)/interviews';
+      return null;
+    };
+    const onTap = (resp: Notifications.NotificationResponse) => {
+      const dest = routeFor(
+        resp.notification.request.content.data as Record<string, unknown> | undefined,
+      );
+      if (dest) router.push(dest as never);
+    };
+    const sub = Notifications.addNotificationResponseReceivedListener(onTap);
+    // App opened cold from a notification tap.
+    void Notifications.getLastNotificationResponseAsync().then((r) => {
+      if (r) onTap(r);
+    });
+
     return () => {
       stopAuth();
       stopResume();
+      sub.remove();
     };
   }, [router]);
 

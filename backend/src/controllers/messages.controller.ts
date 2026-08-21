@@ -9,6 +9,7 @@ import {
 } from '../services/permission.service';
 import { audit } from '../services/audit.service';
 import { publishToUser } from '../services/realtime.service';
+import { sendPushToUser } from '../services/push.service';
 import {
   attachAttachments,
   claimAttachmentsForMessage,
@@ -657,6 +658,14 @@ export const send: RequestHandler = async (req, res) => {
   // (mirrors the read-path filtering). The staff sender still gets the echo.
   if (!(isInternal && recipientIsConsultant)) {
     void publishToUser(parsed.data.recipient_id, 'message:new', withReply);
+    // Hard push to the recipient's devices. Same internal-note guard as above.
+    const senderName =
+      (withReply as { sender?: { full_name?: string } }).sender?.full_name ?? 'New message';
+    void sendPushToUser(parsed.data.recipient_id, {
+      title: senderName,
+      body: parsed.data.body.trim().slice(0, 140) || 'Sent an attachment',
+      data: { type: 'message', peer_id: req.user!.id },
+    });
   }
   void publishToUser(req.user.id, 'message:new', withReply);
   res.status(201).json(withReply);

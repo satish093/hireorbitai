@@ -40,6 +40,7 @@ import { aiUsageRouter } from './aiUsage.routes';
 import { workAuthDocsRouter } from './workAuthDocs.routes';
 import { invoicesRouter } from './invoices.routes';
 import { appVersionRouter } from './appVersion.routes';
+import { pushRouter } from './push.routes';
 
 export const router = Router();
 
@@ -128,6 +129,9 @@ router.use(
   glassdoorRouter,
 );
 router.use('/activity', activityRouter);
+
+// Device push-token registration (any authenticated user, own device).
+router.use('/push', pushRouter);
 // Bug reports / support tickets — any authenticated user may file one.
 router.use('/support', supportRouter);
 router.use('/recruiter-goals', recruiterGoalsRouter);
