@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { LogBox } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -29,6 +30,17 @@ import { applyInterFont } from '../src/theme/fonts';
 // this the app flashes the login screen for a frame before restoring a valid
 // session — which reads as "it logged me out" every cold start.
 void SplashScreen.preventAutoHideAsync().catch(() => {});
+
+// The iOS Simulator has no APNs, so expo-notifications logs a benign error when
+// it can't read its persisted push-registration store. It never fires on a real
+// device and doesn't affect delivery (verified via `simctl push`). Silence the
+// dev red-box for that one known message so it doesn't look like a real crash.
+if (__DEV__) {
+  LogBox.ignoreLogs([
+    'Error reading persisted server registration info',
+    'getRegistrationInfoAsync',
+  ]);
+}
 
 // Show push banners even in the foreground, and route on tap (below).
 configureNotificationHandler();
