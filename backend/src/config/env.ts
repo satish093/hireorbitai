@@ -181,6 +181,22 @@ const envSchema = z.object({
   // Per-user AI endpoint limit (per 5 min). Lower this if Anthropic/Groq costs spike.
   AI_RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(30),
 
+  // --- Mobile release gating ---
+  // The hard floor a client must meet to talk to this API. Bump ONLY when a
+  // breaking API change ships, and only once the replacement build is live in
+  // the store — a floor above the newest published build bricks every user.
+  // Empty (the default) disables the gate entirely.
+  MOBILE_MIN_VERSION_IOS: z.string().default(''),
+  MOBILE_MIN_VERSION_ANDROID: z.string().default(''),
+  // Advisory "there's a newer build" nudge. Non-blocking, safe to bump the
+  // moment a release goes live.
+  MOBILE_LATEST_VERSION_IOS: z.string().default(''),
+  MOBILE_LATEST_VERSION_ANDROID: z.string().default(''),
+  MOBILE_STORE_URL_IOS: z.string().default('https://apps.apple.com/app/id0000000000'),
+  MOBILE_STORE_URL_ANDROID: z
+    .string()
+    .default('https://play.google.com/store/apps/details?id=com.hireorbitai.app'),
+
   // --- Trust proxy (set to 1 behind Nginx/CloudPanel, 0 if direct) ---
   TRUST_PROXY: z.coerce.number().int().min(0).max(10).default(1),
 
@@ -380,6 +396,21 @@ export const env = {
     failClosed: e.CLAMAV_FAIL_CLOSED,
   },
   aiRateLimitMax: e.AI_RATE_LIMIT_MAX,
+  mobile: {
+    minVersion: {
+      ios: e.MOBILE_MIN_VERSION_IOS,
+      android: e.MOBILE_MIN_VERSION_ANDROID,
+    },
+    latestVersion: {
+      ios: e.MOBILE_LATEST_VERSION_IOS,
+      android: e.MOBILE_LATEST_VERSION_ANDROID,
+    },
+    storeUrl: {
+      ios: e.MOBILE_STORE_URL_IOS,
+      android: e.MOBILE_STORE_URL_ANDROID,
+    },
+  },
+
   database: {
     url: e.DATABASE_URL,
     ssl: e.DATABASE_SSL,

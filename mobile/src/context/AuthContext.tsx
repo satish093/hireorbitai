@@ -39,6 +39,7 @@ import {
   type StoredSession,
 } from '../services/session';
 import { config as appConfig } from '../config/env';
+import { registerForPush, unregisterForPush } from '../services/push';
 import type { Role, UserProfile } from '../types';
 
 interface SignInResult {
@@ -139,6 +140,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // profile in if the server eventually answers.
         const cap = new Promise<void>((resolve) => setTimeout(resolve, BOOTSTRAP_CAP_MS));
         await Promise.race([loadProfile(), cap]);
+        // Already-signed-in user on cold boot — (re)register this device so a
+        // token that rotated or a freshly-granted permission is captured.
+        void registerForPush();
       }
       if (!cancelled) setLoading(false);
     })();
@@ -180,6 +184,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // load isn't blocked by the previous session's failure window.
       resetLoadGuards();
       await loadProfile();
+      // Register this device for hard push. Fire-and-forget; never blocks login.
+      void registerForPush();
       return {
         must_change_password: !!data.must_change_password,
         role: data.user.role as Role,
@@ -192,6 +198,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Best-effort backend revoke — kills the refresh token server-side and
     // bumps users.session_version. If it fails (offline), we still clear
     // locally; the token dies on its own TTL.
+    // Unregister this device first — needs the session's bearer token.
+    await unregisterForPush();
     try {
       await api.post('/auth/logout');
     } catch {

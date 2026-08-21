@@ -9,6 +9,7 @@ import helmet from 'helmet';
 import compression from 'compression';
 import hpp from 'hpp';
 import rateLimit from 'express-rate-limit';
+import { sendRateLimitResponse } from './middleware/rateLimitResponse';
 import pinoHttp from 'pino-http';
 import crypto from 'node:crypto';
 import jwt from 'jsonwebtoken';
@@ -157,30 +158,6 @@ app.use(
 //   - Skip /health and /ready so uptime monitors don't burn budget.
 //   - Public auth + invitation routes get their own much stricter limiter
 //     mounted below — those are the brute-force surface.
-// Shared 429 handler — emits a clean JSON body and a Retry-After header in
-// seconds (the default response is HTML "Too many requests"). The frontend
-// can read Retry-After to back off intelligently if we ever wire a retrying
-// client.
-function sendRateLimitResponse(
-  _req: import('express').Request,
-  res: import('express').Response,
-  _next: unknown,
-  opts: { windowMs: number },
-) {
-  // express-rate-limit sets RateLimit-Reset on the response (in seconds until
-  // the bucket frees up). Echo that as Retry-After so clients can back off the
-  // right amount instead of the worst-case full window. We cap at 60s so a
-  // misconfigured client doesn't sleep forever; the next tick will retry if
-  // we're still over budget.
-  const resetSec = Number(res.getHeader('RateLimit-Reset'));
-  const fallback = Math.ceil(opts.windowMs / 1000);
-  const retryAfter = Math.min(60, Number.isFinite(resetSec) && resetSec > 0 ? resetSec : fallback);
-  res.setHeader('Retry-After', String(retryAfter));
-  res.status(429).json({
-    error: 'Too many requests. Please slow down.',
-    retry_after_seconds: retryAfter,
-  });
-}
 
 // The global limiter mounts BEFORE requireAuth runs, so `req.user` isn't
 // populated yet. Decode (verify) the JWT here directly so the bucket is keyed
@@ -211,7 +188,17 @@ function rateLimitKey(req: import('express').Request): string {
 //                        but abusive token-guessing still gets blocked.
 function skipGlobal(req: import('express').Request): boolean {
   const p = req.path;
-  return p === '/health' || p === '/ready' || p === '/auth/refresh' || p === '/api/auth/refresh';
+  return (
+    p === '/health' ||
+    p === '/ready' ||
+    p === '/auth/refresh' ||
+    p === '/api/auth/refresh' ||
+    // The update gate must answer even for a client that has burned its
+    // budget — otherwise a rate-limited user is stuck on a version check that
+    // 429s, with no way to be told to update.
+    p === '/app-version' ||
+    p === '/api/app-version'
+  );
 }
 
 const globalLimiter = rateLimit({
@@ -238,14 +225,8 @@ const authLimiter = rateLimit({
   handler: (req, res, next) =>
     sendRateLimitResponse(req, res, next, { windowMs: AUTH_LIMITER_WINDOW_MS }),
 });
-app.use('/auth/login', authLimiter);
-app.use('/auth/forgot-password', authLimiter);
-app.use('/auth/reset-password', authLimiter);
 app.use('/invitations/setup', authLimiter);
 // Same routes under the /api alias for the legacy single-domain deployment.
-app.use('/api/auth/login', authLimiter);
-app.use('/api/auth/forgot-password', authLimiter);
-app.use('/api/auth/reset-password', authLimiter);
 app.use('/api/invitations/setup', authLimiter);
 
 // --- /auth/refresh dedicated limiter -----------------------------------------

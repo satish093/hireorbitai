@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
+import { sendRateLimitResponse } from '../middleware/rateLimitResponse';
 import { requireAuth } from '../middleware/auth';
 import * as auth from '../controllers/auth.controller';
 
@@ -7,23 +8,30 @@ export const authRouter = Router();
 
 // Per-route limiters, stricter than the global one in server.ts. Mounted on
 // the routes that are the most enumerate-able / brute-forceable.
+const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
+  windowMs: LOGIN_WINDOW_MS,
   max: 10, // 10 login attempts / IP / 15min
   standardHeaders: 'draft-7',
   legacyHeaders: false,
+  handler: (req, res, next) => sendRateLimitResponse(req, res, next, { windowMs: LOGIN_WINDOW_MS }),
 });
+const FORGOT_WINDOW_MS = 60 * 60 * 1000;
 const forgotLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000,
+  windowMs: FORGOT_WINDOW_MS,
   max: 5, // 5 forgot-password requests / IP / hour
   standardHeaders: 'draft-7',
   legacyHeaders: false,
+  handler: (req, res, next) =>
+    sendRateLimitResponse(req, res, next, { windowMs: FORGOT_WINDOW_MS }),
 });
+const RESET_WINDOW_MS = 15 * 60 * 1000;
 const resetLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
+  windowMs: RESET_WINDOW_MS,
   max: 10,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
+  handler: (req, res, next) => sendRateLimitResponse(req, res, next, { windowMs: RESET_WINDOW_MS }),
 });
 
 // --- Public ------------------------------------------------------------------

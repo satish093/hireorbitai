@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { LogBox } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -9,9 +10,12 @@ import { FeatureFlagsProvider } from '../src/hooks/useFeatureFlags';
 import { ThemeProvider, useTheme } from '../src/theme';
 import { hydrateSession } from '../src/services/session';
 import { onAuthFailure, startResumeRefresh } from '../src/services/api';
+import * as Notifications from 'expo-notifications';
+import { configureNotificationHandler } from '../src/services/push';
 import { AppLockProvider } from '../src/security/AppLock';
 import { PrivacyCover } from '../src/security/PrivacyScreen';
 import { ErrorBoundary } from '../src/components/ErrorBoundary';
+import { UpdateGate } from '../src/components/UpdateGate';
 import {
   useFonts,
   Inter_400Regular,
@@ -26,6 +30,20 @@ import { applyInterFont } from '../src/theme/fonts';
 // this the app flashes the login screen for a frame before restoring a valid
 // session — which reads as "it logged me out" every cold start.
 void SplashScreen.preventAutoHideAsync().catch(() => {});
+
+// The iOS Simulator has no APNs, so expo-notifications logs a benign error when
+// it can't read its persisted push-registration store. It never fires on a real
+// device and doesn't affect delivery (verified via `simctl push`). Silence the
+// dev red-box for that one known message so it doesn't look like a real crash.
+if (__DEV__) {
+  LogBox.ignoreLogs([
+    'Error reading persisted server registration info',
+    'getRegistrationInfoAsync',
+  ]);
+}
+
+// Show push banners even in the foreground, and route on tap (below).
+configureNotificationHandler();
 
 export default function RootLayout() {
   const [ready, setReady] = useState(false);
@@ -70,15 +88,20 @@ export default function RootLayout() {
               over everything, including a lock screen or an error boundary,
               the instant the OS starts snapshotting for the app switcher. */}
           <PrivacyCover>
-            <AuthProvider>
-              <AppLockProvider>
-                <FeatureFlagsProvider>
-                  <ErrorBoundary>
-                    <AppShell />
-                  </ErrorBoundary>
-                </FeatureFlagsProvider>
-              </AppLockProvider>
-            </AuthProvider>
+            {/* UpdateGate wraps AuthProvider, not the reverse: a build below
+                the floor must never reach the auth handshake, since the API
+                shape it expects may no longer exist. */}
+            <UpdateGate>
+              <AuthProvider>
+                <AppLockProvider>
+                  <FeatureFlagsProvider>
+                    <ErrorBoundary>
+                      <AppShell />
+                    </ErrorBoundary>
+                  </FeatureFlagsProvider>
+                </AppLockProvider>
+              </AuthProvider>
+            </UpdateGate>
           </PrivacyCover>
         </ThemeProvider>
       </SafeAreaProvider>
@@ -100,9 +123,32 @@ function AppShell() {
     // Refresh an expired token when the app returns from the background —
     // without this, the first request after a resume 401s and boots the user.
     const stopResume = startResumeRefresh();
+
+    // Deep-link on notification tap. `data.type` decides the destination; the
+    // route guards still apply, so an unauthenticated tap lands on /login.
+    const routeFor = (data: Record<string, unknown> | undefined) => {
+      if (!data) return null;
+      if (data.type === 'message' && data.peer_id) return `/(app)/chat/${data.peer_id}`;
+      if (data.type === 'reminder') return '/(app)/reminders';
+      if (data.type === 'interview') return '/(app)/interviews';
+      return null;
+    };
+    const onTap = (resp: Notifications.NotificationResponse) => {
+      const dest = routeFor(
+        resp.notification.request.content.data as Record<string, unknown> | undefined,
+      );
+      if (dest) router.push(dest as never);
+    };
+    const sub = Notifications.addNotificationResponseReceivedListener(onTap);
+    // App opened cold from a notification tap.
+    void Notifications.getLastNotificationResponseAsync().then((r) => {
+      if (r) onTap(r);
+    });
+
     return () => {
       stopAuth();
       stopResume();
+      sub.remove();
     };
   }, [router]);
 

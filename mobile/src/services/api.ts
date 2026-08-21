@@ -37,10 +37,51 @@ import {
   setSession,
 } from './session';
 
+// ---------------------------------------------------------------------------
+// Timeouts
+//
+// A blanket 90s was worse than it looks: when the API is slow or unreachable,
+// an ordinary list screen sat spinning for a minute and a half before it could
+// even show "check your connection". That reads as a frozen app.
+//
+// A blanket SHORT timeout is equally wrong — AI generation and file uploads
+// legitimately run past a minute, and cutting those off mid-flight loses real
+// user work. So the budget is tiered by what the request actually does.
+const DEFAULT_TIMEOUT_MS = 30_000;
+const SLOW_TIMEOUT_MS = 120_000;
+
+/**
+ * Endpoints that are expected to be slow: model inference, document parsing,
+ * and uploads. Matched as substrings against the request path.
+ */
+const SLOW_PATHS = [
+  '/ai',
+  '/ai-email',
+  '/training/ai',
+  '/generate-content',
+  '/generate-quiz',
+  '/generate-capstone',
+  '/enrich',
+  '/copilot',
+  '/cover-letter',
+  '/skill-gap',
+  '/skill-match-for-me',
+  '/ats-match',
+  '/resumes/tailor',
+  '/reextract',
+  '/parse-profile',
+  '/upload',
+  '/attachments',
+];
+
+function isSlowPath(url: string | undefined): boolean {
+  if (!url) return false;
+  return SLOW_PATHS.some((p) => url.includes(p));
+}
+
 export const api = axios.create({
   baseURL: appConfig.apiBaseUrl,
-  // 60s on web; mobile networks warrant more headroom before we give up.
-  timeout: 90_000,
+  timeout: DEFAULT_TIMEOUT_MS,
 });
 
 // ---------------------------------------------------------------------------
@@ -256,6 +297,12 @@ export function startResumeRefresh(): () => void {
 // ---------------------------------------------------------------------------
 api.interceptors.request.use(async (cfg) => {
   const method = (cfg.method ?? 'get').toLowerCase();
+
+  // Give the slow endpoints their longer budget. Only when the timeout is
+  // still the instance default — an explicit per-call timeout wins.
+  if (cfg.timeout === DEFAULT_TIMEOUT_MS && isSlowPath(cfg.url)) {
+    cfg.timeout = SLOW_TIMEOUT_MS;
+  }
   // Suppress cooling GETs only. A write is a deliberate user action and
   // deserves a real server response — which may itself be a 429 that re-arms.
   if (method === 'get') {
@@ -320,7 +367,15 @@ api.get = function dedupedGet<T = unknown, R = AxiosResponse<T>, D = unknown>(
 // ---------------------------------------------------------------------------
 export function apiErrorMessage(err: unknown, fallback = 'Something went wrong'): string {
   const e = err as AxiosError<{ error?: string; details?: unknown }>;
-  if (e?.code === 'ERR_RATE_LIMITED') return 'Slow down a moment and try again.';
+  if (e?.code === 'ERR_RATE_LIMITED' || e?.response?.status === 429) {
+    // Tell the user HOW LONG. During a cooldown every retry fails instantly
+    // with no network call, so without a number the screen just looks broken.
+    const secs = Number(e?.response?.headers?.['retry-after']);
+    if (Number.isFinite(secs) && secs > 0) {
+      return `Too many requests. Try again in ${Math.ceil(secs)}s.`;
+    }
+    return 'Too many requests. Try again in a moment.';
+  }
   if (e?.code === 'ECONNABORTED') return 'The request timed out. Check your connection.';
   const serverMsg = e?.response?.data?.error;
   if (typeof serverMsg === 'string' && serverMsg.trim()) return serverMsg;

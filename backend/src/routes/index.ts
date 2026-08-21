@@ -39,8 +39,15 @@ import { filesRouter } from './files.routes';
 import { aiUsageRouter } from './aiUsage.routes';
 import { workAuthDocsRouter } from './workAuthDocs.routes';
 import { invoicesRouter } from './invoices.routes';
+import { appVersionRouter } from './appVersion.routes';
+import { pushRouter } from './push.routes';
 
 export const router = Router();
+
+// Store-update gate. Public and mounted first: a build below the floor may be
+// too old to authenticate at all, and it still has to learn that it must
+// update. Carries no user data.
+router.use('/app-version', appVersionRouter);
 
 // Public (auth handshake & invitation accept).
 router.use('/auth', authRouter);
@@ -122,6 +129,9 @@ router.use(
   glassdoorRouter,
 );
 router.use('/activity', activityRouter);
+
+// Device push-token registration (any authenticated user, own device).
+router.use('/push', pushRouter);
 // Bug reports / support tickets — any authenticated user may file one.
 router.use('/support', supportRouter);
 router.use('/recruiter-goals', recruiterGoalsRouter);

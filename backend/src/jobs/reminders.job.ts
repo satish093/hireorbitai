@@ -14,6 +14,7 @@
 import { db } from '../config/db';
 import { logger } from '../config/logger';
 import { publishToUser } from '../services/realtime.service';
+import { sendPushToUser } from '../services/push.service';
 
 interface ReminderRow {
   id: string;
@@ -106,6 +107,12 @@ export const remindersJob = {
           due_at: r.due_at,
           related_type: r.related_type ?? null,
           related_id: r.related_id ?? null,
+        });
+        // Hard push so a backgrounded phone still gets the reminder. Best-effort.
+        await sendPushToUser(owner.id, {
+          title: 'Reminder',
+          body: r.title,
+          data: { type: 'reminder', id: r.id },
         });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);

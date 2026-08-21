@@ -30,11 +30,13 @@
     "mobile:typecheck": "npm run shared:build && npm --prefix mobile run typecheck",
     "release": "bash scripts/release.sh",
     "db:build-init": "node scripts/build-init-sql.mjs",
-    "db:reset:dev": "node scripts/reset-dev.mjs"
+    "db:reset:dev": "node scripts/reset-dev.mjs",
+    "postinstall": "patch-package"
   },
   "devDependencies": {
     "husky": "^9.1.7",
     "lint-staged": "^15.2.10",
+    "patch-package": "^8.0.1",
     "prettier": "^3.3.3"
   },
   "lint-staged": {
