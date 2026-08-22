@@ -22,7 +22,8 @@
         "EXPO_PUBLIC_DEV_TOOLS": "false"
       },
       "ios": {
-        "resourceClass": "m-medium"
+        "resourceClass": "m-medium",
+        "image": "latest"
       }
     },
     "production": {
@@ -32,7 +33,8 @@
         "EXPO_PUBLIC_DEV_TOOLS": "false"
       },
       "ios": {
-        "resourceClass": "m-medium"
+        "resourceClass": "m-medium",
+        "image": "latest"
       }
     }
   },
@@ -41,7 +43,8 @@
       "ios": {
         "ascApiKeyPath": "../keys/AuthKey_24F7736GTD.p8",
         "ascApiKeyId": "24F7736GTD",
-        "ascApiKeyIssuerId": "dcfca5b9-bd3a-4d8c-b979-7ceacd4c93e9"
+        "ascApiKeyIssuerId": "dcfca5b9-bd3a-4d8c-b979-7ceacd4c93e9",
+        "ascAppId": "6804181190"
       }
     }
   }
