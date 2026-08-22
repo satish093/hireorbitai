@@ -17,7 +17,6 @@
     },
     "preview": {
       "distribution": "internal",
-      "channel": "preview",
       "env": {
         "EXPO_PUBLIC_API_URL": "https://hireorbitai.com/api",
         "EXPO_PUBLIC_DEV_TOOLS": "false"
@@ -28,7 +27,6 @@
     },
     "production": {
       "autoIncrement": true,
-      "channel": "production",
       "env": {
         "EXPO_PUBLIC_API_URL": "https://hireorbitai.com/api",
         "EXPO_PUBLIC_DEV_TOOLS": "false"
@@ -41,10 +39,9 @@
   "submit": {
     "production": {
       "ios": {
-        "__comment": "Fill these three from your Apple Developer + App Store Connect account before running `eas submit -p ios`.",
-        "appleId": "REPLACE_WITH_YOUR_APPLE_ID_EMAIL",
-        "ascAppId": "REPLACE_WITH_APP_STORE_CONNECT_APP_ID",
-        "appleTeamId": "REPLACE_WITH_YOUR_APPLE_TEAM_ID"
+        "ascApiKeyPath": "../keys/AuthKey_24F7736GTD.p8",
+        "ascApiKeyId": "24F7736GTD",
+        "ascApiKeyIssuerId": "dcfca5b9-bd3a-4d8c-b979-7ceacd4c93e9"
       }
     }
   }

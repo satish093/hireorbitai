@@ -47,7 +47,12 @@
         {
           "action": "VIEW",
           "autoVerify": true,
-          "data": [{ "scheme": "https", "host": "hireorbitai.com" }],
+          "data": [
+            {
+              "scheme": "https",
+              "host": "hireorbitai.com"
+            }
+          ],
           "category": ["BROWSABLE", "DEFAULT"]
         }
       ]
@@ -82,7 +87,11 @@
     "extra": {
       "router": {
         "origin": false
+      },
+      "eas": {
+        "projectId": "a84c7969-00cd-4e9e-9db8-eee8f1b3f1d1"
       }
-    }
+    },
+    "owner": "logicmeshai"
   }
 }
