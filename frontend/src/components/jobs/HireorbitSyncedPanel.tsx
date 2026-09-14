@@ -1,5 +1,137 @@
-import { useEffect, useState } from 'react';
-import { listHireorbitSyncedJobs, type HireorbitSyncedJob } from './jobsApi';
+import { useEffect, useState, type ReactNode } from 'react';
+import {
+  listHireorbitSyncedJobs,
+  getHireorbitJobInsights,
+  type HireorbitSyncedJob,
+  type HireorbitAgentOutput,
+} from './jobsApi';
+
+const INSIGHT_FIELD_LABELS: Record<string, string> = {
+  match_percentage: 'Match Percentage',
+  match_score: 'Match Percentage',
+  readiness: 'Readiness',
+  roadmap: 'Upskilling Roadmap',
+  upskilling_roadmap: 'Upskilling Roadmap',
+  technical_questions: 'Technical Interview Questions',
+  behavioral_questions: 'Behavioral Interview Questions',
+  interview_questions: 'Interview Questions',
+  portfolio_pitch: 'Tailored Portfolio Pitch',
+  tailored_portfolio_pitch: 'Tailored Portfolio Pitch',
+  github_scout: 'GitHub Scout',
+};
+
+function insightFieldLabel(key: string): string {
+  return (
+    INSIGHT_FIELD_LABELS[key] ?? key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+  );
+}
+
+function renderInsightValue(value: unknown): ReactNode {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    return <p className="text-sm">{String(value)}</p>;
+  }
+  if (Array.isArray(value)) {
+    return (
+      <ul className="list-disc pl-4 text-sm">
+        {value.map((item, i) => (
+          <li key={i}>{typeof item === 'object' ? JSON.stringify(item) : String(item)}</li>
+        ))}
+      </ul>
+    );
+  }
+  return (
+    <pre className="whitespace-pre-wrap text-xs text-muted">{JSON.stringify(value, null, 2)}</pre>
+  );
+}
+
+/** One agent's pre-computed output (public.hireorbit_agent_outputs), rendered generically —
+ * the JSONB payload shape is whatever Antigravity sends, so known keys get friendly labels
+ * and anything else still renders instead of being silently dropped. */
+function AgentOutputCard({ output }: { output: HireorbitAgentOutput }) {
+  const entries = Object.entries(output.payload);
+  return (
+    <div className="rounded-lg border border-border/60 p-2">
+      <div className="mb-1 text-xs font-medium text-muted">{output.agent_id}</div>
+      <div className="flex flex-col gap-2">
+        {entries.map(([key, value]) => {
+          const rendered = renderInsightValue(value);
+          if (!rendered) return null;
+          return (
+            <div key={key}>
+              <div className="text-xs font-medium">{insightFieldLabel(key)}</div>
+              {rendered}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/** Collapsible "AI Agent Insights" sub-panel for one synced job — fetches
+ * public.hireorbit_agent_outputs for that job's fingerprint on first expand.
+ * Purely a display of what Antigravity already computed; never calls the
+ * app's own native copilot/cover-letter/skill-gap endpoints. */
+function AgentInsights({ fingerprint }: { fingerprint: string }) {
+  const [open, setOpen] = useState(false);
+  const [outputs, setOutputs] = useState<HireorbitAgentOutput[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!open || loaded) return;
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    getHireorbitJobInsights(fingerprint)
+      .then((rows) => {
+        if (cancelled) return;
+        setOutputs(rows);
+        setLoaded(true);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setError('Could not load AI insights right now.');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, loaded, fingerprint]);
+
+  return (
+    <div className="mt-2 border-t border-border/60 pt-2">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="text-xs font-medium text-primary underline-offset-2 hover:underline"
+        aria-expanded={open}
+      >
+        {open ? 'Hide AI Agent Insights' : 'Show AI Agent Insights'}
+      </button>
+      {open && (
+        <div className="mt-2">
+          {loading && <div className="text-xs text-muted">Loading insights…</div>}
+          {error && <div className="text-xs text-danger">{error}</div>}
+          {!loading && !error && loaded && outputs.length === 0 && (
+            <div className="text-xs text-muted">No AI insights synced for this job yet.</div>
+          )}
+          {!loading && outputs.length > 0 && (
+            <div className="flex flex-col gap-2">
+              {outputs.map((o) => (
+                <AgentOutputCard key={o.id} output={o} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 /**
  * Read-only display of jobs synced in from the external HACP/Oracle agent
@@ -105,6 +237,7 @@ export function HireorbitSyncedPanel() {
                       View listing
                     </a>
                   )}
+                  <AgentInsights fingerprint={j.fingerprint} />
                 </li>
               ))}
             </ul>

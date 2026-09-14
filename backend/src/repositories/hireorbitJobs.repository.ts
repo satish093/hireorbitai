@@ -42,3 +42,33 @@ export async function listSynced(opts?: { limit?: number }): Promise<HireorbitJo
   if (error) throw httpError(500, 'Database error');
   return (data as HireorbitJobRow[]) ?? [];
 }
+
+/**
+ * Read-only repository for public.hireorbit_agent_outputs.
+ *
+ * Owns: public.hireorbit_agent_outputs — candidate-specific AI outputs
+ * (match readiness, upskilling roadmap, interview Q&A, portfolio pitch, etc.)
+ * pushed by the same Oracle HACP/Antigravity agent, keyed to a
+ * hireorbit_jobs.fingerprint via job_fingerprint. Same immutability
+ * guarantees as hireorbit_jobs (DB-level triggers + no DELETE grant); this
+ * repository only ever SELECTs.
+ */
+export interface HireorbitAgentOutputRow {
+  id: number;
+  job_fingerprint: string;
+  agent_id: string;
+  payload: Record<string, unknown>;
+  synced_at: string;
+}
+
+export async function listAgentOutputsForJob(
+  fingerprint: string,
+): Promise<HireorbitAgentOutputRow[]> {
+  const { data, error } = await db
+    .from('hireorbit_agent_outputs')
+    .select('*')
+    .eq('job_fingerprint', fingerprint)
+    .order('agent_id', { ascending: true });
+  if (error) throw httpError(500, 'Database error');
+  return (data as HireorbitAgentOutputRow[]) ?? [];
+}

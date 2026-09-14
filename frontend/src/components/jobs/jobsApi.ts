@@ -147,3 +147,26 @@ export async function listHireorbitSyncedJobs(limit = 100): Promise<HireorbitSyn
   const res = await api.get<HireorbitSyncedJob[]>('/jobs/hireorbit-synced', { params: { limit } });
   return res.data;
 }
+
+export interface HireorbitAgentOutput {
+  id: number;
+  job_fingerprint: string;
+  agent_id: string;
+  payload: Record<string, unknown>;
+  synced_at: string;
+}
+
+/**
+ * GET /jobs/hireorbit-synced/:fingerprint/insights
+ * Read-only, pre-computed AI agent outputs for one synced job (match
+ * readiness, upskilling roadmap, interview Q&A, portfolio pitch, etc.),
+ * one row per agent_id. No fallback — display-only.
+ */
+export async function getHireorbitJobInsights(
+  fingerprint: string,
+): Promise<HireorbitAgentOutput[]> {
+  const res = await api.get<HireorbitAgentOutput[]>(
+    `/jobs/hireorbit-synced/${encodeURIComponent(fingerprint)}/insights`,
+  );
+  return res.data;
+}

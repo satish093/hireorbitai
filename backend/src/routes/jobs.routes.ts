@@ -22,6 +22,9 @@ jobsRouter.get('/match/consultant/:consultantId', c.matchForConsultant);
 // (public.hireorbit_jobs), never merged into public.jobs. See
 // hireorbitJobs.controller.ts / hireorbitJobs.repository.ts.
 jobsRouter.get('/hireorbit-synced', hoc.list);
+// Pre-computed AI agent outputs (public.hireorbit_agent_outputs) for one
+// synced job — read-only display of what Antigravity already computed.
+jobsRouter.get('/hireorbit-synced/:fingerprint/insights', hoc.insights);
 
 // Live job ingestion (Jobright-style real-time pull)
 jobsRouter.get('/sources/drivers', src.drivers);
