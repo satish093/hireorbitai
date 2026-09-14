@@ -4,6 +4,7 @@ import { requireFeature } from '../middleware/featureFlag';
 import { MANAGER_TIER, OPERATOR_TIER } from '../types';
 import * as c from '../controllers/jobs.controller';
 import * as src from '../controllers/jobSources.controller';
+import * as hoc from '../controllers/hireorbitJobs.controller';
 
 export const jobsRouter = Router();
 // `job_ingestion` flag — gates the SYNC/ENRICH/IMPORT endpoints only. The
@@ -16,6 +17,11 @@ jobsRouter.get('/recommended', c.recommended);
 jobsRouter.get('/liked', c.liked);
 jobsRouter.get('/applied', c.applied);
 jobsRouter.get('/match/consultant/:consultantId', c.matchForConsultant);
+
+// Read-only feed synced from the external HACP/Oracle agent — separate table
+// (public.hireorbit_jobs), never merged into public.jobs. See
+// hireorbitJobs.controller.ts / hireorbitJobs.repository.ts.
+jobsRouter.get('/hireorbit-synced', hoc.list);
 
 // Live job ingestion (Jobright-style real-time pull)
 jobsRouter.get('/sources/drivers', src.drivers);

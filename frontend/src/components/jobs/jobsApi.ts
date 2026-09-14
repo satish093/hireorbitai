@@ -116,3 +116,34 @@ export async function fetchRecruiterNote(
     return null;
   }
 }
+
+export interface HireorbitSyncedJob {
+  id: number;
+  fingerprint: string;
+  title: string;
+  company: string;
+  location: string;
+  work_model: string | null;
+  seniority_level: string | null;
+  min_experience_years: number | null;
+  h1b_sponsorship: boolean | null;
+  posted_date: string | null;
+  skills_tags: string | null;
+  salary_min: number | null;
+  salary_max: number | null;
+  salary_currency: string | null;
+  apply_url: string | null;
+  full_description: string | null;
+  synced_at: string;
+}
+
+/**
+ * GET /jobs/hireorbit-synced
+ * Read-only feed synced in from the external HACP/Oracle agent
+ * (public.hireorbit_jobs). No fallback — this is display-only, so an error
+ * just means the panel stays empty rather than showing stale local data.
+ */
+export async function listHireorbitSyncedJobs(limit = 100): Promise<HireorbitSyncedJob[]> {
+  const res = await api.get<HireorbitSyncedJob[]>('/jobs/hireorbit-synced', { params: { limit } });
+  return res.data;
+}
