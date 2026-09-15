@@ -36,6 +36,7 @@ import { activityRouter } from './activity.routes';
 import { recruiterGoalsRouter } from './recruiterGoals.routes';
 import { trainingRouter } from './training.routes';
 import { filesRouter } from './files.routes';
+import { hacpWebhookRouter } from './hacpWebhook.routes';
 import { aiUsageRouter } from './aiUsage.routes';
 import { workAuthDocsRouter } from './workAuthDocs.routes';
 import { invoicesRouter } from './invoices.routes';
@@ -71,6 +72,11 @@ router.use('/files', filesRouter);
 // Public invitation handshake (preview + set-password). Must be BEFORE requireAuth.
 router.get('/invitations/preview', invitationsCtl.preview);
 router.post('/invitations/setup', invitationsCtl.setup);
+
+// Public (machine-to-machine, HMAC-signature-gated) sync endpoint for the
+// Oracle "Hermes" HACP box's LinkedIn scraper pipeline. 503s until
+// HACP_SYNC_SECRET is configured. See hacpWebhook.controller.ts.
+router.use('/hacp', hacpWebhookRouter);
 
 // Feature flags — read-only "what can THIS user see" lookup. Mounted before
 // the password-change block because the frontend fires it from the top-level

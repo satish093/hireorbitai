@@ -80,6 +80,13 @@ const envSchema = z.object({
   // Get a free key at console.groq.com — no credit card required.
   GROQ_API_KEY: optionalKey,
 
+  // --- HACP Oracle sync (LinkedIn job scraper -> jobs table webhook) ---
+  // Shared secret with the Oracle "Hermes" agent box — it HMAC-SHA256-signs
+  // every POST to /api/hacp/sync with this same value (its own env var is
+  // HOSTINGER_SYNC_SECRET). Leave unset to keep the endpoint disabled (it
+  // returns 503) until the key is provisioned on both sides.
+  HACP_SYNC_SECRET: optionalKey,
+
   // --- Google Gemini (free tier — analysis, scoring, large-context tasks) ---
   // Get a free key at aistudio.google.com — 15 req/min, 1M tokens/day, no card.
   GEMINI_API_KEY: optionalKey,
@@ -418,6 +425,9 @@ export const env = {
   storage: {
     uploadsDir: path.resolve(e.UPLOADS_DIR),
     urlSecret: e.STORAGE_URL_SECRET,
+  },
+  hacp: {
+    syncSecret: e.HACP_SYNC_SECRET || undefined,
   },
   jwt: {
     secret: e.JWT_SECRET,

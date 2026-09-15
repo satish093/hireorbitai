@@ -100,7 +100,18 @@ app.use(
 );
 
 // --- Body parsing -------------------------------------------------------------
-app.use(express.json({ limit: '10mb' }));
+// `verify` stashes the exact request bytes on req.rawBody before parsing —
+// req.body alone isn't enough for HMAC-verified webhooks (hacpWebhook
+// controller) because the signature is computed over the bytes as sent, and
+// JSON.stringify(JSON.parse(x)) isn't guaranteed to reproduce them exactly.
+app.use(
+  express.json({
+    limit: '10mb',
+    verify: (req, _res, buf) => {
+      (req as express.Request).rawBody = buf;
+    },
+  }),
+);
 app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 
 // --- Defenses -----------------------------------------------------------------

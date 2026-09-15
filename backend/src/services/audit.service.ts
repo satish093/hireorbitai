@@ -74,7 +74,9 @@ export type AuditAction =
   | 'developer_capabilities_set'
   | 'user_page_access_set'
   | 'feature_flag_changed'
-  | 'feature_flag_group_override_changed';
+  | 'feature_flag_group_override_changed'
+  | 'hacp_sync_received'
+  | 'hacp_sync_rejected';
 
 interface AuditInput {
   action: AuditAction;

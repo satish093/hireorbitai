@@ -19,7 +19,6 @@ import { JobFilterBar } from '../components/jobs/JobFilterBar';
 import { JobModals } from '../components/jobs/JobModals';
 import { JobPreviewDrawer } from '../components/jobs/JobPreviewDrawer';
 import { JobDetailPane } from '../components/jobs/JobDetailPane';
-import { HireorbitSyncedPanel } from '../components/jobs/HireorbitSyncedPanel';
 import { useJobSearch } from '../components/jobs/useJobSearch';
 
 /** lg+ → desktop master-detail split; below → mobile overlay drawer. */
@@ -150,11 +149,6 @@ export function JobSearch() {
           searchRef={searchRef}
           rightSlot={staffActions}
         />
-
-        {/* Separate, clearly-labeled section for the externally-synced
-            (HACP/Oracle agent) feed — public.hireorbit_jobs. Self-contained,
-            does not participate in tab/filter/sort state above. */}
-        <HireorbitSyncedPanel />
 
         {isRecruiterMode && tab === 'recommended' && (
           <RecruiterTargetingBar value={target} onChange={setTarget} />

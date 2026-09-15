@@ -9,14 +9,16 @@
 import { register, start, stop } from './scheduler';
 import { remindersJob } from './reminders.job';
 import { sessionsPurgeJob } from './sessions-purge.job';
-import { jobsSyncJob } from './jobs-sync.job';
 import { dailyDigestJob } from './daily-digest.job';
 import { attachmentsPurgeJob } from './attachments-purge.job';
 import { workAuthExpiryJob } from './work-auth-expiry.job';
 import { invoiceOverdueJob } from './invoice-overdue.job';
 register(remindersJob);
 register(sessionsPurgeJob);
-register(jobsSyncJob);
+// jobs-sync.job (legacy RapidAPI ingestion: LinkedIn/Dice/Monster/CareerBuilder)
+// is deliberately not registered — job data now comes exclusively from the
+// HACP Oracle scraper via POST /api/hacp/sync. Manual sync via the admin API
+// (gated by the `job_ingestion` feature flag) is untouched if ever needed.
 register(dailyDigestJob);
 register(attachmentsPurgeJob);
 // H1B / EAD / I797 expiry alerts — runs daily, emails consultant + recruiter
