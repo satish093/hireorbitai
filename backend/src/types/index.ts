@@ -64,6 +64,11 @@ declare global {
   namespace Express {
     interface Request {
       user?: AuthUser;
+      // Raw request bytes, captured by the global express.json() `verify`
+      // hook in server.ts. Needed by HMAC-verified public webhooks (see
+      // hacpWebhook.controller.ts) because the signature is computed over
+      // the exact bytes sent, not a re-serialized JSON.parse(...) round trip.
+      rawBody?: Buffer;
     }
   }
 }
