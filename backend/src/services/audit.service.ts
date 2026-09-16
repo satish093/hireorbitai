@@ -76,7 +76,9 @@ export type AuditAction =
   | 'feature_flag_changed'
   | 'feature_flag_group_override_changed'
   | 'hacp_sync_received'
-  | 'hacp_sync_rejected';
+  | 'hacp_sync_rejected'
+  | 'hacp_delist_received'
+  | 'hacp_delist_rejected';
 
 interface AuditInput {
   action: AuditAction;
