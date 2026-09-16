@@ -1,4 +1,4 @@
-import { RequestHandler } from 'express';
+import { Request, RequestHandler } from 'express';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
 import { db } from '../config/db';
@@ -6,6 +6,7 @@ import { env } from '../config/env';
 import { logger } from '../config/logger';
 import { httpError } from '../types';
 import { audit } from '../services/audit.service';
+import { deactivateByExternalIds } from '../repositories/jobs.repository';
 
 /**
  * Inbound sync endpoint for the Oracle "Hermes" HACP box — receives jobs
@@ -67,7 +68,13 @@ function safeApplyUrl(raw: string | null | undefined, title: string, company: st
   return `https://www.google.com/search?ibp=htl;jobs&q=${encodeURIComponent(`${title} ${company}`)}`;
 }
 
-export const receiveSync: RequestHandler = async (req, res) => {
+// Shared by every HACP endpoint: HMAC-SHA256 over the raw body, shared secret
+// HACP_SYNC_SECRET. Throws (via audit + httpError) rather than returning a
+// bool so a caller can never forget to act on a bad signature.
+function verifyHacpSignature(
+  req: Request,
+  rejectedAction: 'hacp_sync_rejected' | 'hacp_delist_rejected',
+): void {
   const secret = env.hacp.syncSecret;
   if (!secret) throw httpError(503, 'HACP sync is not configured on this server');
 
@@ -79,9 +86,13 @@ export const receiveSync: RequestHandler = async (req, res) => {
   const sigBuf = Buffer.from(signature, 'utf8');
   const expBuf = Buffer.from(expected, 'utf8');
   if (sigBuf.length !== expBuf.length || !timingSafeEqual(sigBuf, expBuf)) {
-    audit({ action: 'hacp_sync_rejected', req, metadata: { reason: 'bad_signature' } });
+    audit({ action: rejectedAction, req, metadata: { reason: 'bad_signature' } });
     throw httpError(403, 'Invalid signature');
   }
+}
+
+export const receiveSync: RequestHandler = async (req, res) => {
+  verifyHacpSignature(req, 'hacp_sync_rejected');
 
   const parsed = payloadSchema.safeParse(req.body);
   if (!parsed.success) throw httpError(400, 'Invalid payload', parsed.error.flatten());
@@ -149,4 +160,34 @@ export const receiveSync: RequestHandler = async (req, res) => {
   const ingested = count ?? rows.length;
   audit({ action: 'hacp_sync_received', req, metadata: { ingested, submitted: rows.length } });
   res.status(200).json({ ingested });
+};
+
+const delistSchema = z
+  .object({
+    fingerprints: z.array(z.string().min(1).max(128)).min(1).max(500),
+  })
+  .strict();
+
+/**
+ * Inbound delisting endpoint for the Oracle HACP box's job-liveness checker —
+ * soft-deactivates jobs that are no longer live on LinkedIn (never a hard
+ * DELETE, so nothing here is unrecoverable). Same HMAC auth as /sync, same
+ * (source, external_id) dedup key the sync path upserts on, scoped to the
+ * 'linkedin_hacp' source so this can never touch a job from another driver.
+ */
+export const delistJobs: RequestHandler = async (req, res) => {
+  verifyHacpSignature(req, 'hacp_delist_rejected');
+
+  const parsed = delistSchema.safeParse(req.body);
+  if (!parsed.success) throw httpError(400, 'Invalid payload', parsed.error.flatten());
+
+  const { fingerprints } = parsed.data;
+  const delisted = await deactivateByExternalIds('linkedin_hacp', fingerprints);
+
+  audit({
+    action: 'hacp_delist_received',
+    req,
+    metadata: { delisted, submitted: fingerprints.length },
+  });
+  res.status(200).json({ delisted });
 };

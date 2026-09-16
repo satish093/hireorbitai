@@ -25,6 +25,11 @@ const dbState = vi.hoisted(() => ({
   upsertError: null as { message: string } | null,
   upsertCount: 1,
   upsertCalls: 0,
+  lastUpdatePayload: null as Record<string, unknown> | null,
+  lastUpdateFilters: [] as Array<{ op: string; col: string; value: unknown }>,
+  updateError: null as { message: string } | null,
+  updateCount: 0,
+  updateCalls: 0,
 }));
 
 const envState = vi.hoisted(() => ({
@@ -47,6 +52,24 @@ vi.mock('../config/db', () => ({
           return { data: null, error: err };
         }
         return { data: null, error: null, count: dbState.upsertCount };
+      },
+      update: (payload: Record<string, unknown>) => {
+        dbState.lastUpdatePayload = payload;
+        const chain = {
+          eq: (col: string, value: unknown) => {
+            dbState.lastUpdateFilters.push({ op: 'eq', col, value });
+            return chain;
+          },
+          in: async (col: string, value: unknown) => {
+            dbState.lastUpdateFilters.push({ op: 'in', col, value });
+            dbState.updateCalls += 1;
+            if (dbState.updateError) {
+              return { data: null, error: dbState.updateError };
+            }
+            return { data: null, error: null, count: dbState.updateCount };
+          },
+        };
+        return chain;
       },
     }),
   },
@@ -73,7 +96,7 @@ vi.mock('../services/audit.service', () => ({
   },
 }));
 
-import { receiveSync } from './hacpWebhook.controller';
+import { receiveSync, delistJobs } from './hacpWebhook.controller';
 
 const SECRET = 'test-hacp-secret';
 
@@ -121,6 +144,17 @@ async function call(payload: unknown, opts: Parameters<typeof mkReq>[1] = {}) {
   }
 }
 
+async function callDelist(payload: unknown, opts: Parameters<typeof mkReq>[1] = {}) {
+  const req = mkReq(payload, opts);
+  const res = mkRes();
+  try {
+    await delistJobs(req, res, vi.fn());
+    return { res, err: null as { status?: number; message?: string } | null };
+  } catch (e) {
+    return { res, err: e as { status?: number; message?: string } };
+  }
+}
+
 const VALID_JOB = {
   fingerprint: 'fp-abc123',
   title: 'Senior DevOps Engineer',
@@ -147,6 +181,11 @@ beforeEach(() => {
   dbState.upsertError = null;
   dbState.upsertCount = 1;
   dbState.upsertCalls = 0;
+  dbState.lastUpdatePayload = null;
+  dbState.lastUpdateFilters = [];
+  dbState.updateError = null;
+  dbState.updateCount = 0;
+  dbState.updateCalls = 0;
   envState.syncSecret = SECRET;
   auditState.calls = [];
 });
@@ -261,6 +300,74 @@ describe('receiveSync — happy path row shape', () => {
   it('500s when the upsert fails for a non-schema-cache reason', async () => {
     dbState.upsertError = { message: 'connection refused' };
     const { err } = await call({ jobs: [VALID_JOB] });
+    expect(err?.status).toBe(500);
+  });
+});
+
+describe('delistJobs — gating', () => {
+  it('503s when HACP_SYNC_SECRET is not configured', async () => {
+    envState.syncSecret = undefined;
+    const { err } = await callDelist({ fingerprints: ['fp-1'] });
+    expect(err?.status).toBe(503);
+    expect(dbState.updateCalls).toBe(0);
+  });
+
+  it('400s when the signature header is missing', async () => {
+    const { err } = await callDelist({ fingerprints: ['fp-1'] }, { noSig: true });
+    expect(err?.status).toBe(400);
+  });
+
+  it('403s on a signature computed with the wrong secret, and audits hacp_delist_rejected', async () => {
+    const { err } = await callDelist({ fingerprints: ['fp-1'] }, { secret: 'wrong-secret' });
+    expect(err?.status).toBe(403);
+    expect(dbState.updateCalls).toBe(0);
+    expect(auditState.calls.map((c) => c.action)).toContain('hacp_delist_rejected');
+  });
+});
+
+describe('delistJobs — payload validation (.strict())', () => {
+  it('400s on an unrecognized field (mass-assignment guard)', async () => {
+    const { err } = await callDelist({ fingerprints: ['fp-1'], is_active: true } as any);
+    expect(err?.status).toBe(400);
+    expect(dbState.updateCalls).toBe(0);
+  });
+
+  it('400s on an empty fingerprints array', async () => {
+    const { err } = await callDelist({ fingerprints: [] });
+    expect(err?.status).toBe(400);
+    expect(dbState.updateCalls).toBe(0);
+  });
+
+  it('400s when fingerprints is missing entirely', async () => {
+    const { err } = await callDelist({});
+    expect(err?.status).toBe(400);
+  });
+});
+
+describe('delistJobs — happy path', () => {
+  it('soft-deactivates only linkedin_hacp rows matching the given fingerprints', async () => {
+    dbState.updateCount = 2;
+    const { err, res } = await callDelist({ fingerprints: ['fp-1', 'fp-2'] });
+    expect(err).toBeNull();
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toEqual({ delisted: 2 });
+
+    expect(dbState.lastUpdatePayload).toEqual({ is_active: false });
+    expect(dbState.lastUpdateFilters).toEqual([
+      { op: 'eq', col: 'source', value: 'linkedin_hacp' },
+      { op: 'in', col: 'external_id', value: ['fp-1', 'fp-2'] },
+    ]);
+    expect(auditState.calls.map((c) => c.action)).toContain('hacp_delist_received');
+  });
+
+  it('never issues a hard delete — only ever flips is_active', async () => {
+    await callDelist({ fingerprints: ['fp-1'] });
+    expect(dbState.lastUpdatePayload).toEqual({ is_active: false });
+  });
+
+  it('500s when the update fails', async () => {
+    dbState.updateError = { message: 'connection refused' };
+    const { err } = await callDelist({ fingerprints: ['fp-1'] });
     expect(err?.status).toBe(500);
   });
 });

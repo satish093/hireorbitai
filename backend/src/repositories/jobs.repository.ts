@@ -75,3 +75,17 @@ export async function deactivateById(id: string): Promise<void> {
   const { error } = await db.from('jobs').update({ is_active: false }).eq('id', id);
   if (error) throw httpError(500, 'Database error');
 }
+
+/** Soft-deactivate by the (source, external_id) dedup key ingestion drivers use. */
+export async function deactivateByExternalIds(
+  source: string,
+  externalIds: string[],
+): Promise<number> {
+  const { error, count } = await db
+    .from('jobs')
+    .update({ is_active: false }, { count: 'exact' })
+    .eq('source', source)
+    .in('external_id', externalIds);
+  if (error) throw httpError(500, 'Database error');
+  return count ?? 0;
+}
