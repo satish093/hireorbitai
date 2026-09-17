@@ -23,7 +23,8 @@ describe('jobs/index — every expected job is registered', () => {
   const expected: Array<[string, RegExp]> = [
     ['remindersJob', /register\(remindersJob\)/],
     ['sessionsPurgeJob', /register\(sessionsPurgeJob\)/],
-    ['jobsSyncJob', /register\(jobsSyncJob\)/],
+    // jobsSyncJob (legacy RapidAPI ingestion) was deliberately retired in favor
+    // of the HACP webhook (see jobs/index.ts) — not expected here anymore.
     ['dailyDigestJob', /register\(dailyDigestJob\)/],
     ['attachmentsPurgeJob', /register\(attachmentsPurgeJob\)/],
     // Audit regression — was implemented + tested but never registered,
