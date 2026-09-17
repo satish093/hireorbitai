@@ -53,7 +53,8 @@
     "react-native-worklets": "0.10.1"
   },
   "optionalDependencies": {
-    "@rollup/rollup-darwin-x64": "4.60.4"
+    "@rollup/rollup-darwin-x64": "4.60.4",
+    "@rollup/rollup-linux-x64-gnu": "4.60.4"
   },
   "overrides": {
     "react-native": "0.86.2",
