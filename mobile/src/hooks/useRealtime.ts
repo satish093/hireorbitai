@@ -57,7 +57,6 @@ function resolveEventSource(): EventSourceCtor | null {
   if (sseModuleResolved) return EventSourceCls;
   sseModuleResolved = true;
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const mod = require('react-native-sse');
     EventSourceCls = (mod?.default ?? mod) as EventSourceCtor;
   } catch {

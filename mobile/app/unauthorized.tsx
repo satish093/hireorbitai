@@ -19,16 +19,16 @@ import { useTheme } from '../src/theme';
  * are the only two offered.
  */
 export default function UnauthorizedScreen() {
-  const { profile, refreshProfile, signOut } = useAuth();
+  const { profile, profileError, refreshProfile, signOut } = useAuth();
   const { colors, spacing, fontSize } = useTheme();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
 
   const retry = async () => {
     setBusy(true);
-    await refreshProfile();
+    const nextProfile = await refreshProfile();
     setBusy(false);
-    if (profile) router.replace('/(app)/dashboard');
+    if (nextProfile) router.replace('/(app)/dashboard');
   };
 
   const out = async () => {
@@ -77,7 +77,8 @@ export default function UnauthorizedScreen() {
         >
           {profile
             ? 'Your role doesn’t include this area. If you think that’s wrong, ask a workspace admin.'
-            : 'We couldn’t load your profile. Your account may have been deactivated, or the connection dropped mid-sign-in.'}
+            : (profileError ??
+              'We couldn’t load your profile. Your account may have been deactivated, or the connection dropped mid-sign-in.')}
         </Text>
 
         <View style={{ marginTop: spacing.xl, width: '100%', gap: spacing.sm }}>

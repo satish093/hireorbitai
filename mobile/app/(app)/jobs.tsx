@@ -102,7 +102,7 @@ function JobsList() {
     params,
     select: normalizeFeed,
   });
-  const rows = feed.data?.rows ?? [];
+  const rows = useMemo(() => feed.data?.rows ?? [], [feed.data]);
   const total = feed.data?.total ?? rows.length;
 
   const consultants = useApiList<Consultant>('/consultants', {

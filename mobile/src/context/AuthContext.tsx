@@ -51,9 +51,11 @@ interface AuthContextValue {
   session: StoredSession | null;
   profile: UserProfile | null;
   loading: boolean;
+  profileLoading: boolean;
+  profileError: string | null;
   signIn: (email: string, password: string) => Promise<SignInResult>;
   signOut: () => Promise<void>;
-  refreshProfile: () => Promise<void>;
+  refreshProfile: () => Promise<UserProfile | null>;
   /** Push a backend-issued pair into storage — used after the forced
    *  first-login password rotation so the user stays signed in. */
   refreshSession: (accessToken: string, refreshToken: string, expiresAt?: number) => Promise<void>;
@@ -63,60 +65,93 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 const MIN_RELOAD_MS = 5_000;
 const BOOTSTRAP_CAP_MS = 8_000;
+const PROFILE_TIMEOUT_MS = 8_000;
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setLocalSession] = useState<StoredSession | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
 
-  const inflightLoad = useRef<Promise<void> | null>(null);
+  const inflightLoad = useRef<Promise<UserProfile | null> | null>(null);
+  const profileRef = useRef<UserProfile | null>(null);
   const lastLoadedUserId = useRef<string | null>(null);
   const syncAttemptedFor = useRef<string | null>(null);
   const lastLoadAttemptMs = useRef<number>(0);
 
-  const loadProfile = useCallback(async (): Promise<void> => {
-    if (inflightLoad.current) return inflightLoad.current;
-    const now = Date.now();
-    if (lastLoadedUserId.current === null && now - lastLoadAttemptMs.current < MIN_RELOAD_MS) {
-      // A previous load failed recently — don't spin. The next legitimate
-      // session-change event after the cooldown retries.
-      return;
-    }
-    lastLoadAttemptMs.current = now;
-
-    inflightLoad.current = (async () => {
-      try {
-        const { data } = await api.get<UserProfile>('/auth/me');
-        setProfile(data);
-        lastLoadedUserId.current = data?.id ?? null;
-      } catch (err) {
-        const status = (err as { response?: { status?: number } })?.response?.status;
-        // 401/423 are handled by api.ts (auth-failure event). 429 is handled by
-        // its cooldown. We only fall through to /auth/sync when the server
-        // actually told us the profile row is missing.
-        if (status === 403 || status === 404) {
-          const sessUserId = getSession()?.user?.id ?? null;
-          if (sessUserId && syncAttemptedFor.current !== sessUserId) {
-            syncAttemptedFor.current = sessUserId;
-            try {
-              const { data } = await api.post<UserProfile>('/auth/sync', {});
-              setProfile(data);
-              lastLoadedUserId.current = data?.id ?? null;
-            } catch {
-              setProfile(null);
-              lastLoadedUserId.current = null;
-            }
-          }
-        }
-        // 429 / 5xx / offline → leave profile state alone. Resetting
-        // lastLoadedUserId here would re-fire the session-change loop forever.
-      } finally {
-        inflightLoad.current = null;
-      }
-    })();
-
-    return inflightLoad.current;
+  const rememberProfile = useCallback((next: UserProfile | null) => {
+    profileRef.current = next;
+    setProfile(next);
   }, []);
+
+  const loadProfile = useCallback(
+    async (force = false): Promise<UserProfile | null> => {
+      if (inflightLoad.current) return inflightLoad.current;
+      const now = Date.now();
+      if (
+        !force &&
+        lastLoadedUserId.current === null &&
+        now - lastLoadAttemptMs.current < MIN_RELOAD_MS
+      ) {
+        // A previous load failed recently — don't spin. The next legitimate
+        // session-change event after the cooldown retries.
+        return profileRef.current;
+      }
+      lastLoadAttemptMs.current = now;
+      setProfileLoading(true);
+      setProfileError(null);
+
+      inflightLoad.current = (async () => {
+        try {
+          const { data } = await api.get<UserProfile>('/auth/me', { timeout: PROFILE_TIMEOUT_MS });
+          rememberProfile(data);
+          lastLoadedUserId.current = data?.id ?? null;
+          setProfileError(null);
+          return data ?? null;
+        } catch (err) {
+          const status = (err as { response?: { status?: number } })?.response?.status;
+          // 401/423 are handled by api.ts (auth-failure event). 429 is handled by
+          // its cooldown. We only fall through to /auth/sync when the server
+          // actually told us the profile row is missing.
+          if (status === 403 || status === 404) {
+            const sessUserId = getSession()?.user?.id ?? null;
+            if (sessUserId && syncAttemptedFor.current !== sessUserId) {
+              syncAttemptedFor.current = sessUserId;
+              try {
+                const { data } = await api.post<UserProfile>(
+                  '/auth/sync',
+                  {},
+                  { timeout: PROFILE_TIMEOUT_MS },
+                );
+                rememberProfile(data);
+                lastLoadedUserId.current = data?.id ?? null;
+                setProfileError(null);
+                return data ?? null;
+              } catch {
+                rememberProfile(null);
+                lastLoadedUserId.current = null;
+                setProfileError('We could not prepare your profile. Please try again.');
+                return null;
+              }
+            }
+            setProfileError('We could not find a profile for this account.');
+            return null;
+          }
+          // 429 / 5xx / offline → leave profile state alone. Resetting
+          // lastLoadedUserId here would re-fire the session-change loop forever.
+          setProfileError('We could not load your profile. Check your connection and try again.');
+          return profileRef.current;
+        } finally {
+          setProfileLoading(false);
+          inflightLoad.current = null;
+        }
+      })();
+
+      return inflightLoad.current;
+    },
+    [rememberProfile],
+  );
 
   const resetLoadGuards = useCallback(() => {
     lastLoadedUserId.current = null;
@@ -152,7 +187,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const fresh = getSession();
       setLocalSession(fresh);
       if (!fresh) {
-        setProfile(null);
+        rememberProfile(null);
         resetLoadGuards();
         return;
       }
@@ -167,13 +202,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       cancelled = true;
       unsubscribe();
     };
-  }, [loadProfile, resetLoadGuards]);
+  }, [loadProfile, rememberProfile, resetLoadGuards]);
 
   const signIn = useCallback(
     async (email: string, password: string): Promise<SignInResult> => {
       // Bare axios, not `api` — the request interceptor would try to attach a
       // bearer token we don't have yet and run a pointless refresh check.
-      const { data } = await axios.post(`${appConfig.apiBaseUrl}/auth/login`, { email, password });
+      const { data } = await axios.post(`${appConfig.apiBaseUrl}/auth/login`, {
+        email,
+        password,
+      });
       setSession({
         access_token: data.access_token,
         refresh_token: data.refresh_token,
@@ -183,7 +221,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Fresh sign-in — clear every dedup/cooldown guard so the first profile
       // load isn't blocked by the previous session's failure window.
       resetLoadGuards();
-      await loadProfile();
+      await loadProfile(true);
       // Register this device for hard push. Fire-and-forget; never blocks login.
       void registerForPush();
       return {
@@ -206,9 +244,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       /* ignore */
     }
     clearSession();
-    setProfile(null);
+    rememberProfile(null);
+    setProfileError(null);
     resetLoadGuards();
-  }, [resetLoadGuards]);
+  }, [rememberProfile, resetLoadGuards]);
 
   const refreshSession = useCallback(
     async (accessToken: string, refreshToken: string, expiresAt?: number) => {
@@ -220,22 +259,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user: existing?.user ?? null,
       });
       resetLoadGuards();
-      await loadProfile();
+      await loadProfile(true);
     },
     [loadProfile, resetLoadGuards],
   );
+
+  const refreshProfile = useCallback(() => loadProfile(true), [loadProfile]);
 
   const value = useMemo<AuthContextValue>(
     () => ({
       session,
       profile,
       loading,
+      profileLoading,
+      profileError,
       signIn,
       signOut,
-      refreshProfile: loadProfile,
+      refreshProfile,
       refreshSession,
     }),
-    [session, profile, loading, signIn, signOut, loadProfile, refreshSession],
+    [
+      session,
+      profile,
+      loading,
+      profileLoading,
+      profileError,
+      signIn,
+      signOut,
+      refreshProfile,
+      refreshSession,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

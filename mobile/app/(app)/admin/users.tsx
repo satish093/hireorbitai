@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Screen, ListScreen, Banner } from '../../../src/components/ui/Screen';
+import { Screen, ListScreen } from '../../../src/components/ui/Screen';
 import { PageTopBar } from '../../../src/components/ui/TopBar';
 import { Divider, MetricTile } from '../../../src/components/ui/Card';
 import { Button } from '../../../src/components/ui/Button';
@@ -105,7 +105,7 @@ function AdminUsersList() {
   );
   const kpi = useApiQuery<UsersKpi>('/admin/users/kpi', { channel: 'users' });
 
-  const rows = data?.rows ?? [];
+  const rows = useMemo(() => data?.rows ?? [], [data]);
   const total = data?.total ?? rows.length;
   const k = kpi.data;
 

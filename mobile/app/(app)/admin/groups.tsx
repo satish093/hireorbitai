@@ -69,7 +69,7 @@ function UserGroupsList() {
     channel: 'users',
     params: { page_size: 200 },
   });
-  const allUsers = usersQuery.data?.rows ?? [];
+  const allUsers = useMemo(() => usersQuery.data?.rows ?? [], [usersQuery.data]);
   const membersByGroup = useMemo(() => {
     const m = new Map<string, AdminUser[]>();
     for (const u of allUsers) {

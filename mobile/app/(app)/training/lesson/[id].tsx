@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Linking, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { RefreshControl, ScrollView, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Screen, Banner } from '../../../../src/components/ui/Screen';
@@ -13,6 +13,7 @@ import { api, apiErrorMessage } from '../../../../src/services/api';
 import { invalidate } from '../../../../src/hooks/useInvalidate';
 import { BUSINESS_ROLES } from '../../../../src/types';
 import { useTheme } from '../../../../src/theme';
+import { openInAppBrowser } from '../../../../src/utils/safeUrl';
 
 interface Lesson {
   id: string;
@@ -162,7 +163,7 @@ function LessonViewer() {
                     <Button
                       label="Watch video"
                       variant="secondary"
-                      onPress={() => void Linking.openURL(lesson.video_url!)}
+                      onPress={() => void openInAppBrowser(lesson.video_url)}
                     />
                   </View>
                 ) : null}
@@ -195,7 +196,7 @@ function LessonViewer() {
                     <Button
                       label="Open attachment"
                       variant="secondary"
-                      onPress={() => void Linking.openURL(lesson.document_url!)}
+                      onPress={() => void openInAppBrowser(lesson.document_url)}
                     />
                   </View>
                 ) : null}

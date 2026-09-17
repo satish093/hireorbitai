@@ -23,7 +23,6 @@ function readUrl(name: string, value: string | undefined): string {
     );
   }
   try {
-    // eslint-disable-next-line no-new
     new URL(value);
   } catch {
     throw new Error(`${name} is not a valid URL: "${value}"`);

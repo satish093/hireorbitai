@@ -6,13 +6,14 @@
  *
  *   1. Loading auth context        → splash
  *   2. No session                  → /login
- *   3. Session but NO profile      → /unauthorized      ← see note below
- *   4. must_change_password        → /change-password
- *   5. Role not in `allow`         → /unauthorized
- *   6. Profile incomplete          → /complete-profile
- *   7. Onboarding required         → /onboarding/*
- *   8. Feature flag off            → inline disabled panel
- *   9. Otherwise                   → render
+ *   3. Session, profile loading    → splash
+ *   4. Session but NO profile      → /unauthorized      ← see note below
+ *   5. must_change_password        → /change-password
+ *   6. Role not in `allow`         → /unauthorized
+ *   7. Profile incomplete          → /complete-profile
+ *   8. Onboarding required         → /onboarding/*
+ *   9. Feature flag off            → inline disabled panel
+ *   10. Otherwise                  → render
  *
  * Branch 3 is the one that matters most. On the web this was a real privilege-
  * escalation hole: the role check `allow && profile && !allow.includes(...)`
@@ -58,12 +59,14 @@ export function RouteGuard({
   bypassPasswordChange,
   bypassProfileCompletion,
 }: Props) {
-  const { session, profile, loading } = useAuth();
+  const { session, profile, loading, profileLoading } = useAuth();
   const pathname = usePathname();
 
   if (loading) return <SplashGate />;
 
   if (!session) return <Redirect href="/login" />;
+
+  if (!profile && profileLoading) return <SplashGate />;
 
   // Fail-closed: a token with no usable profile means /auth/me AND /auth/sync
   // both failed (deactivated user, missing public.users row, or a network blip

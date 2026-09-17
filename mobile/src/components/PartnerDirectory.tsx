@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Linking, Text, View, type KeyboardTypeOptions } from 'react-native';
 import { Screen, ListScreen, PageHeader, Banner } from './ui/Screen';
-import { Card, DetailRow, Divider } from './ui/Card';
+import { Card, DetailRow } from './ui/Card';
 import { Button } from './ui/Button';
 import { Sheet } from './ui/Sheet';
 import { SearchInput, FormInput, SelectInput } from './ui/Inputs';

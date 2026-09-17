@@ -67,7 +67,6 @@ export function Icon({
   );
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function render(name: IconName, s: any, color: string) {
   switch (name) {
     case 'home':

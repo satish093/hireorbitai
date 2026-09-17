@@ -80,7 +80,7 @@ export function BreakdownRow({
   total: number;
   color: string;
 }) {
-  const { colors, fontSize, spacing } = useTheme();
+  const { colors, fontSize } = useTheme();
   const pct = total > 0 ? (value / total) * 100 : 0;
   return (
     <View style={{ gap: 4 }}>

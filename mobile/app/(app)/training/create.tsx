@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, Text } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { Screen, Banner } from '../../../src/components/ui/Screen';
 import { PageTopBar } from '../../../src/components/ui/TopBar';

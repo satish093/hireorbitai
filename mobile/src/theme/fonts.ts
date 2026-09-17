@@ -36,16 +36,13 @@ export function familyForWeight(weight?: string | number): string {
   return FAMILY_BY_WEIGHT[String(weight ?? '400')] ?? 'Inter_400Regular';
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function patchComponent(Component: any): void {
   if (!Component || Component.__interPatched || typeof Component.render !== 'function') return;
   const originalRender = Component.render;
   Component.__interPatched = true;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   Component.render = function patchedRender(...args: any[]) {
     const element = originalRender.apply(this, args);
     if (!element?.props) return element;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const flat = (StyleSheet.flatten(element.props.style) || {}) as any;
     // Respect an explicitly-set family (monospace, etc.).
     if (flat.fontFamily) return element;
