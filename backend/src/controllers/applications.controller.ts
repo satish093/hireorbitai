@@ -51,7 +51,9 @@ async function getCallerRecruiterRowId(userId: string): Promise<string | null> {
   }
 }
 
-async function getCallerConsultantRowId(userId: string): Promise<string | null> {
+// Exported for applicationCopilot.controller.ts, which needs the caller's own
+// consultant row id for the same self-scoping this file already does.
+export async function getCallerConsultantRowId(userId: string): Promise<string | null> {
   const { data } = await db.from('consultants').select('id').eq('user_id', userId).maybeSingle();
   return (data as { id?: string } | null)?.id ?? null;
 }
@@ -68,8 +70,10 @@ interface ApplicationOwnership {
 }
 
 /** Throws 404 if the application doesn't exist, 403 if the caller can't see
- *  it. Returns the loaded row for downstream use. */
-async function loadAndAuthorize(
+ *  it. Returns the loaded row for downstream use. Exported for
+ *  applicationCopilot.controller.ts, which reuses this exact ownership check
+ *  rather than duplicating it. */
+export async function loadAndAuthorize(
   caller: { id: string; role: Role; group_id?: string | null },
   applicationId: string,
 ): Promise<ApplicationOwnership> {
@@ -182,11 +186,39 @@ export const listMine: RequestHandler = async (req, res) => {
   const { data, error } = await db
     .from('applications')
     .select(
-      'id, status, submitted_at, job:jobs(id, title, company_name), vendor:vendors(id, company_name)',
+      'id, status, application_type, submitted_at, created_at, ' +
+        'job:jobs(id, title, company_name), vendor:vendors(id, company_name)',
     )
     .eq('consultant_id', myConsId)
-    .order('submitted_at', { ascending: false });
+    // submitted_at is null for in-progress copilot drafts, so order by
+    // created_at instead — submitted_at desc would scatter drafts unpredictably
+    // depending on Postgres's NULLS ordering default.
+    .order('created_at', { ascending: false });
   if (error) throw httpError(500, 'Database error');
+  res.json(data);
+};
+
+/**
+ * GET /applications/:id — single-application detail, same narrow/safe
+ * projection as listMine (no recruiter_id / ats_score / notes) regardless of
+ * caller role. Operators already have `list`/`update` for the fuller view;
+ * this endpoint exists for the consultant-facing MyApplications detail page,
+ * gated only by loadAndAuthorize's ownership check, not by role.
+ */
+export const getById: RequestHandler = async (req, res) => {
+  if (!req.user) throw httpError(401, 'Not authenticated');
+  await loadAndAuthorize(req.user, req.params.id);
+  const { data, error } = await db
+    .from('applications')
+    .select(
+      'id, status, application_type, submitted_at, cover_letter_text, cover_letter_source, ' +
+        'error_code, error_message, resume_id, job:jobs(id, title, company_name, linkedin_job_url), ' +
+        'vendor:vendors(id, company_name)',
+    )
+    .eq('id', req.params.id)
+    .maybeSingle();
+  if (error) throw httpError(500, 'Database error');
+  if (!data) throw httpError(404, 'Application not found');
   res.json(data);
 };
 
@@ -458,6 +490,22 @@ const EVENT_KINDS = [
   'apply_declined',
   'status_changed',
   'note',
+  // LinkedIn Application Copilot steps — see
+  // 1785000000000_application_status_and_event_kind_extend.sql for the
+  // matching Postgres enum values.
+  'linkedin_connected',
+  'linkedin_disconnected',
+  'linkedin_reauthorization_required',
+  'duplicate_check_completed',
+  'profile_loaded',
+  'resume_selected',
+  'cover_letter_ready',
+  'questions_answered',
+  'ready_for_review',
+  'submission_confirmed',
+  'needs_user_action',
+  'user_action_completed',
+  'external_application_detected',
 ] as const;
 
 /** POST /applications/:id/events — append an event to an existing application's log. */

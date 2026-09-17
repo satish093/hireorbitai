@@ -78,7 +78,10 @@ export type AuditAction =
   | 'hacp_sync_received'
   | 'hacp_sync_rejected'
   | 'hacp_delist_received'
-  | 'hacp_delist_rejected';
+  | 'hacp_delist_rejected'
+  | 'linkedin_connected'
+  | 'linkedin_disconnected'
+  | 'linkedin_reauthorization_required';
 
 interface AuditInput {
   action: AuditAction;

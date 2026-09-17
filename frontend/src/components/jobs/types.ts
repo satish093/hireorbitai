@@ -69,13 +69,17 @@ export interface JobRow {
   applied_at?: string;
   applied_method?: 'CUSTOMIZED' | 'ORIGINAL' | null;
   ats_score?: number | null;
-  // Live ingestion fields
-  source?: 'remoteok' | 'greenhouse' | 'lever' | 'adzuna' | null;
+  // Live ingestion fields. 'linkedin_hacp' is the only LinkedIn value the
+  // current HACP webhook pipeline actually produces; 'linkedin' is kept for
+  // forward-compat with any future direct driver. Both trigger the LinkedIn
+  // Application Copilot instead of the plain external-apply flow.
+  source?: 'remoteok' | 'greenhouse' | 'lever' | 'adzuna' | 'linkedin' | 'linkedin_hacp' | null;
   external_id?: string | null;
   apply_url?: string | null;
   company_name?: string | null;
   publisher?: string | null;
   last_synced_at?: string | null;
+  linkedin_job_url?: string | null;
   requirements?: {
     // Hard match signals
     must_haves?: string[];

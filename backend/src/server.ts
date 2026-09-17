@@ -5,6 +5,7 @@ import 'dotenv/config';
 import 'express-async-errors';
 import express from 'express';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import compression from 'compression';
 import hpp from 'hpp';
@@ -113,6 +114,11 @@ app.use(
   }),
 );
 app.use(express.urlencoded({ extended: true, limit: '2mb' }));
+
+// Signed cookies — used only for the short-lived LinkedIn OAuth state/CSRF
+// cookie (linkedin.service.ts). No session cookies exist otherwise; auth
+// tokens travel in JSON bodies/Authorization headers (see auth.local.ts).
+app.use(cookieParser(env.cookieSecret));
 
 // --- Defenses -----------------------------------------------------------------
 // hpp = HTTP Parameter Pollution guard. Strips duplicate query/body keys

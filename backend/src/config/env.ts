@@ -178,6 +178,25 @@ const envSchema = z.object({
     .url('FRONTEND_URL must be a fully-qualified URL')
     .default('https://hireorbitai.com'),
 
+  // --- LinkedIn OAuth ("Sign In with LinkedIn using OpenID Connect") ---
+  // Identity only (openid/profile/email scopes) — LinkedIn has no public API
+  // for job search or application submission for third-party apps. All
+  // three are optional so the app boots without a LinkedIn integration
+  // configured; the LinkedIn Connect feature 503s cleanly if it's missing
+  // (see linkedin.service.ts), same pattern as the optional AI provider keys.
+  LINKEDIN_CLIENT_ID: optionalKey,
+  LINKEDIN_CLIENT_SECRET: optionalKey,
+  // Deliberately NOT z.string().url() — that combined with .default('') would
+  // fail validation whenever LinkedIn isn't configured at all (Zod re-checks
+  // a substituted default against the inner schema, and '' isn't a URL).
+  // Its shape is instead checked below, only when LINKEDIN_CLIENT_ID is set.
+  LINKEDIN_REDIRECT_URI: optionalKey,
+  // Base64-encoded 32-byte AES-256-GCM key for encrypting LinkedIn tokens at
+  // rest (crypto.service.ts). Cross-checked against LINKEDIN_CLIENT_ID below —
+  // a configured LinkedIn integration must not silently encrypt with a
+  // missing/malformed key.
+  TOKEN_ENCRYPTION_KEY: optionalKey,
+
   // --- Rate limiting (configurable per env) ---
   RATE_LIMIT_WINDOW_MS: z.coerce
     .number()
@@ -374,6 +393,42 @@ if (e.DB_GUARD !== 'off' && e.NODE_ENV !== 'test') {
   }
 }
 
+// --- LinkedIn token-encryption guard ------------------------------------------
+// A configured LINKEDIN_CLIENT_ID with a missing or malformed
+// TOKEN_ENCRYPTION_KEY would mean crypto.service.ts either throws at first use
+// (safe but confusing) or, worse, someone "fixes" it by weakening the key
+// check later. Fail fast at boot instead: half-configured LinkedIn OAuth is a
+// deploy mistake, not a runtime surprise.
+if (e.LINKEDIN_CLIENT_ID) {
+  const keyBytes = (() => {
+    try {
+      return Buffer.from(e.TOKEN_ENCRYPTION_KEY, 'base64');
+    } catch {
+      return Buffer.alloc(0);
+    }
+  })();
+  if (keyBytes.length !== 32) {
+    console.error(
+      '\n✗ LINKEDIN_CLIENT_ID is set but TOKEN_ENCRYPTION_KEY is missing or not a valid ' +
+        'base64-encoded 32-byte key.\n  Generate one with: openssl rand -base64 32\n',
+    );
+    process.exit(1);
+  }
+  let validRedirectUri = false;
+  try {
+    validRedirectUri = new URL(e.LINKEDIN_REDIRECT_URI).protocol.startsWith('http');
+  } catch {
+    validRedirectUri = false;
+  }
+  if (!validRedirectUri) {
+    console.error(
+      '\n✗ LINKEDIN_CLIENT_ID is set but LINKEDIN_REDIRECT_URI is missing or not a ' +
+        'fully-qualified http(s) URL.\n',
+    );
+    process.exit(1);
+  }
+}
+
 /**
  * Validated, typed config. Import this anywhere in the backend instead of
  * touching `process.env` directly so the typechecker enforces the schema.
@@ -471,6 +526,12 @@ export const env = {
   maxFailedLogins: e.MAX_FAILED_LOGINS,
   lockoutMinutes: e.LOCKOUT_MINUTES,
   cookieSecret: e.COOKIE_SECRET,
+  linkedin: {
+    clientId: e.LINKEDIN_CLIENT_ID || undefined,
+    clientSecret: e.LINKEDIN_CLIENT_SECRET || undefined,
+    redirectUri: e.LINKEDIN_REDIRECT_URI || undefined,
+  },
+  tokenEncryptionKey: e.TOKEN_ENCRYPTION_KEY || undefined,
   turn: {
     cloudflare: {
       keyId: e.CLOUDFLARE_REALTIME_TURN_KEY_ID || undefined,

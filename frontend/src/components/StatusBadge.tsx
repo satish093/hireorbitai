@@ -96,6 +96,23 @@ export const STATUS_TONES: Record<string, PillTone> = {
     dot: 'bg-emerald-500',
   },
   REVOKED: { bg: 'bg-hover', text: 'text-muted', dot: 'bg-muted' },
+  // LinkedIn Application Copilot draft/terminal states (application_status enum).
+  READY_FOR_REVIEW: {
+    bg: 'bg-sky-50 dark:bg-sky-500/15',
+    text: 'text-sky-700 dark:text-sky-300',
+    dot: 'bg-sky-500',
+  },
+  NEEDS_USER_ACTION: {
+    bg: 'bg-amber-50 dark:bg-amber-500/15',
+    text: 'text-amber-700 dark:text-amber-300',
+    dot: 'bg-amber-500',
+  },
+  SUBMITTING: {
+    bg: 'bg-sky-50 dark:bg-sky-500/15',
+    text: 'text-sky-700 dark:text-sky-300',
+    dot: 'bg-sky-500',
+  },
+  EXTERNAL_APPLICATION: { bg: 'bg-hover', text: 'text-ink', dot: 'bg-muted' },
 };
 
 export const DEFAULT_STATUS_TONE: PillTone = {
@@ -106,7 +123,14 @@ export const DEFAULT_STATUS_TONE: PillTone = {
 
 // Statuses that benefit from a slow ambient pulse on the dot (active states
 // the user wants to *notice*).
-export const STATUS_PULSING = new Set(['SCHEDULED', 'INTERVIEW', 'PENDING', 'SCREENING', 'ACTIVE']);
+export const STATUS_PULSING = new Set([
+  'SCHEDULED',
+  'INTERVIEW',
+  'PENDING',
+  'SCREENING',
+  'ACTIVE',
+  'SUBMITTING',
+]);
 
 /**
  * Standalone, importable tone helper. Returns the {@link PillTone} for a status

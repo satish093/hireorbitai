@@ -1,10 +1,12 @@
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { api } from '../../services/api';
+import { invalidate } from '../../hooks/useInvalidate';
 import { ApplyInterceptModal } from '../ApplyInterceptModal';
 import { CustomizeResumeWizard } from '../CustomizeResumeWizard';
 import { DuplicateSubmissionModal } from '../DuplicateSubmissionModal';
 import { ApplyConfirmModal } from './ApplyConfirmModal';
+import { ApplyCopilotWizard } from './ApplyCopilotWizard';
 import { SourcesDrawer } from './SourcesDrawer';
 import { resolveApplyUrl } from './helpers';
 import type { ApplyTarget, JobRow, TabKey } from './types';
@@ -22,6 +24,8 @@ export interface JobModalsProps {
   setInterceptFor: (v: JobRow | null) => void;
   customizeFor: JobRow | null;
   setCustomizeFor: (v: JobRow | null) => void;
+  copilotFor: JobRow | null;
+  setCopilotFor: (v: JobRow | null) => void;
   confirmFor: { job: JobRow; resumeId: string | null } | null;
   setConfirmFor: (v: { job: JobRow; resumeId: string | null } | null) => void;
   dupWarning: {
@@ -60,6 +64,8 @@ export function JobModals(props: JobModalsProps) {
     setInterceptFor,
     customizeFor,
     setCustomizeFor,
+    copilotFor,
+    setCopilotFor,
     confirmFor,
     setConfirmFor,
     dupWarning,
@@ -133,6 +139,17 @@ export function JobModals(props: JobModalsProps) {
             />
           );
         })()}
+      {copilotFor && (
+        <ApplyCopilotWizard
+          job={copilotFor}
+          onClose={() => setCopilotFor(null)}
+          onSubmitted={() => {
+            setCopilotFor(null);
+            load(tab);
+            invalidate('applications');
+          }}
+        />
+      )}
       {dupWarning && (
         <DuplicateSubmissionModal
           consultantName={dupWarning.consultantName}

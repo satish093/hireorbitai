@@ -20,11 +20,19 @@ applicationsRouter.get('/mine', c.listMine);
 applicationsRouter.get('/', operatorOnly, c.list);
 applicationsRouter.get('/check-duplicate', operatorOnly, c.checkDuplicate);
 applicationsRouter.post('/', operatorOnly, c.create);
-applicationsRouter.post('/from-job', operatorOnly, c.fromJob);
+// Consultant self-apply (LinkedIn Application Copilot + the existing "Yes, I
+// applied" confirm flow) both need to call this — self-scoped inside fromJob
+// via assertCanActOnConsultant, so opening the route gate is safe.
+applicationsRouter.post('/from-job', c.fromJob);
 applicationsRouter.patch('/:id', operatorOnly, c.update);
 // Hard-delete is admin-tier only — destructive (cascades to interviews + the
 // apply-funnel event log), so it sits above the operator gate.
 applicationsRouter.delete('/:id', requireRole(...ADMIN_TIER), c.remove);
 applicationsRouter.post('/:id/ats-score', operatorOnly, c.runAtsScore);
-applicationsRouter.get('/:id/events', operatorOnly, c.listEvents);
+// Consultant-safe single-application detail + activity log — both self-scope
+// via loadAndAuthorize (404-not-403), same pattern as /mine. Registered after
+// the operator-only literal routes above but the :id here can't collide with
+// them (Express matches literal segments first).
+applicationsRouter.get('/:id', c.getById);
+applicationsRouter.get('/:id/events', c.listEvents);
 applicationsRouter.post('/:id/events', operatorOnly, c.appendEvent);

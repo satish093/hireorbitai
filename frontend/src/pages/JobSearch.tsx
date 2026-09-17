@@ -53,6 +53,8 @@ export function JobSearch() {
     setInterceptFor,
     customizeFor,
     setCustomizeFor,
+    copilotFor,
+    setCopilotFor,
     confirmFor,
     setConfirmFor,
     dupWarning,
@@ -294,6 +296,8 @@ export function JobSearch() {
         setInterceptFor={setInterceptFor}
         customizeFor={customizeFor}
         setCustomizeFor={setCustomizeFor}
+        copilotFor={copilotFor}
+        setCopilotFor={setCopilotFor}
         confirmFor={confirmFor}
         setConfirmFor={setConfirmFor}
         dupWarning={dupWarning}

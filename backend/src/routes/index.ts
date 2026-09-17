@@ -42,6 +42,8 @@ import { workAuthDocsRouter } from './workAuthDocs.routes';
 import { invoicesRouter } from './invoices.routes';
 import { appVersionRouter } from './appVersion.routes';
 import { pushRouter } from './push.routes';
+import { linkedinRouter, linkedinPublicRouter } from './linkedin.routes';
+import { applicationCopilotRouter } from './applicationCopilot.routes';
 
 export const router = Router();
 
@@ -78,6 +80,11 @@ router.post('/invitations/setup', invitationsCtl.setup);
 // HACP_SYNC_SECRET is configured. See hacpWebhook.controller.ts.
 router.use('/hacp', hacpWebhookRouter);
 
+// LinkedIn OAuth callback — LinkedIn redirects the user's browser here with
+// no Authorization header, so it must be public; it authenticates via its
+// own signed state cookie instead (see linkedin.controller.ts).
+router.use('/linkedin', linkedinPublicRouter);
+
 // Feature flags — read-only "what can THIS user see" lookup. Mounted before
 // the password-change block because the frontend fires it from the top-level
 // FeatureFlagsProvider on every page load (including /change-password). The
@@ -107,10 +114,12 @@ router.use('/work-auth-docs', requireRole(...BUSINESS_ROLES), workAuthDocsRouter
 router.use('/recruiters', recruitersRouter);
 router.use('/managers', managersRouter);
 router.use('/resumes', resumesRouter);
-// Jobs are an operator pipeline tool — OPERATOR_TIER (admins, group leads,
-// recruiters) only. CONSULTANT is excluded (consultants don't browse jobs) and
-// so is a capability-less DEVELOPER (OPERATOR_TIER has no DEVELOPER).
-router.use('/jobs', requireRole(...OPERATOR_TIER), jobsRouter);
+// Jobs were an OPERATOR_TIER-only pipeline tool; widened to BUSINESS_ROLES so
+// a CONSULTANT can browse jobs and self-apply (LinkedIn Application Copilot).
+// A capability-less DEVELOPER is still excluded (BUSINESS_ROLES = ALL_ROLES
+// minus DEVELOPER). Ingestion-source config/health stays OPERATOR_TIER via an
+// explicit per-route gate inside jobs.routes.ts.
+router.use('/jobs', requireRole(...BUSINESS_ROLES), jobsRouter);
 router.use('/vendors', vendorsRouter);
 router.use('/clients', clientsRouter);
 // Applications is an operator pipeline tool whose responses carry recruiter-
@@ -120,6 +129,16 @@ router.use('/clients', clientsRouter);
 // excludes DEVELOPER) only so the self-scoped, narrowed-projection
 // GET /applications/mine is reachable by a CONSULTANT for their own dashboard.
 router.use('/applications', requireRole(...BUSINESS_ROLES), applicationsRouter);
+// LinkedIn Connect (identity-only OAuth — no job-search/apply API exists for
+// third-party apps). No requireRole, same pattern as /users below: every
+// handler self-scopes to req.user.id, so a tier gate would add nothing.
+router.use('/linkedin', linkedinRouter);
+// LinkedIn Application Copilot — assembles resume/cover-letter/answers for a
+// consultant's own self-apply, then records the manual on-LinkedIn submit
+// the consultant confirms. BUSINESS_ROLES (excludes DEVELOPER); every
+// handler additionally self-scopes via applications.controller's
+// loadAndAuthorize / getCallerConsultantRowId.
+router.use('/application-copilot', requireRole(...BUSINESS_ROLES), applicationCopilotRouter);
 router.use('/feature-flags', featureFlagsRouter);
 router.use('/user-groups', userGroupsRouter);
 router.use('/users', usersRouter);

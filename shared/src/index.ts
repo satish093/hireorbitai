@@ -12,4 +12,5 @@
 
 export * from './roles';
 export * from './tasks';
+export * from './applicationQuestions';
 export * from './version';

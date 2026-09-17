@@ -83,6 +83,9 @@ const JobDetail = lazy(() => import('./pages/JobDetail').then((m) => ({ default:
 const Applications = lazy(() =>
   import('./pages/Applications').then((m) => ({ default: m.Applications })),
 );
+const MyApplications = lazy(() =>
+  import('./pages/MyApplications').then((m) => ({ default: m.MyApplications })),
+);
 const Interviews = lazy(() =>
   import('./pages/Interviews').then((m) => ({ default: m.Interviews })),
 );
@@ -355,10 +358,13 @@ export default function App() {
                 </ProtectedRoute>
               }
             />
+            {/* Widened from OPERATOR_TIER to BUSINESS_ROLES so a CONSULTANT can
+              browse jobs and self-apply via the LinkedIn Application Copilot.
+              The backend mount (routes/index.ts) was widened to match. */}
             <Route
               path="/jobs"
               element={
-                <ProtectedRoute allow={OPERATOR_TIER}>
+                <ProtectedRoute allow={BUSINESS_ROLES}>
                   <JobSearch />
                 </ProtectedRoute>
               }
@@ -366,7 +372,7 @@ export default function App() {
             <Route
               path="/jobs/:id"
               element={
-                <ProtectedRoute allow={OPERATOR_TIER}>
+                <ProtectedRoute allow={BUSINESS_ROLES}>
                   <JobDetail />
                 </ProtectedRoute>
               }
@@ -376,6 +382,17 @@ export default function App() {
               element={
                 <ProtectedRoute allow={OPERATOR_TIER}>
                   <Applications />
+                </ProtectedRoute>
+              }
+            />
+            {/* Consultant-facing self-apply history (LinkedIn Application
+              Copilot + any quick-logged external applications). Separate from
+              the operator /applications pipeline view above. */}
+            <Route
+              path="/my-applications"
+              element={
+                <ProtectedRoute allow={BUSINESS_ROLES}>
+                  <MyApplications />
                 </ProtectedRoute>
               }
             />

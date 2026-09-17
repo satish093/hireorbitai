@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Layout } from '../components/Layout';
 import { SkeletonCard } from '../components/Skeleton';
@@ -13,6 +13,7 @@ import { invalidate } from '../hooks/useInvalidate';
 import { ADMIN_TIER, MANAGER_TIER, ROLE_LABEL, Role } from '../types';
 import { GroupBadge } from '../components/GroupBadge';
 import { replayTour } from '../components/ProductTour';
+import { LinkedInConnectionCard } from '../components/linkedin/LinkedInConnectionCard';
 
 interface UserProfile {
   id: string;
@@ -56,6 +57,7 @@ interface UserProfile {
 export function UserProfile() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { profile: me } = useAuth();
   const isManagerTier = !!me && (MANAGER_TIER as string[]).includes(me.role);
   const isAdmin = !!me && (ADMIN_TIER as string[]).includes(me.role);
@@ -136,6 +138,21 @@ export function UserProfile() {
       cancelled = true;
     };
   }, [id]);
+
+  // The LinkedIn OAuth callback (GET /api/linkedin/callback) redirects the
+  // browser straight back here with a `?linkedin=` result — surface it once,
+  // then strip the param so a refresh doesn't re-toast.
+  useEffect(() => {
+    const result = searchParams.get('linkedin');
+    if (!result) return;
+    if (result === 'connected') toast.success('LinkedIn connected');
+    else if (result === 'cancelled') toast('LinkedIn connect cancelled', { icon: 'ℹ️' });
+    else toast.error('Failed to connect LinkedIn — please try again');
+    const next = new URLSearchParams(searchParams);
+    next.delete('linkedin');
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   // Allowlist of user-editable fields. Anything not in this list (role,
   // is_active, group_id, reports_to, last_seen_at, context, etc.) stays
@@ -537,6 +554,11 @@ export function UserProfile() {
               placeholder="America/New_York"
             />
           </Card>
+
+          {/* LinkedIn Connect — only the consultant themselves may connect their
+              own LinkedIn account; a manager viewing this page never sees or
+              triggers it on their behalf. */}
+          {isSelf && user.role === 'CONSULTANT' && <LinkedInConnectionCard />}
 
           {/* Personal notes — only on your own profile, private to you. */}
           {isSelf && <SelfNotesCard userId={user.id} initial={user.self_notes ?? ''} />}

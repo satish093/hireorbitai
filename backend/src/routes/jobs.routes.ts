@@ -17,10 +17,13 @@ jobsRouter.get('/liked', c.liked);
 jobsRouter.get('/applied', c.applied);
 jobsRouter.get('/match/consultant/:consultantId', c.matchForConsultant);
 
-// Live job ingestion (Jobright-style real-time pull)
-jobsRouter.get('/sources/drivers', src.drivers);
-jobsRouter.get('/sources/health', src.sourcesHealth);
-jobsRouter.get('/sources', src.listSources);
+// Live job ingestion (Jobright-style real-time pull). These three GETs used
+// to rely entirely on the parent mount being OPERATOR_TIER; now that the
+// /jobs mount admits CONSULTANT too, gate them explicitly so ingestion
+// source config/health stays an operator-only surface.
+jobsRouter.get('/sources/drivers', requireRole(...OPERATOR_TIER), src.drivers);
+jobsRouter.get('/sources/health', requireRole(...OPERATOR_TIER), src.sourcesHealth);
+jobsRouter.get('/sources', requireRole(...OPERATOR_TIER), src.listSources);
 jobsRouter.post('/sources', ingest, requireRole(...MANAGER_TIER), src.createSource);
 jobsRouter.patch('/sources/:id', ingest, requireRole(...MANAGER_TIER), src.updateSource);
 jobsRouter.delete('/sources/:id', ingest, requireRole(...MANAGER_TIER), src.deleteSource);
