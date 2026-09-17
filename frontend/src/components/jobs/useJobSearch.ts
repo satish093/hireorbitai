@@ -42,6 +42,9 @@ export function useJobSearch() {
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [interceptFor, setInterceptFor] = useState<JobRow | null>(null);
   const [customizeFor, setCustomizeFor] = useState<JobRow | null>(null);
+  /** LinkedIn-sourced job a consultant is applying to via the Application
+   *  Copilot wizard instead of the plain intercept/confirm flow. */
+  const [copilotFor, setCopilotFor] = useState<JobRow | null>(null);
   const [confirmFor, setConfirmFor] = useState<{ job: JobRow; resumeId: string | null } | null>(
     null,
   );
@@ -189,10 +192,11 @@ export function useJobSearch() {
     let totalFailed = 0;
     try {
       toast('Enriching all jobs… this runs locally and may take a minute', { duration: 4000 });
-      // /enrich-pending only processes a capped batch (jobs whose requirements
-      // are still null) per call, so loop until none remain. parseJobRequirements
-      // is a free LOCAL parser — no AI cost or rate limit — so it's safe to sweep
-      // the whole board. The cap (200 iters × 200) backstops a runaway.
+      // /enrich-pending only processes a capped batch (jobs with no requirements
+      // yet, or only the lightweight HACP-webhook metadata) per call, so loop
+      // until none remain. parseJobRequirements is a free LOCAL parser — no AI
+      // cost or rate limit — so it's safe to sweep the whole board. The cap
+      // (200 iters × 200) backstops a runaway.
       for (let i = 0; i < 200; i++) {
         const r = await api.post('/jobs/enrich-pending', null, {
           params: { limit: 200, concurrency: 8 },
@@ -368,6 +372,14 @@ export function useJobSearch() {
   function proceedToApply(job: JobRow, consultantId?: string | null) {
     if (isRecruiterMode && consultantId) {
       setInterceptFor(job);
+      return;
+    }
+    // LinkedIn-sourced jobs get the Application Copilot (assembled resume +
+    // cover letter + question answers, self-confirmed after the consultant
+    // submits on LinkedIn's own site) instead of the plain intercept flow —
+    // LinkedIn has no submission API, so this IS the self-apply path for it.
+    if (isConsultant && (job.source === 'linkedin' || job.source === 'linkedin_hacp')) {
+      setCopilotFor(job);
       return;
     }
     if (isConsultant && shouldShowApplyIntercept()) {
@@ -574,6 +586,8 @@ export function useJobSearch() {
     setInterceptFor,
     customizeFor,
     setCustomizeFor,
+    copilotFor,
+    setCopilotFor,
     confirmFor,
     setConfirmFor,
     dupWarning,

@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
 import { api } from '../services/api';
@@ -6,14 +6,16 @@ import { SelectInput } from './SelectInput';
 import { MatchRing } from './jobs/MatchRing';
 import { CompanyLogo } from './jobs/CompanyLogo';
 import { jobTags, TAG_TONE } from './jobs/jobTags';
+import { Section, FactRow, Bullets } from './jobs/JobDetailPrimitives';
+import { JobDescriptionSections } from './jobs/JobDescriptionSections';
 import {
   Job,
   JobRequirements,
   cleanText,
+  formatCompensation,
   jdToSafeHtml,
   jdToText,
   looksLikeHtml,
-  prettyRate,
   prettyType,
   relative,
   resolveApplyUrl,
@@ -39,32 +41,6 @@ interface AtsResp {
   matched_keywords: string[];
   missing_keywords: string[];
   summary: string;
-}
-
-function Section({ title, children }: { title?: string; children: ReactNode }) {
-  return (
-    <div className="bg-surface border border-border rounded-2xl p-5 shadow-sm min-w-0">
-      {title && (
-        <div className="text-[10px] font-semibold tracking-widest text-muted uppercase mb-2.5">
-          {title}
-        </div>
-      )}
-      {children}
-    </div>
-  );
-}
-
-function FactRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-baseline justify-between gap-4 py-2.5 border-b border-border first:pt-0 last:border-0 last:pb-0">
-      <span className="text-[11px] font-medium uppercase tracking-wide text-muted shrink-0">
-        {label}
-      </span>
-      <span className="text-sm font-medium text-ink text-right min-w-0 break-words" title={value}>
-        {value}
-      </span>
-    </div>
-  );
 }
 
 function ScoreCard({
@@ -96,50 +72,6 @@ function ScoreCard({
       </div>
       {sub && <div className="text-[11px] text-muted mt-0.5 break-words">{sub}</div>}
     </div>
-  );
-}
-
-function TagChip({ tag }: { tag: string }) {
-  const t = tag.toLowerCase();
-  const tone = /(no sponsor|no h1b)/.test(t)
-    ? 'bg-red-50 dark:bg-red-500/15 text-red-700 dark:text-red-300 border-red-100 dark:border-red-500/20'
-    : /(sponsor|h1b)/.test(t)
-      ? 'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-100 dark:border-emerald-500/20'
-      : /(clearance|secret)/.test(t)
-        ? 'bg-amber-50 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-100 dark:border-amber-500/20'
-        : /(remote)/.test(t)
-          ? 'bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border-indigo-100 dark:border-indigo-500/20'
-          : 'bg-hover text-ink border-border';
-  return (
-    <span
-      className={clsx(
-        'text-[11px] font-medium px-2 py-0.5 rounded-full border inline-flex items-center gap-1',
-        tone,
-      )}
-    >
-      ✦ {tag}
-    </span>
-  );
-}
-
-function Bullets({
-  items,
-  marker = '•',
-  tone = 'text-muted',
-}: {
-  items: string[];
-  marker?: string;
-  tone?: string;
-}) {
-  return (
-    <ul className="space-y-1 text-sm text-ink">
-      {items.map((b, i) => (
-        <li key={i} className="flex items-start gap-1.5">
-          <span className={tone}>{marker}</span>
-          <span className="min-w-0 break-words">{b}</span>
-        </li>
-      ))}
-    </ul>
   );
 }
 
@@ -574,6 +506,22 @@ export function JobDetailView({
   const workModel = reqs?.work_model ?? (job.remote ? 'Remote' : 'Onsite');
   const skills = (reqs?.required_skills?.length ? reqs.required_skills : job.required_skills) ?? [];
 
+  const hasAnyReqData =
+    (reqs?.highlights?.length ?? 0) > 0 ||
+    (reqs?.core_responsibilities?.length ?? 0) > 0 ||
+    (reqs?.must_haves?.length ?? 0) > 0 ||
+    (reqs?.nice_to_haves?.length ?? 0) > 0 ||
+    (reqs?.skill_summaries?.length ?? 0) > 0 ||
+    (reqs?.benefits_summaries?.length ?? 0) > 0 ||
+    (reqs?.education_summaries?.length ?? 0) > 0 ||
+    (reqs?.work_authorization?.length ?? 0) > 0 ||
+    (reqs?.recommendation_tags?.length ?? 0) > 0;
+  const showEmptyState =
+    !enriching &&
+    !(job.description && jdToText(job.description).length > 0) &&
+    skills.length === 0 &&
+    !hasAnyReqData;
+
   // Many aggregated listings expire — the stored apply link can 404. Offer a
   // Google-for-jobs search as a always-valid fallback under the Apply button.
   const googleUrl =
@@ -671,52 +619,13 @@ export function JobDetailView({
         <div className={clsx('space-y-4 min-w-0', !embedded && 'lg:col-span-3')}>
           <JobCopilot jobId={job.id} isConsultant={isConsultant} />
 
-          {(reqs?.highlights ?? []).length > 0 && (
-            <Section title="Highlights">
-              <Bullets
-                items={(reqs?.highlights ?? []).slice(0, 5)}
-                marker="★"
-                tone="text-sky-500"
-              />
-            </Section>
-          )}
-
-          {(reqs?.core_responsibilities ?? []).length > 0 && (
-            <Section title="Core responsibilities">
-              <Bullets items={(reqs?.core_responsibilities ?? []).slice(0, 8)} />
-            </Section>
-          )}
-
-          {(reqs?.skill_summaries ?? []).length > 0 && (
-            <Section title="Skill requirements">
-              <Bullets items={(reqs?.skill_summaries ?? []).slice(0, 8)} />
-            </Section>
-          )}
-
-          {skills.length > 0 && (
-            <Section title="Required skills">
-              <div className="flex flex-wrap gap-1.5">
-                {skills.map((s) => (
-                  <span
-                    key={s}
-                    className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-hover text-ink"
-                  >
-                    {s}
-                  </span>
-                ))}
-              </div>
-            </Section>
-          )}
-
-          {(reqs?.benefits_summaries ?? []).length > 0 && (
-            <Section title="Benefits">
-              <Bullets
-                items={(reqs?.benefits_summaries ?? []).slice(0, 6)}
-                marker="+"
-                tone="text-emerald-500"
-              />
-            </Section>
-          )}
+          <JobDescriptionSections
+            job={job}
+            reqs={reqs}
+            skills={skills}
+            applyUrl={resolveApplyUrl(job)}
+            googleUrl={googleUrl}
+          />
 
           {job.description &&
             jdToText(job.description).length > 0 &&
@@ -724,7 +633,7 @@ export function JobDetailView({
               const useHtml = looksLikeHtml(job.description!);
               const html = useHtml ? jdToSafeHtml(job.description!) : '';
               return (
-                <Section title="Job description">
+                <Section title="Full Original Posting">
                   {useHtml && html ? (
                     <div
                       className="jd-prose text-sm text-ink"
@@ -864,19 +773,14 @@ export function JobDetailView({
           )}
 
           {/* Empty-state when there's genuinely nothing to show. */}
-          {!enriching &&
-            !(job.description && jdToText(job.description).length > 0) &&
-            skills.length === 0 &&
-            (reqs?.recommendation_tags ?? []).length === 0 &&
-            (reqs?.core_responsibilities ?? []).length === 0 &&
-            (reqs?.skill_summaries ?? []).length === 0 && (
-              <Section>
-                <p className="text-sm text-muted text-center">
-                  This listing hasn't been enriched yet — only the basic facts are available. Open
-                  the original posting for the full description.
-                </p>
-              </Section>
-            )}
+          {showEmptyState && (
+            <Section>
+              <p className="text-sm text-muted text-center">
+                This listing hasn't been enriched yet — only the basic facts are available. Open the
+                original posting for the full description.
+              </p>
+            </Section>
+          )}
 
           {/* Recruiter/operator candidate tools (tailored resumes + cover letter
               for a selected consultant). Placed at the end so the recruiter
@@ -895,27 +799,13 @@ export function JobDetailView({
               <FactRow label="Location" value={job.location ?? '—'} />
               <FactRow label="Work model" value={workModel} />
               <FactRow label="Type" value={prettyType(job.job_type)} />
-              {hasRate && <FactRow label="Salary" value={prettyRate(job.rate_min, job.rate_max)} />}
+              {hasRate && (
+                <FactRow label="Salary" value={formatCompensation(job.rate_min, job.rate_max)} />
+              )}
               {seniority && <FactRow label="Level" value={seniority} />}
               {minYears != null && <FactRow label="Experience" value={`${minYears}+ years`} />}
             </div>
           </Section>
-
-          {(reqs?.recommendation_tags ?? []).length > 0 && (
-            <Section title="Flags">
-              <div className="flex flex-wrap gap-1.5">
-                {(reqs?.recommendation_tags ?? []).slice(0, 8).map((t) => (
-                  <TagChip key={t} tag={t} />
-                ))}
-              </div>
-            </Section>
-          )}
-
-          {(reqs?.work_authorization ?? []).length > 0 && (
-            <Section title="Work authorization">
-              <Bullets items={reqs?.work_authorization ?? []} tone="text-amber-500" />
-            </Section>
-          )}
 
           {applyBtn('w-full')}
         </div>

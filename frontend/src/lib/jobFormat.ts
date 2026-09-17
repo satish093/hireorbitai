@@ -79,6 +79,32 @@ export function prettyRate(min?: number | null, max?: number | null): string {
   return `$${min ?? max}/hr`;
 }
 
+/**
+ * Compensation string for the detail view. Unlike prettyRate() (used on job
+ * cards, which always assumes an hourly contract rate), aggregated postings
+ * mix W2 salary and C2C/hourly rates and the stored numbers carry no explicit
+ * unit — so this labels the range as hourly or annual by magnitude. Real
+ * hourly rates and real annual salaries never overlap around $1,000, which is
+ * the same convention job boards use for unlabeled numbers.
+ *
+ * LinkedIn-sourced postings (source=linkedin_hacp) store an explicit 0/0
+ * rather than leaving the columns null when salary isn't disclosed — a real
+ * pattern confirmed against production data (majority of rated jobs), so 0 is
+ * treated as "not provided" the same as null/undefined.
+ */
+export function formatCompensation(min?: number | null, max?: number | null): string {
+  const validMin = min != null && min > 0 ? min : null;
+  const validMax = max != null && max > 0 ? max : null;
+  if (validMin == null && validMax == null) return 'Compensation not provided';
+  const basis = validMax ?? validMin ?? 0;
+  const period = basis < 1000 ? '/hr' : '/yr';
+  const fmt = (n: number) => (period === '/yr' ? `$${Math.round(n).toLocaleString()}` : `$${n}`);
+  if (validMin != null && validMax != null && validMin !== validMax) {
+    return `${fmt(validMin)} – ${fmt(validMax)}${period}`;
+  }
+  return `${fmt(validMin ?? validMax ?? 0)}${period}`;
+}
+
 // Final apply-URL safety net: synthesize a Google-for-jobs search if the
 // stored apply_url is missing/invalid, so the button is always usable.
 export function resolveApplyUrl(job: Job): string {

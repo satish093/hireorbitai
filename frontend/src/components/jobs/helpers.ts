@@ -32,10 +32,16 @@ export function prettyType(t?: string | null): string {
   return map[t] ?? t;
 }
 
+// LinkedIn-sourced jobs (source=linkedin_hacp) store an explicit 0/0 rather
+// than leaving rate_min/rate_max null when a rate isn't disclosed — confirmed
+// against production data (majority of "priced" jobs) — so 0 is treated as
+// undisclosed the same as null/undefined.
 export function prettyRate(min?: number | null, max?: number | null): string {
-  if (min == null && max == null) return 'Rate undisclosed';
-  if (min != null && max != null) return `$${min}/hr – $${max}/hr`;
-  return `$${min ?? max}/hr`;
+  const validMin = min != null && min > 0 ? min : null;
+  const validMax = max != null && max > 0 ? max : null;
+  if (validMin == null && validMax == null) return 'Rate undisclosed';
+  if (validMin != null && validMax != null) return `$${validMin}/hr – $${validMax}/hr`;
+  return `$${validMin ?? validMax}/hr`;
 }
 
 export function scoreLabel(score: number | null): string {

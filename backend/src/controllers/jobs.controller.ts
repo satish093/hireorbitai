@@ -1,6 +1,6 @@
 import { RequestHandler } from 'express';
 import { z } from 'zod';
-import { db } from '../config/db';
+import { db, pool } from '../config/db';
 import {
   matchJobsForConsultant,
   atsScore,
@@ -870,7 +870,11 @@ export const requirementsFor: RequestHandler = async (req, res) => {
   if (!req.user) throw httpError(401, 'Not authenticated');
   const { data: job, error } = await db.from('jobs').select('*').eq('id', req.params.id).single();
   if (error || !job) throw httpError(404, 'Job not found');
-  if (job.requirements) {
+  // `job.requirements` truthy isn't enough — the HACP webhook always writes a
+  // non-null metadata object (ats_provider/h1b_sponsorship/etc, see
+  // hacpWebhook.controller.ts) that isn't the parsed shape this endpoint
+  // promises. Only skip parsing when the real fields are already present.
+  if (job.requirements && 'must_haves' in job.requirements) {
     res.json(job.requirements);
     return;
   }
@@ -882,8 +886,9 @@ export const requirementsFor: RequestHandler = async (req, res) => {
     location: job.location,
     remote: job.remote,
   });
-  await db.from('jobs').update({ requirements: extracted }).eq('id', job.id);
-  res.json(extracted);
+  const merged = { ...(job.requirements ?? {}), ...extracted };
+  await db.from('jobs').update({ requirements: merged }).eq('id', job.id);
+  res.json(merged);
 };
 
 // ---------------------------------------------------------------------------
@@ -896,14 +901,31 @@ export const enrichPending: RequestHandler = async (req, res) => {
   const limit = Math.min(Math.max(Number(req.query.limit ?? 50), 1), 200);
   const concurrency = Math.min(Math.max(Number(req.query.concurrency ?? 5), 1), 10);
 
-  const { data: pending, error } = await db
-    .from('jobs')
-    .select('id, title, description, required_skills, location')
-    .is('requirements', null)
-    .eq('is_active', true)
-    .limit(limit);
-  if (error) throw httpError(500, 'Database error');
-  if (!pending || pending.length === 0) {
+  // A job is "pending" when it has no requirements yet, OR when the only
+  // requirements it has are the lightweight metadata the HACP webhook writes
+  // at ingest time (ats_provider/h1b_sponsorship/salary_currency/skills_tags/
+  // experience_years_str — see hacpWebhook.controller.ts). That row is never
+  // null, so a plain `.is('requirements', null)` filter permanently skips
+  // every HACP-sourced job. `must_haves` is present on both the heuristic
+  // (jobParser.service.ts) and AI (ai.service.ts) output, so its absence is a
+  // reliable "not yet enriched" signal regardless of which path ran.
+  const { rows: pending, rowCount } = await pool.query<{
+    id: string;
+    title: string;
+    description: string | null;
+    required_skills: string[] | null;
+    location: string | null;
+    remote: boolean | null;
+    requirements: Record<string, unknown> | null;
+  }>(
+    `select id, title, description, required_skills, location, remote, requirements
+     from public.jobs
+     where is_active = $1
+       and (requirements is null or not (requirements ? 'must_haves'))
+     limit $2`,
+    [true, limit],
+  );
+  if (!pending || rowCount === 0) {
     res.json({ enriched: 0, total_pending: 0 });
     return;
   }
@@ -925,7 +947,10 @@ export const enrichPending: RequestHandler = async (req, res) => {
             location: job.location,
             remote: job.remote,
           });
-          const patch: any = { requirements: reqs };
+          // Merge onto whatever's already there (e.g. the HACP webhook's
+          // ats_provider/h1b_sponsorship/salary_currency metadata) instead of
+          // replacing wholesale, so an enrichment pass never destroys data.
+          const patch: any = { requirements: { ...(job.requirements ?? {}), ...reqs } };
           // Mirror Jobright: surface seniority/work model at the column level too.
           if (reqs.job_seniority) patch.level = reqs.job_seniority;
           // Also enrich the canonical required_skills column.
@@ -959,7 +984,10 @@ export const enrichOne: RequestHandler = async (req, res) => {
     required_skills: job.required_skills,
     location: job.location,
   });
-  const patch: any = { requirements: { ...reqs, _ai: true } };
+  // Merge onto whatever's already there (e.g. the HACP webhook's
+  // ats_provider/h1b_sponsorship/salary_currency metadata) instead of
+  // replacing wholesale, so re-enriching never destroys data.
+  const patch: any = { requirements: { ...(job.requirements ?? {}), ...reqs, _ai: true } };
   if (reqs.job_seniority) patch.level = reqs.job_seniority;
   if (reqs.required_skills?.length) patch.required_skills = reqs.required_skills;
   await db.from('jobs').update(patch).eq('id', job.id);
