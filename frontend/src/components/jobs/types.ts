@@ -49,6 +49,10 @@ export interface JobRow {
   rate_min?: number | null;
   rate_max?: number | null;
   description?: string | null;
+  /** Structured Markdown job summary -- see the matching field in lib/jobFormat.ts. */
+  description_summary?: string | null;
+  /** Non-AI fallback excerpt shown when description_summary isn't ready/failed. */
+  description_summary_backup?: string | null;
   required_skills?: string[] | null;
   posted_at?: string | null;
   created_at: string;

@@ -40,6 +40,12 @@ export interface Job {
   rate_min?: number | null;
   rate_max?: number | null;
   description?: string | null;
+  /** Structured Markdown job summary (overview, responsibilities, skills,
+   *  qualifications, quick-summary table) built by a local text extractor on
+   *  the Hermes box -- render via renderSummaryMarkdown(), not as plain text. */
+  description_summary?: string | null;
+  /** Non-AI fallback excerpt shown when description_summary isn't ready/failed. */
+  description_summary_backup?: string | null;
   required_skills?: string[] | null;
   posted_at?: string | null;
   created_at: string;
@@ -257,4 +263,114 @@ export function jdToSafeHtml(raw: string): string {
   };
   walk(doc.body, out);
   return out.innerHTML.replace(/(\s*<br\s*\/?>\s*){3,}/gi, '<br><br>').trim();
+}
+
+/**
+ * Convert the constrained Markdown subset the job-summary agent emits
+ * (## / ### headings, **bold**, "- " bullet lists, "| a | b |" tables,
+ * blank-line paragraphs -- see job_summary_agent.py on the Hermes box) into
+ * HTML safe for dangerouslySetInnerHTML. Unlike jdToSafeHtml (which
+ * sanitizes real HTML via DOMParser), there's no HTML to parse here -- all
+ * text content is escaped up front, then our own fixed set of tag rules is
+ * applied on top, so this can never re-interpret a `<script>` or other tag
+ * that ended up in the source text.
+ */
+export function renderSummaryMarkdown(md: string): string {
+  const escapeHtml = (s: string) =>
+    s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const escapeInline = (s: string) =>
+    escapeHtml(s).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+
+  let lines = md.replace(/\r\n/g, '\n').split('\n');
+  // The agent's own "# Company — Title" heading duplicates the page's
+  // existing title/company header shown directly above this section.
+  if (lines[0]?.trim().startsWith('# ')) lines = lines.slice(1);
+
+  const html: string[] = [];
+  let paragraph: string[] = [];
+  let inList = false;
+  let inTable = false;
+
+  const flushParagraph = () => {
+    if (paragraph.length) {
+      // A soft line break (no blank line between rows) keeps each metadata
+      // field ("**Company:** ...") on its own line instead of running them
+      // all together as one paragraph of text.
+      html.push(`<p>${paragraph.join('<br>')}</p>`);
+      paragraph = [];
+    }
+  };
+  const closeList = () => {
+    if (inList) {
+      html.push('</ul>');
+      inList = false;
+    }
+  };
+  const closeTable = () => {
+    if (inTable) {
+      html.push('</tbody></table>');
+      inTable = false;
+    }
+  };
+
+  for (const raw of lines) {
+    const line = raw.trim();
+
+    if (!line) {
+      flushParagraph();
+      closeList();
+      closeTable();
+      continue;
+    }
+
+    const heading = /^(#{2,3})\s+(.*)$/.exec(line);
+    if (heading) {
+      flushParagraph();
+      closeList();
+      closeTable();
+      const level = heading[1].length;
+      html.push(`<h${level}>${escapeInline(heading[2])}</h${level}>`);
+      continue;
+    }
+
+    const bullet = /^[-*]\s+(.*)$/.exec(line);
+    if (bullet) {
+      flushParagraph();
+      closeTable();
+      if (!inList) {
+        html.push('<ul>');
+        inList = true;
+      }
+      html.push(`<li>${escapeInline(bullet[1])}</li>`);
+      continue;
+    }
+
+    if (line.startsWith('|')) {
+      flushParagraph();
+      closeList();
+      const cells = line
+        .split('|')
+        .slice(1, -1)
+        .map((c) => c.trim());
+      if (cells.every((c) => /^:?-{2,}:?$/.test(c))) continue; // header separator row
+      if (!inTable) {
+        html.push('<table><thead><tr>');
+        html.push(cells.map((c) => `<th>${escapeInline(c)}</th>`).join(''));
+        html.push('</tr></thead><tbody>');
+        inTable = true;
+      } else {
+        html.push(`<tr>${cells.map((c) => `<td>${escapeInline(c)}</td>`).join('')}</tr>`);
+      }
+      continue;
+    }
+
+    closeList();
+    closeTable();
+    paragraph.push(escapeInline(line));
+  }
+  flushParagraph();
+  closeList();
+  closeTable();
+
+  return html.join('');
 }

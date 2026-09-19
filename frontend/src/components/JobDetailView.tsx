@@ -18,6 +18,7 @@ import {
   looksLikeHtml,
   prettyType,
   relative,
+  renderSummaryMarkdown,
   resolveApplyUrl,
 } from '../lib/jobFormat';
 
@@ -618,6 +619,39 @@ export function JobDetailView({
         {/* Main column */}
         <div className={clsx('space-y-4 min-w-0', !embedded && 'lg:col-span-3')}>
           <JobCopilot jobId={job.id} isConsultant={isConsultant} />
+
+          {(() => {
+            // Prefer the structured summary (a full Markdown document --
+            // overview, responsibilities, skills, qualifications, quick
+            // summary table); fall back to the plain-bullet excerpt (always
+            // populated, no dependency on the summary agent having run yet)
+            // so this section still renders while the real one is pending.
+            const summary = job.description_summary?.trim();
+            if (summary) {
+              return (
+                <Section title="✦ At a Glance">
+                  <div
+                    className="jd-prose text-sm text-ink"
+                    dangerouslySetInnerHTML={{ __html: renderSummaryMarkdown(summary) }}
+                  />
+                </Section>
+              );
+            }
+            const backup = job.description_summary_backup?.trim();
+            if (!backup) return null;
+            return (
+              <Section title="✦ At a Glance">
+                <Bullets
+                  items={backup
+                    .split('\n')
+                    .map((line: string) => line.replace(/^[-•*]\s*/, '').trim())
+                    .filter(Boolean)}
+                  marker="✦"
+                  tone="text-accent"
+                />
+              </Section>
+            );
+          })()}
 
           <JobDescriptionSections
             job={job}

@@ -378,6 +378,23 @@ body {
   font-weight: 600;
   color: var(--foreground);
 }
+.jd-prose table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 0.7rem;
+  font-size: 0.85rem;
+}
+.jd-prose th,
+.jd-prose td {
+  border: 1px solid var(--border);
+  padding: 0.35rem 0.5rem;
+  text-align: left;
+  vertical-align: top;
+}
+.jd-prose th {
+  font-weight: 600;
+  background: var(--surface-2);
+}
 
 /* Override browser's native dark-mode select rendering (color-scheme:dark gives
    selects a #6b6b6b background that fails contrast with our light text tokens). */

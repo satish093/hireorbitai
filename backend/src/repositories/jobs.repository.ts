@@ -1,13 +1,12 @@
 /**
  * Jobs repository.
  *
- * Owns: public.jobs (the upserted feed from every ingestion driver).
+ * Owns: public.jobs (the HACP webhook feed — see hacpWebhook.controller.ts).
  *
  * Caveats:
- *   - The ingestion service does its own bulk upserts in jobIngestion.service.ts
- *     because it batches at sizes the query builder would split awkwardly.
- *     That's fine — repositories are a guideline for HTTP-shaped reads, not a
- *     religion.
+ *   - The HACP webhook does its own bulk upserts because it batches at sizes
+ *     the query builder would split awkwardly. That's fine — repositories are
+ *     a guideline for HTTP-shaped reads, not a religion.
  */
 
 import { db } from '../config/db';
@@ -20,6 +19,8 @@ export interface JobRow {
   title: string;
   company_name: string;
   description: string | null;
+  description_summary: string | null;
+  description_summary_backup: string | null;
   location: string | null;
   remote: boolean;
   job_type: string | null;

@@ -41,6 +41,18 @@ const jobSchema = z
     ats_provider: z.string().max(50).nullish(),
     apply_url: z.string().max(2000).nullish(),
     full_description: z.string().max(20000).nullish(),
+    // Structured Markdown job summary (overview, responsibilities, skills,
+    // qualifications, quick-summary table) built by a local, non-AI text
+    // extractor — see agents/job_summary_agent.py on the Oracle box. Optional:
+    // stays absent for jobs pushed before that agent ran, or if a given row's
+    // description didn't parse. Capped well above the ~4.7k char max observed
+    // across real postings, with headroom for longer ones.
+    description_summary: z.string().max(8000).nullish(),
+    // Zero-cost fallback excerpt for description_summary (see
+    // backfill_backups() in job_summary_agent.py). Populated for nearly every
+    // job immediately, unlike description_summary which depends on the raw
+    // description actually containing parseable structure.
+    description_summary_backup: z.string().max(8000).nullish(),
   })
   .strict();
 
@@ -60,8 +72,8 @@ function parseSkills(raw?: string | null): string[] {
   }
 }
 
-// Mirrors safeApplyUrl() in jobIngestion.service.ts — only accept http(s)
-// URLs from an untrusted source; fall back to a search link otherwise.
+// Only accept http(s) URLs from an untrusted source; fall back to a search
+// link otherwise.
 function safeApplyUrl(raw: string | null | undefined, title: string, company: string): string {
   const s = (raw ?? '').trim();
   if (/^https?:\/\//i.test(s)) return s;
@@ -113,6 +125,8 @@ export const receiveSync: RequestHandler = async (req, res) => {
       title: j.title,
       company_name: j.company,
       description: j.full_description ?? null,
+      description_summary: j.description_summary ?? null,
+      description_summary_backup: j.description_summary_backup ?? null,
       location: j.location ?? null,
       remote,
       job_type: 'FTE',
@@ -127,8 +141,8 @@ export const receiveSync: RequestHandler = async (req, res) => {
       last_synced_at: new Date().toISOString(),
       // Metadata that has no dedicated column yet — kept alongside rather
       // than dropped. Stripped automatically below if the column is missing
-      // on a not-yet-migrated environment (same retry-and-strip pattern as
-      // jobIngestion.service.ts's upsertJobs()).
+      // on a not-yet-migrated environment (see database.md's retry-and-strip
+      // pattern).
       requirements: {
         ats_provider: j.ats_provider ?? null,
         experience_years_str: j.experience_years_str ?? null,
@@ -145,7 +159,13 @@ export const receiveSync: RequestHandler = async (req, res) => {
 
   if (error && /schema cache|column/i.test(error.message)) {
     const stripped = rows.map(
-      ({ publisher: _publisher, requirements: _requirements, ...rest }) => rest,
+      ({
+        publisher: _publisher,
+        requirements: _requirements,
+        description_summary: _summary,
+        description_summary_backup: _summaryBackup,
+        ...rest
+      }) => rest,
     );
     ({ error, count } = await db
       .from('jobs')
